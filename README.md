@@ -1,25 +1,33 @@
-# Neudron.github.io
+https://img.shields.io/badge/UHCV%20on%20Discord-8A2BE2
 
-This is my personal website that shows my web development skills and interests. You can see it at [https://neudron.github.io/].
+# Welcome to Neudron's Website!
 
-## Planned Features
+[![GitHub stars]] [![GitHub forks]] [![GitHub issues]] [![Twitter Follow]]
 
-- Responsive design for different screens and devices
-- Dark mode and light mode themes
-- Animated menu and scroll effects
-- Sections for about, skills, projects, and contact
-- Links to my social media and GitHub
+This is my personal website where I share my projects, skills, and interests with the world. You can find out more about me and what I do on this website.
 
-## Technologies
+## What's on this website?
 
-This project uses:
+- A responsive design that adapts to different screen sizes and devices
+- A dark mode that reduces eye strain and saves battery
+- An animated background that adds some flair and fun
+- Project cards that showcase my work and link to the source code and live demos
+- A contact form that lets you get in touch with me easily
 
-- HTML5
+## Is this website finished?
 
-## How to build
+[![Netlify Status]]
 
-To build this project locally, you need [Git]. Then, do this:
+Not yet. This website is still a work in progress. I am constantly adding new content and features to it. Stay tuned for more updates!
 
-1. Run `git clone https://github.com/Neudron/Neudron.github.io.git` in your terminal.
-2. Open `index.html` in your browser.
+## Where did I get the inspiration for this website?
 
+This website is based on the [Creative Portfolio Template] by [Start Bootstrap]. I modified it to suit my needs and preferences.
+
+## How can you contact me?
+
+You can find me on GitHub as [@Neudron]. Or fill out the contact form on my website. I would love to hear from you!
+
+## What license does this website use?
+
+[MIT]
