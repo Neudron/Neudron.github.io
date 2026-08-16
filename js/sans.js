@@ -967,7 +967,9 @@
     dogEl.hidden = false;
     requestAnimationFrame(function () { dogEl.classList.add('is-in'); });
     if (NEU.quest) NEU.quest.mark('dog');
-    totemSound();
+    /* No totemSound() here. It was firing on every line he speaks in
+       this path, and it is a "you nearly died" cue — it belongs to the
+       totem actually appearing (popTotem) and nowhere else. */
     say([
       "huh. you actually fed it.",
       "that's toby. he isn't mine. he isn't anyone's, really.",
@@ -1032,6 +1034,8 @@
      Cosmolight is the oldest interaction on the site, and taking it
      away is the only way the blackout means anything. */
   var dogTalks = 0, hasHammer = false, broken = false, hasClicker = false;
+  var stuck = false;              // jams the moment you are handed a hammer
+  var swBtn = document.getElementById('lightsToggle');
   var hammerChip  = document.getElementById('hammerChip');
   var clickerChip = document.getElementById('clickerChip');
   var darkChip    = document.getElementById('darkChip');
@@ -1053,17 +1057,24 @@
       hasHammer = true;
       showChip(hammerChip, true);
       if (NEU.quest) NEU.quest.mark('hammer');
+      /* The switch jams at the same moment. Being handed a tool and
+         then finding something broken is a much better motivation than
+         being handed a tool and told to go vandalise a working one. */
+      stuck = true;
+      if (swBtn) swBtn.classList.add('is-stuck');
       setTimeout(function () {
         say(["he spat out a hammer.",
-             "i'd point that at something that deserves it."]);
+             "huh. cosmolight's jammed too. that's new.",
+             "you've got a hammer. i'm sure it'll be fine."]);
       }, 1500);
     }
   }
   if (dogBtn) dogBtn.addEventListener('click', talkDog);
 
   function smashLight() {
-    hasHammer = false; broken = true;
+    hasHammer = false; broken = true; stuck = false;
     showChip(hammerChip, false);
+    if (swBtn) { swBtn.classList.remove('is-stuck'); swBtn.classList.add('is-smashed'); }
     document.body.classList.add('is-blackout');
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     if (NEU.quest) NEU.quest.mark('smash');
@@ -1077,6 +1088,8 @@
     showChip(clickerChip, true);
   };
 
+  NEU.fitClicker = function () { fitClicker(); };
+  NEU.hasClicker = function () { return hasClicker; };
   function fitClicker() {
     hasClicker = false; broken = false;
     showChip(clickerChip, false);
@@ -1084,7 +1097,7 @@
     document.body.classList.remove('is-blackout');
     if (NEU.dark) NEU.dark.close();
     if (NEU.quest) NEU.quest.mark('fixed');
-    totemSound();
+    if (swBtn) swBtn.classList.remove('is-smashed');
     say(["huh. it fits.",
          "wax free. still not sure what wax was doing in there."]);
   }
@@ -1093,14 +1106,28 @@
      true means "handled, don't run the normal toggle" — which is how
      one control ends up meaning four different things depending on
      what you are carrying. */
+  /* One control, four meanings, in order of precedence. Note that
+     fitting the clicker is NOT here any more — the repair happens at
+     the switch's guts down in the dark, not at the faceplate. */
   NEU.switchHook = function () {
-    if (broken && hasClicker) { fitClicker(); return true; }
     if (broken) {
       if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
-      say(["that's a hole in the wall now, buddy."]);
+      say(hasClicker
+        ? ["you're holding the part. it doesn't go in from out here."]
+        : ["that's a hole in the wall now, buddy."]);
       return true;
     }
-    if (hasHammer) { smashLight(); return true; }
+    if (stuck && hasHammer) {
+      say(["...you hit it.", "you hit the jammed light with a hammer."]);
+      smashLight();
+      return true;
+    }
+    if (stuck) {
+      if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
+      say(["it's stuck. won't budge either way.",
+           "you'd need to hit it with something. hypothetically."]);
+      return true;
+    }
     return false;
   };
 

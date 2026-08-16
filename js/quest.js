@@ -31,6 +31,7 @@
   ];
 
   var done = {}, counts = {};
+  var locked = false;                 // set while a sequence owns the screen
   var panel = document.getElementById('quest');
   var list  = document.getElementById('questList');
   var tally = document.getElementById('questTally');
@@ -97,10 +98,25 @@
       render();
     },
     has: function (id) { return !!done[id]; },
-    open: function () { if (panel) { panel.classList.add('is-open');
-                                     if (toggle) toggle.setAttribute('aria-expanded', 'true'); } },
-    hide: function () { if (panel) { panel.classList.remove('is-open');
-                                     if (toggle) toggle.setAttribute('aria-expanded', 'false'); } },
+    open: function () {
+      if (locked || !panel) return;
+      panel.classList.add('is-open');
+      if (toggle) toggle.setAttribute('aria-expanded', 'true');
+    },
+    hide: function () {
+      if (!panel) return;
+      panel.classList.remove('is-open');
+      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    },
+    /* Sequences call lock(true) on entry and lock(false) on exit. It
+       hides the tab as well as the panel — a tab you cannot click is
+       worse than no tab, and the bullet hell and the blackout both own
+       the whole screen while they run. */
+    lock: function (on) {
+      locked = !!on;
+      if (panel) panel.classList.remove('is-open');
+      if (toggle) { toggle.hidden = !!on; toggle.setAttribute('aria-expanded', 'false'); }
+    },
     reset: function () { done = {}; counts = {}; render(); }
   };
 
@@ -109,16 +125,23 @@
       panel.classList.contains('is-open') ? NEU.quest.hide() : NEU.quest.open();
     });
   }
-  /* `o` toggles it, but never while something else owns the keyboard —
-     the bullet hell reads letters for movement and the dev console
-     reads them as text. */
+  var close = document.getElementById('questClose');
+  if (close) close.addEventListener('click', function () { NEU.quest.hide(); });
+
+  /* TAB toggles it. preventDefault is required — tab's default job is
+     moving focus, and letting both happen means the panel opens and
+     the focus ring simultaneously jumps somewhere off screen.
+     Suppressed inside inputs so the dev console can still be typed in,
+     and while a sequence is locked. */
   addEventListener('keydown', function (e) {
-    if (e.key !== 'o' && e.key !== 'O') return;
+    if (e.key !== 'Tab') return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     var t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+    if (locked) return;
     if (NEU.bullet && NEU.bullet.running) return;
     if (NEU.dark && NEU.dark.running) return;
+    e.preventDefault();
     panel.classList.contains('is-open') ? NEU.quest.hide() : NEU.quest.open();
   });
 

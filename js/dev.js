@@ -42,6 +42,7 @@
       log('dog    summon him directly');
       log('dark   open the blackout');
       log('warp   stand at the grey door');
+      log('sw     stand on the switch (the way out)');
       log('reset  back to the start');
       log('close  esc also works');
     },
@@ -71,6 +72,10 @@
     },
     warp: function () {
       if (NEU.dark) { NEU.dark.warp(); log('at the door.'); }
+      else log('nope');
+    },
+    sw: function () {
+      if (NEU.dark && NEU.dark.warpSw) { NEU.dark.warpSw(); log('standing on the switch.'); }
       else log('nope');
     },
     reset: function () {

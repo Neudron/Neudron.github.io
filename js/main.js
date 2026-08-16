@@ -297,6 +297,7 @@
         box.classList.remove('is-on', 'is-pop');
         void box.offsetWidth;              // reflow, so the animation replays
         box.classList.add('is-on');
+        if (NEU.quest) NEU.quest.lock(true);
 
         /* Minecraft picks a random drift target each time the totem
            fires, which is why no two pops travel the same way. Same
@@ -313,6 +314,7 @@
              its resting transform for a frame. */
           tEnd = setTimeout(function () {
             box.classList.remove('is-on', 'is-pop');
+            if (NEU.quest) NEU.quest.lock(false);
           }, 2000);
         }, 1500);
       }

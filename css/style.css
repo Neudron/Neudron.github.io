@@ -859,10 +859,13 @@ body.is-playing { overflow: hidden; }
 }
 
 /* ── the dog ──────────────────────────────────────────────────────*/
+/* Absolute inside .sec (already position:relative), so he sits at the
+   bottom of the last section — the bottom of the PAGE — and scrolls
+   with it instead of following the viewport. */
 .dog {
-  position: fixed;
+  position: absolute;
   right: clamp(84px, 12vw, 130px);
-  bottom: clamp(14px, 3vh, 34px);
+  bottom: clamp(20px, 5vh, 60px);
   z-index: 40;
   opacity: 0; transform: translateY(14px) scale(.7);
   transition: opacity .5s ease, transform .5s var(--bounce);
@@ -946,6 +949,31 @@ body.is-blackout::before {
    turns discovery into a checklist, hiding it means nobody knows there
    IS a chain. */
 .quest__i.is-veiled { opacity: .38; }
+
+
+/* the switch, once it jams and once it is beyond jamming */
+.sw.is-stuck .sw__lever {
+  transform: translateY(11px);          /* wedged halfway, neither on nor off */
+  background: var(--blood);
+  transition: none;
+}
+.sw.is-stuck .sw__plate { border-color: var(--blood); }
+.sw.is-smashed .sw__plate {
+  border-color: var(--blood);
+  background: repeating-linear-gradient(45deg,
+    var(--void) 0 4px, var(--ink) 4px 8px);
+}
+.sw.is-smashed .sw__lever { opacity: 0; }   /* the lever is simply gone */
+
+/* objectives close button */
+.quest__x {
+  position: absolute; top: 10px; right: 10px;
+  width: 26px; height: 26px; padding: 0;
+  background: none; border: 2px solid var(--edge);
+  color: var(--text); font: 400 16px/1 var(--font);
+  cursor: pointer;
+}
+.quest__x:hover { border-color: var(--accent); }
 
 /* ── dev console ──────────────────────────────────────────────────*/
 .dev {

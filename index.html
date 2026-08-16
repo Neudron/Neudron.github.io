@@ -155,12 +155,6 @@
   </div>
 </div>
 
-<!-- He is clickable. Enough times and he gives something up. -->
-<div class="dog" id="dog" hidden>
-  <button class="dog__btn" id="dogBtn" aria-label="the dog">
-    <img src="img/dog.svg" alt="" width="104" height="91">
-  </button>
-</div>
 
 <!-- ═══ after the light ════════════════════════════════════════════ -->
 <div class="dk" id="dk" hidden>
@@ -170,8 +164,9 @@
 </div>
 
 <!-- ═══ objectives ═════════════════════════════════════════════════ -->
-<button class="quest__t" id="questToggle" aria-expanded="false">objectives</button>
+<button class="quest__t" id="questToggle" aria-expanded="false">objectives &middot; tab</button>
 <aside class="quest" id="quest" aria-label="Objectives">
+  <button class="quest__x" id="questClose" aria-label="Close objectives">&#215;</button>
   <h2 class="quest__h">objectives <span class="quest__n" id="questTally">0/11</span></h2>
   <ul class="quest__l" id="questList"></ul>
 </aside>
@@ -249,6 +244,16 @@
 
 <!-- ═══ 04 · contact ═══════════════════════════════════════════════ -->
 <section class="sec contact" id="contact">
+  <!-- He lives at the bottom of the page, not pinned to the viewport.
+       Absolutely positioned inside .sec (which is position:relative
+       already) rather than making <body> relative — a page-tall
+       absolute layer on a relative body is exactly what broke
+       scrolling when the starfield tried it. -->
+  <div class="dog" id="dog" hidden>
+    <button class="dog__btn" id="dogBtn" aria-label="the dog">
+      <img src="img/dog.svg" alt="" width="104" height="91">
+    </button>
+  </div>
   <div class="stage">
     <svg class="el el--star-d" viewBox="0 0 100 100" aria-hidden="true"><path d="M13.5 34.5 C15.7 31.1 35.5 37.7 42.2 33.4 C48.9 29.1 50.2 7.8 53.6 8.6 C57.0 9.4 56.5 32.2 62.8 38.3 C69.1 44.4 90.5 42.0 91.4 45.2 C92.3 48.5 71.6 50.1 68.4 57.9 C65.1 65.7 75.8 90.5 72.0 92.1 C68.2 93.8 53.6 69.7 45.5 67.9 C37.5 66.1 26.5 83.7 23.7 81.3 C20.9 78.9 30.4 61.6 28.7 53.8 C27.0 46.0 11.2 37.9 13.5 34.5Z" fill="currentColor"/></svg>
 

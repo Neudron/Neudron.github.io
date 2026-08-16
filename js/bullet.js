@@ -478,12 +478,14 @@
   function open() {
     wrap.hidden = false;
     document.body.classList.add('is-playing');
+    if (NEU.quest) NEU.quest.lock(true);
     begin();
   }
   function close() {
     running = false;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
+    if (NEU.quest) NEU.quest.lock(false);
   }
 
   var startBtn = document.getElementById('bhStart');
