@@ -43,6 +43,9 @@
       log('dark   open the blackout');
       log('warp   stand at the grey door');
       log('sw     stand on the switch (the way out)');
+      log('sleep  skip to the sleeping scene');
+      log('con    make the console appear');
+      log('boss   open the tv fight');
       log('reset  back to the start');
       log('close  esc also works');
     },
@@ -78,6 +81,9 @@
       if (NEU.dark && NEU.dark.warpSw) { NEU.dark.warpSw(); log('standing on the switch.'); }
       else log('nope');
     },
+    sleep: function () { if (NEU.devSleep) { NEU.devSleep(); log('lights out for them.'); } },
+    con:   function () { if (NEU.devSwitch) { NEU.devSwitch(); log('console is there.'); } },
+    boss:  function () { if (NEU.boss) { hide(); NEU.boss.open(); log('good luck.'); } },
     reset: function () {
       if (NEU.devReset) { NEU.devReset(); log('reset.'); }
       else log('nope');

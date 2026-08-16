@@ -83,8 +83,31 @@
     }
   }
 
+  /* Lightning glyph stamped on the electric blaster's brow, so the
+     blue one is distinguishable at a glance and not only by colour —
+     colour alone is the classic way to make a mechanic unreadable. */
+  var BOLT = [
+    '..##.',
+    '.##..',
+    '####.',
+    '.##..',
+    '.#...'
+  ];
+
   var blasters = [];
   var BL_CHARGE = 0.85, BL_FIRE = 0.42, BL_HALF = 17;
+
+  /* ── the electric blaster ─────────────────────────────────────────
+     Its rule is INVERTED and that is the whole point: it hurts you if
+     you are moving and charges the console if you are not. Every other
+     thing in this room punishes standing still, so the correct play
+     here is the one the last twenty seconds trained out of you.
+
+     Charge survives between runs — asking someone to take both hits in
+     a single attempt would make a joke into a grind. */
+  var ELEC_EVERY = 4.4;
+  var charge = 0, chargeFx = 0;
+  NEU.charge = function () { return charge; };
   var dying = 0, shards = [];
 
   var running = false, won = false;
@@ -125,7 +148,8 @@
       { kind: 'aimed',  every: 0.95, next: 1.6, ang: 0 },
       { kind: 'spiral', every: 0.075, next: 5.0, ang: 0 },
       { kind: 'wall',   every: 2.60, next: 10.0, ang: 0 },
-      { kind: 'blaster',every: 3.10, next: 7.5,  ang: 0 }
+      { kind: 'blaster',every: 3.10, next: 7.5,  ang: 0 },
+      { kind: 'elec',   every: ELEC_EVERY, next: 4.2, ang: 0 }
     ];
     blasters = [];
   }
@@ -195,6 +219,17 @@
         bl.from = Math.random() < 0.5 ? 't' : 'b';
       }
       blasters.push(bl);
+    } else if (e.kind === 'elec') {
+      if (charge >= 100) return;          // nothing left to charge
+      var eh = Math.random() < 0.5, be = { horiz: eh, t: 0, elec: true, took: false };
+      if (eh) {
+        be.lane = Math.min(Math.max(py + (Math.random() - 0.5) * 80, AY + 34), AY + AH - 34);
+        be.from = Math.random() < 0.5 ? 'l' : 'r';
+      } else {
+        be.lane = Math.min(Math.max(px + (Math.random() - 0.5) * 80, AX + 34), AX + AW - 34);
+        be.from = Math.random() < 0.5 ? 't' : 'b';
+      }
+      blasters.push(be);
     } else if (e.kind === 'wall') {
       if (t < 10) return;
       /* A line with one gap. The gap is the entire point — a wall with
@@ -265,9 +300,30 @@
       bl.t += dt;
       if (bl.t > BL_CHARGE + BL_FIRE) continue;
       kb.push(bl);
-      if (inv <= 0 && bl.t > BL_CHARGE) {
+      if (bl.t > BL_CHARGE) {
         var off = bl.horiz ? Math.abs(py - bl.lane) : Math.abs(px - bl.lane);
-        if (off < BL_HALF + PLAYER_R) {
+        var inBeam = off < BL_HALF + PLAYER_R;
+
+        if (bl.elec) {
+          /* Standing still is safe AND is what charges it. `held` is
+             true only while no movement key is down — checking speed
+             would let you cheese it by tapping between frames. */
+          var held = !(keys.left || keys.right || keys.up || keys.down);
+          if (inBeam && !bl.took) {
+            if (held) {
+              bl.took = true;
+              charge = Math.min(100, charge + 50);
+              chargeFx = performance.now();
+              if (NEU.quest) NEU.quest.bump('charge', charge / 50);
+              if (NEU.tvState) NEU.tvState();
+            } else if (inv <= 0) {
+              bl.took = true;
+              hp--; inv = IFRAMES;
+              if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
+              if (hp <= 0) { startDeath(); return; }
+            }
+          }
+        } else if (inv <= 0 && inBeam) {
           hp--; inv = IFRAMES;
           if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
           if (hp <= 0) { startDeath(); return; }
@@ -312,23 +368,26 @@
       if (bl.horiz) { sx2 = bl.from === 'l' ? AX - 26 : AX + AW + 26; sy2 = bl.lane; }
       else          { sx2 = bl.lane; sy2 = bl.from === 't' ? AY - 26 : AY + AH + 26; }
 
+      var ec = bl.elec ? '#4FC3F7' : COL.bone;
       if (charging) {
         if (((bl.t * 20) | 0) % 2 === 0) {
-          ctx.fillStyle = 'rgba(237,231,222,0.22)';
+          ctx.fillStyle = bl.elec ? 'rgba(79,195,247,0.30)' : 'rgba(237,231,222,0.22)';
           if (bl.horiz) ctx.fillRect(AX, (bl.lane - 1) | 0, AW, 2);
           else          ctx.fillRect((bl.lane - 1) | 0, AY, 2, AH);
         }
-        stamp(SKULL, sx2, sy2, 2 + (k * 2) | 0, COL.bone, COL.void_);
+        stamp(SKULL, sx2, sy2, 2 + (k * 2) | 0, ec, COL.void_);
+        if (bl.elec) stamp(BOLT, sx2, sy2 - 20, 3, '#FFF06A', COL.void_);
       } else {
         var f = 1 - (bl.t - BL_CHARGE) / BL_FIRE;      // beam narrows as it dies
         var hh = (BL_HALF * f) | 0;
-        ctx.fillStyle = COL.bone;
+        ctx.fillStyle = ec;
         if (bl.horiz) ctx.fillRect(AX, (bl.lane - hh) | 0, AW, hh * 2);
         else          ctx.fillRect((bl.lane - hh) | 0, AY, hh * 2, AH);
-        ctx.fillStyle = '#FFFFFF';
+        ctx.fillStyle = bl.elec ? '#CFF3FF' : '#FFFFFF';
         if (bl.horiz) ctx.fillRect(AX, (bl.lane - hh / 3) | 0, AW, Math.max(2, (hh / 1.5) | 0));
         else          ctx.fillRect((bl.lane - hh / 3) | 0, AY, Math.max(2, (hh / 1.5) | 0), AH);
-        stamp(SKULL, sx2, sy2, 4, COL.bone, COL.void_);
+        stamp(SKULL, sx2, sy2, 4, ec, COL.void_);
+        if (bl.elec) stamp(BOLT, sx2, sy2 - 26, 3, '#FFF06A', COL.void_);
       }
     }
 
@@ -350,6 +409,31 @@
     ctx.fillText('HP ' + Math.max(0, hp) + '/3', AX, AY + AH + 12);
     var left = Math.max(0, SURVIVE - t).toFixed(1);
     ctx.fillText(left + 's', AX + AW - 44, AY + AH + 12);
+    if (charge > 0) {
+      ctx.fillStyle = '#4FC3F7';
+      ctx.fillText('CHG ' + charge + '%', AX + (AW / 2 - 44) | 0, AY + AH + 12);
+    }
+
+    /* the charge cutscene: centre screen, unmissable, ~1.6s */
+    if (chargeFx && performance.now() - chargeFx < 1600) {
+      var e2 = (performance.now() - chargeFx) / 1600;
+      var bw2 = 210, bh2 = 96;
+      var bx2 = ((innerWidth - bw2) / 2) | 0, by2 = ((innerHeight - bh2) / 2) | 0;
+      ctx.globalAlpha = e2 > 0.8 ? (1 - e2) / 0.2 : 1;
+      ctx.fillStyle = COL.void_;  ctx.fillRect(bx2 - 10, by2 - 10, bw2 + 20, bh2 + 46);
+      ctx.fillStyle = '#4FC3F7';
+      ctx.fillRect(bx2 - 10, by2 - 10, bw2 + 20, 3);
+      ctx.fillRect(bx2 - 10, by2 + bh2 + 33, bw2 + 20, 3);
+      ctx.fillStyle = '#22222E'; ctx.fillRect(bx2, by2, bw2, bh2);
+      ctx.fillStyle = '#4FC3F7';
+      ctx.fillRect(bx2 + 6, by2 + 6, ((bw2 - 12) * (charge / 100) * Math.min(1, e2 * 3)) | 0, bh2 - 12);
+      ctx.fillStyle = COL.bone;
+      ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('CHARGING  ' + charge + '%', innerWidth / 2, by2 + bh2 + 12);
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    }
   }
 
   /* ── start / finish ───────────────────────────────────────────────*/

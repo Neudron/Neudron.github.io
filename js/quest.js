@@ -27,7 +27,12 @@
     { id: 'greydoor',text: 'find the door in the dark' },
     { id: 'answers', text: 'hear all four answers', count: 4 },
     { id: 'clicker', text: 'recover the clicker' },
-    { id: 'fixed',   text: 'put the light back' }
+    { id: 'fixed',   text: 'put the light back' },
+    { id: 'sleep',   text: 'let them rest' },
+    { id: 'console', text: 'notice what turned up' },
+    { id: 'charge',  text: 'charge it the hard way', count: 2 },
+    { id: 'docked',  text: 'dock it' },
+    { id: 'spared',  text: 'finish the fight' }
   ];
 
   var done = {}, counts = {};

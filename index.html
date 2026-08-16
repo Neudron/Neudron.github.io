@@ -36,7 +36,8 @@
 <noscript><style>
   .boot, .ctl, .glass, .stars, .cue, .cat,
   .sans, .sword, .tbox, .chip, .panel, .keyobj, .swcue,
-  .bh, .dog, .dev, .chips, .dk, .quest, .quest__t { display: none !important; }
+  .bh, .dog, .dev, .chips, .dk, .quest, .quest__t,
+  .sleep, .tv, .pethand, .boss { display: none !important; }
   body.is-booting { overflow: auto !important; }
   .lay, .el { opacity: 1 !important; transform: none !important; }
 </style></noscript>
@@ -132,12 +133,6 @@
     <img src="img/sword-key.svg" alt="" width="16" height="40">
     <span>Broken hero key</span>
   </div>
-  <!-- permanent once the door is open: the door is on a cube face at
-       the top of the page you have to rotate to see. -->
-  <button class="chip chip--btn" id="roomChip" hidden>
-    <img src="img/sword-key.svg" alt="" width="14" height="35">
-    <span>inside</span>
-  </button>
   <div class="chip" id="foodChip" hidden>
     <img src="img/dog.svg" alt="" width="22" height="19">
     <span>dog food?</span>
@@ -170,6 +165,16 @@
   <h2 class="quest__h">objectives <span class="quest__n" id="questTally">0/11</span></h2>
   <ul class="quest__l" id="questList"></ul>
 </aside>
+
+<!-- ═══ what's on the television ═══════════════════════════════════ -->
+<div class="boss" id="boss" hidden>
+  <canvas id="bossCanvas"></canvas>
+  <img id="bossSans" src="img/Sans_sprite.webp" alt="" hidden>
+  <button class="bh__quit" id="bossQuit">esc</button>
+</div>
+
+<!-- swipes down on every pet -->
+<img class="pethand" id="petHand" src="img/hand.svg" alt="" hidden aria-hidden="true">
 
 <!-- ═══ dev ════════════════════════════════════════════════════════
      Ctrl + Shift + ` — see js/dev.js for why that combination. -->
@@ -254,6 +259,23 @@
       <img src="img/dog.svg" alt="" width="104" height="91">
     </button>
   </div>
+
+  <!-- Everyone asleep once the light is back. The switch turns up
+       beside them on a later visit; the tv is to their right. -->
+  <div class="sleep" id="sleep" hidden>
+    <img class="sleep__blanket" src="img/blanket.svg" alt="">
+    <img class="sleep__sans" src="img/Sans_sprite.webp" alt="">
+    <img class="sleep__dog" src="img/dog.svg" alt="">
+    <span class="zzz zzz--1" aria-hidden="true">Z</span>
+    <span class="zzz zzz--2" aria-hidden="true">Z</span>
+    <span class="zzz zzz--3" aria-hidden="true">Z</span>
+    <img class="sleep__sw" id="sleepSwitch" src="img/switch2.svg" alt="" hidden>
+  </div>
+
+  <button class="tv" id="tv" hidden aria-label="the television">
+    <img src="img/tv.svg" alt="">
+    <span class="tv__lbl" id="tvLbl">dock</span>
+  </button>
   <div class="stage">
     <svg class="el el--star-d" viewBox="0 0 100 100" aria-hidden="true"><path d="M13.5 34.5 C15.7 31.1 35.5 37.7 42.2 33.4 C48.9 29.1 50.2 7.8 53.6 8.6 C57.0 9.4 56.5 32.2 62.8 38.3 C69.1 44.4 90.5 42.0 91.4 45.2 C92.3 48.5 71.6 50.1 68.4 57.9 C65.1 65.7 75.8 90.5 72.0 92.1 C68.2 93.8 53.6 69.7 45.5 67.9 C37.5 66.1 26.5 83.7 23.7 81.3 C20.9 78.9 30.4 61.6 28.7 53.8 C27.0 46.0 11.2 37.9 13.5 34.5Z" fill="currentColor"/></svg>
 
@@ -290,6 +312,7 @@
      loads after sans.js. dev.js drives both and goes last. -->
 <script src="js/bullet.js"></script>
 <script src="js/dark.js"></script>
+<script src="js/boss.js"></script>
 <script src="js/dev.js"></script>
 <script type="module" src="js/scene.js"></script>
 </body>

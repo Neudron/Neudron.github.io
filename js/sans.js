@@ -537,6 +537,7 @@
   var hideT = null;
 
   function showSans() {
+    if (asleep) { maybeSwitch(); if (NEU.tvState) NEU.tvState(); return; }
     clearTimeout(hideT);
     sans.hidden = false;
     requestAnimationFrame(function () { sans.classList.add('is-in'); });
@@ -890,7 +891,6 @@
      The chip is the actual answer to "there's no way back in". The
      unlocked door is the consistent one. */
   var doorOpened = false;
-  var roomChip = document.getElementById('roomChip');
 
   function unlockDoor() {
     if (doorOpened) return;
@@ -898,9 +898,7 @@
     NEU.doorOpen = true;
     if (NEU.doorGlow) NEU.doorGlow(true);   // stays lit: it is usable, not locked
     if (NEU.quest) NEU.quest.mark('door');
-    showChip(roomChip, true);
   }
-  if (roomChip) roomChip.addEventListener('click', function () { openPanel(); });
 
   NEU.tryDoor = function () {
     if (doorOpened) { openPanel(); return; }
@@ -1024,6 +1022,8 @@
   };
   NEU.devOpenRoom = function () { unlockDoor(); openPanel(); };
   NEU.devDog = function () { hasFood = true; summonDog(); };
+  NEU.devSleep = function () { goToSleep(); };
+  NEU.devSwitch = function () { goToSleep(); switchSeen = false; maybeSwitch(); };
   NEU.devReset = function () { location.reload(); };
 
   /* ── the dog, the hammer, and the light ─────────────────────────
@@ -1040,6 +1040,25 @@
   var clickerChip = document.getElementById('clickerChip');
   var darkChip    = document.getElementById('darkChip');
   var dogBtn      = document.getElementById('dogBtn');
+  var petHand     = document.getElementById('petHand');
+  var sleepEl     = document.getElementById('sleep');
+  var sleepSw     = document.getElementById('sleepSwitch');
+  var tvEl        = document.getElementById('tv');
+  var tvLbl       = document.getElementById('tvLbl');
+  var asleep = false, switchSeen = false, docked = false;
+
+  /* The hand lands where the dog actually is rather than at a fixed
+     spot, so it reads as petting THAT dog and not as a cursor. */
+  function petSwipe() {
+    if (!petHand || !dogBtn || reduced) return;
+    var r = dogBtn.getBoundingClientRect();
+    petHand.hidden = false;
+    petHand.style.left = (r.left + r.width / 2) + 'px';
+    petHand.style.top  = (r.top + r.height * 0.34) + 'px';
+    petHand.classList.remove('is-pet');
+    void petHand.offsetWidth;
+    petHand.classList.add('is-pet');
+  }
 
   var DOGTALK = [
     "he's looking at you.",
@@ -1050,6 +1069,7 @@
   ];
 
   function talkDog() {
+    petSwipe();
     if (hasHammer || broken) { say(["he's out of hammers."]); return; }
     say([DOGTALK[Math.min(dogTalks, DOGTALK.length - 1)]]);
     dogTalks++;
@@ -1062,6 +1082,8 @@
          being handed a tool and told to go vandalise a working one. */
       stuck = true;
       if (swBtn) swBtn.classList.add('is-stuck');
+      /* He stops fidgeting once he has given the thing up. */
+      if (dogEl) dogEl.classList.add('is-settled');
       setTimeout(function () {
         say(["he spat out a hammer.",
              "huh. cosmolight's jammed too. that's new.",
@@ -1098,6 +1120,8 @@
     if (NEU.dark) NEU.dark.close();
     if (NEU.quest) NEU.quest.mark('fixed');
     if (swBtn) swBtn.classList.remove('is-smashed');
+    /* Everyone has had a long day. */
+    setTimeout(goToSleep, 2200);
     say(["huh. it fits.",
          "wax free. still not sure what wax was doing in there."]);
   }
@@ -1135,8 +1159,65 @@
     if (NEU.dark) NEU.dark.open();
   });
 
+  /* ── the long sleep ─────────────────────────────────────────────
+     Nobody leaves. The console turns up beside them on a LATER visit
+     rather than immediately, so returning to the page has a reason to
+     be interesting a second time. */
+  function goToSleep() {
+    if (asleep) return;
+    asleep = true;
+    if (dogEl)   { dogEl.classList.remove('is-in'); setTimeout(function () { dogEl.hidden = true; }, 520); }
+    sans.classList.remove('is-in');
+    setTimeout(function () { sans.hidden = true; }, 520);
+    if (sleepEl) {
+      sleepEl.hidden = false;
+      requestAnimationFrame(function () { sleepEl.classList.add('is-in'); });
+    }
+    if (tvEl) {
+      tvEl.hidden = false;
+      requestAnimationFrame(function () { tvEl.classList.add('is-in'); });
+    }
+    if (NEU.quest) NEU.quest.mark('sleep');
+  }
+
+  /* Called by the observer: the second time you come back to them. */
+  function maybeSwitch() {
+    if (!asleep || switchSeen || !sleepSw) return;
+    switchSeen = true;
+    sleepSw.hidden = false;
+    if (NEU.quest) NEU.quest.mark('console');
+    say(["...", "that wasn't there before."]);
+  }
+
+  function tvState() {
+    if (!tvLbl) return;
+    var pct = NEU.charge ? NEU.charge() : 0;
+    if (docked)        tvLbl.textContent = 'playing';
+    else if (pct >= 100) tvLbl.textContent = 'dock it';
+    else if (switchSeen) tvLbl.textContent = pct + '% — flat';
+    else               tvLbl.textContent = 'dock';
+  }
+  NEU.tvState = tvState;
+
+  if (tvEl) tvEl.addEventListener('click', function () {
+    if (!switchSeen) { say(["a television. nothing to put in it."]); return; }
+    var pct = NEU.charge ? NEU.charge() : 0;
+    if (pct < 100) {
+      say(["it's flat. " + pct + "%.",
+           "something in that room hits hard enough to charge it. hold still."]);
+      return;
+    }
+    docked = true;
+    tvEl.classList.add('is-live');
+    tvState();
+    if (NEU.quest) NEU.quest.mark('docked');
+    if (NEU.boss) NEU.boss.open();
+  });
+
   NEU.sans = {
     get state()   { return state; },
+    get asleep()  { return asleep; },
+    get switchSeen() { return switchSeen; },
     get hasHammer(){ return hasHammer; },
     get broken()  { return broken; },
     get hasClicker(){ return hasClicker; },

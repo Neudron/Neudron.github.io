@@ -55,6 +55,11 @@
   /* Determination Mono is the in-game text; Sans is its variant. */
   --font:  "Determination Mono", "Pixelify Sans", ui-monospace, monospace;
   --font-talk: 'Undertale Sans', 'Comic Sans MS', 'Comic Neue', cursive;
+  /* Papyrus for the objectives panel. It is the one place a second
+     in-game face belongs: a list of tasks is not the site's voice, it
+     is an overlay on top of it, and giving it its own typeface stops
+     it reading as page content. The kit ships it; nothing new loads. */
+  --font-quest: 'Undertale Papyrus', 'Determination Mono', 'Pixelify Sans', monospace;
   --font-display: "Determination Sans", "Determination Mono", "Pixelify Sans", ui-monospace, monospace;
 
   --bounce: cubic-bezier(.34, 1.36, .64, 1);
@@ -889,6 +894,81 @@ body.is-playing { overflow: hidden; }
             line-height: 0; cursor: pointer; }
 .dog__btn:focus-visible { outline: 2px solid var(--edge); outline-offset: 5px; }
 
+
+/* ── the dog, awake then asleep ───────────────────────────────────
+   The idle only runs until he gives up the hammer. An animation that
+   never stops stops reading as alive and starts reading as a loop. */
+.dog__btn img { animation: dogIdle 1.9s steps(2, end) infinite; }
+.dog.is-settled .dog__btn img { animation: none; }
+@keyframes dogIdle {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50%      { transform: translateY(-2px) scaleY(1.04); }
+}
+
+/* the petting hand: one swipe per pet, restarted by class toggling */
+.pethand {
+  position: fixed; z-index: 46;
+  width: 58px; height: auto;
+  image-rendering: pixelated;
+  pointer-events: none;
+  opacity: 0;
+}
+.pethand.is-pet { animation: petSwipe .52s ease-out; }
+@keyframes petSwipe {
+  0%   { opacity: 0; transform: translate(-50%, -150%) rotate(-8deg); }
+  22%  { opacity: 1; transform: translate(-50%, -96%)  rotate(-2deg); }
+  55%  { opacity: 1; transform: translate(-50%, -74%)  rotate(3deg); }
+  78%  { opacity: 1; transform: translate(-50%, -92%)  rotate(-1deg); }
+  100% { opacity: 0; transform: translate(-50%, -140%) rotate(-6deg); }
+}
+
+/* ── asleep ───────────────────────────────────────────────────────*/
+.sleep {
+  position: absolute;
+  right: clamp(72px, 11vw, 150px);
+  bottom: clamp(20px, 5vh, 60px);
+  z-index: 40;
+  width: 250px; height: 140px;
+  opacity: 0; transition: opacity .7s ease;
+}
+.sleep.is-in { opacity: 1; }
+.sleep img { position: absolute; image-rendering: pixelated; }
+.sleep__blanket { left: 0; bottom: 0; width: 250px; }
+.sleep__sans    { left: 26px;  bottom: 16px; width: 54px;  transform: rotate(-90deg); }
+.sleep__dog     { left: 108px; bottom: 20px; width: 92px; }
+.sleep__sw      { left: 196px; bottom: 22px; width: 46px; }
+.zzz {
+  position: absolute;
+  font: 400 16px/1 var(--font-quest);
+  color: var(--dim);
+  animation: zzzUp 3.2s linear infinite;
+}
+.zzz--1 { left: 66px;  bottom: 66px; animation-delay: 0s; }
+.zzz--2 { left: 84px;  bottom: 66px; animation-delay: 1.05s; }
+.zzz--3 { left: 102px; bottom: 66px; animation-delay: 2.1s; }
+@keyframes zzzUp {
+  0%   { opacity: 0; transform: translateY(0) scale(.7); }
+  18%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-52px) scale(1.5); }
+}
+
+/* ── the television ───────────────────────────────────────────────*/
+.tv {
+  position: absolute;
+  right: clamp(12px, 2vw, 30px);
+  bottom: clamp(20px, 5vh, 60px);
+  z-index: 40;
+  display: grid; justify-items: center; gap: 6px;
+  padding: 0; border: 0; background: none;
+  cursor: pointer;
+  opacity: 0; transition: opacity .7s ease;
+}
+.tv.is-in { opacity: 1; }
+.tv img { display: block; width: 96px; image-rendering: pixelated; }
+.tv__lbl { font: 400 16px/1 var(--font); color: var(--dim); }
+.tv.is-live img { filter: drop-shadow(0 0 14px rgba(184,146,255,.75)); }
+.tv.is-live .tv__lbl { color: var(--accent); }
+
 /* ── the blackout ─────────────────────────────────────────────────
    A fixed pseudo-element rather than a filter on body: a filter
    creates a containing block and darkens EVERY descendant, including
@@ -904,13 +984,17 @@ body.is-blackout::before {
 .dk { position: fixed; inset: 0; z-index: 70; background: #050507; }
 .dk canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 
+/* what's on the television */
+.boss { position: fixed; inset: 0; z-index: 72; background: #000; }
+.boss canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
 /* ── objectives ───────────────────────────────────────────────────*/
 .quest__t {
   position: fixed; left: 0; top: 50%;
   transform: translateY(-50%) rotate(180deg);
   writing-mode: vertical-rl;
   z-index: 42;
-  font: 400 16px/1 var(--font);
+  font: 400 16px/1 var(--font-quest);
   color: var(--dim);
   background: var(--ink);
   border: 2px solid var(--edge); border-left: 0;
@@ -932,14 +1016,14 @@ body.is-blackout::before {
 .quest.is-open { transform: translate(0, -50%); }
 .quest.is-hit { border-color: var(--accent); }
 .quest__h {
-  margin: 0 0 14px; font: 400 16px/1 var(--font); color: var(--text);
+  margin: 0 0 14px; font: 400 16px/1 var(--font-quest); color: var(--text);
   display: flex; justify-content: space-between; gap: 12px;
 }
 .quest__n { color: var(--accent); }
 .quest__l { margin: 0; padding: 0; list-style: none; }
 .quest__i {
   display: flex; gap: 10px; align-items: baseline;
-  font: 400 16px/1.45 var(--font); color: var(--dim);
+  font: 400 16px/1.45 var(--font-quest); color: var(--dim);
   margin-bottom: 6px;
 }
 .quest__i.is-done { color: var(--text); }
@@ -970,7 +1054,7 @@ body.is-blackout::before {
   position: absolute; top: 10px; right: 10px;
   width: 26px; height: 26px; padding: 0;
   background: none; border: 2px solid var(--edge);
-  color: var(--text); font: 400 16px/1 var(--font);
+  color: var(--text); font: 400 16px/1 var(--font-quest);
   cursor: pointer;
 }
 .quest__x:hover { border-color: var(--accent); }
