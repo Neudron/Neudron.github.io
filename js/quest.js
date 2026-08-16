@@ -122,6 +122,13 @@
       if (panel) panel.classList.remove('is-open');
       if (toggle) { toggle.hidden = !!on; toggle.setAttribute('aria-expanded', 'false'); }
     },
+    /* Un-tick a set of steps so a repeatable loop can be replayed
+       honestly. Distinct from reset(), which wipes everything — here
+       only the steps that genuinely became undone are cleared. */
+    replay: function (ids) {
+      for (var i = 0; i < ids.length; i++) { delete done[ids[i]]; delete counts[ids[i]]; }
+      render();
+    },
     reset: function () { done = {}; counts = {}; render(); }
   };
 

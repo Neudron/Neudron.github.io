@@ -43,9 +43,14 @@
 
   var W = 2600, H = 1800;
   var DOOR = { x: 2060, y: 1360, w: 74, h: 122 };
-  var SWITCH = { x: 470, y: 1420, w: 66, h: 96 };   // far from the door on purpose
   var LIGHT = 132;
 
+  /* Two modes share this file because they share the character and its
+     walk cycle. 'dark' is the black field with the grey door in it;
+     'walk' drops the same character onto the REAL PAGE, over the top of
+     it, so the cosmolight you have to reach is the actual button in
+     the corner rather than a drawing of one. */
+  var mode = 'dark';
   var running = false, last = 0;
   var px = 420, py = 380, keys = {};
   var talks = 0, through = false, fixed = false;
@@ -154,21 +159,29 @@
   function near(o, r) {
     return Math.hypot(px - (o.x + o.w / 2), py - (o.y + o.h / 2)) < (r || 92);
   }
-  /* Standing ON it, not just beside it — the ask was to walk on top. */
-  function onSwitch() { return near(SWITCH, 54); }
+  /* In walk mode the target is the real switch element, so its box is
+     read from the DOM rather than stored — it is position:fixed, so
+     this works at any scroll offset. */
+  function swRect() {
+    var el = document.getElementById('lightsToggle');
+    return el ? el.getBoundingClientRect() : null;
+  }
+  function onSwitch() {
+    var r = swRect();
+    if (!r) return false;
+    var m = 26;
+    return px >= r.left - m && px <= r.right + m && py >= r.top - m && py <= r.bottom + m;
+  }
 
   function interact() {
-    if (onSwitch()) {
-      if (fixed) { say('it works. you can go.'); return; }
-      if (!(NEU.hasClicker && NEU.hasClicker())) {
-        say('the switch, from the inside. the contact is snapped clean off.');
-        return;
-      }
+    if (mode === 'walk') {
+      if (!onSwitch()) return;
+      if (fixed) { say('it works. go on.'); return; }
       fixed = true;
       say('the clicker seats with a click. of course it does.');
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
       if (NEU.fitClicker) NEU.fitClicker();
-      setTimeout(function () { close(); }, 1400);
+      setTimeout(function () { close(); }, 1500);
       return;
     }
 
@@ -185,12 +198,13 @@
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
       if (NEU.quest) NEU.quest.mark('clicker');
       if (NEU.grantClicker) NEU.grantClicker();
-      setTimeout(function () {
-        say('"inter-conexion on-and-off wax free clicker". now find the switch.');
-      }, 2600);
+      /* Through the door is not another room — it is back out onto the
+         page, still holding the character. The switch you have to reach
+         is the one that was in the corner the whole time. */
+      setTimeout(function () { toWalk(); }, 1800);
       return;
     }
-    say('nothing else in here. the switch is your way out.');
+    say('nothing else in here.');
   }
 
   function step(now) {
@@ -209,8 +223,13 @@
     else if (vx < 0) face = 'left'; else if (vx > 0) face = 'right';
 
     var dx = vx * 210 * dt, dy = vy * 210 * dt;
-    px = Math.min(Math.max(px + dx, 20), W - 20);
-    py = Math.min(Math.max(py + dy, 20), H - 20);
+    if (mode === 'walk') {
+      px = Math.min(Math.max(px + dx, 12), innerWidth - 12);
+      py = Math.min(Math.max(py + dy, 12), innerHeight - 12);
+    } else {
+      px = Math.min(Math.max(px + dx, 20), W - 20);
+      py = Math.min(Math.max(py + dy, 20), H - 20);
+    }
     walked += Math.hypot(dx, dy);
 
     if (!found && near(DOOR)) {
@@ -231,8 +250,36 @@
 
   function draw(now) {
     var w = innerWidth, h = innerHeight;
-    var camX = px - w / 2, camY = py - h / 2;
 
+    if (mode === 'walk') {
+      /* Transparent: the page itself is the backdrop. Only the
+         character and the prompt are painted, so you are genuinely
+         walking around on the site rather than on a picture of it. */
+      ctx.clearRect(0, 0, w, h);
+      var r = swRect();
+      if (r) {
+        var on = onSwitch();
+        ctx.globalAlpha = on ? 0.9 : (0.34 + 0.12 * Math.sin(now / 380));
+        ctx.fillStyle = '#C9A227';
+        ctx.fillRect((r.left - 8) | 0, (r.top - 8) | 0, (r.width + 16) | 0, 3);
+        ctx.fillRect((r.left - 8) | 0, (r.bottom + 5) | 0, (r.width + 16) | 0, 3);
+        ctx.fillRect((r.left - 8) | 0, (r.top - 8) | 0, 3, (r.height + 16) | 0);
+        ctx.fillRect((r.right + 5) | 0, (r.top - 8) | 0, 3, (r.height + 16) | 0);
+        ctx.globalAlpha = 1;
+      }
+      drawPlayer(px | 0, py | 0);
+      if (onSwitch()) {
+        ctx.fillStyle = '#EDE7DE';
+        ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('press E', px | 0, (py - 30) | 0);
+        ctx.textAlign = 'left';
+      }
+      drawMsg(now);
+      return;
+    }
+
+    var camX = px - w / 2, camY = py - h / 2;
     ctx.fillStyle = '#050507';
     ctx.fillRect(0, 0, w, h);
 
@@ -242,7 +289,6 @@
       ctx.fillRect((d.x - camX) | 0, (d.y - camY) | 0, d.w | 0, d.h | 0);
     }
 
-    /* the grey door */
     var dx = (DOOR.x - camX) | 0, dy = (DOOR.y - camY) | 0;
     ctx.fillStyle = through ? '#3b3b48' : '#2a2a34';
     ctx.fillRect(dx, dy, DOOR.w, DOOR.h);
@@ -256,20 +302,8 @@
       ctx.fillRect(dx + 6, dy + 6, DOOR.w - 12, DOOR.h - 10);
     }
 
-    /* the switch, from the inside */
-    var kx = (SWITCH.x - camX) | 0, ky = (SWITCH.y - camY) | 0;
-    ctx.fillStyle = '#1b1b24'; ctx.fillRect(kx, ky, SWITCH.w, SWITCH.h);
-    ctx.fillStyle = fixed ? '#C9A227' : '#4a4a5a';
-    ctx.fillRect(kx, ky, SWITCH.w, 4); ctx.fillRect(kx, ky + SWITCH.h - 4, SWITCH.w, 4);
-    ctx.fillRect(kx, ky, 4, SWITCH.h); ctx.fillRect(kx + SWITCH.w - 4, ky, 4, SWITCH.h);
-    /* the snapped contact: a lever hanging at a broken angle until fixed */
-    ctx.fillStyle = fixed ? '#B892FF' : '#8C2F4A';
-    if (fixed) ctx.fillRect(kx + 22, ky + 20, 22, 52);
-    else { ctx.fillRect(kx + 22, ky + 20, 22, 22); ctx.fillRect(kx + 34, ky + 48, 10, 10); }
-
     drawPlayer((px - camX) | 0, (py - camY) | 0);
 
-    /* the dark, punched through in five hard steps */
     var g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, LIGHT);
     g.addColorStop(0.00, 'rgba(0,0,0,1)');
     g.addColorStop(0.45, 'rgba(0,0,0,1)');
@@ -281,31 +315,36 @@
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
     ctx.globalCompositeOperation = 'source-over';
 
-    /* Landmarks glow in different hues so you can tell them apart from
-       across a black room: violet is the door, amber is the way out. */
-    glow(dx, dy, DOOR.w, DOOR.h, '#B892FF',
-         Math.hypot(px - (DOOR.x + DOOR.w / 2), py - (DOOR.y + DOOR.h / 2)));
-    glow(kx, ky, SWITCH.w, SWITCH.h, '#C9A227',
-         Math.hypot(px - (SWITCH.x + SWITCH.w / 2), py - (SWITCH.y + SWITCH.h / 2)));
+    /* Only the door glows now. There is nothing else in here. */
+    var gd = Math.hypot(px - (DOOR.x + DOOR.w / 2), py - (DOOR.y + DOOR.h / 2));
+    if (gd > LIGHT * 0.6) {
+      ctx.globalAlpha = Math.max(0, (0.10 + 0.045 * Math.sin(now / 420)) * Math.min(1, 900 / gd));
+      ctx.fillStyle = '#B892FF';
+      ctx.fillRect(dx - 8, dy - 8, DOOR.w + 16, DOOR.h + 16);
+      ctx.globalAlpha = 1;
+    }
 
-    if (near(DOOR) || onSwitch()) {
+    if (near(DOOR)) {
       ctx.fillStyle = '#EDE7DE';
       ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
       ctx.textAlign = 'center';
       ctx.fillText('press E', w / 2, h / 2 - 46);
       ctx.textAlign = 'left';
     }
+    drawMsg(now);
+  }
 
-    if (msg && now - msgT < 6000) {
-      var bw = Math.min(680, w - 48), bx = ((w - bw) / 2) | 0, by = h - 132;
-      ctx.fillStyle = '#000'; ctx.fillRect(bx, by, bw, 84);
-      ctx.fillStyle = '#EDE7DE';
-      ctx.fillRect(bx, by, bw, 3); ctx.fillRect(bx, by + 81, bw, 3);
-      ctx.fillRect(bx, by, 3, 84); ctx.fillRect(bx + bw - 3, by, 3, 84);
-      ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-      ctx.textBaseline = 'top';
-      ctx.fillText(msg, bx + 20, by + 30);
-    }
+  function drawMsg(now) {
+    if (!msg || now - msgT > 6000) return;
+    var w = innerWidth, h = innerHeight;
+    var bw = Math.min(680, w - 48), bx = ((w - bw) / 2) | 0, by = h - 132;
+    ctx.fillStyle = '#000'; ctx.fillRect(bx, by, bw, 84);
+    ctx.fillStyle = '#EDE7DE';
+    ctx.fillRect(bx, by, bw, 3); ctx.fillRect(bx, by + 81, bw, 3);
+    ctx.fillRect(bx, by, 3, 84); ctx.fillRect(bx + bw - 3, by, 3, 84);
+    ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
+    ctx.textBaseline = 'top';
+    ctx.fillText(msg, bx + 20, by + 30);
   }
 
   function name(e) {
@@ -327,7 +366,18 @@
     var n = name(e); if (n) keys[n] = false;
   });
 
+  /* Out of the door and onto the page, still driving the character. */
+  function toWalk() {
+    mode = 'walk';
+    wrap.classList.add('is-walk');
+    px = innerWidth / 2; py = innerHeight * 0.62;
+    face = 'up'; walked = 0;
+    say('you are back on the page. the switch is where you left it.');
+  }
+
   function open() {
+    mode = 'dark';
+    wrap.classList.remove('is-walk');
     wrap.hidden = false;
     document.body.classList.add('is-playing');
     layout();
@@ -345,12 +395,29 @@
   var q = document.getElementById('dkQuit');
   if (q) q.addEventListener('click', close);
 
+  /* Replaying the hammer must replay the whole errand. Without this
+     the module keeps `through` and `fixed` from the first run, the
+     grey door has nothing left to give, and the second blackout is
+     unescapable — which is exactly the trap that got reported. */
+  function reset() {
+    mode = 'dark';
+    talks = 0; through = false; fixed = false; found = false;
+    px = 420; py = 380; walked = 0; face = 'down';
+    msg = null;
+    if (wrap) wrap.classList.remove('is-walk');
+  }
+
   NEU.dark = {
-    open: open, close: close,
+    open: open, close: close, reset: reset,
+    get mode() { return mode; },
     /* dev: the door is a deliberate long walk, which is right once and
        wrong the fortieth time. */
-    warp:   function () { px = DOOR.x - 46;   py = DOOR.y + DOOR.h / 2; },
-    warpSw: function () { px = SWITCH.x + 30; py = SWITCH.y + SWITCH.h / 2; },
+    warp:   function () { px = DOOR.x - 46; py = DOOR.y + DOOR.h / 2; },
+    warpSw: function () {
+      if (mode !== 'walk') toWalk();
+      var r = swRect();
+      if (r) { px = r.left + r.width / 2; py = r.top + r.height / 2; }
+    },
     interact: interact,
     get running() { return running; },
     get talks() { return talks; },

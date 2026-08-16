@@ -1094,6 +1094,15 @@
   if (dogBtn) dogBtn.addEventListener('click', talkDog);
 
   function smashLight() {
+    /* Every state the last repair consumed has to come back, or the
+       second blackout is a dead end: the grey door remembers it
+       already handed over a clicker, so it hands over nothing, and
+       there is no way to fix the light again. Reported as "you get
+       stuck if you redo the hammer part" — this is that fix. */
+    if (NEU.dark && NEU.dark.reset) NEU.dark.reset();
+    if (NEU.quest) NEU.quest.replay(['greydoor', 'answers', 'clicker', 'fixed']);
+    hasClicker = false;
+    showChip(clickerChip, false);
     hasHammer = false; broken = true; stuck = false;
     showChip(hammerChip, false);
     if (swBtn) { swBtn.classList.remove('is-stuck'); swBtn.classList.add('is-smashed'); }
@@ -1113,6 +1122,9 @@
   NEU.fitClicker = function () { fitClicker(); };
   NEU.hasClicker = function () { return hasClicker; };
   function fitClicker() {
+    /* Reset the dog so the whole loop can be run again from the top. */
+    dogTalks = 0;
+    if (dogEl) dogEl.classList.remove('is-settled');
     hasClicker = false; broken = false;
     showChip(clickerChip, false);
     showChip(darkChip, false);

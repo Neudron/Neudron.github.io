@@ -982,6 +982,10 @@ body.is-blackout::before {
 
 /* ── after the light ──────────────────────────────────────────────*/
 .dk { position: fixed; inset: 0; z-index: 70; background: #050507; }
+/* Walk mode paints the character straight onto the page, so the layer
+   itself must be see-through and must not eat clicks. */
+.dk.is-walk { background: transparent; pointer-events: none; }
+.dk.is-walk .bh__quit, .dk.is-walk .bh__keys { pointer-events: auto; }
 .dk canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 
 /* what's on the television */
@@ -991,7 +995,10 @@ body.is-blackout::before {
 /* ── objectives ───────────────────────────────────────────────────*/
 .quest__t {
   position: fixed; left: 0; top: 50%;
-  transform: translateY(-50%) rotate(180deg);
+  /* scaleX, NOT rotate(180deg): a 180 rotation mirrors both axes
+     and the vertical half is what made the glyphs read upside
+     down. This flips left-to-right only. */
+  transform: translateY(-50%) scaleX(-1);
   writing-mode: vertical-rl;
   z-index: 42;
   font: 400 16px/1 var(--font-quest);
@@ -1018,6 +1025,9 @@ body.is-blackout::before {
 .quest__h {
   margin: 0 0 14px; font: 400 16px/1 var(--font-quest); color: var(--text);
   display: flex; justify-content: space-between; gap: 12px;
+  /* clears the absolutely-positioned close button, which the
+     tally was sitting directly underneath */
+  padding-right: 34px;
 }
 .quest__n { color: var(--accent); }
 .quest__l { margin: 0; padding: 0; list-style: none; }
