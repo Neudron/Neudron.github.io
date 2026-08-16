@@ -1,0 +1,30 @@
+# build artefacts / experiments
+index-standalone.html
+*-standalone.html
+
+# secrets — never publish
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.*
+credentials.*
+
+# dependencies
+node_modules/
+
+# editor / OS noise
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# logs & temp
+*.log
+tmp/
+.cache/
