@@ -679,6 +679,22 @@ body.is-scrolled .cue { opacity: 0; pointer-events: none; }
   -webkit-font-smoothing: antialiased;
 }
 .tbox__face img { width: 42px; height: auto; image-rendering: pixelated; }
+
+/* ── who is in the box ────────────────────────────────────────────
+   The portrait used to be his in every single box, including the
+   dog's and the television's. It follows the speaker now, and
+   narration drops the column entirely — which means the grid has to
+   be redeclared, since `auto 1fr auto` with the first child gone
+   would put the text in the auto track and squash it. */
+.tbox[data-who="narr"] { grid-template-columns: 1fr auto; }
+.tbox[data-who="narr"] .tbox__face { display: none; }
+.tbox[data-who="dog"] .tbox__face img { width: 46px; }
+.tbox[data-who="tv"]  .tbox__face img { width: 44px; }
+/* A hairline of the speaker's colour, so a glance at the frame tells
+   you who is talking without waiting for the portrait to register. */
+.tbox[data-who="dog"]  { border-color: #E4C46A; }
+.tbox[data-who="tv"]   { border-color: var(--accent); }
+.tbox[data-who="narr"] { border-color: #9C97AA; }
 .tbox__txt {
   margin: 0; color: #fff;
   font-size: 16px; line-height: 1.5;
@@ -932,11 +948,44 @@ body.is-playing { overflow: hidden; }
   opacity: 0; transition: opacity .7s ease;
 }
 .sleep.is-in { opacity: 1; }
-.sleep img { position: absolute; image-rendering: pixelated; }
+/* Direct children only. The console is a <button> now, and a blanket
+   rule on `.sleep img` would absolutely-position the sprite inside it
+   and tear it out of its own button. */
+.sleep > img { position: absolute; image-rendering: pixelated; }
 .sleep__blanket { left: 0; bottom: 0; width: 250px; }
 .sleep__sans    { left: 26px;  bottom: 16px; width: 54px;  transform: rotate(-90deg); }
 .sleep__dog     { left: 108px; bottom: 20px; width: 92px; }
-.sleep__sw      { left: 196px; bottom: 22px; width: 46px; }
+
+/* ── the console ──────────────────────────────────────────────────
+   It is a real object you take, so it has to look takeable: it bobs
+   until you pick it up, and it lifts under the cursor. */
+.sleep__sw {
+  position: absolute;
+  left: 190px; bottom: 16px;
+  padding: 6px; border: 0; background: none;
+  cursor: pointer; line-height: 0;
+  animation: swBob 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(184,146,255,.45));
+}
+.sleep__sw img { display: block; width: 46px; image-rendering: pixelated; }
+.sleep__sw:hover { filter: drop-shadow(0 0 12px rgba(184,146,255,.9)); }
+.sleep__sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sleep__sw.is-taken {
+  animation: none; pointer-events: none;
+  opacity: 0; transform: scale(.4); transition: opacity .34s ease, transform .34s ease;
+}
+@keyframes swBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+
+/* The flight into the dock. Fixed, so viewport rects go straight in
+   without worrying about which container each end lives in. */
+.swfly {
+  position: fixed; z-index: 90;
+  image-rendering: pixelated; pointer-events: none;
+  transition: transform .72s cubic-bezier(.5,-0.25,.3,1), opacity .72s ease-in;
+}
 .zzz {
   position: absolute;
   font: 400 16px/1 var(--font-quest);
@@ -968,6 +1017,14 @@ body.is-playing { overflow: hidden; }
 .tv__lbl { font: 400 16px/1 var(--font); color: var(--dim); }
 .tv.is-live img { filter: drop-shadow(0 0 14px rgba(184,146,255,.75)); }
 .tv.is-live .tv__lbl { color: var(--accent); }
+/* Charged and carrying it: the dock asks for it. Without this the only
+   signal that you CAN dock is a label nobody is reading. */
+.tv.is-ready img { animation: tvWant 1.5s ease-in-out infinite; }
+.tv.is-ready .tv__lbl { color: var(--accent); }
+@keyframes tvWant {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(184,146,255,.35)); }
+  50%      { filter: drop-shadow(0 0 13px rgba(184,146,255,.95)); }
+}
 
 /* ── the blackout ─────────────────────────────────────────────────
    A fixed pseudo-element rather than a filter on body: a filter

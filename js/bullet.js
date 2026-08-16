@@ -108,6 +108,12 @@
   var ELEC_EVERY = 4.4;
   var charge = 0, chargeFx = 0;
   NEU.charge = function () { return charge; };
+  NEU.devCharge = function (n) {
+    charge = Math.max(0, Math.min(100, n | 0));
+    if (NEU.quest) NEU.quest.bump('charge', charge / 50);
+    if (NEU.tvState) NEU.tvState();
+    return charge;
+  };
   var dying = 0, shards = [];
 
   var running = false, won = false;
@@ -570,6 +576,10 @@
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
+    /* You came in here to charge the console; tell the dock about it
+       on the way out rather than making the label wait for the next
+       scroll to notice. */
+    if (NEU.tvState) NEU.tvState();
   }
 
   var startBtn = document.getElementById('bhStart');

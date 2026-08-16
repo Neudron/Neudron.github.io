@@ -45,6 +45,8 @@
       log('sw     stand on the switch (the way out)');
       log('sleep  skip to the sleeping scene');
       log('con    make the console appear');
+      log('take   pocket the console, fully charged');
+      log('chg    fill the charge to 100%');
       log('boss   open the tv fight');
       log('reset  back to the start');
       log('close  esc also works');
@@ -83,6 +85,14 @@
     },
     sleep: function () { if (NEU.devSleep) { NEU.devSleep(); log('lights out for them.'); } },
     con:   function () { if (NEU.devSwitch) { NEU.devSwitch(); log('console is there.'); } },
+    take:  function () {
+      if (NEU.devTake) { NEU.devTake(); log('pocketed and charged. go dock it.'); }
+      else log('nope');
+    },
+    chg:   function () {
+      if (NEU.devCharge) log('charge: ' + NEU.devCharge(100) + '%');
+      else log('bullet.js not loaded');
+    },
     boss:  function () { if (NEU.boss) { hide(); NEU.boss.open(); log('good luck.'); } },
     reset: function () {
       if (NEU.devReset) { NEU.devReset(); log('reset.'); }

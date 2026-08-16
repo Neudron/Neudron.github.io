@@ -97,8 +97,32 @@
     }
   } catch (e) { blipOk = false; }
 
-  function blip() {
+  /* ── who is talking ─────────────────────────────────────────────
+     snd_txtsans is HIS voice. Using it for the dog, for the narrator,
+     and for the television made every box on the page sound like the
+     same skeleton, which quietly undoes the one joke the sample is
+     doing any work for: you should be able to tell he has walked into
+     the conversation without reading a word.
+
+     So the sample is reserved for lines he actually says, and the
+     other two speakers are synthesised — deliberately NOT sampled,
+     because a second real voice would compete with his rather than
+     get out of the way.
+
+       sans — the real wav, warm and mid
+       narr — a short high tick. Undertale's narration is a typewriter,
+              not a person; it should read as text appearing.
+       dog  — low, with a downward slide. Big animal, small opinion. */
+  var VOICE = {
+    sans: null,                                  // sample, handled below
+    narr: { type: 'square',   f: 760, to: 760, g: 0.030, ms: 0.022, jit: 60 },
+    dog:  { type: 'triangle', f: 220, to: 150,  g: 0.075, ms: 0.075, jit: 22 },
+    tv:   { type: 'sawtooth', f: 330, to: 300,  g: 0.026, ms: 0.030, jit: 14 }
+  };
+
+  function blip(who) {
     if (reduced) return;
+    if (who && who !== 'sans') { synthVoice(VOICE[who] || VOICE.narr); return; }
     if (blipOk && blipPool.length) {
       try {
         var a = blipPool[blipI++ % blipPool.length];
@@ -122,6 +146,25 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
       o.connect(g); g.connect(actx.destination);
       o.start(t); o.stop(t + 0.04);
+    } catch (e) {}
+  }
+
+  /* One oscillator per character, detuned a little each time. The jitter
+     is what stops a long line turning into a dial tone — without it the
+     ear locks onto the pitch and stops hearing individual letters. */
+  function synthVoice(v) {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      var o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+      var d = (Math.random() - 0.5) * v.jit;
+      o.type = v.type;
+      o.frequency.setValueAtTime(v.f + d, t);
+      if (v.to !== v.f) o.frequency.exponentialRampToValueAtTime(v.to + d, t + v.ms);
+      g.gain.setValueAtTime(v.g, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + v.ms);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t); o.stop(t + v.ms + 0.01);
     } catch (e) {}
   }
 
@@ -328,9 +371,31 @@
   /* ── the textbox ────────────────────────────────────────────────
      Letter by letter, because an undertale box that just appears
      fully written is not an undertale box. */
-  var queue = [], typing = null;
-  function say(lines) {
+  /* The second argument names the speaker, and it can be a single
+     string for the whole call or an array running parallel to `lines`
+     — the dog handing over the hammer is narration first and him
+     second, and forcing that into one voice loses the beat. */
+  var queue = [], queueV = [], typing = null, curV = 'sans';
+  var tface = document.getElementById('tboxFace');
+  var tfaceImg = document.getElementById('tboxFaceImg');
+  var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/dog.svg', tv: 'img/tv.svg' };
+
+  /* Only the src is set here. Whether the portrait shows at all is a
+     css question, because hiding it also has to re-do the box's grid
+     columns — doing that from js would mean the layout rule lived in
+     two files. */
+  function setFace(who) {
+    var src = FACE[who];
+    if (src && tfaceImg && tfaceImg.getAttribute('src') !== src) {
+      tfaceImg.setAttribute('src', src);
+    }
+    if (tface) tface.hidden = false;
+  }
+  function say(lines, who) {
     queue = lines.slice();
+    queueV = lines.map(function (_, i) {
+      return Array.isArray(who) ? (who[i] || 'narr') : (who || 'sans');
+    });
     tbox.hidden = false;
     next();
   }
@@ -338,6 +403,14 @@
     clearInterval(typing); clearTimeout(next.hold);
     if (!queue.length) { tbox.hidden = true; return; }
     var line = queue.shift(), i = 0;
+    curV = queueV.shift() || 'sans';
+    /* The box wears the speaker too. His portrait sat in the corner of
+       EVERY box on the page — including the dog's and the television's
+       — which is the loudest reason it all read as him talking. The
+       face follows the voice, and narration has no face at all,
+       because narration is not a person. */
+    tbox.setAttribute('data-who', curV);
+    setFace(curV);
     ttxt.textContent = '';
     if (tmore) tmore.hidden = true;
     if (reduced) {                       // no typing, just the line
@@ -346,9 +419,10 @@
       next.hold = setTimeout(next, 2600);
       return;
     }
+    var v = curV;
     typing = setInterval(function () {
       ttxt.textContent = line.slice(0, ++i);
-      if (i % 2 === 0) blip();
+      if (i % 2 === 0) blip(v);
       if (i >= line.length) {
         clearInterval(typing);
         if (tmore) tmore.hidden = false;
@@ -362,7 +436,7 @@
      longer there is just litter. */
   function shutUp() {
     clearInterval(typing); clearTimeout(next.hold);
-    queue = []; ttxt.textContent = ''; tbox.hidden = true;
+    queue = []; queueV = []; ttxt.textContent = ''; tbox.hidden = true;
   }
 
   /* ── the small totem pop ────────────────────────────────────────
@@ -535,9 +609,16 @@
      actually finished. Set it immediately and display:none lands on
      the first frame, so the transition never gets to render. */
   var hideT = null;
+  var onScreen = false;          // is the contact section in view right now
 
   function showSans() {
-    if (asleep) { maybeSwitch(); if (NEU.tvState) NEU.tvState(); return; }
+    onScreen = true;
+    /* The sleep is queued rather than immediate — see goToSleep. If it
+       is still pending when you come back, do the swap NOW, while he is
+       still behind the `hidden` attribute, so what fades in is the pile
+       of blankets rather than him popping out of existence. */
+    if (wantSleep && !asleep) goToSleep();
+    if (asleep) { maybeSwitch(); tvState(); return; }
     clearTimeout(hideT);
     sans.hidden = false;
     requestAnimationFrame(function () { sans.classList.add('is-in'); });
@@ -545,9 +626,10 @@
     if (NEU.quest) NEU.quest.mark('sans');
   }
   function hideSans() {
+    onScreen = false;
     clearTimeout(hideT);
     sans.classList.remove('is-in');
-    hideT = setTimeout(function () { sans.hidden = true; }, 520);
+    hideT = setTimeout(function () { sans.hidden = true; trySleep(); }, 520);
     shutUp();
   }
 
@@ -1022,8 +1104,15 @@
   };
   NEU.devOpenRoom = function () { unlockDoor(); openPanel(); };
   NEU.devDog = function () { hasFood = true; summonDog(); };
-  NEU.devSleep = function () { goToSleep(); };
-  NEU.devSwitch = function () { goToSleep(); switchSeen = false; maybeSwitch(); };
+  NEU.devSleep = function () { wantSleep = true; goToSleep(); };
+  NEU.devSwitch = function () { NEU.devSleep(); switchSeen = false; maybeSwitch(); };
+  /* Takes the console AND fills it, because the two things the dock
+     needs are exactly the two things that take five minutes to earn. */
+  NEU.devTake = function () {
+    NEU.devSwitch();
+    if (NEU.devCharge) NEU.devCharge(100);
+    if (sleepSw) sleepSw.click();
+  };
   NEU.devReset = function () { location.reload(); };
 
   /* ── the dog, the hammer, and the light ─────────────────────────
@@ -1070,8 +1159,8 @@
 
   function talkDog() {
     petSwipe();
-    if (hasHammer || broken) { say(["he's out of hammers."]); return; }
-    say([DOGTALK[Math.min(dogTalks, DOGTALK.length - 1)]]);
+    if (hasHammer || broken) { say(["he's out of hammers."], 'narr'); return; }
+    say([DOGTALK[Math.min(dogTalks, DOGTALK.length - 1)]], 'dog');
     dogTalks++;
     if (dogTalks >= DOGTALK.length) {
       hasHammer = true;
@@ -1085,9 +1174,11 @@
       /* He stops fidgeting once he has given the thing up. */
       if (dogEl) dogEl.classList.add('is-settled');
       setTimeout(function () {
+        /* Narration, then him. He does not narrate the dog. */
         say(["he spat out a hammer.",
              "huh. cosmolight's jammed too. that's new.",
-             "you've got a hammer. i'm sure it'll be fine."]);
+             "you've got a hammer. i'm sure it'll be fine."],
+            ['narr', 'sans', 'sans']);
       }, 1500);
     }
   }
@@ -1132,10 +1223,19 @@
     if (NEU.dark) NEU.dark.close();
     if (NEU.quest) NEU.quest.mark('fixed');
     if (swBtn) swBtn.classList.remove('is-smashed');
-    /* Everyone has had a long day. */
-    setTimeout(goToSleep, 2200);
-    say(["huh. it fits.",
-         "wax free. still not sure what wax was doing in there."]);
+    /* Everyone has had a long day — but he is standing right in front
+       of you, so this only ARMS the sleep. goUp() sends the page back
+       to the top, he leaves the viewport, and the swap happens where
+       you cannot see it. */
+    var first = !asleep;             // the loop is replayable; the sleep isn't
+    wantSleep = first;
+    say(first
+      ? ["huh. it fits.",
+         "wax free. still not sure what wax was doing in there.",
+         "i'm gonna go lie down. don't wait up."]
+      : ["huh. it fits. again.",
+         "you really like that hammer."]);
+    if (first) setTimeout(goUp, 2600);
   }
 
   /* main.js asks this before doing anything with the switch. Returning
@@ -1154,7 +1254,7 @@
       return true;
     }
     if (stuck && hasHammer) {
-      say(["...you hit it.", "you hit the jammed light with a hammer."]);
+      say(["...you hit it.", "you hit the jammed light with a hammer."], 'narr');
       smashLight();
       return true;
     }
@@ -1174,10 +1274,40 @@
   /* ── the long sleep ─────────────────────────────────────────────
      Nobody leaves. The console turns up beside them on a LATER visit
      rather than immediately, so returning to the page has a reason to
-     be interesting a second time. */
+     be interesting a second time.
+
+     IT MUST NOT HAPPEN IN FRONT OF YOU. Fitting the clicker put you
+     right next to him, so the old code swapped a standing skeleton for
+     a sleeping one while you were staring at both — which does not
+     read as "time passed", it reads as a sprite bug. Two halves to the
+     fix: the swap is queued behind `wantSleep`, and fitting the clicker
+     scrolls the page back to the top so he leaves the viewport on his
+     own. Come back down and they have been asleep the whole time. */
+  var wantSleep = false;
+
+  function trySleep() {
+    if (!wantSleep || asleep) return;
+    if (onScreen) return;               // not while you are looking
+    goToSleep();
+  }
+
+  /* Send the reader up the page. The scroll is what makes him leave,
+     and the observer firing hideSans is what actually triggers the
+     swap — so this is not decoration, it is the mechanism. */
+  function goUp() {
+    try {
+      window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+    } catch (e) { window.scrollTo(0, 0); }
+    /* Belt and braces: if the page cannot scroll (short viewport, or a
+       browser that ignores the request) nothing will ever leave the
+       screen, and a queued sleep that never fires is a dead end. */
+    setTimeout(function () { if (wantSleep && !asleep && !onScreen) goToSleep(); }, 1200);
+    setTimeout(function () { if (wantSleep && !asleep) goToSleep(); }, 6000);
+  }
+
   function goToSleep() {
     if (asleep) return;
-    asleep = true;
+    asleep = true; wantSleep = false;
     if (dogEl)   { dogEl.classList.remove('is-in'); setTimeout(function () { dogEl.hidden = true; }, 520); }
     sans.classList.remove('is-in');
     setTimeout(function () { sans.hidden = true; }, 520);
@@ -1189,6 +1319,7 @@
       tvEl.hidden = false;
       requestAnimationFrame(function () { tvEl.classList.add('is-in'); });
     }
+    tvState();
     if (NEU.quest) NEU.quest.mark('sleep');
   }
 
@@ -1198,38 +1329,127 @@
     switchSeen = true;
     sleepSw.hidden = false;
     if (NEU.quest) NEU.quest.mark('console');
-    say(["...", "that wasn't there before."]);
+    say(["...", "that wasn't there before."], 'narr');
   }
+
+  /* ── the dock ───────────────────────────────────────────────────
+     What was wrong with it: the console was a decoration. It appeared
+     on the blanket and stayed there forever, the television read the
+     charge straight out of the bullet room, and "docking" was a
+     boolean — you clicked a television across the room and a console
+     you had never touched was suddenly inside it.
+
+     Now it is an object. You pick it up (it goes in the tray with the
+     hammer and the clicker), it is what carries the charge, and
+     docking physically moves it: the sprite flies from wherever it is
+     into the television, and the television lights up when it lands.
+
+     The label also has to stop lying. It used to refresh only when the
+     contact section re-entered the viewport, so it would read "0% —
+     flat" for a fully charged console until you scrolled away and back
+     — the single most likely reason this looked broken. It now polls
+     while it is on screen, which costs one comparison every 400ms. */
+  var hasConsole = false, docking = false;
+  var swChip = document.getElementById('swChip');
+
+  function charge() { return NEU.charge ? NEU.charge() : 0; }
 
   function tvState() {
     if (!tvLbl) return;
-    var pct = NEU.charge ? NEU.charge() : 0;
-    if (docked)        tvLbl.textContent = 'playing';
+    var pct = charge();
+    if (docked)          tvLbl.textContent = 'playing';
+    else if (!hasConsole) tvLbl.textContent = switchSeen ? 'empty dock' : 'dock';
     else if (pct >= 100) tvLbl.textContent = 'dock it';
-    else if (switchSeen) tvLbl.textContent = pct + '% — flat';
-    else               tvLbl.textContent = 'dock';
+    else                 tvLbl.textContent = pct + '% — flat';
+    if (tvEl) tvEl.classList.toggle('is-ready', !docked && hasConsole && pct >= 100);
   }
   NEU.tvState = tvState;
 
+  setInterval(function () {
+    if (asleep && tvEl && !tvEl.hidden && !docked) tvState();
+  }, 400);
+
+  /* Pick it up. */
+  if (sleepSw) sleepSw.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (hasConsole || docked) return;
+    hasConsole = true;
+    sleepSw.classList.add('is-taken');
+    showChip(swChip, true);
+    tvState();
+    if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+    say(["you pick it up. it is completely dead.",
+         "there's a dock over there. it needs the thing charged first."], 'narr');
+  });
+
+  /* Fly it into the dock. Both rects are viewport-space, so the flier
+     is position:fixed and no ancestor's transform can drag it off
+     course — the console and the television live in different
+     positioned containers. */
+  function flyToDock(from, to, done) {
+    if (reduced || !from || !to) { done(); return; }
+    var img = document.createElement('img');
+    img.src = 'img/switch2.svg';
+    img.alt = '';
+    img.className = 'swfly';
+    img.style.left = from.left + 'px';
+    img.style.top = from.top + 'px';
+    img.style.width = Math.max(28, from.width) + 'px';
+    document.body.appendChild(img);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        var dx = (to.left + to.width / 2) - (from.left + from.width / 2);
+        var dy = (to.top + to.height * 0.62) - (from.top + from.height / 2);
+        img.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(.34)';
+        img.style.opacity = '0.15';
+      });
+    });
+    setTimeout(function () { img.remove(); done(); }, 760);
+  }
+
   if (tvEl) tvEl.addEventListener('click', function () {
-    if (!switchSeen) { say(["a television. nothing to put in it."]); return; }
-    var pct = NEU.charge ? NEU.charge() : 0;
-    if (pct < 100) {
-      say(["it's flat. " + pct + "%.",
-           "something in that room hits hard enough to charge it. hold still."]);
+    if (docked || docking) { say(["it's already playing."], 'tv'); return; }
+    if (!switchSeen) { say(["a television. nothing to put in it."], 'tv'); return; }
+    if (!hasConsole) {
+      say(["an empty dock.", "the thing that goes in it is over there, on the blanket."], 'tv');
       return;
     }
-    docked = true;
-    tvEl.classList.add('is-live');
-    tvState();
-    if (NEU.quest) NEU.quest.mark('docked');
-    if (NEU.boss) NEU.boss.open();
+    var pct = charge();
+    if (pct < 100) {
+      say(["it's flat. " + pct + "%.",
+           "something in that room hits hard enough to charge it. hold still."],
+          ['tv', 'sans']);
+      return;
+    }
+    docking = true;
+    showChip(swChip, false);
+    var from = sleepSw ? sleepSw.getBoundingClientRect() : null;
+    /* The console is in your pocket by now, so the flight starts from
+       the chip if the sprite on the blanket is no longer laid out. */
+    if ((!from || !from.width) && swChip) from = swChip.getBoundingClientRect();
+    flyToDock(from, tvEl.getBoundingClientRect(), function () {
+      docking = false;
+      docked = true;
+      hasConsole = false;
+      if (sleepSw) sleepSw.hidden = true;
+      tvEl.classList.add('is-live');
+      tvEl.classList.remove('is-ready');
+      tvState();
+      if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+      if (NEU.quest) NEU.quest.mark('docked');
+      setTimeout(function () { if (NEU.boss) NEU.boss.open(); }, 420);
+    });
   });
 
   NEU.sans = {
     get state()   { return state; },
     get asleep()  { return asleep; },
+    get wantSleep(){ return wantSleep; },
+    get onScreen(){ return onScreen; },
     get switchSeen() { return switchSeen; },
+    get hasConsole() { return hasConsole; },
+    get docked()  { return docked; },
+    get voice()   { return curV; },
     get hasHammer(){ return hasHammer; },
     get broken()  { return broken; },
     get hasClicker(){ return hasClicker; },

@@ -37,7 +37,7 @@
   .boot, .ctl, .glass, .stars, .cue, .cat,
   .sans, .sword, .tbox, .chip, .panel, .keyobj, .swcue,
   .bh, .dog, .dev, .chips, .dk, .quest, .quest__t,
-  .sleep, .tv, .pethand, .boss { display: none !important; }
+  .sleep, .tv, .pethand, .boss, .swfly { display: none !important; }
   body.is-booting { overflow: auto !important; }
   .lay, .el { opacity: 1 !important; transform: none !important; }
 </style></noscript>
@@ -148,6 +148,10 @@
     <img src="img/clicker.svg" alt="" width="22" height="22">
     <span>Inter-Conexion on-and-off wax free clicker</span>
   </div>
+  <div class="chip" id="swChip" hidden>
+    <img src="img/switch2.svg" alt="" width="24" height="16">
+    <span>a console, flat</span>
+  </div>
 </div>
 
 
@@ -189,7 +193,7 @@
 </div>
 
 <div class="tbox" id="tbox" hidden role="status" aria-live="polite">
-  <span class="tbox__face"><img src="img/Sans_sprite.webp" alt="" width="42" height="63"></span>
+  <span class="tbox__face" id="tboxFace"><img id="tboxFaceImg" src="img/Sans_sprite.webp" alt="" width="42" height="63"></span>
   <p class="tbox__txt" id="tboxTxt"></p>
   <span class="tbox__more" id="tboxMore" hidden aria-hidden="true">&#9660;</span>
 </div>
@@ -269,7 +273,9 @@
     <span class="zzz zzz--1" aria-hidden="true">Z</span>
     <span class="zzz zzz--2" aria-hidden="true">Z</span>
     <span class="zzz zzz--3" aria-hidden="true">Z</span>
-    <img class="sleep__sw" id="sleepSwitch" src="img/switch2.svg" alt="" hidden>
+    <button class="sleep__sw" id="sleepSwitch" aria-label="take the console" hidden>
+      <img src="img/switch2.svg" alt="">
+    </button>
   </div>
 
   <button class="tv" id="tv" hidden aria-label="the television">
