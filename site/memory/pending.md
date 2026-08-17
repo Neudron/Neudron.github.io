@@ -13,9 +13,9 @@ than trusting the plan document.
 | | |
 |---|---|
 | Acts | I–IV complete. 31 rooms, 3 bosses, quiz, rhythm game, crafting grid |
-| Tests | **1208 checks, 14 suites, all green** — fixes5 (50) fixes6 (48) fixes7 (70) fixes8 (49) fixes9 (53) fixes10 (78) fixes11 (75) fixes12 (58) fixes13 (72) fixes14 (70) fixes15 (99) fixes16 (181) **fixes17 (260)** playthrough (45) |
+| Tests | **1237 checks, 14 suites, all green** — re-verified 2026-08-17 by running every suite. fixes5 (50) fixes6 (48) fixes7 (70) fixes8 (49) fixes9 (53) fixes10 (78) fixes11 (75) fixes12 (58) fixes13 (72) fixes14 (70) fixes15 (99) fixes16 (181) **fixes17 (289)** playthrough (45) |
 | Location | everything in `Documents\neu\site`, tests in `site\tests` |
-| Deployed | **no.** Live site is on `20213f3` (Act III). `_deploy` is now a real clone and `_scripts\deploy.ps1` makes the push one command |
+| Deployed | **no — but committed.** `_deploy` is a real clone on `main`, **one commit ahead** at `1ae52d0` ("Act four: the woods, the castle, and everything after"), 111 files, shape + leak checks passed. `origin/main` is still `20213f3`. The push is yours: `_scripts\deploy.ps1` |
 
 **Phases 1–3 of PLAN.md are done and verified, plus 2.4, 2.5, 4a, 4b and 5:**
 
@@ -66,7 +66,7 @@ Status: 🔴 blocked on Neu · 🟠 real gap · 🟡 polish · ⚪ decided, no a
 
 | # | Item | Status | Where | Effort |
 |---|---|---|---|---|
-| **1.1** | **Deploy permission.** All of Acts I–IV is local; live site is pre-Act-IV | 🔴 | `_deploy\` | 1 push |
+| **1.1** | **Deploy permission.** Acts I–IV are **committed** in `_deploy` (`1ae52d0`) but not pushed. Close PR #1 first (1.4) — merged after your push it overwrites the site | 🔴 | `_deploy\` | 1 push |
 | **1.2** | ✅ **DONE.** All five settled. Three by autocorrelation (`measure-sheets.mjs`), then `sepulcher` and `heart` by rendering them at 5x with the candidate cell rules drawn on and **looking** (`contact-sheet.mjs`). `sepulcher` was never 2 frames — it is one beetle head and the 44px rule cut it through the face. `heart` was never 5 — six beats on a 62px grid; its sheet had been trimmed 2 rows short of its own grid and was re-padded | ✅ | `data/sheets.js` | done |
 | **1.3** | ✅ **DONE — they WERE swapped.** Confirmed twice: centre of mass (67% vs 45% down the cell) and then by eye at 4x. `Slash.png` is the lower jaw, `SlashAlt.png` the upper. **The plan's own fix was wrong** — it said swap the two `src` strings and nothing else, but the files are 168x240 and 192x232, so the geometry had to move with the src or each entry would hold the other's dimensions | ✅ | `data/sheets.js` | done |
 | **1.4** | **PR #1 still open** — `copilot/link-neuac-domain`, holds an old 70-byte page, would overwrite the site | 🔴 | GitHub | 1 min |
@@ -89,6 +89,7 @@ Status: 🔴 blocked on Neu · 🟠 real gap · 🟡 polish · ⚪ decided, no a
 | **3.8** | ✅ **DONE.** All three read on 2026-08-17, verdicts in `PLAN.md` §1.10: `threejs-skills` maybe-later (the cube is finished), `threejs-game-skills` **no** (Vite + TypeScript + Playwright — a build step and a blocked browser), `OpenGame` **no** (an agentic framework with its own model, nothing to port). One idea salvaged: a seeded RNG for deterministic playtests | ✅ | `PLAN.md` §1.10 | done |
 | **4.1** | `loader.js` dropped deliberately — boot carries ~30 KB more JS than the "+0 KB" target; the 302 KB of art is already lazy | ⚪ | `plan-act4.md` §9 | — |
 | **4.2** | Splitting `style.css` would need a build step, which rule 2 forbids | ⚪ | — | — |
+| **5.1** | ✅ **DONE.** Workshop repo at `Documents\neu` — `main`, 200 files, `0f37283`, no remote. Backs up `memory/` **and** `_scripts/`, which had no copy either. `site/memory/` is force-added because a nested `.gitignore` outranks the root; commit docs with `_scripts\backup-docs.ps1`, not raw `git add`. **Still local-only** — a private remote finishes it | ✅ | `Documents\neu` | done |
 
 ---
 
@@ -108,32 +109,54 @@ Status: 🔴 blocked on Neu · 🟠 real gap · 🟡 polish · ⚪ decided, no a
    about whether the castle track is any good.
 7. **2.6 / 2.7** — the seven placeholder sprites and the deck covers.
 
-## A risk created on 2026-08-17, worth a decision
+## The docs backup — ✅ RESOLVED 2026-08-17
 
-Two changes made on the same day compound into one gap:
+**The gap.** Two changes made the same day compounded: `memory/` went into
+`site/.gitignore` (so it left the Pages repo), and the stray empty repo at
+`Documents\neu\.git` was removed (so `site/` was in no repo at all). Neither
+was wrong alone. Together they left 3,600 lines of documentation with **no
+version history and no copy anywhere.**
 
-1. `memory/` is now in `site/.gitignore`, so the 3,600 lines of design
-   documentation are no longer in the Pages repo.
-2. The stray empty repo at `Documents\neu\.git` was removed, so `site/`
-   is not inside any git repository at all.
+**Neu chose:** a local repo at `Documents\neu`. Done — `main`, 200 files,
+commit `0f37283`, **no remote**.
 
-Neither was wrong on its own. Together they mean **`memory/` has no version
-history and no off-machine copy.** Losing the laptop loses `story.md`,
-`decisions.md`, `PLAN.md` and the rest.
+It covers `site/` *and* `_scripts/`, which mattered more than expected:
+`_scripts/` sits outside `site/`, so `deploy.ps1`, `make-sprites.mjs`,
+`measure-sheets.mjs` and `contact-sheet.mjs` had no backup either.
 
-`site/` itself is safe once a deploy happens — `_deploy` is a real clone and
-the code is committed there. It is only the excluded folder that is exposed.
+### The trap this hit, which is worth knowing
 
-Three ways out, in order of how little they change:
+`site/memory/` had to be **force-added**. Git gives a lower-level
+`.gitignore` precedence over a parent's, so the `memory/` line in
+`site/.gitignore` *also* hides `memory/` from the repo one level up — the
+repo whose only purpose is to back it up. A root-level `!site/memory/`
+does not help; the nested rule wins.
 
-- **A private second repo** for `memory/` alone. Keeps it off the public
-  site, gets history and a backup. One `git init` and a remote.
-- **A local repo at `Documents\neu`** covering everything including
-  `memory/`, never pushed anywhere. History but no off-machine copy.
-- **Un-ignore `memory/`** and accept that the walkthrough is public. This is
-  the option that was just deliberately rejected, listed for completeness.
+The first `git add -A` staged 186 files and **zero** of them were the docs.
+It reported success.
 
-Recommendation: the first. It is the only one that solves both halves.
+Tracked files are safe from here (`.gitignore` only affects untracked
+files), but a **new** file inside `memory/` will be skipped again. So:
+
+> **Use `_scripts\backup-docs.ps1` to commit docs**, not raw `git add`. It
+> force-adds `site\memory`, then asserts at least 10 files are tracked
+> there and stops if not — because a backup that silently backs up nothing
+> is worse than no backup. fixes17 §11 asserts the script still does both.
+
+### Still open: it is local-only
+
+There is history now, but still no copy off the machine. To finish it,
+create a **private** repo and:
+
+```
+cd Documents\neu
+git remote add origin git@github.com:Neudron/neu-workshop.git
+git push -u origin main
+```
+
+**It must be private.** It contains `story.md`. A public remote here undoes
+the entire reason `memory/` was excluded from the site. `backup-docs.ps1`
+warns if it ever finds a remote.
 
 ## 3.7 — `.well-known/discord`, and what I would do
 

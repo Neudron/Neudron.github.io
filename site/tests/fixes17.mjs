@@ -605,5 +605,125 @@ console.log('\n10. .well-known');
      !GI.split('\n').some(l => l.trim() && !l.startsWith('#') && /well-known/.test(l)));
 }
 
+console.log('\n11. the docs have a backup, and it actually reaches them');
+{
+  /* Excluding memory/ from the Pages repo (§9) and removing the stray
+     root .git were each right on their own. Together they left 3,600
+     lines of documentation with no history and no off-machine copy.
+     The workshop repo at Documents\neu closes that.
+
+     THE TRAP THIS SECTION EXISTS FOR. Git gives a lower-level
+     .gitignore precedence over a parent's, so `memory/` in
+     site/.gitignore ALSO hides memory/ from the repo one level up —
+     the repo whose only job is to back it up. No warning; `git add -A`
+     just skips it. It has to be force-added, and a NEW file inside
+     memory/ has to be force-added again.
+
+     A backup that silently backs up nothing is worse than none, so
+     this asserts the mechanism rather than trusting it. */
+  const S  = path.join(ROOT, '..', '_scripts', 'backup-docs.ps1');
+  const RG = path.join(ROOT, '..', '.gitignore');
+
+  ok('a backup script exists', fs.existsSync(S));
+  ok('the workshop repo has its own .gitignore', fs.existsSync(RG));
+
+  if (fs.existsSync(S)) {
+    const B = fs.readFileSync(S, 'utf8');
+    ok('>>> it force-adds memory/, or it backs up nothing <<<',
+       /git add -f\s+site\\memory/.test(B));
+    ok('it explains WHY the force-add is needed',
+       /lower-level \.gitignore/i.test(B) && /precedence/i.test(B));
+    /* the guard against the failure being silent next time */
+    ok('>>> it fails loudly if the docs stop being tracked <<<',
+       /ls-files site\\memory/.test(B) && /\.Count -lt/.test(B));
+    ok('it warns before a remote makes the walkthrough public',
+       /PRIVATE/.test(B) && /remote/i.test(B));
+  }
+
+  if (fs.existsSync(RG)) {
+    const R2 = fs.readFileSync(RG, 'utf8');
+    ok('the workshop repo does not swallow the Pages clone',
+       /^_deploy\/$/m.test(R2));
+    ok('it does not track node_modules', /node_modules/.test(R2));
+    ok('it does not track the sprite source rips', /deltarune/.test(R2));
+    /* If someone ever writes `memory/` in here it would be belt AND
+       braces against the backup working at all. */
+    ok('>>> it does NOT re-exclude memory <<<',
+       !R2.split('\n').some(l => l.trim() && !l.startsWith('#') &&
+                                 /(^|\/)memory\/?$/.test(l.trim())));
+  }
+
+  /* And the decision is written down where the next session looks. */
+  const P = fs.readFileSync(path.join(ROOT, 'memory', 'pending.md'), 'utf8');
+  ok('pending.md records how the docs are backed up',
+     /backup-docs/.test(P));
+}
+
+console.log('\n12. deploy.ps1 — the only path to production');
+{
+  /* Nothing tested this script until now, which is backwards: it is the
+     one file that can put something wrong in front of the world, and
+     GitHub Pages has no staging step to catch it afterwards.
+
+     It cannot be executed here (no PowerShell, and it pushes), so these
+     are source assertions. They cover the properties whose absence is
+     silent — the failures you would not notice until the site was
+     already wrong, or already unchanged when you needed it changed. */
+  const D = path.join(ROOT, '..', '_scripts', 'deploy.ps1');
+  ok('deploy.ps1 exists', fs.existsSync(D));
+
+  if (fs.existsSync(D)) {
+    const S2 = fs.readFileSync(D, 'utf8');
+
+    /* THE ONE THAT MATTERS MOST. A clean working tree does not mean
+       there is nothing to deploy — work can be committed and unpushed,
+       which is exactly what a session leaves when told to commit but
+       not push. The script used to answer "already in sync" and exit,
+       doing nothing at the one moment it was needed. */
+    ok('>>> a clean tree still pushes existing commits <<<',
+       /rev-list origin\/main\.\.HEAD/.test(S2) &&
+       /ahead\.Count -eq 0/.test(S2));
+    ok('it distinguishes "nothing staged" from "nothing to do"',
+       /hasStaged/.test(S2));
+    ok('it does not commit when there is nothing to commit',
+       /if \(\$hasStaged\) \{[\s\S]*?git commit/.test(S2));
+
+    /* it must never push without being told to, twice over */
+    ok('>>> it asks before going live <<<',
+       /Read-Host/.test(S2) && /-ne 'deploy'/.test(S2));
+    ok('it has a dry run', /\$DryRun/.test(S2));
+    ok('it warns about PR #1 at the moment of the push',
+       /PR #1/i.test(S2));
+
+    /* Stale .lock files under .git make every later git command refuse
+       with "Another git process seems to be running". A crashed process
+       leaves them, and so does any environment that can create files
+       but not delete them. Clearing them is the difference between the
+       script running and the script refusing on a Tuesday for reasons
+       nobody remembers. */
+    ok('it clears stale git locks before starting',
+       /\*\.lock/.test(S2) && /Remove-Item/.test(S2));
+    ok('>>> but only OLD locks, so it cannot interrupt a live git <<<',
+       /AddMinutes\(-\d+\)/.test(S2) && /LastWriteTime -lt/.test(S2));
+
+    /* the gates that stop a bad tree reaching the CDN */
+    ok('it checks the tree shape before staging', /the tree is wrong/.test(S2));
+    ok('it detects a pre-reorg flat js/ tree', /flat js/.test(S2));
+    ok('>>> it blocks memory/ from shipping <<<', /\^memory\//.test(S2));
+    ok('it blocks node_modules and the sprite rips',
+       /node_modules/.test(S2) && /deltarune/.test(S2));
+    ok('it blocks secrets', /\\\.env|\.pem|\.key/.test(S2));
+
+    /* mirroring, not copying — the bug that once shipped 2,284 KB */
+    ok('it mirrors rather than copies (robocopy /MIR)', /\/MIR/.test(S2));
+    ok('it keeps .git and node_modules out of the mirror',
+       /\/XD/.test(S2) && /'\.git'/.test(S2));
+
+    /* verifying against the CDN, not an API that lies earlier */
+    ok('it verifies against the live file', /neu\.ac\/js\//.test(S2));
+    ok('it cache-busts the verification', /cb=/.test(S2));
+  }
+}
+
 console.log('\n' + (fail ? 'FAILED ' : 'passed ') + pass + '/' + (pass + fail));
 process.exit(fail ? 1 : 0);

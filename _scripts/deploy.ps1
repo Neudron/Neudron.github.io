@@ -51,6 +51,26 @@ function Good($m) { Write-Host "   $m" -ForegroundColor Green }
 Step 1 'checking the folders'
 if (-not (Test-Path $site))          { Bad "no site\ at $site" }
 if (-not (Test-Path "$deploy\.git")) { Bad "_deploy has no .git. Re-clone it: git clone https://github.com/Neudron/Neudron.github.io.git _deploy" }
+
+# Stale lock files. Git takes .git\index.lock, HEAD.lock and
+# refs\heads\*.lock while it writes, and removes them when it is done.
+# A process that dies mid-write - or a sandbox that can create files
+# but not delete them - leaves them behind, and every later git command
+# refuses with "Another git process seems to be running". Nothing here
+# runs git concurrently, so a lock older than two minutes is litter.
+#
+# Only old ones are touched, and only inside _deploy\.git, so this can
+# never interrupt a git command that is genuinely in flight.
+$cut = (Get-Date).AddMinutes(-2)
+$locks = @(Get-ChildItem "$deploy\.git" -Recurse -Force -ErrorAction SilentlyContinue |
+           Where-Object { -not $_.PSIsContainer -and
+                          ($_.Name -like '*.lock' -or $_.Name -like '*stale*') -and
+                          $_.LastWriteTime -lt $cut })
+if ($locks.Count -gt 0) {
+  $locks | Remove-Item -Force -ErrorAction SilentlyContinue
+  Good "cleared $($locks.Count) stale git lock file(s)"
+}
+
 Push-Location $deploy
 $remote = (git remote get-url origin 2>$null)
 if ($remote -notmatch 'Neudron\.github\.io') { Pop-Location; Bad "origin is '$remote', not the pages repo" }
@@ -105,13 +125,32 @@ if ($leak) { git reset --quiet; Pop-Location; Bad ("these must not ship: " + ($l
 Good "$($staged.Count) file(s) staged, no leaks"
 
 # -- 5. what is actually changing -------------------------------------
+# A clean working tree does NOT mean there is nothing to deploy. Work
+# can already be committed here and simply not pushed - that is exactly
+# the state a session leaves behind when it is told to commit but not
+# push. An earlier version of this script exited with "already in sync"
+# in that case, which is the worst possible answer: the one moment you
+# most need it to act, it politely does nothing and the site stays on
+# the old commit.
 Step 5 'what would go live'
-if ($staged.Count -eq 0) {
+git fetch --quiet origin main 2>$null
+$ahead = @(git rev-list origin/main..HEAD)
+$hasStaged = $staged.Count -gt 0
+
+if (-not $hasStaged -and $ahead.Count -eq 0) {
   git reset --quiet; Pop-Location
   Write-Host "   nothing to deploy - already in sync" -ForegroundColor Yellow
   exit 0
 }
-git diff --cached --stat | Select-Object -Last 30
+
+if ($hasStaged) {
+  Write-Host "   uncommitted changes:" -ForegroundColor Cyan
+  git diff --cached --stat | Select-Object -Last 30
+}
+if ($ahead.Count -gt 0) {
+  Write-Host "   already committed, waiting to be pushed:" -ForegroundColor Cyan
+  git --no-pager log --oneline origin/main..HEAD | ForEach-Object { Write-Host "     $_" }
+}
 
 if ($DryRun) {
   git reset --quiet; Pop-Location
@@ -123,16 +162,25 @@ if ($DryRun) {
 # -- 6. ASK. Pages has no staging step --------------------------------
 Step 6 'confirm'
 Write-Host "   This goes LIVE at https://www.neu.ac in about a minute." -ForegroundColor Yellow
+Write-Host "   Close PR #1 first if it is still open - merged after this," -ForegroundColor Yellow
+Write-Host "   it overwrites the site with a 70-byte page." -ForegroundColor Yellow
 $a = Read-Host "   Type  deploy  to continue"
 if ($a -ne 'deploy') {
   git reset --quiet; Pop-Location
   Write-Host "   cancelled, nothing committed"
   exit 0
 }
-if (-not $Message) { $Message = Read-Host "   commit message" }
-if (-not $Message) { $Message = 'Update the site' }
 
-git commit -q -m $Message
+if ($hasStaged) {
+  if (-not $Message) { $Message = Read-Host "   commit message" }
+  if (-not $Message) { $Message = 'Update the site' }
+  git commit -q -m $Message
+  Good "committed $(git rev-parse --short HEAD)"
+} else {
+  git reset --quiet          # nothing to commit; drop the staging from step 4
+  Good "pushing $($ahead.Count) existing commit(s)"
+}
+
 git push origin main
 if ($LASTEXITCODE -ne 0) { Pop-Location; Bad "push failed" }
 Good "pushed"

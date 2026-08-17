@@ -53,12 +53,25 @@ Documents\neu\
               (node_modules is gitignored — 13 MB of jsdom)
     .github\workflows\deploy.yml
     CNAME     www.neu.ac
+  .git\       ← THE WORKSHOP REPO (added 2026-08-17). local-only, no
+              remote. Covers site\ AND _scripts\, neither of which is
+              backed up anywhere else once memory\ left the Pages repo.
+  .gitignore  excludes _deploy\, node_modules, the sprite rips
   _deploy\    git clone of Neudron/Neudron.github.io — push from HERE
-  _scripts\   one-off sprite-scraping scripts. not part of the site.
+  _scripts\   sprite scrapers, deploy.ps1, backup-docs.ps1.
+              NOT part of the site, and not in the Pages repo either.
   _removed-from-main\
 ```
 
 `site\` and `_deploy\` must be kept identical. `site\` is where you work.
+
+**Two repos, and they do not overlap.** `_deploy` is the public Pages clone
+and holds only `site\` minus `memory\`. The workshop repo at `Documents\neu`
+holds everything including `memory\` and `_scripts\`, and has no remote.
+
+**Commit docs with `_scripts\backup-docs.ps1`, never a bare `git add -A`.**
+`site\.gitignore` excludes `memory\`, and a nested `.gitignore` outranks the
+root, so a plain add silently skips the documentation — see §1.8.
 
 ## 1.3 The memory files
 
@@ -167,11 +180,12 @@ node fixes13.mjs   # Calamitas sheets + six oggs, danmaku seam        (72)
 node fixes14.mjs   # the six tilesets, atlas bounds, palette fallback (70)
 node fixes15.mjs   # thumb controls, key synthesis, no stuck keys     (99)
 node fixes16.mjs   # the soundtrack: gate, crossfade, duck, hidden tab (181)
-node fixes17.mjs   # quiz focus, fps, covers, sprites, README, deploy line (260)
+node fixes17.mjs   # quiz focus, fps, covers, sprites, README, the deploy
+                   #   boundary, the docs backup, deploy.ps1 itself     (289)
 node playthrough.mjs # full Act I→IV walkthrough, save round-trips   (45)
 ```
 
-**1208 checks. All passing as of 2026-08-17.** Run them one at a time —
+**1237 checks. All passing as of 2026-08-17.** Run them one at a time —
 the whole set exceeds a single tool-call timeout.
 
 Syntax gate first, it is instant and catches most mistakes:
@@ -201,7 +215,7 @@ real files.
 ## 1.8 Traps that have produced FALSE FAILURES here
 
 **Check the harness before the site. Most failures in this project have been
-test bugs reporting working code as broken.** Eleven so far:
+test bugs reporting working code as broken.** Twelve so far:
 
 1. **Unanchored CSS selector search.** `CSS.indexOf('.tbox {')` matched the
    phrase quoted inside an explanatory comment. Anchor to `'\n' + sel + ' {'`.
@@ -239,7 +253,29 @@ test bugs reporting working code as broken.** Eleven so far:
    equally have passed if someone deleted one and added another. Assert the
    names, then the count.
 
-**And two that were NOT test bugs:**
+12. **A green check on an empty set.** Repeated from #8 because it happened
+   twice in different clothes and it is the most dangerous shape here. The
+   docs-backup repo was created, `git add -A` was run, 186 files staged, exit
+   0, everything looked right — and **zero** of them were the documentation
+   the repo existed to protect. See the gitignore trap below.
+
+**And FOUR that were NOT test bugs:**
+
+- **A nested `.gitignore` outranks its parent, and that can hide a folder from
+  a repo one level up.** `site/.gitignore` excludes `memory/` so the
+  walkthrough never reaches the public Pages repo. That same line also hid
+  `memory/` from the workshop repo at `Documents\neu` whose *only purpose* is
+  to back it up. A root-level `!site/memory/` does not fix it — git gives the
+  lower-level file precedence, full stop. It has to be **force-added**
+  (`git add -f site/memory`), and a *new* file in there needs forcing again.
+  `_scripts\backup-docs.ps1` does the force-add and then asserts at least ten
+  files are tracked, because the failure mode is silence.
+- **A clean working tree does not mean there is nothing to deploy.** Work can
+  be committed and unpushed — precisely what a session leaves behind when told
+  to commit but not push. `deploy.ps1` used to answer "already in sync" and
+  exit, doing nothing at the one moment it was needed. It now compares
+  `origin/main..HEAD` and offers to push existing commits. fixes17 §12 pins
+  this; before that, nothing tested the one script that touches production.
 
 - `Copy-Item` adds files and never removes them, so syncing `site\` to
   `_deploy\` left deleted files behind and Act IV art sat at 2,284 KB against

@@ -40,7 +40,7 @@ node fixes5.mjs          # ... through fixes17.mjs
 node playthrough.mjs     # a full scripted run of the whole game
 ```
 
-Run them one at a time; the whole set takes a few minutes. **1208 checks
+Run them one at a time; the whole set takes a few minutes. **1237 checks
 across 14 files**, all passing.
 
 Before anything else, the syntax gate — it is instant and catches most
