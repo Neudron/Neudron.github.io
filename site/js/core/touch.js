@@ -136,9 +136,11 @@
      the same class of bug as a stuck key: the scene closes, the timer
      does not, and it keeps firing keydowns into nothing. */
   var killRepeat = function () {};
+  var clearStick = function () {};
 
   function releaseAll() {
     killRepeat();
+    clearStick();
     for (var k in held) if (held[k]) send(k, false);
   }
 
@@ -311,6 +313,11 @@
     }
 
     killRepeat = stopRepeat;
+    /* releaseAll() calls this so a backgrounded tab cannot leave the
+       stick latched to a pointer that is no longer there — the pad
+       would come back looking held. end(null) skips the pointer-id
+       guard and runs the same clear path. */
+    clearStick = function () { end(null); };
 
     stick.addEventListener('pointerdown', begin);
     stick.addEventListener('pointermove', move);
@@ -371,6 +378,13 @@
   addEventListener('blur', releaseAll);
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) releaseAll();
+  });
+  /* A physical keyup makes the pad's latch stale: the pad thinks it is
+     still holding ArrowLeft, so a thumb that has not moved stops being
+     re-sent the moment the real keyboard lets go. Clear the latch —
+     the next pointermove re-arms the direction. */
+  addEventListener('keyup', function (e) {
+    if (e && held[e.key]) held[e.key] = false;
   });
 
   NEU.touch = {

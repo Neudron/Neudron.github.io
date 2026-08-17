@@ -248,13 +248,33 @@
     if (m) m.value = String(NEU.music ? NEU.music.volume : num(K_MUSIC, 55));
   }
 
+  /* The panel's focusables — everything EXCEPT the disabled switches.
+   Under prefers-reduced-motion the shake and flash switches are
+   disabled (the OS preference is the player's own statement), and a
+   disabled element is not focusable: focusing it is a no-op, and a
+   trap that wraps to one eats Tabs silently while nothing appears to
+   have focus. */
+  function focusables() {
+    var all = panel.querySelectorAll('button:not(:disabled), input:not(:disabled)');
+    var out = [], i;
+    for (i = 0; i < all.length; i++) out.push(all[i]);
+    /* jsdom returns selector-list matches grouped by selector rather
+       than in document order, which would wrap the trap backwards.
+       Sort explicitly so the order is the same in every engine. */
+    out.sort(function (a, b) { return (a.compareDocumentPosition(b) & 4) ? -1 : 1; });
+    return out;
+  }
+
   function open() {
     if (open_) return;
     open_ = true;
     refresh();
     panel.hidden = false;
     document.body.classList.add('is-playing');
-    var first = panel.querySelector('[role="switch"]');
+    /* A single selector on purpose: a selector LIST comes back grouped
+       by selector in jsdom, and the first match must be the first
+       switch in DOM order, not the first element of the last group. */
+    var first = panel.querySelector('[role="switch"]:not(:disabled)');
     (first || panel.querySelector('.sett__x')).focus();
     requestAnimationFrame(function () { panel.classList.add('is-in'); });
   }
@@ -286,8 +306,10 @@
       /* Buttons AND inputs. The trap used to collect only buttons, so
          the moment a slider was added Tab walked straight out of a
          dialog marked aria-modal and left the player behind the scrim
-         with no way back to the close button. */
-      var els = panel.querySelectorAll('button, input');
+         with no way back to the close button. Disabled switches are
+         excluded the same way — a trap that wraps to one eats Tabs
+         silently. */
+      var els = focusables();
       if (!els.length) return;
       var i = Array.prototype.indexOf.call(els, document.activeElement);
       if (e.shiftKey) {

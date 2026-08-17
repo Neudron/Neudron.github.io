@@ -60,7 +60,8 @@
        a room id can be renamed during development and a save file
        pointing at a deleted room would otherwise be a hard lock. */
     var s = (NEU.save && NEU.save.data) || {};
-    var resume = s.room && NEU.engine.rooms.indexOf(s.room) >= 0;
+    var rooms = (NEU.engine && NEU.engine.rooms) || [];
+    var resume = s.room && rooms.indexOf(s.room) >= 0;
     var room = resume ? s.room : START;
     var spawn = resume ? (s.spawn || 'default') : 'default';
 

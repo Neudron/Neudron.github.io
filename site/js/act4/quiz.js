@@ -111,7 +111,7 @@
   }
 
   var TIME = 12;
-  var i = 0, score = 0, t = 0, tick = null, locked = false, open_ = false;
+  var i = 0, score = 0, t = 0, tick = null, askTimer = null, locked = false, open_ = false;
   /* Dev/test only. The pacing between questions is most of what makes
      this feel like a game show, so it cannot be tuned down for real
      players — but a test that has to sit through twenty 1.5-second
@@ -151,8 +151,10 @@
     if (open_) return;
     open_ = true;
     /* Where to put the player back when they leave. Same courtesy the
-       settings panel does with the gear button. */
-    lastFocus = document.activeElement;
+       settings panel does with the gear button. Only captured once —
+       a retry from the end screen must not overwrite it with the quit
+       button it is sitting on. */
+    if (!lastFocus) lastFocus = document.activeElement;
     wrap.hidden = false;
     document.body.classList.add('is-playing');
     if (NEU.quest) { NEU.quest.lock(true); NEU.quest.mark('a4_tenna'); }
@@ -163,12 +165,19 @@
     /* No options exist yet, so the quit button is the way in. */
     var q0 = document.getElementById('quizQuit');
     if (q0 && q0.focus) q0.focus();
-    setTimeout(ask, pace(2400));
+    askTimer = setTimeout(ask, pace(2400));
   }
 
   function close() {
     open_ = false;
     clearInterval(tick);
+    /* A pending "next question" timer must die with the overlay. If
+       it survived, ask() would keep rebuilding the board on a hidden
+       wrapper, the timer would run the whole show into a phantom "D-"
+       finish, and the rank door would mark itself a4_rank behind the
+       player's back. */
+    clearTimeout(askTimer);
+    askTimer = null;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
@@ -187,6 +196,9 @@
   }
 
   function ask() {
+    /* The guard every timer fires into: if the show was closed while
+       this call was queued, rebuild nothing and touch nothing. */
+    if (!open_) return;
     if (i >= Q.length) { finish(); return; }
     locked = false;
     var q = Q[i];
@@ -237,10 +249,11 @@
       if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     }
     i++;
-    setTimeout(ask, pace(1500));
+    askTimer = setTimeout(ask, pace(1500));
   }
 
   function finish() {
+    if (!open_) return;
     var rank = rankFor(score);
     if (NEU.save) {
       /* Only ever improves. A worse re-run must not close a door that

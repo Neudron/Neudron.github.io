@@ -98,7 +98,7 @@
       phase = 'response';
       notes = notes.concat(build(true));
       say(TAUNT[round][1] || 'go.');
-    }, 1400 + 4 * beatLen() * 1000 - 400);
+    }, 1400 + 4 * beatLen() * 1000);
   }
 
   function say(s) { judged = ''; if (msg) { msg.hidden = false; msg.textContent = s; } }
@@ -272,7 +272,7 @@
   addEventListener('keydown', function (e) {
     if (wrap.hidden) return;
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
-    if (!running && e.key === 'Enter') { e.preventDefault(); open(); return; }
+    if (!running && e.key === 'Enter') { e.preventDefault(); retry(); return; }
     var l = laneOf(e);
     if (l >= 0) { e.preventDefault(); if (!keys[LANES[l]]) press(l); keys[LANES[l]] = true; }
   });
@@ -281,6 +281,17 @@
     if (l >= 0) keys[LANES[l]] = false;
   });
 
+  function retry() {
+    wrap.hidden = false;
+    document.body.classList.add('is-playing');
+    if (NEU.quest) NEU.quest.lock(true);
+    if (msg) msg.hidden = true;
+    layout();
+    hp = 0.5; keys = {}; judged = '';
+    running = true;
+    startRound();
+    requestAnimationFrame(step);
+  }
   function open() {
     wrap.hidden = false;
     document.body.classList.add('is-playing');

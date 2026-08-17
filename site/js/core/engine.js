@@ -98,6 +98,58 @@
     }
   }
 
+  /* ── prop sprites ─────────────────────────────────────────────────
+     Same ASCII-rows-plus-a-palette form the player is drawn in, because
+     that is this project's pixel-art primitive and a second one would be
+     a second thing to keep on the grid. Drawn at SCALE, the size a tile
+     pixel is, so props sit on the same grid as the world they stand in.
+
+     These two are here rather than in a PNG because there is no art in
+     the repo for either: the altar and the save point were falling
+     through drawEnt to the generic 18x18 square, so the stone bowl the
+     room describes at length ("a stone bowl on a stone plinth… a ring of
+     ash in it") was a lilac rectangle. Colours are the castle ramp's
+     own, plus the save star in the brazier's warm pair. */
+  var PROP = {
+    /* The bowl has to be LIGHTER than the plinth it stands on. The
+       plinth tile is #6A5C74 and the first draft used the castle's dark
+       stone, so the altar read as a hole punched in its own plinth —
+       the exact failure the 'A' tile was added to fix in the first
+       place (see the comment on the castle tileset). */
+    altar: { pal: { k: '#2A2238', s: '#8A8598', l: '#C4B8CC', a: '#4A4560' },
+             rows: ['...kkkkk...',
+                    '..klllllk..',
+                    '..klaaalk..',
+                    '..kklllkk..',
+                    '...kkkkk...',
+                    '....sss....',
+                    '....sss....',
+                    '...sssss...',
+                    '..kssssskk.',
+                    '..kkkkkkkk.'] },
+    save:  { pal: { y: '#E4C46A', w: '#FFF2C4', k: '#8F7016' },
+             rows: ['....k....',
+                    '....y....',
+                    '...kyk...',
+                    '.kkyywkk.',
+                    'kyywwwyyk',
+                    '.kkyywkk.',
+                    '...kyk...',
+                    '....y....',
+                    '....k....'] }
+  };
+
+  function stampPal(rows, pal, cx, cy, s) {
+    var h = rows.length, w = rows[0].length;
+    var x0 = (cx - w * s / 2) | 0, y0 = (cy - h * s) | 0;
+    for (var r = 0; r < h; r++) for (var c = 0; c < w; c++) {
+      var ch = rows[r][c];
+      if (ch === '.' || !pal[ch]) continue;
+      ctx.fillStyle = pal[ch];
+      ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
+    }
+  }
+
   function drawPlayer(targetCtx, sx, sy, fce, wlk, mov, anchorFeet, sc) {
     var c = targetCtx || ctx;
     var s = sc || 2;
@@ -280,11 +332,33 @@
   /* ── entities ─────────────────────────────────────────────────── */
   function entAt(e) { return { x: (e.x + 0.5) * TILE, y: (e.y + 1) * TILE }; }
 
-  function nearest() {
+  /* What `fire` can actually DO something with — the list below is
+     exactly the set of branches fire() has.
+
+     This exists because the E handler was `if (nearest()) fire(it); else
+     tryPush()`, and `nearest` returned whatever entity was closest
+     including blocks and plates. fire() has no branch for either, so it
+     returned in silence and tryPush() was never reached: standing
+     correctly against a block with open floor beyond it and pressing e
+     did nothing, in every room, for every block. Every block puzzle in
+     the game was unsolvable no matter how the room was laid out. */
+  function interactive(e) {
+    return typeof e.run === 'function' ||
+           e.t === 'exit' || e.t === 'pickup' || e.t === 'save' ||
+           e.t === 'npc'  || e.t === 'altar';
+  }
+
+  /* A pushable block is worth an `e` prompt even though pressing e goes
+     through tryPush rather than fire. A plate is not: it is floor paint
+     and there has never been anything to press. */
+  function promptable(e) { return interactive(e) || (e.t === 'block' && e.push); }
+
+  function nearest(want) {
     var best = null, bd = REACH;
     for (var i = 0; i < ents.length; i++) {
       var e = ents[i];
       if (e.dead || e.t === 'trigger') continue;
+      if (want && !want(e)) continue;
       var p = entAt(e);
       var d = Math.hypot(p.x - px, p.y - (py - PLAYER_H / 2));
       if (d < bd) { bd = d; best = e; }
@@ -386,6 +460,15 @@
     });
   }
 
+  /* Only reached by a room that declares no spawns at all: the first cell
+     you could actually stand in, in reading order. */
+  function firstOpenCell() {
+    for (var y = 0; y < room.h; y++)
+      for (var x = 0; x < room.w; x++)
+        if (!solidAt(x, y)) return { x: x, y: y };
+    return { x: 2, y: 2 };
+  }
+
   function land(id, spawn) {
     if (room && room.onExit) room.onExit(API);
     room = rooms[id];
@@ -394,8 +477,22 @@
        room shows an arrangement that no longer means anything. */
     room.__solved = NEU.save ? NEU.save.flagged('solved:' + id) : false;
     ents = spawnEnts(room);
-    var s = (room.spawns && room.spawns[spawn]) || room.spawns && room.spawns.default
-            || { x: 2, y: 2 };
+    var s = (room.spawns && room.spawns[spawn]) || (room.spawns && room.spawns.default);
+    if (!s) {
+      /* An exit naming a spawn the target room does not declare used to
+         fall through to a hard-coded {x:2,y:2}. That cell is inside a
+         wall in four of the rooms shipped here and the wrong end of the
+         room in the rest, so a single typo in an exit became a silent
+         soft-lock that no spawn check could see — d3_square was exactly
+         this. Prefer any spawn the room really declares, then go looking
+         for floor, and say so out loud: a missing spawn is a bug in the
+         room and it should not be able to pass for level design. */
+      var names = room.spawns ? Object.keys(room.spawns) : [];
+      s = names.length ? room.spawns[names[0]] : firstOpenCell();
+      if (window.console && console.warn)
+        console.warn('[neu] room "' + id + '" has no spawn "' + spawn +
+                     '" — landing at ' + s.x + ',' + s.y);
+    }
     px = (s.x + 0.5) * TILE; py = (s.y + 1) * TILE;
     walked = 0; face = s.face || 'down';
     room.__spawn = spawn;
@@ -469,6 +566,12 @@
         px = p.x; py = p.y;
         walked += Math.hypot(px - before, py - bY);
         checkTriggers();
+        /* A room's solved() can become true on a WALK, not just on a
+           push — b5 needs you standing on one plate while the block
+           holds the other, and the walk onto the plate is the final
+           move. Check every moving frame; __solved makes it a no-op
+           once the room is done. */
+        checkPuzzle();
       }
       camFollow();
     }
@@ -517,8 +620,14 @@
     for (var pi = 0; pi < ents.length; pi++)
       if (!ents[pi].dead && ents[pi].t === 'plate') drawEnt(ents[pi], now);
 
+    /* An exit is normally a hole in the wall with nothing to draw — but
+       one carrying a `sheet` is a THING, and blanket-filtering exits
+       meant the only entity sheet binding in the whole game never drew.
+       b7_altar's fire door has had `sheet: 'firedoor'` on it since the
+       room was written and has never once appeared on screen. */
     var drawn = ents.filter(function (e) {
-      return !e.dead && e.t !== 'trigger' && e.t !== 'exit' && e.t !== 'plate'; })
+      return !e.dead && e.t !== 'trigger' && e.t !== 'plate' &&
+             (e.t !== 'exit' || e.sheet); })
                     .map(function (e) { return { e: e, y: (e.y + 1) * TILE }; });
     drawn.push({ e: null, y: py });
     drawn.sort(function (a, b) { return a.y - b.y; });
@@ -527,15 +636,21 @@
       var d = drawn[i];
       if (!d.e) {
         var f = moving ? (1 + (((walked / 10) | 0) % 2)) : 0;
+        /* SCALE, not 2. The world draws a pixel at 3 CSS px and the
+           character drew one at 2, so the two never shared a grid and
+           fine detail always fought the character. It also fixes a
+           mismatch the other way: at 2 the sprite was 6 world units
+           wide against a 10-unit collision box, so she read as smaller
+           than the space she actually occupied. */
         stamp(BODIES[face].concat(LEGS[f]),
-              ((px - camX) * SCALE) | 0, ((py - camY) * SCALE) | 0, 2 * SCALE / 3 | 0 || 2);
+              ((px - camX) * SCALE) | 0, ((py - camY) * SCALE) | 0, SCALE);
         continue;
       }
       drawEnt(d.e, now);
     }
 
     /* the interact prompt */
-    var n = nearest();
+    var n = nearest(promptable);
     if (n && !busy) {
       var p = entAt(n);
       ctx.fillStyle = '#EDE7DE';
@@ -575,14 +690,12 @@
     var sx = ((p.x - camX) * SCALE) | 0, sy = ((p.y - camY) * SCALE) | 0;
     var sheet = e.sheet && NEU.sheets && NEU.sheets[e.sheet];
     if (sheet) {
-      var im = img(sheet.src);
-      if (im.complete && im.naturalWidth && !im.__failed) {
-        var fr = sheet.fps ? (((now / (1000 / sheet.fps)) | 0) % sheet.frames) : (e.frame || 0);
-        var dw = sheet.fw * (e.scale || 1), dh = sheet.fh * (e.scale || 1);
-        ctx.drawImage(im, 0, fr * sheet.fh, sheet.fw, sheet.fh,
-                      (sx - dw / 2) | 0, (sy - dh) | 0, dw | 0, dh | 0);
-        return;
-      }
+      /* One blitter, in data/sheets.js — it is the only thing that
+         knows about `cols`, and it is shared with both bosses. */
+      if (NEU.sheetDraw && NEU.sheetDraw(ctx, e.sheet, sx, sy, {
+            frame: sheet.fps ? null : (e.frame || 0),
+            col: e.col || 0, scale: e.scale || 1,
+            anchor: 'feet', now: now })) return;
       /* Missing art is LOUD. A silently absent sprite gets mistaken
          for a logic bug and costs an hour; a magenta box does not. */
       ctx.fillStyle = '#FF00A0';
@@ -614,6 +727,21 @@
       if (on) { ctx.fillStyle = '#FFF2C4'; ctx.fillRect(sx - 3, sy - 18 - wob, 6, 6); }
       return;
     }
+    if (PROP[e.t]) {
+      /* 2 is the player's pixel size, so a prop and a person are on the
+         same grid. The save point breathes; the altar does not. */
+      var pr = PROP[e.t];
+      if (e.t === 'save') {
+        var pulse = 1 + Math.sin(now / 420) * 0.06;
+        ctx.save();
+        ctx.globalAlpha = 0.85 + Math.sin(now / 420) * 0.15;
+        stampPal(pr.rows, pr.pal, sx, (sy - 6 + (1 - pulse) * 8) | 0, SCALE);
+        ctx.restore();
+        return;
+      }
+      stampPal(pr.rows, pr.pal, sx, sy, SCALE);
+      return;
+    }
     ctx.fillStyle = e.colour || '#B892FF';
     ctx.fillRect(sx - 9, sy - 18, 18, 18);
   }
@@ -635,7 +763,7 @@
       if (busy) return;
       /* Interact first, push second. A block you are standing next to
          is almost never what you meant when there is an npc in reach. */
-      var n = nearest();
+      var n = nearest(interactive);
       if (n) fire(n); else tryPush();
       return;
     }
@@ -645,6 +773,13 @@
   addEventListener('keyup', function (e) {
     if (!running) return;
     var n = keyName(e); if (n) keys[n] = false;
+  });
+  /* Alt-tab away with a key held and the keyup never arrives — the
+     player would keep walking the moment the tab comes back. Same
+     release-all the touch layer does. */
+  addEventListener('blur', function () { keys = {}; });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) keys = {};
   });
 
   /* ── talking ──────────────────────────────────────────────────── */

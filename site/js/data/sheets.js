@@ -42,12 +42,22 @@
        an additive glow, not different art. So phase 2 is drawn as
        this sheet plus a second pass in 'lighter' composite, which is
        also how the game does it. */
+    /* TWO COLUMNS, not one. Both of these sheets are 120 wide and hold
+       two 60px-wide pose sets side by side — measured, by decoding the
+       PNG and counting opaque columns inside one cell: there is a figure
+       at x 12-53 and a second at x 72-115 with 24 transparent columns
+       between them, in all 21 rows, and the two halves differ from each
+       other in every row. `fw` was 120, so the blitter drew BOTH poses
+       at once and she rendered as a double exposure of two overlapping
+       women — which is what "Calamitas has no sprite" actually looked
+       like on screen. `cols` makes the second half addressable instead
+       of accidental; `frames` stays the row count. */
     scal:      { src: IMG + 'calamity/SupremeCalamitas.png',
-                 w: 120, h: 1260, frames: 21, fw: 120, fh: 60, fps: 12,
-                 note: 'frame count from the source sheet (21 x 60)' },
+                 w: 120, h: 1260, frames: 21, cols: 2, fw: 60, fh: 60, fps: 12,
+                 note: 'measured: 21 rows x 2 columns of 60x60' },
     scalHood:  { src: IMG + 'calamity/SupremeCalamitasHooded.png',
-                 w: 120, h: 1302, frames: 21, fw: 120, fh: 62, fps: 12,
-                 note: 'the hooded intro. same cadence as the body' },
+                 w: 120, h: 1302, frames: 21, cols: 2, fw: 60, fh: 62, fps: 12,
+                 note: 'measured: 21 rows x 2 columns of 60x62. the hooded intro' },
 
     /* her projectiles */
     dart:      { src: IMG + 'calamity/BrimstoneBarrage.png',
@@ -175,6 +185,85 @@
     firedoor:  { src: IMG + 'undertale/firedoor.png',    w: 55, h: 70,  frames: 1, fw: 55, fh: 70,  fps: 0 },
     armchair:  { src: IMG + 'undertale/armchair.png',    w: 45, h: 83,  frames: 1, fw: 45, fh: 83,  fps: 0 },
     corridor:  { src: IMG + 'undertale/newhome-corridor.png', w: 743, h: 76, frames: 1, fw: 743, fh: 76, fps: 0 }
+  };
+
+  /* ── ONE blitter, and one image cache ──────────────────────────────
+     This lives here rather than in engine.js because the manifest is
+     what defines the contract, and because three modules need it
+     against three different canvases: engine.js for entities,
+     boss-scal.js and boss-polt.js for their own fights.
+
+     It replaces four copies of the same frame formula and three copies
+     of the same `img()` cache — and the copies are why `cols` did not
+     exist: every one of them hardcoded a source x of 0, so a sheet with
+     two columns had no way to say so and Calamitas drew both of her
+     pose sets on top of each other.
+
+     `o` accepts: frame (else the fps clock), col, scale, rot, glow,
+     anchor ('feet' | 'centre'), alpha. Returns false when the image is
+     not ready, so callers keep their own fallback. */
+  var imgs = {};
+  NEU.sheetImg = function (src) {
+    if (imgs[src]) return imgs[src];
+    var i = new Image();
+    i.onerror = function () { i.__failed = true; };
+    i.src = src;
+    imgs[src] = i;
+    return i;
+  };
+
+  NEU.sheetReady = function (sh) {
+    if (!sh) return null;
+    var im = NEU.sheetImg(sh.src);
+    return (im.complete && im.naturalWidth && !im.__failed) ? im : null;
+  };
+
+  NEU.sheetDraw = function (ctx, key, x, y, o) {
+    o = o || {};
+    var sh = NEU.sheets[key];
+    var im = NEU.sheetReady(sh);
+    if (!im) return false;
+    var n = sh.frames || 1;
+    var fr = (o.frame === undefined || o.frame === null)
+      ? (sh.fps ? ((((o.now === undefined ? Date.now() : o.now) / (1000 / sh.fps)) | 0) % n) : 0)
+      : (((o.frame % n) + n) % n);
+    /* cols is the whole point: source x moves across the sheet instead
+       of being pinned at 0 */
+    var cols = sh.cols || 1;
+    var col = ((o.col || 0) % cols + cols) % cols;
+    var sxi = col * sh.fw, syi = fr * sh.fh;
+    var sc = o.scale || 1;
+    var dw = sh.fw * sc, dh = sh.fh * sc;
+    ctx.save();
+    ctx.translate(x, y);
+    if (o.rot) ctx.rotate(o.rot);
+    if (o.alpha !== undefined) ctx.globalAlpha = o.alpha;
+    var dx = (-dw / 2) | 0;
+    var dy = (o.anchor === 'feet' ? -dh : -dh / 2) | 0;
+    ctx.drawImage(im, sxi, syi, sh.fw, sh.fh, dx, dy, dw | 0, dh | 0);
+    if (o.glow) {
+      /* the same art added over itself — what phase 2 is, and what the
+         game does too */
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = (o.alpha === undefined ? 1 : o.alpha) * 0.5;
+      ctx.drawImage(im, sxi, syi, sh.fw, sh.fh, dx, dy, dw | 0, dh | 0);
+    }
+    /* Separate glowmask FILES stacked additively on the same frame —
+       Polterghast escalates by adding one per phase, which is how the
+       fight shows a phase change without any new art. */
+    if (o.glowKeys) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (var g = 0; g < o.glowKeys.length; g++) {
+        var gs = NEU.sheets[o.glowKeys[g]], gi = NEU.sheetReady(gs);
+        if (!gi) continue;
+        ctx.globalAlpha = 0.55;
+        ctx.drawImage(gi, ((o.col || 0) % (gs.cols || 1)) * gs.fw,
+                      (fr % (gs.frames || 1)) * gs.fh, gs.fw, gs.fh,
+                      dx, dy, dw | 0, dh | 0);
+      }
+    }
+    ctx.restore();
+    return true;
   };
 
   /* SOURCE-ONLY. Big atlases that crops come out of. They must NEVER

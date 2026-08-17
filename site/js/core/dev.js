@@ -145,8 +145,17 @@
     wipe: function () {
       if (NEU.save) { NEU.save.wipe(); log('save wiped.'); }
     },
-    goto: function () { log('usage: goto <room>. rooms: ' +
-      (NEU.engine ? NEU.engine.rooms.join(' ') || '(none registered yet)' : 'engine.js not loaded')); }
+    goto: function (room) {
+      if (!room) {
+        log('usage: goto <room>. rooms: ' +
+          (NEU.engine && NEU.engine.rooms ? NEU.engine.rooms.join(' ') : '(engine not loaded)'));
+        return;
+      }
+      if (!NEU.engine || !NEU.engine.enter) { log('engine.js not loaded'); return; }
+      hide();
+      if (NEU.engine.enter(room)) log('now in ' + room + '.');
+      else log('no room "' + room + '". try the list.');
+    }
   };
 
   /* The overlay. Its own element rather than a canvas inside the dev

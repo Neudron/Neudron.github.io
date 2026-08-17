@@ -24,7 +24,7 @@
   var el = document.getElementById('crack');
   if (!el) { NEU.crack = { arm: function () {} }; return; }
 
-  var armed = false, clicks = 0, opened = false;
+  var armed = false, clicks = 0, opened = false, timer = null;
 
   var NOISE = [
     'something behind the panel makes a noise. it is not a good noise.',
@@ -72,10 +72,24 @@
       opened = true;
       el.classList.add('is-portal');
       if (NEU.talk) NEU.talk(['it is not a crack. it is a hole, and it is round now.'], 'narr');
-      setTimeout(function () {
+      timer = setTimeout(function () {
         if (NEU.polt) NEU.polt.open();
       }, 2400);
     }
+  }
+
+  /* Quitting the fight without killing him puts the crack back. A
+     crack that stayed "opened" forever would be a dead end with no
+     exit: the finale never resolves, the save stays stuck at a portal
+     that will not open again. The three clicks are cheap; losing the
+     whole endgame is not. */
+  function reset() {
+    if (!armed || !opened) return;
+    opened = false; clicks = 0;
+    el.classList.remove('is-portal');
+    el.setAttribute('data-n', '0');
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (NEU.save) NEU.save.flag('crack_clicks', 0);
   }
 
   el.addEventListener('click', function (e) { e.stopPropagation(); hit(); });
@@ -88,7 +102,7 @@
     if (clicks >= 3) { opened = true; el.classList.add('is-portal'); }
   }
 
-  NEU.crack = { arm: arm, hit: hit,
+  NEU.crack = { arm: arm, hit: hit, reset: reset,
                 get armed() { return armed; },
                 get clicks() { return clicks; },
                 get opened() { return opened; } };

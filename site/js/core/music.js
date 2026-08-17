@@ -228,7 +228,9 @@
       bus = actx.createGain();
       duckG = actx.createGain();
       bus.gain.value = (vol() / 100) * PEAK;
-      duckG.gain.value = 1;
+      /* If a conversation is already ducking when the context first
+         builds, the duck must survive it. */
+      duckG.gain.value = ducked ? DUCK : 1;
       duckG.connect(bus);
       bus.connect(actx.destination);
 

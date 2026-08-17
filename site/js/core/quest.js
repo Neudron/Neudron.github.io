@@ -217,6 +217,7 @@
     var t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
     if (locked) return;
+    if (!panel) return;
     if (NEU.bullet && NEU.bullet.running) return;
     if (NEU.dark && NEU.dark.running) return;
     e.preventDefault();
