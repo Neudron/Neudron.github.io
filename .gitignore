@@ -1,0 +1,61 @@
+# ── never publish ────────────────────────────────────────────────
+.env
+.env.*
+*.pem
+*.key
+*.p12
+
+# ── test rig ─────────────────────────────────────────────────────
+# 13 MB of jsdom and its dependency tree. The suites themselves
+# (tests/*.mjs) DO belong in the repo — they are the only proof any
+# of this works. Their node_modules does not.
+tests/node_modules/
+tests/package-lock.json
+
+# ── sprite sources ───────────────────────────────────────────────
+# The Deltarune/Calamity rips are 2.5 MB and exist only so tiles and
+# frames can be cropped out of them. The crops ship; the sources do
+# not. js/data/sheets.js keeps the manifest (NEU.sheetSources) and
+# tests/fixes14.mjs §5 asserts no shipped module points at one.
+img/act4/deltarune/
+sr-*.png
+
+# ── the documentation ────────────────────────────────────────────
+# ADDED 2026-08-17. This site is a puzzle game and memory/story.md is
+# the complete walkthrough of it, start to finish, in plain prose.
+# Publishing it was never a decision — memory/ simply sat inside site/
+# and the mirror took everything. Anyone who found the repo (it is
+# named after the site) got the answers before the questions.
+#
+# Also excluded for the same reason: chain.md (all 45 objectives in
+# order), plan-act4.md (every room and boss), build-notes.md (how each
+# mechanic works). And workflow.md, which is deploy and DNS detail
+# that has no business being served to strangers.
+#
+# WHY THE WHOLE FOLDER AND NOT A LIST. The four files above are the
+# spoilers today. A rule that names four files is a rule that goes
+# stale the first time someone writes a fifth, and the failure is
+# silent. Excluding the folder and re-including by exception is the
+# direction where mistakes are safe.
+#
+# THE COST, WHICH IS REAL: memory/ is now local-only. The Pages repo
+# was the only off-machine copy of 3,600 lines of design documentation
+# and it no longer is. That is a backup question, not a publishing
+# question, and it needs a separate answer — see memory/pending.md.
+#
+# TO REVERT: delete the two lines below. Nothing else depends on it;
+# no shipped file references memory/ (asserted by fixes17).
+memory/
+!memory/.gitkeep
+
+# ── build artefacts / experiments ────────────────────────────────
+index-standalone.html
+*-standalone.html
+.DS_Store
+Thumbs.db
+
+# ── one-off tool output ──────────────────────────────────────────
+# contact-sheet.mjs and pad-sheet.mjs write here. Nothing in _scripts
+# ships anyway (it is outside site/), but a .orig backup left next to
+# a sprite by mistake would.
+*.orig

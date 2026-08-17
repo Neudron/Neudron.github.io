@@ -37,7 +37,7 @@
   .boot, .ctl, .glass, .stars, .cue, .cat,
   .sans, .sword, .tbox, .chip, .panel, .keyobj, .swcue,
   .bh, .dog, .dev, .chips, .dk, .quest, .quest__t,
-  .sleep, .tv, .pethand, .boss, .swfly { display: none !important; }
+  .sleep, .tv, .pethand, .deck, .swfly, .eng, .sheetbox, .quiz, .fnf, .craft, .polt, .crack { display: none !important; }
   body.is-booting { overflow: auto !important; }
   .lay, .el { opacity: 1 !important; transform: none !important; }
 </style></noscript>
@@ -112,6 +112,17 @@
   <p><button class="btn" id="bhStart">step in</button></p>
   <p class="panel__note">arrows or wasd &middot; hold shift to focus &middot;
      three hits and you're out</p>
+
+  <!-- Only when you are actually carrying it. The blue blaster in
+       there charges what is in your hands and nothing else, so the
+       room has to tell you what you walked in with. -->
+  <!-- Four pixels, bottom right. Dead until he sits down. -->
+  <button class="crack" id="crack" hidden aria-label="a crack in the panel"></button>
+
+  <p class="panel__carry" id="panelCarry" hidden>
+    <img src="img/switch2.svg" alt="" width="34" height="23">
+    <span id="panelCarryTxt">a console, flat</span>
+  </p>
 </aside>
 
 <!-- ═══ the room ═══════════════════════════════════════════════════
@@ -162,19 +173,98 @@
   <p class="bh__keys">arrows / wasd &nbsp;&middot;&nbsp; e to interact</p>
 </div>
 
+<!-- ═══ tenna ══════════════════════════════════════════════════════
+     A game show, which is an interface, so it is elements. -->
+<div class="quiz" id="quiz" hidden role="dialog" aria-modal="true" aria-label="the show">
+  <div class="quiz__top">
+    <span class="quiz__cat" id="quizCat"></span>
+    <span class="quiz__num" id="quizNum"></span>
+  </div>
+  <div class="quiz__board" id="quizBoard" aria-label="rank thresholds"></div>
+  <p class="quiz__host" id="quizSay"></p>
+  <h2 class="quiz__q" id="quizQ"></h2>
+  <div class="quiz__opts" id="quizOpts"></div>
+  <div class="quiz__timer"><i id="quizBar"></i></div>
+  <div class="quiz__end" id="quizEnd" hidden></div>
+  <button class="bh__quit" id="quizQuit">esc</button>
+  <p class="bh__keys">a b c d &nbsp;&middot;&nbsp; or 1 2 3 4 &nbsp;&middot;&nbsp; esc to leave</p>
+</div>
+
+<!-- ═══ through the crack ══════════════════════════════════════════ -->
+<div class="polt" id="polt" hidden aria-label="polterghast">
+  <canvas id="poltCanvas"></canvas>
+  <div class="bh__msg" id="poltMsg" hidden></div>
+  <button class="bh__quit" id="poltQuit">esc</button>
+  <p class="bh__keys">arrows / wasd &nbsp;&middot;&nbsp; shift to focus &nbsp;&middot;&nbsp; z to strike</p>
+</div>
+
+<!-- ═══ the argument ═══════════════════════════════════════════════ -->
+<div class="fnf" id="fnf" hidden aria-label="rap battle">
+  <canvas id="fnfCanvas"></canvas>
+  <div class="bh__msg" id="fnfMsg" hidden></div>
+  <button class="bh__quit" id="fnfQuit">esc</button>
+  <p class="bh__keys">arrows / wasd &nbsp;&middot;&nbsp; hit them when they land</p>
+</div>
+
+<!-- ═══ the pot ═════════════════════════════════════════════════════ -->
+<div class="craft" id="craft" hidden aria-label="crafting">
+  <h2 class="craft__h">the pot</h2>
+  <p class="craft__say" id="craftSay"></p>
+  <div class="craft__row">
+    <div class="craft__grid" id="craftGrid"></div>
+    <button class="craft__out" id="craftOut"><span>nothing yet</span></button>
+  </div>
+  <div class="craft__tray" id="craftTray"></div>
+  <button class="bh__quit" id="craftQuit">esc</button>
+</div>
+
+<!-- ═══ act iv rooms ═══════════════════════════════════════════════
+     One canvas for all 35 of them. See js/core/engine.js — rooms are data,
+     this is the only surface they draw on. -->
+<div class="eng" id="eng" hidden>
+  <canvas id="engCanvas"></canvas>
+  <button class="bh__quit" id="engQuit">esc</button>
+  <p class="bh__keys">arrows / wasd &nbsp;&middot;&nbsp; e to interact &nbsp;&middot;&nbsp; esc to leave</p>
+</div>
+
 <!-- ═══ objectives ═════════════════════════════════════════════════ -->
 <button class="quest__t" id="questToggle" aria-expanded="false">objectives</button>
 <aside class="quest" id="quest" aria-label="Objectives">
   <button class="quest__x" id="questClose" aria-label="Close objectives">&#215;</button>
-  <h2 class="quest__h">objectives <span class="quest__n" id="questTally">0/11</span></h2>
+  <!-- Placeholder only; quest.js overwrites it from STEPS.length on
+       first render, so this number never needs hand-updating. -->
+  <h2 class="quest__h">objectives <span class="quest__n" id="questTally">0/16</span></h2>
   <ul class="quest__l" id="questList"></ul>
 </aside>
 
-<!-- ═══ what's on the television ═══════════════════════════════════ -->
-<div class="boss" id="boss" hidden>
-  <canvas id="bossCanvas"></canvas>
-  <img id="bossSans" src="img/Sans_sprite.webp" alt="" hidden>
-  <button class="bh__quit" id="bossQuit">esc</button>
+<!-- ═══ what's on the television ═══════════════════════════════════
+     A handheld's home screen, on the big screen. Built as elements
+     rather than a canvas because it is an interface, not a game: the
+     text has to be selectable, readable and reflowable. -->
+<div class="deck" id="deck" hidden aria-label="neu deck">
+  <div class="deck__bar">
+    <span class="deck__brand">neu deck</span>
+    <span class="deck__stat">
+      <span class="deck__wifi" aria-hidden="true">&#9679;&#9679;&#9679;</span>
+      <span id="deckClock">--:--</span>
+      <span class="deck__batt" aria-hidden="true"><i id="deckBattFill"></i></span>
+      <span id="deckBattTxt">100%</span>
+    </span>
+  </div>
+
+  <div class="deck__body">
+    <h2 class="deck__h">library</h2>
+    <ul class="deck__shelf" id="deckShelf" role="listbox" aria-label="games"></ul>
+    <div class="deck__sel">
+      <h3 class="deck__t" id="deckTitle"></h3>
+      <p class="deck__m" id="deckMeta"></p>
+      <button class="deck__play" id="deckPlay">&#9656; play</button>
+      <p class="deck__err" id="deckErr" hidden role="alert"></p>
+    </div>
+  </div>
+
+  <p class="bh__keys">&larr; &rarr; to browse &nbsp;&middot;&nbsp; enter to play &nbsp;&middot;&nbsp; esc to put it down</p>
+  <button class="bh__quit" id="deckQuit">esc</button>
 </div>
 
 <!-- swipes down on every pet -->
@@ -273,6 +363,7 @@
     <span class="zzz zzz--1" aria-hidden="true">Z</span>
     <span class="zzz zzz--2" aria-hidden="true">Z</span>
     <span class="zzz zzz--3" aria-hidden="true">Z</span>
+    <img class="sleep__chair" id="armchair" src="img/act4/undertale/armchair.png" alt="" hidden>
     <button class="sleep__sw" id="sleepSwitch" aria-label="take the console" hidden>
       <img src="img/switch2.svg" alt="">
     </button>
@@ -304,22 +395,48 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
 }}
 </script>
-<script src="js/data.js"></script>
-<script src="js/main.js"></script>
+<script src="js/data/data.js"></script>
+<script src="js/page/main.js"></script>
 <!-- after main.js: stars.js hangs itself off the window.NEU bus -->
-<script src="js/stars.js"></script>
+<script src="js/page/stars.js"></script>
 <!-- sword.js publishes NEU.sword; sans.js drives it. Classic scripts,
      so this order is the execution order. -->
 <!-- quest.js first: everything else reports progress into it. -->
-<script src="js/quest.js"></script>
-<script src="js/sword.js"></script>
-<script src="js/sans.js"></script>
+<!-- quest owns progress; save mirrors it. Both before anything that
+     reports into them. -->
+<script src="js/core/quest.js"></script>
+<script src="js/core/save.js"></script>
+<script src="js/core/juice.js"></script>
+<script src="js/core/danmaku.js"></script>
+<script src="js/data/sheets.js"></script>
+<script src="js/core/engine.js"></script>
+<script src="js/game/sword.js"></script>
+<script src="js/game/sans.js"></script>
 <!-- bullet.js publishes NEU.bullet and calls NEU.grantDogFood, so it
      loads after sans.js. dev.js drives both and goes last. -->
-<script src="js/bullet.js"></script>
-<script src="js/dark.js"></script>
-<script src="js/boss.js"></script>
-<script src="js/dev.js"></script>
-<script type="module" src="js/scene.js"></script>
+<script src="js/game/bullet.js"></script>
+<script src="js/game/dark.js"></script>
+<script src="js/act4/act4.js"></script>
+<script src="js/act4/rooms-a.js"></script>
+<script src="js/act4/rooms-d.js"></script>
+<script src="js/act4/boss-scal.js"></script>
+<script src="js/act4/rooms-g.js"></script>
+<script src="js/act4/quiz.js"></script>
+<script src="js/act4/rhythm.js"></script>
+<script src="js/act4/craft.js"></script>
+<script src="js/act4/boss-polt.js"></script>
+<script src="js/act4/crack.js"></script>
+<script src="js/game/deck.js"></script>
+<!-- after every scene, before settings: like touch.js it polls the
+     scenes to decide what to play, and settings.js reads its volume
+     when the panel is built. -->
+<script src="js/core/music.js"></script>
+<!-- samples nothing until the dev console asks; dev.js exposes it -->
+<script src="js/core/perf.js"></script>
+<script src="js/core/settings.js"></script>
+<!-- after every scene: it polls them to decide which buttons to show -->
+<script src="js/core/touch.js"></script>
+<script src="js/core/dev.js"></script>
+<script type="module" src="js/page/scene.js"></script>
 </body>
 </html>

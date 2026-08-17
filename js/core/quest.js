@@ -16,6 +16,13 @@
 
   var NEU = window.NEU = window.NEU || {};
 
+  /* Acts, because forty-five flat items is not a list, it is
+     wallpaper. Only the act you are in is expanded; the rest collapse
+     to a header and a count, which keeps the "one legible next thing"
+     property that made the short list work. */
+  var GROUPS = ['I the sword', 'II the dark', 'III the console'];
+  var GROUP_OF = {};
+
   var STEPS = [
     { id: 'sans',    text: 'find someone at the end of the page' },
     { id: 'break',   text: 'break the sword' },
@@ -32,7 +39,7 @@
     { id: 'console', text: 'notice what turned up' },
     { id: 'charge',  text: 'charge it the hard way', count: 2 },
     { id: 'docked',  text: 'dock it' },
-    { id: 'spared',  text: 'finish the fight' }
+    { id: 'deck',    text: 'see what it plays' }
   ];
 
   var done = {}, counts = {};
@@ -57,10 +64,32 @@
     return !!done[STEPS[i - 1].id] || !!done[STEPS[i].id];
   }
 
+  /* Which act a step belongs to. The first sixteen are the original
+     three acts, split where the chain actually changes hands. */
+  function groupFor(i) {
+    var id = STEPS[i].id;
+    if (GROUP_OF[id]) return GROUP_OF[id];
+    if (i <= 5)  return GROUPS[0];
+    if (i <= 10) return GROUPS[1];
+    return GROUPS[2];
+  }
+
   function render() {
     if (!list) return;
     list.innerHTML = '';
+    var lastGroup = null;
     for (var i = 0; i < STEPS.length; i++) {
+      var g = groupFor(i);
+      if (g !== lastGroup) {
+        lastGroup = g;
+        var hd = document.createElement('li');
+        hd.className = 'quest__g';
+        var n = 0, tot = 0;
+        for (var k = 0; k < STEPS.length; k++)
+          if (groupFor(k) === g) { tot++; if (done[STEPS[k].id]) n++; }
+        hd.textContent = g + '  ' + n + '/' + tot;
+        list.appendChild(hd);
+      }
       var s = STEPS[i], li = document.createElement('li');
       var on = !!done[s.id], vis = reachable(i);
       li.className = 'quest__i' + (on ? ' is-done' : '') + (vis ? '' : ' is-veiled');
@@ -103,6 +132,19 @@
       render();
     },
     has: function (id) { return !!done[id]; },
+
+    /* Later acts register their own steps rather than this file
+       knowing about content it has never seen. Idempotent, because the
+       console tile can be clicked twice. */
+    add: function (step, group) {
+      for (var i = 0; i < STEPS.length; i++) if (STEPS[i].id === step.id) return;
+      STEPS.push(step);
+      if (group) {
+        if (GROUPS.indexOf(group) < 0) GROUPS.push(group);
+        GROUP_OF[step.id] = group;
+      }
+      render();
+    },
     open: function () {
       if (locked || !panel) return;
       panel.classList.add('is-open');
@@ -129,8 +171,32 @@
       for (var i = 0; i < ids.length; i++) { delete done[ids[i]]; delete counts[ids[i]]; }
       render();
     },
-    reset: function () { done = {}; counts = {}; render(); }
+    reset: function () { done = {}; counts = {}; render(); },
+
+    /* ── persistence ──────────────────────────────────────────────
+       save.js pulls from here rather than keeping its own copy of
+       progress. This module has been the single source of truth since
+       it was written and it stays that way — the one time something
+       else kept its own copy (dark.js holding `through` and `fixed`
+       across runs) it produced an unfinishable dead end. */
+    snapshot: function () {
+      return { done: JSON.parse(JSON.stringify(done)),
+               counts: JSON.parse(JSON.stringify(counts)) };
+    },
+    restore: function (s) {
+      if (!s) return;
+      done = s.done || {};
+      counts = s.counts || {};
+      render();
+    }
   };
+
+  /* Every tick writes through. Cheap — save.js coalesces. */
+  (function (q) {
+    var mark = q.mark, bump = q.bump;
+    q.mark = function (id) { mark.call(q, id); if (NEU.save) NEU.save.capture(); };
+    q.bump = function (id, to) { bump.call(q, id, to); if (NEU.save) NEU.save.capture(); };
+  })(NEU.quest);
 
   if (toggle) {
     toggle.addEventListener('click', function () {

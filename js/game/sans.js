@@ -316,7 +316,24 @@
     } catch (e) {}
   }
 
-  NEU.sfx = { whoosh: whoosh, snap: snap, locked: locked };
+  /* Menu navigation. Deliberately the quietest thing in this file —
+     it fires on every arrow key, and anything with body to it becomes
+     unbearable by the fourth tile. Sine, 25ms, no decay tail. */
+  function tick() {
+    if (reduced) return;
+    try {
+      var a = ctx(), t = a.currentTime;
+      var o = a.createOscillator(), g = a.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(1180, t);
+      g.gain.setValueAtTime(0.045, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+      o.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + 0.03);
+    } catch (e) {}
+  }
+
+  NEU.sfx = { whoosh: whoosh, snap: snap, locked: locked, tick: tick };
 
   /* ── the particles ──────────────────────────────────────────────
      Drawn as integer-aligned fillRects, never circles — this page is
@@ -430,6 +447,13 @@
       }
     }, 42);
   }
+
+  /* The dialogue box is the only one on the site and every new scene
+     needs it, so it is lent out rather than reimplemented. Act IV
+     talks through this — same typing, same voices, same portraits,
+     same z-index, no second box to keep in sync. */
+  NEU.talk = function (lines, who) { say(lines, who); };
+  NEU.hush = function () { shutUp(); };
 
   /* Kills the box mid-sentence. Needed because he can be scrolled off
      screen while still talking, and a dialog box for someone who is no
@@ -1080,7 +1104,7 @@
   }
 
   /* ── dev hooks ──────────────────────────────────────────────────
-     Driven by js/dev.js. Deliberately blunt: they set the end state
+     Driven by js/core/dev.js. Deliberately blunt: they set the end state
      directly rather than fast-forwarding the animations, because the
      point is to be standing in the room a second from now. */
   NEU.devSkip = function () {
@@ -1351,6 +1375,10 @@
      while it is on screen, which costs one comparison every 400ms. */
   var hasConsole = false, docking = false;
   var swChip = document.getElementById('swChip');
+  var swChipTxt = swChip ? swChip.querySelector('span') : null;
+  /* The room reads this to decide whether its blue beam has anything
+     to charge. */
+  NEU.hasConsole = function () { return hasConsole; };
 
   function charge() { return NEU.charge ? NEU.charge() : 0; }
 
@@ -1362,6 +1390,20 @@
     else if (pct >= 100) tvLbl.textContent = 'dock it';
     else                 tvLbl.textContent = pct + '% — flat';
     if (tvEl) tvEl.classList.toggle('is-ready', !docked && hasConsole && pct >= 100);
+    /* The chip carries the charge with it, so the thing in your hands
+       and the thing in the dock never disagree about the number. */
+    var label = pct >= 100 ? 'a console, charged'
+              : pct > 0    ? 'a console, ' + pct + '%'
+                           : 'a console, flat';
+    if (swChipTxt && hasConsole) swChipTxt.textContent = label;
+    /* The room you charge it in is reached through the panel, so the
+       panel is where you find out whether you brought it. */
+    var pc = document.getElementById('panelCarry');
+    if (pc) {
+      pc.hidden = !hasConsole || docked;
+      var pt = document.getElementById('panelCarryTxt');
+      if (pt) pt.textContent = label + (pct >= 100 ? '' : ' — the blue one fills it');
+    }
   }
   NEU.tvState = tvState;
 
@@ -1407,8 +1449,37 @@
     setTimeout(function () { img.remove(); done(); }, 760);
   }
 
+  /* ── breaking it ────────────────────────────────────────────────
+     He tells you to do this at the end of the last corridor, and the
+     flag is what makes an object two acts old gain a new verb. Before
+     the flag it is a television. After it, it is a television you can
+     hit with a sword. Nothing about the television changes. */
+  NEU.tvBreakable = function () {
+    return !!(NEU.save && NEU.save.flagged('tv_breakable')) && !tvBroken;
+  };
+  var tvBroken = false;
+  NEU.breakTV = function () {
+    if (!NEU.tvBreakable()) return false;
+    tvBroken = true;
+    if (NEU.save) NEU.save.flag('tv_broken', 1);
+    if (tvEl) { tvEl.classList.add('is-broke'); tvEl.classList.remove('is-live'); }
+    if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+    if (NEU.quest) NEU.quest.mark('a4_smash');
+    say(["you put the sword through the television.",
+         "something climbs out of it."], 'narr');
+    setTimeout(function () { if (NEU.quiz) NEU.quiz.open(); }, 2600);
+    return true;
+  };
+
   if (tvEl) tvEl.addEventListener('click', function () {
-    if (docked || docking) { say(["it's already playing."], 'tv'); return; }
+    /* Carrying the sword and allowed to swing it beats every other
+       meaning the television has. */
+    if (NEU.tvBreakable() && state === 'held') { NEU.breakTV(); return; }
+    if (docked || docking) {
+      /* Once it is in, the television is just a way back to the menu. */
+      if (docked && NEU.deck) { NEU.deck.open(); return; }
+      say(["it's already playing."], 'tv'); return;
+    }
     if (!switchSeen) { say(["a television. nothing to put in it."], 'tv'); return; }
     if (!hasConsole) {
       say(["an empty dock.", "the thing that goes in it is over there, on the blanket."], 'tv');
@@ -1437,7 +1508,10 @@
       tvState();
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
       if (NEU.quest) NEU.quest.mark('docked');
-      setTimeout(function () { if (NEU.boss) NEU.boss.open(); }, 420);
+      /* The television used to start a fight. It starts a home screen
+         now — a fight has one punchline and you can only hear it
+         once, a library is a joke you can browse. */
+      setTimeout(function () { if (NEU.deck) NEU.deck.open(); }, 420);
     });
   });
 
