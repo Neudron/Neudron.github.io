@@ -98,6 +98,58 @@
     }
   }
 
+  /* ── prop sprites ─────────────────────────────────────────────────
+     Same ASCII-rows-plus-a-palette form the player is drawn in, because
+     that is this project's pixel-art primitive and a second one would be
+     a second thing to keep on the grid. Drawn at SCALE, the size a tile
+     pixel is, so props sit on the same grid as the world they stand in.
+
+     These two are here rather than in a PNG because there is no art in
+     the repo for either: the altar and the save point were falling
+     through drawEnt to the generic 18x18 square, so the stone bowl the
+     room describes at length ("a stone bowl on a stone plinth… a ring of
+     ash in it") was a lilac rectangle. Colours are the castle ramp's
+     own, plus the save star in the brazier's warm pair. */
+  var PROP = {
+    /* The bowl has to be LIGHTER than the plinth it stands on. The
+       plinth tile is #6A5C74 and the first draft used the castle's dark
+       stone, so the altar read as a hole punched in its own plinth —
+       the exact failure the 'A' tile was added to fix in the first
+       place (see the comment on the castle tileset). */
+    altar: { pal: { k: '#2A2238', s: '#8A8598', l: '#C4B8CC', a: '#4A4560' },
+             rows: ['...kkkkk...',
+                    '..klllllk..',
+                    '..klaaalk..',
+                    '..kklllkk..',
+                    '...kkkkk...',
+                    '....sss....',
+                    '....sss....',
+                    '...sssss...',
+                    '..kssssskk.',
+                    '..kkkkkkkk.'] },
+    save:  { pal: { y: '#E4C46A', w: '#FFF2C4', k: '#8F7016' },
+             rows: ['....k....',
+                    '....y....',
+                    '...kyk...',
+                    '.kkyywkk.',
+                    'kyywwwyyk',
+                    '.kkyywkk.',
+                    '...kyk...',
+                    '....y....',
+                    '....k....'] }
+  };
+
+  function stampPal(rows, pal, cx, cy, s) {
+    var h = rows.length, w = rows[0].length;
+    var x0 = (cx - w * s / 2) | 0, y0 = (cy - h * s) | 0;
+    for (var r = 0; r < h; r++) for (var c = 0; c < w; c++) {
+      var ch = rows[r][c];
+      if (ch === '.' || !pal[ch]) continue;
+      ctx.fillStyle = pal[ch];
+      ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
+    }
+  }
+
   function drawPlayer(targetCtx, sx, sy, fce, wlk, mov, anchorFeet, sc) {
     var c = targetCtx || ctx;
     var s = sc || 2;
@@ -578,8 +630,14 @@
       var d = drawn[i];
       if (!d.e) {
         var f = moving ? (1 + (((walked / 10) | 0) % 2)) : 0;
+        /* SCALE, not 2. The world draws a pixel at 3 CSS px and the
+           character drew one at 2, so the two never shared a grid and
+           fine detail always fought the character. It also fixes a
+           mismatch the other way: at 2 the sprite was 6 world units
+           wide against a 10-unit collision box, so she read as smaller
+           than the space she actually occupied. */
         stamp(BODIES[face].concat(LEGS[f]),
-              ((px - camX) * SCALE) | 0, ((py - camY) * SCALE) | 0, 2 * SCALE / 3 | 0 || 2);
+              ((px - camX) * SCALE) | 0, ((py - camY) * SCALE) | 0, SCALE);
         continue;
       }
       drawEnt(d.e, now);
@@ -661,6 +719,21 @@
       var wob = on ? ((now / 90 | 0) % 2) * 2 : 0;
       ctx.fillRect(sx - 4 * SCALE / 2, sy - 22 - wob, 4 * SCALE, 12 + wob);
       if (on) { ctx.fillStyle = '#FFF2C4'; ctx.fillRect(sx - 3, sy - 18 - wob, 6, 6); }
+      return;
+    }
+    if (PROP[e.t]) {
+      /* 2 is the player's pixel size, so a prop and a person are on the
+         same grid. The save point breathes; the altar does not. */
+      var pr = PROP[e.t];
+      if (e.t === 'save') {
+        var pulse = 1 + Math.sin(now / 420) * 0.06;
+        ctx.save();
+        ctx.globalAlpha = 0.85 + Math.sin(now / 420) * 0.15;
+        stampPal(pr.rows, pr.pal, sx, (sy - 6 + (1 - pulse) * 8) | 0, SCALE);
+        ctx.restore();
+        return;
+      }
+      stampPal(pr.rows, pr.pal, sx, sy, SCALE);
       return;
     }
     ctx.fillStyle = e.colour || '#B892FF';

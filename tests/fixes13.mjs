@@ -102,12 +102,26 @@ console.log('\n2. Calamitas draws from her sheets');
      /var bodyKey = mode === 'intro' \? 'scalHood' : 'scal'/.test(SCAL));
   ok('the brothers pick fist vs slash by kind',
      /bKey = br\.kind === 'fist' \? 'fist' : 'slashTop'/.test(SCAL));
-  ok('>>> the sprite helper exists <<<', /function sprite\(key, x, y, scale, rot, glow\)/.test(SCAL));
-  ok('it rotates to face travel', /ctx\.rotate\(rot\)/.test(SCAL) &&
+  /* The blitter these three describe moved into data/sheets.js when
+     three identical copies of it were collapsed into one — the copies
+     were why a two-column sheet could not be declared, since each
+     hardcoded source x to 0. The behaviour is unchanged, so each check
+     now spans both halves: boss-scal still ASKS for rotation and glow,
+     and the shared blitter still honours them. Grepping boss-scal.js
+     alone would report all three gone because the lines live elsewhere. */
+  const SHEETS = fs.readFileSync(path.join(ROOT, 'js', 'data', 'sheets.js'), 'utf8');
+  ok('>>> the sprite helper exists <<<',
+     /function sprite\(key, x, y, scale, rot, glow, col\)/.test(SCAL) &&
+     /NEU\.sheetDraw = function/.test(SHEETS));
+  ok('it rotates to face travel', /ctx\.rotate\(o\.rot\)/.test(SHEETS) &&
      /Math\.atan2\(b\.vy, b\.vx\)/.test(SCAL));
   ok('the brothers rotate toward the player', /Math\.atan2\(py - br\.y, px - br\.x\)/.test(SCAL));
-  ok('phase 2 still gets the additive glow', /globalCompositeOperation = 'lighter'/.test(SCAL) &&
-     /if \(glow\)/.test(SCAL));
+  ok('phase 2 still gets the additive glow',
+     /globalCompositeOperation = 'lighter'/.test(SHEETS) && /if \(o\.glow\)/.test(SHEETS) &&
+     /glow: glow/.test(SCAL));
+  /* and the column that started all of this is addressable */
+  ok('>>> a two-column sheet can say so <<<', /cols: 2/.test(SHEETS) &&
+     /col \* sh\.fw/.test(SHEETS));
 
   /* the fallback: a missing sheet must draw the OLD squares, not
      nothing — a silent absence is mistaken for a logic bug. */
