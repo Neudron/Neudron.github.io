@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { fileURLToPath } from 'node:url';
-import { stranded, roomCount } from './reach.mjs';
+import { stranded, roomCount, badSpawns, untouchable, unsolvable } from './reach.mjs';
 
 /* The suites live in site/tests/, so the site is one level up. Resolving
    from import.meta.url rather than hard-coding a path is what lets them
@@ -101,6 +101,17 @@ console.log('\n1. the complete map');
   ok('>>> and you can walk from every spawn to every exit <<<', lost.length === 0);
   if (lost.length) console.log('       ' + lost.join('\n       '));
   ok('the proof covered all 31', roomCount(ROOT, ZONES) === 31);
+  const wrongDoor = badSpawns(ROOT, ZONES);
+  ok('>>> no exit in the game asks for a spawn that is not there <<<', wrongDoor.length === 0);
+  if (wrongDoor.length) console.log('       ' + wrongDoor.join('\n       '));
+  /* h1_storm's door trigger was sealed inside its own frame, and it is
+     the only way into h2_machine and h3_trip. */
+  const sealed = untouchable(ROOT, ZONES);
+  ok('>>> every entity in the game can be touched <<<', sealed.length === 0);
+  if (sealed.length) console.log('       ' + sealed.join('\n       '));
+  const { unsolvable: dead } = unsolvable(ROOT, ZONES);
+  ok('>>> every block puzzle in the game is solvable <<<', dead.length === 0);
+  if (dead.length) console.log('       ' + dead.join('\n       '));
 }
 
 /* ═══ 2. the prize rooms ══════════════════════════════════════════*/

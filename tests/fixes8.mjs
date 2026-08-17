@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { fileURLToPath } from 'node:url';
-import { stranded, roomCount } from './reach.mjs';
+import { stranded, roomCount, badSpawns, untouchable, unsolvable } from './reach.mjs';
 
 /* The suites live in site/tests/, so the site is one level up. Resolving
    from import.meta.url rather than hard-coding a path is what lets them
@@ -109,6 +109,18 @@ console.log('\n2. walkable');
      free, so say out loud how many it flooded */
   ok('and the proof actually saw the rooms', roomCount(ROOT, zoneA) === 11);
 
+  /* An exit asking for a spawn the target room does not declare. */
+  const wrongDoor = badSpawns(ROOT, zoneA);
+  ok('>>> every exit names a spawn its target really has <<<', wrongDoor.length === 0);
+  if (wrongDoor.length) console.log('       ' + wrongDoor.join('\n       '));
+
+  /* Entities you can see and never touch. b8_arena's trigger for the
+     Calamitas fight was sealed inside its own doorframe, which killed
+     the ashes, the altar, the fire door and every zone after them. */
+  const sealed = untouchable(ROOT, zoneA);
+  ok('>>> every entity can be reached from somewhere you can stand <<<', sealed.length === 0);
+  if (sealed.length) console.log('       ' + sealed.join('\n       '));
+
   /* The specific geometry that was missing: a2's two paths are joined at
      both walls, so "hold right until you stop, then hold down" arrives
      at the exit and the same move mirrored gets you home. */
@@ -205,6 +217,17 @@ console.log('\n4. puzzles');
   ok('>>> the solved map is the shipped map <<<',
      grid.every(row => src.includes("'" + row + "'")));
 
+  /* Every block puzzle, proved solvable BY A PLAYER — the pusher has to
+     walk to the cell it pushes from, and the BFS above over block
+     positions alone does not say that. b4, b5 and b6 all passed the
+     weaker proof while being impossible. */
+  const { unsolvable: dead, lengths } = unsolvable(ROOT, ['rooms-a.js']);
+  ok('>>> every block puzzle has a solution a player can walk <<<', dead.length === 0);
+  if (dead.length) console.log('       ' + dead.join('\n       '));
+  ok('and all four castle puzzles were checked', Object.keys(lengths).length === 4);
+  for (const id of Object.keys(lengths))
+    console.log('       ' + id + ': ' + lengths[id] + ' moves (walk + push)');
+
   /* B3: the order is stated in the room and matched by the check. */
   ok('b3 order is declared once', /B3_ORDER = \[2, 0, 3, 1\]/.test(src));
   ok('>>> and the plaque says the same thing <<<',
@@ -215,6 +238,50 @@ console.log('\n4. puzzles');
   /* B5 is deliberately unsolvable by the B2 rule. */
   ok('b5 overrides the plate rule', /solved: function \(c\)/.test(src));
   ok('>>> b5 needs you standing on one plate <<<', /onL && bR\) \|\| \(onR && bL/.test(src));
+}
+
+/* ═══ 4b. pressing e actually pushes ══════════════════════════════
+   The static proofs above check that a LAYOUT admits a solution. They
+   cannot see whether the push works at all, and it did not: the E
+   handler was `if (nearest()) fire(it); else tryPush()`, and `nearest`
+   happily returned the block itself. fire() has no branch for a block,
+   so it returned in silence and tryPush() was never reached — standing
+   correctly against a block with open floor beyond and pressing e did
+   nothing, in every room, for every block. Every puzzle in the game was
+   unsolvable while passing every solvability test we had.
+
+   So this drives the real engine: walk east out of b2's spawn until the
+   block stops you, press e, and watch the block move. Frames come off a
+   manual queue because jsdom's clock will not produce the fixed
+   timestep the sweep needs. */
+console.log('\n4b. the push');
+{
+  const { w, NEU } = boot();
+  let frames = [];
+  w.requestAnimationFrame = cb => { frames.push(cb); return frames.length; };
+  let t = w.performance.now();
+  const pump = n => { for (let i = 0; i < n; i++) { const q = frames; frames = []; t += 16; for (const cb of q) cb(t); } };
+  const key = (ty, k) => w.dispatchEvent(new w.KeyboardEvent(ty, { key: k, bubbles: true }));
+  const blocks = () => NEU.engine.api.ents().filter(e => e.t === 'block').map(b => [b.x, b.y]);
+
+  NEU.engine.enter('b2_blocks', 'west');
+  ok('b2 loaded with both blocks', JSON.stringify(blocks()) === '[[6,4],[8,4]]');
+
+  key('keydown', 'ArrowRight'); pump(60); key('keyup', 'ArrowRight');
+  const p = NEU.engine.api.player;
+  ok('walking east stops you against the block',
+     Math.floor(p.x / 16) === 5 && p.face === 'right');
+
+  const before = JSON.stringify(blocks());
+  key('keydown', 'e'); key('keyup', 'e'); pump(4);
+  const after = JSON.stringify(blocks());
+  ok('>>> e pushes the block away from you <<<', before !== after);
+  ok('and it moves exactly one cell, in the direction you face',
+     after === '[[7,4],[8,4]]');
+
+  /* the same press must still talk to an npc when one is in reach —
+     that is what the nearest()-first ordering was for */
+  NEU.engine.leave();
 }
 
 /* ═══ 5. locked doors say what they want ══════════════════════════*/

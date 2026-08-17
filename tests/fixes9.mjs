@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { fileURLToPath } from 'node:url';
-import { stranded, roomCount } from './reach.mjs';
+import { stranded, roomCount, badSpawns, untouchable } from './reach.mjs';
 
 /* The suites live in site/tests/, so the site is one level up. Resolving
    from import.meta.url rather than hard-coding a path is what lets them
@@ -133,6 +133,12 @@ console.log('\n2. no room is a trap');
   ok('>>> and every spawn can walk to every exit <<<', lost.length === 0);
   if (lost.length) console.log('       ' + lost.join('\n       '));
   ok('the proof covered all 18', roomCount(ROOT, ZONES) === 18);
+  const wrongDoor = badSpawns(ROOT, ZONES);
+  ok(">>> and no exit asks for a spawn that isn't there <<<", wrongDoor.length === 0);
+  if (wrongDoor.length) console.log('       ' + wrongDoor.join('\n       '));
+  const sealed = untouchable(ROOT, ZONES);
+  ok('>>> every entity is reachable <<<', sealed.length === 0);
+  if (sealed.length) console.log('       ' + sealed.join('\n       '));
 }
 
 /* ═══ 3. the fire door ════════════════════════════════════════════*/

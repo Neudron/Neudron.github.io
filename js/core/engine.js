@@ -280,11 +280,33 @@
   /* ── entities ─────────────────────────────────────────────────── */
   function entAt(e) { return { x: (e.x + 0.5) * TILE, y: (e.y + 1) * TILE }; }
 
-  function nearest() {
+  /* What `fire` can actually DO something with — the list below is
+     exactly the set of branches fire() has.
+
+     This exists because the E handler was `if (nearest()) fire(it); else
+     tryPush()`, and `nearest` returned whatever entity was closest
+     including blocks and plates. fire() has no branch for either, so it
+     returned in silence and tryPush() was never reached: standing
+     correctly against a block with open floor beyond it and pressing e
+     did nothing, in every room, for every block. Every block puzzle in
+     the game was unsolvable no matter how the room was laid out. */
+  function interactive(e) {
+    return typeof e.run === 'function' ||
+           e.t === 'exit' || e.t === 'pickup' || e.t === 'save' ||
+           e.t === 'npc'  || e.t === 'altar';
+  }
+
+  /* A pushable block is worth an `e` prompt even though pressing e goes
+     through tryPush rather than fire. A plate is not: it is floor paint
+     and there has never been anything to press. */
+  function promptable(e) { return interactive(e) || (e.t === 'block' && e.push); }
+
+  function nearest(want) {
     var best = null, bd = REACH;
     for (var i = 0; i < ents.length; i++) {
       var e = ents[i];
       if (e.dead || e.t === 'trigger') continue;
+      if (want && !want(e)) continue;
       var p = entAt(e);
       var d = Math.hypot(p.x - px, p.y - (py - PLAYER_H / 2));
       if (d < bd) { bd = d; best = e; }
@@ -386,6 +408,15 @@
     });
   }
 
+  /* Only reached by a room that declares no spawns at all: the first cell
+     you could actually stand in, in reading order. */
+  function firstOpenCell() {
+    for (var y = 0; y < room.h; y++)
+      for (var x = 0; x < room.w; x++)
+        if (!solidAt(x, y)) return { x: x, y: y };
+    return { x: 2, y: 2 };
+  }
+
   function land(id, spawn) {
     if (room && room.onExit) room.onExit(API);
     room = rooms[id];
@@ -394,8 +425,22 @@
        room shows an arrangement that no longer means anything. */
     room.__solved = NEU.save ? NEU.save.flagged('solved:' + id) : false;
     ents = spawnEnts(room);
-    var s = (room.spawns && room.spawns[spawn]) || room.spawns && room.spawns.default
-            || { x: 2, y: 2 };
+    var s = (room.spawns && room.spawns[spawn]) || (room.spawns && room.spawns.default);
+    if (!s) {
+      /* An exit naming a spawn the target room does not declare used to
+         fall through to a hard-coded {x:2,y:2}. That cell is inside a
+         wall in four of the rooms shipped here and the wrong end of the
+         room in the rest, so a single typo in an exit became a silent
+         soft-lock that no spawn check could see — d3_square was exactly
+         this. Prefer any spawn the room really declares, then go looking
+         for floor, and say so out loud: a missing spawn is a bug in the
+         room and it should not be able to pass for level design. */
+      var names = room.spawns ? Object.keys(room.spawns) : [];
+      s = names.length ? room.spawns[names[0]] : firstOpenCell();
+      if (window.console && console.warn)
+        console.warn('[neu] room "' + id + '" has no spawn "' + spawn +
+                     '" — landing at ' + s.x + ',' + s.y);
+    }
     px = (s.x + 0.5) * TILE; py = (s.y + 1) * TILE;
     walked = 0; face = s.face || 'down';
     room.__spawn = spawn;
@@ -535,7 +580,7 @@
     }
 
     /* the interact prompt */
-    var n = nearest();
+    var n = nearest(promptable);
     if (n && !busy) {
       var p = entAt(n);
       ctx.fillStyle = '#EDE7DE';
@@ -635,7 +680,7 @@
       if (busy) return;
       /* Interact first, push second. A block you are standing next to
          is almost never what you meant when there is an npc in reach. */
-      var n = nearest();
+      var n = nearest(interactive);
       if (n) fire(n); else tryPush();
       return;
     }

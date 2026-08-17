@@ -384,7 +384,23 @@
      You cannot stop. Step onto ice and you slide until something stops
      you, which turns movement itself into the puzzle. The layout is
      small on purpose: a big ice room is not four times harder, it is
-     four times more walking between attempts. */
+     four times more walking between attempts.
+
+     THE BLOCK STARTS ON THE ICE AND THE PLATE IS OFF IT, at the far end
+     of the run. That pairing is the puzzle and both halves are load
+     bearing. The block began at (3,1) on the dry corridor above the
+     ring, where pushing it south needed the pusher to stand at (3,0) —
+     the outer wall — so it could only ever be shoved along row 1 and
+     never touched the ice at all. The plate was at (7,5), inside the
+     core, in a three-cell slot walled at both ends: pushing a block in
+     from either side needed the pusher standing in the wall at (5,5) or
+     (9,5). The room could not be solved by anyone.
+
+     Now: the block sits on the top ice row and the plate is the dry cell
+     the slide dies on. You arrive from the west, so the side you reach
+     first pushes it the WRONG way — you have to go round the ring and
+     push from (11,2). That is B2's lesson ("stand on the far side")
+     bent by the fact that the block no longer stops when you do. */
   E.register('b4_ice', {
     tileset: 'castle',
     tiles: [
@@ -401,8 +417,8 @@
     ].join('\n'),
     spawns: { west: { x: 1, y: 5, face: 'right' } },
     entities: [
-      { t: 'plate', x: 7, y: 5 },
-      { t: 'block', x: 3, y: 1, solid: true, push: true },
+      { t: 'plate', x: 2, y: 2 },
+      { t: 'block', x: 10, y: 2, solid: true, push: true },
       { t: 'exit', x: 15, y: 5, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice' },
       { t: 'exit', x: 0, y: 5, to: 'b3_braziers', spawn: 'west' }
     ],
@@ -442,7 +458,14 @@
     entities: [
       { t: 'plate', x: 5, y: 4, id: 'L' },
       { t: 'plate', x: 12, y: 4, id: 'R' },
-      { t: 'block', x: 8, y: 6, solid: true, push: true },
+      /* Row 5, NOT row 6. On row 6 the block sat against the bottom wall,
+         and pushing it north needs the pusher standing south of it — in
+         row 7, which is the wall. It could only ever slide left and right
+         along the bottom of the room and never reached either plate, so
+         the one arrangement this room is about was unreachable. From row
+         5 you stand below it, push it up, then walk it sideways onto
+         whichever plate you are not going to stand on yourself. */
+      { t: 'block', x: 8, y: 5, solid: true, push: true },
       { t: 'npc', x: 7, y: 1, colour: '#8A8598', mirror: true,
         lines: ['a mirror, floor to ceiling, badly cleaned.',
                 'the room in it is the same room. you are in it, standing where you are standing.'] },
@@ -475,7 +498,18 @@
 
   /* ══ B6 — the dark one ═══════════════════════════════════════════
      A callback, not a reskin: the torch from the blackout, in a room
-     that is about remembering a shape rather than finding a door. */
+     that is about remembering a shape rather than finding a door.
+
+     THE SPAWN MUST OPEN ONTO THE MIDDLE CORRIDOR. There used to be a
+     wall stub at (2,5), one cell east of where you land, and it made the
+     room impossible: you spawn facing right, the block is at (3,5), and
+     pushing it east needs the pusher west of it — in the cell that stub
+     occupied. The block could be shoved up and down inside column 3 and
+     nothing else, so the plate at (10,5) was unreachable. With (2,5)
+     open you walk straight out of the spawn into the push, and the block
+     goes the length of the dark corridor ahead of you, which is the room
+     working as intended rather than a new idea. The four blind alcoves
+     are untouched — they are the shape you are meant to remember. */
   E.register('b6_dark', {
     tileset: 'castle',
     dark: 108,
@@ -485,7 +519,7 @@
       '#.####.######.####.#',
       '#.#..#.#....#.#..#.#',
       '#.#..#.#....#.#..#.#',
-      '#.#..............,,#',
+      '#................,,#',
       '#.#..#.#....#.#..#.#',
       '#.####.######.####.#',
       '#..................#',
@@ -571,7 +605,15 @@
     spawns: { west: { x: 1, y: 4, face: 'right' } },
     entities: [
       { t: 'save', x: 3, y: 6 },
-      { t: 'npc', x: 6, y: 3, colour: '#C2405F', run: function (c) { enterArena(c); } },
+      /* ON the doorframe at (5,4), where the swept corridor runs into it.
+         This sat at (6,3), inside the 2x2 the frame encloses, and the
+         frame is solid: there was no cell in the room you could stand in
+         and still be within REACH of it, so the fight could not be
+         started. Everything downstream of her — the ashes, the altar,
+         the fire door, every zone after the castle — was unreachable
+         because of one entity two cells too far in. It is the door
+         itself now, which is also what the room has been calling it. */
+      { t: 'npc', x: 5, y: 4, colour: '#C2405F', run: function (c) { enterArena(c); } },
       { t: 'exit', x: 0, y: 4, to: 'b7_altar', spawn: 'north' }
     ],
     onEnter: function (c) {

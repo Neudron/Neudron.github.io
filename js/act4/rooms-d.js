@@ -203,7 +203,14 @@
       '#..................#',
       '####################'
     ].join('\n'),
-    spawns: { west: { x: 1, y: 5, face: 'right' } },
+    /* `north` is where you come back to when you walk west out of the
+       house. e1_hall's exit has always asked for it by name; the room
+       only had `west`, so the engine fell through to its last-ditch (2,2)
+       and dropped you in the top-left corner of the square facing down,
+       nowhere near the circle you left from. You step back out of the
+       chalk circle now. */
+    spawns: { west: { x: 1, y: 5, face: 'right' },
+              north: { x: 4, y: 7, face: 'down' } },
     entities: [
       { t: 'save', x: 3, y: 2 },
       { t: 'npc', x: 9, y: 4, colour: '#4A4560',

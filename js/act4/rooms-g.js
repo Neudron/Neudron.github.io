@@ -171,7 +171,11 @@
     spawns: { top: { x: 2, y: 4, face: 'right' } },
     entities: [
       { t: 'save', x: 4, y: 6 },
-      { t: 'npc', x: 9, y: 3, colour: '#7FA8FF', run: function (c) { c.go('h2_machine', 'door'); } },
+      /* On the doorframe at (8,4), where the lit path meets it. This was
+         at (9,3), sealed inside the 2x2 the frame encloses — the same
+         mistake as b8_arena, and here it walled off h2_machine and
+         h3_trip, which nothing else leads to. */
+      { t: 'npc', x: 8, y: 4, colour: '#7FA8FF', run: function (c) { c.go('h2_machine', 'door'); } },
       { t: 'exit', x: 2, y: 6, to: 'g_8', spawn: 'default' }
     ],
     onEnter: function (c) {
