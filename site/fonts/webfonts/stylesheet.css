@@ -1,0 +1,60 @@
+@font-face {
+    font-family: 'Undertale Papyrus';
+    src: url('papyrus-webfont.eot');
+    src: url('papyrus-webfont.eot?#iefix') format('embedded-opentype'),
+         url('papyrus-webfont.woff2') format('woff2'),
+         url('papyrus-webfont.woff') format('woff'),
+         url('papyrus-webfont.ttf') format('truetype'),
+         url('papyrus-webfont.svg#undertale_papyrusregular') format('svg');
+    font-weight: normal;
+    font-style: normal;
+
+}
+
+
+
+
+@font-face {
+    font-family: 'Undertale Sans';
+    src: url('sans-webfont.eot');
+    src: url('sans-webfont.eot?#iefix') format('embedded-opentype'),
+         url('sans-webfont.woff2') format('woff2'),
+         url('sans-webfont.woff') format('woff'),
+         url('sans-webfont.ttf') format('truetype'),
+         url('sans-webfont.svg#undertale_sansregular') format('svg');
+    font-weight: normal;
+    font-style: normal;
+
+}
+
+
+
+
+@font-face {
+    font-family: 'Determination Mono';
+    src: url('determinationmonoweb-webfont.eot');
+    src: url('determinationmonoweb-webfont.eot?#iefix') format('embedded-opentype'),
+         url('determinationmonoweb-webfont.woff2') format('woff2'),
+         url('determinationmonoweb-webfont.woff') format('woff'),
+         url('determinationmonoweb-webfont.ttf') format('truetype'),
+         url('determinationmonoweb-webfont.svg#determination_mono_webregular') format('svg');
+    font-weight: normal;
+    font-style: normal;
+
+}
+
+
+
+
+@font-face {
+    font-family: 'Determination Sans';
+    src: url('determinationsansweb-webfont.eot');
+    src: url('determinationsansweb-webfont.eot?#iefix') format('embedded-opentype'),
+         url('determinationsansweb-webfont.woff2') format('woff2'),
+         url('determinationsansweb-webfont.woff') format('woff'),
+         url('determinationsansweb-webfont.ttf') format('truetype'),
+         url('determinationsansweb-webfont.svg#determination_sans_webregular') format('svg');
+    font-weight: normal;
+    font-style: normal;
+
+}
