@@ -468,7 +468,14 @@
     /* her */
     if (mode !== 'won') {
       var bodyKey = mode === 'intro' ? 'scalHood' : 'scal';
-      if (!sprite(bodyKey, bx, by, 1, 0, phase === 2)) {
+      /* Column 0 is the front-facing pose set — she looks at you, and
+         frames 12 and 16 are the casting flare. Column 1 is the same
+         woman turned away, which is the wrong read for a boss you are
+         fighting. Scale 2 because that is the pixel size the rest of
+         this layer draws at (the soul is stamped at 2 in danmaku.js);
+         at scale 1 she was 60px of fine detail in a 700px arena and
+         read as a smudge rather than as a sprite. */
+      if (!sprite(bodyKey, bx, by, 2, 0, phase === 2, 0)) {
         ctx.fillStyle = '#FF00A0';
         ctx.fillRect((bx - 20) | 0, (by - 26) | 0, 40, 52);
       }
@@ -520,7 +527,14 @@
     /* her bar. It DOES move — that is the difference between this
        fight and the one on the television, and the contrast only
        lands because that one refused to. */
-    var bw = 260, bx2 = ((w - bw) / 2) | 0, by2 = AY - 44;
+    /* Her bar clears her sprite rather than cutting across it. She
+       hovers centred on AY-24 and is 120 tall at scale 2, so she owns
+       AY-84 upward; the bar used to sit at AY-44, straight through her
+       chest. Moving HER instead would change the fight: the player is
+       clamped to AY+7 and a strike needs to be within 34, so her
+       resting height is load-bearing. Floored at 40 so a short viewport
+       keeps the bar on screen. */
+    var bw = 260, bx2 = ((w - bw) / 2) | 0, by2 = Math.max(40, AY - 128);
     ctx.fillStyle = '#22222E'; ctx.fillRect(bx2, by2, bw, 8);
     ctx.fillStyle = invuln ? '#4A4560' : COL.dark;
     ctx.fillRect(bx2, by2, (bw * Math.max(0, bossHP / bossMax)) | 0, 8);
@@ -553,40 +567,15 @@
      so a missing file degrades to the old look rather than to a
      blob. Projectiles rotate to face travel — the sheets are drawn
      upright and Terraria spins them in code. */
-  var imgs = {};
-  function imgOf(src) {
-    if (imgs[src]) return imgs[src];
-    var i = new Image(); i.onerror = function () { i.__failed = true; };
-    i.src = src; imgs[src] = i; return i;
-  }
-  function sheetOK(sh) {
-    if (!sh) return null;
-    var im = imgOf(sh.src);
-    return (im.complete && im.naturalWidth && !im.__failed) ? im : null;
-  }
-  function sprite(key, x, y, scale, rot, glow) {
-    var sh = NEU.sheets && NEU.sheets[key];
-    var im = sheetOK(sh);
-    if (!im) return false;
-    var fr = ((performance.now() / (1000 / (sh.fps || 10))) | 0) % sh.frames;
-    var dw = sh.fw * scale, dh = sh.fh * scale;
-    ctx.save();
-    ctx.translate(x, y);
-    if (rot) ctx.rotate(rot);
-    ctx.drawImage(im, 0, fr * sh.fh, sh.fw, sh.fh,
-                  (-dw / 2) | 0, (-dh / 2) | 0, dw | 0, dh | 0);
-    if (glow) {
-      /* Phase 2 is the same art with an additive pass — which is what
-         the delivered sheet made true, and what the game does too. */
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = 0.5;
-      ctx.drawImage(im, 0, fr * sh.fh, sh.fw, sh.fh,
-                    (-dw / 2) | 0, (-dh / 2) | 0, dw | 0, dh | 0);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    ctx.restore();
-    return true;
+  /* One blitter for the whole site, in data/sheets.js — see the note
+     there. The local copy this replaces pinned source x at 0, which is
+     why her two-column sheet drew as two overlapping women. */
+  function sprite(key, x, y, scale, rot, glow, col) {
+    if (!NEU.sheetDraw) return false;
+    return NEU.sheetDraw(ctx, key, x, y, {
+      scale: scale, rot: rot, glow: glow, col: col,
+      now: performance.now()
+    });
   }
 
   /* ── input ──────────────────────────────────────────────────────*/

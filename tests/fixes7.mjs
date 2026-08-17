@@ -247,8 +247,17 @@ console.log('\n6. sprite manifest');
        return s.frames >= 1 && s.fw > 0 && s.fh > 0; }));
   ok('>>> every grid divides its sheet exactly <<<',
      names.every(n => { const s = NEU.sheets[n]; return s.frames * s.fh === s.h; }));
-  ok('frame width is the sheet width (vertical strips)',
-     names.every(n => NEU.sheets[n].fw === NEU.sheets[n].w));
+  /* `fw === w` was asserting that EVERY sheet is a single vertical
+     strip, and that was not true: SupremeCalamitas.png and its hooded
+     twin are 120 wide and hold two 60px columns of poses. The old
+     invariant made the manifest unable to say so, the blitter pinned
+     source x at 0, and she drew as both columns at once. Now a sheet
+     declares `cols` and the width has to add up — which is the same
+     check, generalised, and still pins a strip to fw === w. */
+  ok('>>> the columns account for the whole sheet width <<<',
+     names.every(n => { const s = NEU.sheets[n]; return s.fw * (s.cols || 1) === s.w; }));
+  ok('a sheet without cols is still a plain vertical strip',
+     names.every(n => { const s = NEU.sheets[n]; return s.cols ? s.cols > 1 : s.fw === s.w; }));
 
   /* NOTHING IS PROVISIONAL ANY MORE, as of 2026-08-17. All five were
      settled: fireblast, gigablast and hook by autocorrelating the row

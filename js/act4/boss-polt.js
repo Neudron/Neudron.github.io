@@ -310,38 +310,13 @@
      changes read without a single new sprite. Missing art draws
      magenta rather than nothing; a silently absent sprite gets
      mistaken for a logic bug and costs an hour. */
-  var imgs = {};
-  function imgOf(src) {
-    if (imgs[src]) return imgs[src];
-    var i = new Image(); i.onerror = function () { i.__failed = true; };
-    i.src = src; imgs[src] = i; return i;
-  }
-  function sheetOK(sh) {
-    if (!sh) return null;
-    var im = imgOf(sh.src);
-    return (im.complete && im.naturalWidth && !im.__failed) ? im : null;
-  }
-  function drawSheet(key, x, y, scale, glowKeys) {
-    var sh = NEU.sheets && NEU.sheets[key];
-    var im = sheetOK(sh);
-    if (!im) return false;
-    var fr = ((performance.now() / (1000 / (sh.fps || 10))) | 0) % sh.frames;
-    var dw = sh.fw * scale, dh = sh.fh * scale;
-    ctx.drawImage(im, 0, fr * sh.fh, sh.fw, sh.fh,
-                  (x - dw / 2) | 0, (y - dh / 2) | 0, dw | 0, dh | 0);
-    if (glowKeys) {
-      ctx.globalCompositeOperation = 'lighter';
-      for (var g = 0; g < glowKeys.length; g++) {
-        var gs = NEU.sheets && NEU.sheets[glowKeys[g]], gi = sheetOK(gs);
-        if (!gi) continue;
-        ctx.globalAlpha = 0.55;
-        ctx.drawImage(gi, 0, fr * gs.fh, gs.fw, gs.fh,
-                      (x - dw / 2) | 0, (y - dh / 2) | 0, dw | 0, dh | 0);
-      }
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    return true;
+  /* One blitter for the whole site, in data/sheets.js. The local copy
+     this replaces was the third of three identical image caches. */
+  function drawSheet(key, x, y, scale, glowKeys, rot) {
+    if (!NEU.sheetDraw) return false;
+    return NEU.sheetDraw(ctx, key, x, y, {
+      scale: scale, glowKeys: glowKeys, rot: rot, now: performance.now()
+    });
   }
 
   function frame() {
@@ -358,10 +333,30 @@
 
     /* chains first, behind everything */
     if (phase !== 2) {
-      ctx.strokeStyle = 'rgba(127,227,196,.28)'; ctx.lineWidth = 2;
+      /* Real chain links, not a translucent line. The header of this
+         file has always said the chains are drawn; PolterghastChain.png
+         has been sitting in the manifest unreferenced the whole time.
+         Links are stepped along the tether and rotated to face it, with
+         the old stroke kept as the fallback so a missing file degrades
+         to the previous look instead of to nothing. */
+      var link = NEU.sheets && NEU.sheets.chain;
+      var haveLink = !!(NEU.sheetReady && NEU.sheetReady(link));
+      if (!haveLink) { ctx.strokeStyle = 'rgba(127,227,196,.28)'; ctx.lineWidth = 2; }
       for (var i = 0; i < hooks.length; i++) {
         var p1 = proj(bx, by, bz), p2 = proj(hooks[i].x, hooks[i].y, 0);
-        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        if (!haveLink) {
+          ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+          continue;
+        }
+        var dx2 = p2.x - p1.x, dy2 = p2.y - p1.y;
+        var len = Math.hypot(dx2, dy2);
+        var ang = Math.atan2(dy2, dx2) - Math.PI / 2;   // art points up
+        var step = link.fh * 0.7;                        // overlap so it reads solid
+        var n = Math.max(1, Math.min(24, (len / step) | 0));
+        for (var s2 = 1; s2 <= n; s2++) {
+          var t2 = s2 / (n + 1);
+          drawSheet('chain', p1.x + dx2 * t2, p1.y + dy2 * t2, 0.7, null, ang);
+        }
       }
     }
 

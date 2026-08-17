@@ -326,8 +326,16 @@ console.log('\n6. calamitas');
   ok('the brothers show up', /startBrothers/.test(src));
   ok('>>> her bar actually moves <<<', /bossHP -= 1/.test(src));
   ok('she is visibly shielded while invincible', /calamitas — shielded/.test(src));
+  /* The additive pass moved into the one shared blitter in
+     data/sheets.js when three copies of it were collapsed into one, so
+     this now checks both halves: that she still ASKS for the glow on
+     phase 2, and that asking for it still means an additive pass. The
+     old single grep over boss-scal.js would report the behaviour gone
+     purely because the line lives somewhere else now. */
+  ok('phase 2 asks for the glow', /sprite\(bodyKey, bx, by, 2, 0, phase === 2/.test(src));
   ok('phase 2 is an additive pass, not new art',
-     /globalCompositeOperation = 'lighter'/.test(src));
+     /globalCompositeOperation = 'lighter'/.test(
+       fs.readFileSync(path.join(ROOT, 'js', 'data', 'sheets.js'), 'utf8')));
   ok('losing does not cost the hour', /esc to leave/.test(src));
 
   NEU.scal.open();

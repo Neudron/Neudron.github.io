@@ -562,8 +562,14 @@
     for (var pi = 0; pi < ents.length; pi++)
       if (!ents[pi].dead && ents[pi].t === 'plate') drawEnt(ents[pi], now);
 
+    /* An exit is normally a hole in the wall with nothing to draw — but
+       one carrying a `sheet` is a THING, and blanket-filtering exits
+       meant the only entity sheet binding in the whole game never drew.
+       b7_altar's fire door has had `sheet: 'firedoor'` on it since the
+       room was written and has never once appeared on screen. */
     var drawn = ents.filter(function (e) {
-      return !e.dead && e.t !== 'trigger' && e.t !== 'exit' && e.t !== 'plate'; })
+      return !e.dead && e.t !== 'trigger' && e.t !== 'plate' &&
+             (e.t !== 'exit' || e.sheet); })
                     .map(function (e) { return { e: e, y: (e.y + 1) * TILE }; });
     drawn.push({ e: null, y: py });
     drawn.sort(function (a, b) { return a.y - b.y; });
@@ -620,14 +626,12 @@
     var sx = ((p.x - camX) * SCALE) | 0, sy = ((p.y - camY) * SCALE) | 0;
     var sheet = e.sheet && NEU.sheets && NEU.sheets[e.sheet];
     if (sheet) {
-      var im = img(sheet.src);
-      if (im.complete && im.naturalWidth && !im.__failed) {
-        var fr = sheet.fps ? (((now / (1000 / sheet.fps)) | 0) % sheet.frames) : (e.frame || 0);
-        var dw = sheet.fw * (e.scale || 1), dh = sheet.fh * (e.scale || 1);
-        ctx.drawImage(im, 0, fr * sheet.fh, sheet.fw, sheet.fh,
-                      (sx - dw / 2) | 0, (sy - dh) | 0, dw | 0, dh | 0);
-        return;
-      }
+      /* One blitter, in data/sheets.js — it is the only thing that
+         knows about `cols`, and it is shared with both bosses. */
+      if (NEU.sheetDraw && NEU.sheetDraw(ctx, e.sheet, sx, sy, {
+            frame: sheet.fps ? null : (e.frame || 0),
+            col: e.col || 0, scale: e.scale || 1,
+            anchor: 'feet', now: now })) return;
       /* Missing art is LOUD. A silently absent sprite gets mistaken
          for a logic bug and costs an hour; a magenta box does not. */
       ctx.fillStyle = '#FF00A0';
