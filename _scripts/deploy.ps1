@@ -165,6 +165,12 @@ Write-Host "   This goes LIVE at https://www.neu.ac in about a minute." -Foregro
 Write-Host "   Close PR #1 first if it is still open - merged after this," -ForegroundColor Yellow
 Write-Host "   it overwrites the site with a 70-byte page." -ForegroundColor Yellow
 $a = Read-Host "   Type  deploy  to continue"
+# Normalise before comparing. PowerShell writes a UTF-8 BOM at the head
+# of a redirected pipeline, so `'deploy' | powershell -File deploy.ps1`
+# arrives as "<BOM>deploy" and a plain -ne comparison rejects it. The
+# failure looks like a refusal to deploy rather than an encoding bug,
+# which is a confusing place to lose ten minutes.
+$a = ($a -replace "^﻿", '').Trim()
 if ($a -ne 'deploy') {
   git reset --quiet; Pop-Location
   Write-Host "   cancelled, nothing committed"

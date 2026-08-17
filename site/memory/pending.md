@@ -15,7 +15,7 @@ than trusting the plan document.
 | Acts | I–IV complete. 31 rooms, 3 bosses, quiz, rhythm game, crafting grid |
 | Tests | **1237 checks, 14 suites, all green** — re-verified 2026-08-17 by running every suite. fixes5 (50) fixes6 (48) fixes7 (70) fixes8 (49) fixes9 (53) fixes10 (78) fixes11 (75) fixes12 (58) fixes13 (72) fixes14 (70) fixes15 (99) fixes16 (181) **fixes17 (289)** playthrough (45) |
 | Location | everything in `Documents\neu\site`, tests in `site\tests` |
-| Deployed | **no — but committed.** `_deploy` is a real clone on `main`, **one commit ahead** at `1ae52d0` ("Act four: the woods, the castle, and everything after"), 111 files, shape + leak checks passed. `origin/main` is still `20213f3`. The push is yours: `_scripts\deploy.ps1` |
+| Deployed | ✅ **YES — 2026-08-17.** `1c31455` is live at **https://www.neu.ac**. Action `32027211150` succeeded; verified against the CDN, not the API: `js/core/{music,touch,perf,engine}.js`, `js/act4/boss-scal.js`, `img/act4/tiles/woods.png`, `.well-known/discord` and `CNAME` all 200, and `memory/story.md`, `memory/PLAN.md`, `memory/chain.md` and the sprite rips all 404. `index.html` loads the reorganised tree (30 script tags, `js/core/…` not flat `js/…`) |
 
 **Phases 1–3 of PLAN.md are done and verified, plus 2.4, 2.5, 4a, 4b and 5:**
 
@@ -66,11 +66,11 @@ Status: 🔴 blocked on Neu · 🟠 real gap · 🟡 polish · ⚪ decided, no a
 
 | # | Item | Status | Where | Effort |
 |---|---|---|---|---|
-| **1.1** | **Deploy permission.** Acts I–IV are **committed** in `_deploy` (`1ae52d0`) but not pushed. Close PR #1 first (1.4) — merged after your push it overwrites the site | 🔴 | `_deploy\` | 1 push |
+| **1.1** | ✅ **DONE. Acts I–IV are live** at https://www.neu.ac (`1c31455`). Pushed through `deploy.ps1`: lock sweep → syntax gate → mirror → shape check → leak check → confirm → push → verify. Verified against the live CDN both ways — everything new serves, nothing excluded leaked | ✅ | `_deploy\` | done |
 | **1.2** | ✅ **DONE.** All five settled. Three by autocorrelation (`measure-sheets.mjs`), then `sepulcher` and `heart` by rendering them at 5x with the candidate cell rules drawn on and **looking** (`contact-sheet.mjs`). `sepulcher` was never 2 frames — it is one beetle head and the 44px rule cut it through the face. `heart` was never 5 — six beats on a 62px grid; its sheet had been trimmed 2 rows short of its own grid and was re-padded | ✅ | `data/sheets.js` | done |
 | **1.3** | ✅ **DONE — they WERE swapped.** Confirmed twice: centre of mass (67% vs 45% down the cell) and then by eye at 4x. `Slash.png` is the lower jaw, `SlashAlt.png` the upper. **The plan's own fix was wrong** — it said swap the two `src` strings and nothing else, but the files are 168x240 and 192x232, so the geometry had to move with the src or each entry would hold the other's dimensions | ✅ | `data/sheets.js` | done |
-| **1.4** | **PR #1 still open** — `copilot/link-neuac-domain`, holds an old 70-byte page, would overwrite the site | 🔴 | GitHub | 1 min |
-| **1.5** | **Enforce HTTPS unticked** | 🔴 | Settings → Pages | 1 min |
+| **1.4** | ✅ **DONE.** PR #1 (`copilot/link-neuac-domain`) is **closed, not merged** — confirmed via the API before the push. The 70-byte page never reached `main` | ✅ | GitHub | done |
+| **1.5** | ✅ **DONE.** Verified rather than assumed: `http://www.neu.ac/` answers **301 → https://www.neu.ac/** | ✅ | Settings → Pages | done |
 | **1.6** | ✅ **DONE.** The stray empty repo at `Documents\neu\.git` is **gone** — proved empty first (0 commits, refs, stashes, reflog entries, remotes, objects; fsck clean; only default scaffolding plus a `[user]` block), backed up whole to `_scripts\orig\stray-root-git-backup-2026-08-17.zip`, then removed. `_deploy` re-cloned from `Neudron/Neudron.github.io`, on `main` at `20213f3`, tree mirrored. The wrong staged commit in `%TEMP%\neu-pages` (a pre-reorg, pre-Act-IV tree of 64 files) was discarded. `_scripts\deploy.ps1` now does mirror → shape check → leak check → diff → **ask** → push → verify live. | ✅ | `_deploy\`, `_scripts\` | done |
 | **2.1** | ✅ **DONE.** Calamitas draws from her sheets: `sprite(key,x,y,scale,rot,glow)` replaces `drawSheet`, projectiles (dart/hellblast/fireblast/gigablast) rotate to travel, brothers rotate to the player, Sepulcher, hearts and the won-state ashes all sprite; magenta + coloured-square fallbacks kept | ✅ | `act4/boss-scal.js` | done |
 | **2.2** | ✅ **DONE.** All six zones draw real 16×16 art — `woods castle city home prize storm`, one sheet each in `img/act4/tiles/` (2.1 KB total). Tiles were scored out of the Deltarune atlases for opacity, interior variance and seam cost, then re-mapped onto the palette colour each char already had, so the texture is theirs and the tone is ours. `colours` kept as the fallback throughout | ✅ | `act4/rooms-*.js` | done |
@@ -95,8 +95,8 @@ Status: 🔴 blocked on Neu · 🟠 real gap · 🟡 polish · ⚪ decided, no a
 
 ## Suggested order
 
-1. **1.1–1.6** — five minutes of yours, and 1.1 unblocks everyone seeing any
-   of this. 1.6 (re-clone `_deploy`) has to happen before 1.1 can.
+1. ✅ ~~1.1–1.6~~ **all done.** The site is live and the deploy path is sane.
+   **Everything that is left is 3.5: play it.**
 2. ✅ ~~2.1 + 2.3~~ **done** — Calamitas's projectiles and her six sounds.
 3. ✅ ~~2.2~~ **done** — the tilesets. Six zones are places now, not colours.
 4. ✅ ~~2.5~~ **done** — touch. Act IV is playable on a phone now.
