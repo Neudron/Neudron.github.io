@@ -1,0 +1,618 @@
+{
+ "calamity/AshesofAnnihilation.png": {
+  "w": 56,
+  "h": 360,
+  "frames": 6,
+  "fw": 56,
+  "fh": 60,
+  "blocks": 7
+ },
+ "calamity/BrimstoneBarrage.png": {
+  "w": 18,
+  "h": 176,
+  "frames": 1,
+  "fw": 18,
+  "fh": 176,
+  "blocks": 4
+ },
+ "calamity/BrimstoneHeart.png": {
+  "w": 44,
+  "h": 370,
+  "frames": 2,
+  "fw": 44,
+  "fh": 185,
+  "blocks": 6
+ },
+ "calamity/BrimstoneHellblast2.png": {
+  "w": 54,
+  "h": 176,
+  "frames": 4,
+  "fw": 54,
+  "fh": 44,
+  "blocks": 4
+ },
+ "calamity/PhantomBlast.png": {
+  "w": 18,
+  "h": 24,
+  "frames": 1,
+  "fw": 18,
+  "fh": 24,
+  "blocks": 1
+ },
+ "calamity/PhantomBlast2.png": {
+  "w": 18,
+  "h": 24,
+  "frames": 1,
+  "fw": 18,
+  "fh": 24,
+  "blocks": 1
+ },
+ "calamity/PhantomGhostShot.png": {
+  "w": 14,
+  "h": 28,
+  "frames": 1,
+  "fw": 14,
+  "fh": 28,
+  "blocks": 1
+ },
+ "calamity/PhantomHookShot.png": {
+  "w": 14,
+  "h": 28,
+  "frames": 1,
+  "fw": 14,
+  "fh": 28,
+  "blocks": 1
+ },
+ "calamity/PhantomMine.png": {
+  "w": 30,
+  "h": 30,
+  "frames": 1,
+  "fw": 30,
+  "fh": 30,
+  "blocks": 1
+ },
+ "calamity/Polterghast.png": {
+  "w": 90,
+  "h": 1800,
+  "frames": 12,
+  "fw": 90,
+  "fh": 150,
+  "blocks": 12
+ },
+ "calamity/PolterghastChain.png": {
+  "w": 20,
+  "h": 26,
+  "frames": 1,
+  "fw": 20,
+  "fh": 26,
+  "blocks": 1
+ },
+ "calamity/PolterghastGlow.png": {
+  "w": 90,
+  "h": 1800,
+  "frames": 12,
+  "fw": 90,
+  "fh": 150,
+  "blocks": 16
+ },
+ "calamity/PolterghastGlow2.png": {
+  "w": 90,
+  "h": 1800,
+  "frames": 12,
+  "fw": 90,
+  "fh": 150,
+  "blocks": 6
+ },
+ "calamity/PolterghastHook.png": {
+  "w": 44,
+  "h": 88,
+  "frames": 1,
+  "fw": 44,
+  "fh": 88,
+  "blocks": 1
+ },
+ "calamity/SCalBrimstoneFireblast.png": {
+  "w": 36,
+  "h": 250,
+  "frames": 1,
+  "fw": 36,
+  "fh": 250,
+  "blocks": 6
+ },
+ "calamity/SCalBrimstoneGigablast.png": {
+  "w": 52,
+  "h": 492,
+  "frames": 3,
+  "fw": 52,
+  "fh": 164,
+  "blocks": 8
+ },
+ "calamity/SepulcherArm.png": {
+  "w": 20,
+  "h": 62,
+  "frames": 1,
+  "fw": 20,
+  "fh": 62,
+  "blocks": 1
+ },
+ "calamity/SepulcherBody.png": {
+  "w": 82,
+  "h": 72,
+  "frames": 1,
+  "fw": 82,
+  "fh": 72,
+  "blocks": 1
+ },
+ "calamity/SepulcherBodyAlt.png": {
+  "w": 86,
+  "h": 82,
+  "frames": 1,
+  "fw": 86,
+  "fh": 82,
+  "blocks": 1
+ },
+ "calamity/SepulcherForearm.png": {
+  "w": 18,
+  "h": 60,
+  "frames": 1,
+  "fw": 18,
+  "fh": 60,
+  "blocks": 1
+ },
+ "calamity/SepulcherHand.png": {
+  "w": 34,
+  "h": 48,
+  "frames": 1,
+  "fw": 34,
+  "fh": 48,
+  "blocks": 1
+ },
+ "calamity/SepulcherHead.png": {
+  "w": 62,
+  "h": 88,
+  "frames": 1,
+  "fw": 62,
+  "fh": 88,
+  "blocks": 1
+ },
+ "calamity/SepulcherTail.png": {
+  "w": 54,
+  "h": 54,
+  "frames": 1,
+  "fw": 54,
+  "fh": 54,
+  "blocks": 1
+ },
+ "calamity/SupremeCalamitas.png": {
+  "w": 120,
+  "h": 1260,
+  "frames": 3,
+  "fw": 120,
+  "fh": 420,
+  "blocks": 19
+ },
+ "calamity/SupremeCalamitasHooded.png": {
+  "w": 120,
+  "h": 1302,
+  "frames": 3,
+  "fw": 120,
+  "fh": 434,
+  "blocks": 19
+ },
+ "calamity/SupremeCataclysmFist.png": {
+  "w": 126,
+  "h": 224,
+  "frames": 4,
+  "fw": 126,
+  "fh": 56,
+  "blocks": 4
+ },
+ "calamity/SupremeCataclysmFistAlt.png": {
+  "w": 126,
+  "h": 224,
+  "frames": 4,
+  "fw": 126,
+  "fh": 56,
+  "blocks": 4
+ },
+ "calamity/SupremeCatastropheSlash.png": {
+  "w": 168,
+  "h": 240,
+  "frames": 4,
+  "fw": 168,
+  "fh": 60,
+  "blocks": 4
+ },
+ "calamity/SupremeCatastropheSlashAlt.png": {
+  "w": 192,
+  "h": 232,
+  "frames": 4,
+  "fw": 192,
+  "fh": 58,
+  "blocks": 4
+ },
+ "calamity/ashes.png": {
+  "w": 56,
+  "h": 360,
+  "frames": 6,
+  "fw": 56,
+  "fh": 60,
+  "blocks": 7
+ },
+ "calamity/brim-dart.png": {
+  "w": 18,
+  "h": 176,
+  "frames": 1,
+  "fw": 18,
+  "fh": 176,
+  "blocks": 4
+ },
+ "calamity/brim-fireblast.png": {
+  "w": 36,
+  "h": 250,
+  "frames": 1,
+  "fw": 36,
+  "fh": 250,
+  "blocks": 6
+ },
+ "calamity/brim-giga.png": {
+  "w": 52,
+  "h": 492,
+  "frames": 3,
+  "fw": 52,
+  "fh": 164,
+  "blocks": 8
+ },
+ "calamity/brim-heart.png": {
+  "w": 44,
+  "h": 370,
+  "frames": 2,
+  "fw": 44,
+  "fh": 185,
+  "blocks": 6
+ },
+ "calamity/brim-hellblast.png": {
+  "w": 54,
+  "h": 176,
+  "frames": 4,
+  "fw": 54,
+  "fh": 44,
+  "blocks": 4
+ },
+ "calamity/cataclysm-fist.png": {
+  "w": 126,
+  "h": 224,
+  "frames": 4,
+  "fw": 126,
+  "fh": 56,
+  "blocks": 4
+ },
+ "calamity/cataclysm-fist2.png": {
+  "w": 126,
+  "h": 224,
+  "frames": 4,
+  "fw": 126,
+  "fh": 56,
+  "blocks": 4
+ },
+ "calamity/catastrophe-bot.png": {
+  "w": 192,
+  "h": 232,
+  "frames": 4,
+  "fw": 192,
+  "fh": 58,
+  "blocks": 4
+ },
+ "calamity/catastrophe-top.png": {
+  "w": 168,
+  "h": 240,
+  "frames": 4,
+  "fw": 168,
+  "fh": 60,
+  "blocks": 4
+ },
+ "calamity/phantom-blast.png": {
+  "w": 18,
+  "h": 24,
+  "frames": 1,
+  "fw": 18,
+  "fh": 24,
+  "blocks": 1
+ },
+ "calamity/phantom-orb.png": {
+  "w": 30,
+  "h": 30,
+  "frames": 1,
+  "fw": 30,
+  "fh": 30,
+  "blocks": 1
+ },
+ "calamity/phantom-shot.png": {
+  "w": 14,
+  "h": 28,
+  "frames": 1,
+  "fw": 14,
+  "fh": 28,
+  "blocks": 1
+ },
+ "calamity/polter-chain.png": {
+  "w": 20,
+  "h": 26,
+  "frames": 1,
+  "fw": 20,
+  "fh": 26,
+  "blocks": 1
+ },
+ "calamity/polter-hook.png": {
+  "w": 44,
+  "h": 88,
+  "frames": 1,
+  "fw": 44,
+  "fh": 88,
+  "blocks": 1
+ },
+ "calamity/polter-p1.png": {
+  "w": 90,
+  "h": 1800,
+  "frames": 12,
+  "fw": 90,
+  "fh": 150,
+  "blocks": 12
+ },
+ "calamity/polter-p2.png": {
+  "w": 90,
+  "h": 1800,
+  "frames": 12,
+  "fw": 90,
+  "fh": 150,
+  "blocks": 16
+ },
+ "calamity/polter-p3.png": {
+  "w": 90,
+  "h": 1800,
+  "frames": 12,
+  "fw": 90,
+  "fh": 150,
+  "blocks": 6
+ },
+ "calamity/potent-blast.png": {
+  "w": 18,
+  "h": 24,
+  "frames": 1,
+  "fw": 18,
+  "fh": 24,
+  "blocks": 1
+ },
+ "calamity/potent-shot.png": {
+  "w": 14,
+  "h": 28,
+  "frames": 1,
+  "fw": 14,
+  "fh": 28,
+  "blocks": 1
+ },
+ "calamity/sepulcher.png": {
+  "w": 62,
+  "h": 88,
+  "frames": 1,
+  "fw": 62,
+  "fh": 88,
+  "blocks": 1
+ },
+ "calamity/swc-p1-hood.png": {
+  "w": 120,
+  "h": 1302,
+  "frames": 3,
+  "fw": 120,
+  "fh": 434,
+  "blocks": 19
+ },
+ "calamity/swc-p1.png": {
+  "w": 120,
+  "h": 1260,
+  "frames": 3,
+  "fw": 120,
+  "fh": 420,
+  "blocks": 19
+ },
+ "calamity/swc-p2-hood.png": {
+  "w": 120,
+  "h": 1302,
+  "frames": 3,
+  "fw": 120,
+  "fh": 434,
+  "blocks": 19
+ },
+ "calamity/swc-p2.png": {
+  "w": 120,
+  "h": 1260,
+  "frames": 3,
+  "fw": 120,
+  "fh": 420,
+  "blocks": 19
+ },
+ "deltarune/sr-Board_Games-274913.png": {
+  "w": 1472,
+  "h": 1550,
+  "frames": 1,
+  "fw": 1472,
+  "fh": 1550,
+  "blocks": 1
+ },
+ "deltarune/sr-Card_Castle-110766.png": {
+  "w": 746,
+  "h": 884,
+  "frames": 1,
+  "fw": 746,
+  "fh": 884,
+  "blocks": 1
+ },
+ "deltarune/sr-Great_Board-110849.png": {
+  "w": 526,
+  "h": 220,
+  "frames": 1,
+  "fw": 526,
+  "fh": 220,
+  "blocks": 1
+ },
+ "deltarune/sr-Mancountry-273193.png": {
+  "w": 332,
+  "h": 324,
+  "frames": 1,
+  "fw": 332,
+  "fh": 324,
+  "blocks": 1
+ },
+ "deltarune/sr-Purple_Cliffs-273345.png": {
+  "w": 689,
+  "h": 1120,
+  "frames": 1,
+  "fw": 689,
+  "fh": 1120,
+  "blocks": 1
+ },
+ "deltarune/sr-Scarlet_Forest-110841.png": {
+  "w": 425,
+  "h": 416,
+  "frames": 1,
+  "fw": 425,
+  "fh": 416,
+  "blocks": 1
+ },
+ "deltarune/sr-Tenna-273063.png": {
+  "w": 2200,
+  "h": 5745,
+  "frames": 1,
+  "fw": 2200,
+  "fh": 5745,
+  "blocks": 1
+ },
+ "deltarune/sr-Tree_Tiles-111897.png": {
+  "w": 323,
+  "h": 805,
+  "frames": 1,
+  "fw": 323,
+  "fh": 805,
+  "blocks": 1
+ },
+ "deltarune/tenna-idle.png": {
+  "w": 70,
+  "h": 92,
+  "frames": 1,
+  "fw": 70,
+  "fh": 92,
+  "blocks": 1
+ },
+ "deltarune/tenna-point.png": {
+  "w": 90,
+  "h": 120,
+  "frames": 1,
+  "fw": 90,
+  "fh": 120,
+  "blocks": 1
+ },
+ "terraria/axe.png": {
+  "w": 34,
+  "h": 30,
+  "frames": 1,
+  "fw": 34,
+  "fh": 30,
+  "blocks": 1
+ },
+ "terraria/mushroom.png": {
+  "w": 22,
+  "h": 24,
+  "frames": 1,
+  "fw": 22,
+  "fh": 24,
+  "blocks": 1
+ },
+ "terraria/recall-potion.png": {
+  "w": 16,
+  "h": 16,
+  "frames": 1,
+  "fw": 16,
+  "fh": 16,
+  "blocks": 1
+ },
+ "terraria/slot.png": {
+  "w": 52,
+  "h": 52,
+  "frames": 1,
+  "fw": 52,
+  "fh": 52,
+  "blocks": 1
+ },
+ "terraria/sr-Terraria-Inventory_Back.png": {
+  "w": 52,
+  "h": 52,
+  "frames": 1,
+  "fw": 52,
+  "fh": 52,
+  "blocks": 1
+ },
+ "terraria/sr-Terraria-Item_10-IronAxe.png": {
+  "w": 34,
+  "h": 30,
+  "frames": 1,
+  "fw": 34,
+  "fh": 30,
+  "blocks": 1
+ },
+ "terraria/sr-Terraria-Item_5-Mushroom.png": {
+  "w": 22,
+  "h": 24,
+  "frames": 1,
+  "fw": 22,
+  "fh": 24,
+  "blocks": 1
+ },
+ "terraria/sr-Terraria-Item_662-RecallPotion.png": {
+  "w": 16,
+  "h": 16,
+  "frames": 1,
+  "fw": 16,
+  "fh": 16,
+  "blocks": 1
+ },
+ "undertale/armchair.png": {
+  "w": 45,
+  "h": 83,
+  "frames": 1,
+  "fw": 45,
+  "fh": 83,
+  "blocks": 2
+ },
+ "undertale/firedoor.png": {
+  "w": 55,
+  "h": 70,
+  "frames": 1,
+  "fw": 55,
+  "fh": 70,
+  "blocks": 1
+ },
+ "undertale/newhome-corridor.png": {
+  "w": 743,
+  "h": 76,
+  "frames": 1,
+  "fw": 743,
+  "fh": 76,
+  "blocks": 1
+ },
+ "undertale/sr-Undertale-Home_and_New_Home-76337.png": {
+  "w": 1401,
+  "h": 730,
+  "frames": 1,
+  "fw": 1401,
+  "fh": 730,
+  "blocks": 1
+ },
+ "undertale/sr-Undertale-Papyrus_and_Sans_House-77169.png": {
+  "w": 490,
+  "h": 1239,
+  "frames": 1,
+  "fw": 490,
+  "fh": 1239,
+  "blocks": 1
+ }
+}

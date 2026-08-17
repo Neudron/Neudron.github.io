@@ -1,0 +1,48 @@
+# Working repo for Documents\neu — NOT the Pages repo.
+#
+# WHAT THIS IS FOR. The Pages repo (_deploy) only ever holds `site\`,
+# and `site\.gitignore` deliberately keeps `memory\` out of it because
+# memory\story.md is the complete walkthrough of the game. Removing the
+# stray root repo on 2026-08-17 was correct on its own, but together
+# those two facts left 3,600 lines of design documentation — plus every
+# script in _scripts\ — with no version history and no copy anywhere.
+#
+# This repo covers that gap. It is local-only by design. Add a PRIVATE
+# remote when you want an off-machine copy:
+#
+#     git remote add origin git@github.com:Neudron/neu-workshop.git
+#     git push -u origin main
+#
+# PRIVATE. It contains the walkthrough. A public remote here undoes the
+# entire reason memory\ was excluded from the site in the first place.
+
+# ── the Pages clone ──────────────────────────────────────────────
+# _deploy is its own git repository with its own history and its own
+# remote. Tracking it from here would either nest a repo inside a repo
+# or duplicate every shipped file. It needs no backup: it is a clone.
+_deploy/
+
+# ── dependencies and generated output ────────────────────────────
+site/tests/node_modules/
+site/tests/package-lock.json
+_scripts/out/
+
+# ── sprite sources ───────────────────────────────────────────────
+# 2.5 MB of Deltarune/Calamity rips that exist only so tiles and frames
+# can be cropped out of them. The crops are tracked; the rips are not.
+# They are re-downloadable and they are not our work.
+site/img/act4/deltarune/
+
+# ── backups of things this repo now replaces ─────────────────────
+# _scripts\orig holds zipped copies of files before they were changed,
+# including the stray root .git. Useful on disk, pointless in history.
+_scripts/orig/
+
+# ── leftovers ────────────────────────────────────────────────────
+# Written by a sandbox that could create files but not delete them.
+# Safe to remove by hand.
+.git-write-probe
+
+.DS_Store
+Thumbs.db
+*.orig

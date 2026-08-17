@@ -1,0 +1,1813 @@
+/* ═══════════════════════════════════════════════════════════════════
+   neu — one stylesheet.
+
+   Tone is 6/10 toward cute, and the split is deliberate:
+   goth lives in the colour and the material, cute lives in the
+   motion and the silhouette. Nothing decorative is allowed to
+   carry the cute — no bows, no charms. Rounded corners, generous
+   air, and easing that overshoots do all of that work.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── table of contents ──────────────────────────────────────────────
+   153 boot          869 a plain button       1198 the argument
+   186 chrome        881 the room             1202 the pot
+   242 the cat        918 the dog             1251 act iv rooms
+   277 the totem      950 dog, awake/asleep    1257 on the television
+   342 two fixed layers 977 asleep            1372 objectives
+   383 sections       995 the console         1466 dev console
+   413 cut-outs       1040 the television     1503 the room behind
+   448 hero           1068 the blackout       1544 motion off
+   497 headings/copy  1079 after the light    1572 juice, DOM half
+   511 work           1087 sprite inspector   1592 settings
+   540 contact        1113 the show           1664 larger text (zoom)
+   552 reveals        1158 through the crack  1650 gear button
+   573 no-webgl       1162 the crack
+   587 sans           1209 craft ready        1667 thumb controls
+   664 the sword                              (line numbers drift —
+                                              keep the names current)
+   685 the textbox
+   714 who is in the box
+   741 swing trail
+   753 the two halves
+   793 what you're carrying
+   825 "it went up there"
+   849 the key          */
+
+/* ═══════════════════════════════════════════════════════════════════
+   Type: the actual Undertale fonts.
+
+   The game's narration, overworld dialogue and interface are set in
+   8-Bit Operator JVE (Jayvee Enaguas). Determination Mono is the
+   faithful recreation of how that text actually renders in-game,
+   rebuilt by Haley Wakamatsu from the game's own spritesheet, and
+   Determination Sans is its proportional variant. Both are used here:
+   Mono for body and interface, Sans for display.
+
+   The font files are NOT in this repo. Download the webfonts kit and
+   drop the whole `webfonts` folder into site/fonts/ — see
+   fonts/README.txt. index.html links that kit's own stylesheet, so
+   the @font-face rules come from the kit and there is nothing here to
+   keep in sync with it.
+
+   Until the files are there the page falls back to Pixelify Sans off
+   Google Fonts, which is also a pixel face, so nothing looks broken.
+
+   THE SIZES ARE INTEGERS ON PURPOSE — and this is the font author's
+   own advice, not a preference: "the fonts look best when your font
+   size is a multiple of 16 pixels." These faces are drawn on a 16px
+   grid, so at 15px or 17.4px the browser resamples the bitmap and the
+   whole point of the typeface is lost to blur. Every font-size here
+   is 16, 32, 48 or 96 — never a clamp(), never an em that lands
+   between grid steps. If you add a size, keep it a multiple of 16.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --void:  #08080B;
+  --ink:   #14141C;
+  --crypt: #22222E;
+  --bone:  #EDE7DE;
+  --ghost: #8A8598;
+  --lilac: #B892FF;
+  --blood: #8C2F4A;
+
+  --page: var(--void);
+  --text: var(--bone);
+  --dim:  var(--ghost);
+  --rule: var(--crypt);      /* decorative hairlines only */
+  --edge: #5C5C70;           /* interactive control borders — 3.07:1 on --void */
+  --accent: var(--lilac);    /* the accent that is actually safe to read */
+
+  /* Determination Mono is the in-game text; Sans is its variant. */
+  --font:  "Determination Mono", "Pixelify Sans", ui-monospace, monospace;
+  --font-talk: 'Undertale Sans', 'Comic Sans MS', 'Comic Neue', cursive;
+  /* Papyrus for the objectives panel. It is the one place a second
+     in-game face belongs: a list of tasks is not the site's voice, it
+     is an overlay on top of it, and giving it its own typeface stops
+     it reading as page content. The kit ships it; nothing new loads. */
+  --font-quest: 'Undertale Papyrus', 'Determination Mono', 'Pixelify Sans', monospace;
+  --font-display: "Determination Sans", "Determination Mono", "Pixelify Sans", ui-monospace, monospace;
+
+  --bounce: cubic-bezier(.34, 1.36, .64, 1);
+  --gutter: clamp(24px, 7vw, 120px);
+}
+
+/* the joke: a goth site with a light mode */
+body.is-lit-mode {
+  --page: #EFEBE4;
+  --text: #14141C;
+  --dim:  #6B6678;
+  --rule: #D6D0C6;
+  --edge: #8A857B;   /* 3.09:1 on the light page */
+  /* --lilac at 2.06:1 on this background is unreadable as text.
+     The hue survives; the lightness does not. */
+  --accent: #5E33BE; /* 6.56:1 */
+}
+
+* { box-sizing: border-box; }
+
+/* The browser's own rule for the hidden attribute is `[hidden] {
+   display: none }` in the UA stylesheet, which ANY author rule setting
+   display will outrank — `.tbox { display: grid }` did exactly that,
+   and the dialog was permanently on screen no matter what js set.
+   This is the standard defence and it fixes the whole class of bug
+   rather than the one instance. */
+[hidden] { display: none !important; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font: 400 16px/1.5 var(--font);
+  -webkit-font-smoothing: none;          /* keep the pixels hard */
+  font-smooth: never;
+  transition: background .6s ease, color .6s ease;
+  overflow-x: hidden;
+}
+
+body.is-booting { overflow: hidden; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.skip {
+  position: absolute; left: -9999px; top: 12px; z-index: 60;
+  background: var(--ink); color: var(--bone); padding: 10px 16px;
+  border-radius: 10px; text-decoration: none; font-size: 16px;
+}
+.skip:focus { left: 12px; }
+
+a { color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.mono { font-family: var(--font); }    /* already pixel — nothing to switch to */
+
+/* ── boot ───────────────────────────────────────────────────────── */
+.boot {
+  position: fixed; inset: 0; z-index: 50;
+  display: grid; place-content: center; gap: 18px; justify-items: center;
+  background: var(--void);
+  transition: opacity .55s ease, visibility .55s;
+}
+.boot.is-done { opacity: 0; visibility: hidden; }
+
+/* The boot screen is deliberately NOT pixel. It keeps the original
+   serif, so the page opens on something quiet and then reveals itself
+   as the pixel thing underneath. */
+.boot__mark {
+  font: italic 300 clamp(46px, 9vw, 92px)/1 "Cormorant Garamond", Georgia, serif;
+  color: var(--bone);
+  letter-spacing: .01em;
+  -webkit-font-smoothing: antialiased;   /* a serif does want smoothing */
+}
+.boot__bar {
+  position: relative; width: min(180px, 42vw); height: 1px;
+  background: var(--crypt); overflow: hidden;
+}
+.boot__bar span {
+  position: absolute; inset: 0 100% 0 0;
+  background: var(--accent);
+  transition: right .25s linear;
+}
+.boot__pct {
+  font-family: "VT323", monospace; font-size: 15px;
+  color: var(--ghost); letter-spacing: .22em;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── chrome ─────────────────────────────────────────────────────── */
+.ctl {
+  position: fixed; right: var(--gutter); top: 28px; z-index: 30;
+  display: flex; gap: 10px;
+}
+/* A wall switch, not a button. Square corners and stepped easing so
+   the lever snaps between two positions like a real one rather than
+   gliding. The plate is the affordance; the label just names it. */
+.sw {
+  display: grid; justify-items: center; gap: 8px;
+  background: none; border: 0; padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sw__plate {
+  width: 34px; height: 56px;
+  border: 2px solid var(--edge);
+  background: var(--ink);
+  padding: 4px;
+  display: block;
+  transition: border-color .25s;
+}
+.sw__lever {
+  display: block;
+  width: 100%; height: 22px;
+  background: var(--dim);
+  transform: translateY(22px);            /* resting: down = off */
+  transition: transform .1s steps(2, end), background-color .25s;
+}
+.sw[aria-pressed="true"] .sw__lever { transform: translateY(0); background: var(--accent); }
+.sw[aria-pressed="true"] .sw__plate { border-color: var(--accent); }
+.sw:hover .sw__plate { border-color: var(--dim); }
+.sw__label {
+  font: 400 16px/1 var(--font);
+  color: var(--dim);
+  letter-spacing: 1px;
+  transition: color .25s;
+}
+.sw:hover .sw__label { color: var(--text); }
+
+/* the contact fails: the lever twitches and drops back */
+.sw.is-broken .sw__lever { animation: swFail .34s steps(3, end); }
+@keyframes swFail {
+  0%   { transform: translateY(22px); }
+  25%  { transform: translateY(14px); }
+  50%  { transform: translateY(20px); }
+  75%  { transform: translateY(16px); }
+  100% { transform: translateY(22px); }
+}
+.sw.is-broken .sw__plate { animation: plateJolt .34s steps(2, end); }
+@keyframes plateJolt {
+  0%,100% { transform: translateX(0); }
+  30%     { transform: translateX(-2px); }
+  60%     { transform: translateX(2px); }
+}
+
+/* ── the cat ─────────────────────────────────────────────────────
+   Shown on the second press, with the boom. Pointer-events off so it
+   can never swallow a click, and aria-hidden because it is a joke,
+   not information. */
+.cat {
+  position: fixed; inset: 0; z-index: 45;
+  display: grid; place-items: center;
+  pointer-events: none;
+  perspective: 900px;          /* rotateY needs this or it reads as scaleX */
+  --tx: 0px; --ty: 0px;        /* drift target; js randomises per trigger */
+  opacity: 0;
+  visibility: hidden;          /* see note below — this is load-bearing */
+  transition: opacity .18s ease;
+}
+/* `visibility` and not just opacity, deliberately. The exit animation
+   uses `forwards` to hold its final frame; the instant its class is
+   removed the image snaps back to its resting transform. With only an
+   opacity transition on the container, that snap-back is visible for
+   ~180ms — a small cat popping back into the middle of the screen
+   after the animation has finished. visibility: hidden lands in the
+   same frame the class is dropped, so the revert never renders. */
+.cat.is-on { opacity: 1; visibility: visible; }
+.cat img {
+  width: min(46vw, 340px); height: auto;
+  image-rendering: pixelated;
+  transform: scale(.4) rotate(-6deg);
+  filter: drop-shadow(0 12px 40px rgba(0,0,0,.7));
+}
+.cat.is-on img { animation: catIn .5s var(--bounce) forwards; }
+@keyframes catIn {
+  0%   { transform: scale(.4) rotate(-6deg); }
+  60%  { transform: scale(1.08) rotate(2deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+/* ── the totem of undying pop ────────────────────────────────────
+   Ported from Minecraft's own item-activation animation rather than
+   eyeballed, because eyeballing it failed twice.
+
+   The game holds a progress value f over 40 ticks (2s) and runs it
+   through a quintic:
+
+     poly(f) = 10.25f^5 - 24.95f^4 + 25.5f^3 - 13.8f^2 + 4f
+
+   That curve is not an ease. It rockets to ~0.5 by t=0.25, sits on a
+   plateau through the whole middle, then rockets to 1.0 at the end.
+   Feed it into 900 * |sin(poly * PI)| and the spin does something no
+   standard easing produces: two and a half turns almost immediately,
+   a held beat facing away, then two and a half turns back. That
+   stall in the middle is the entire character of the animation, and
+   it is why a linear or eased spin reads as "funky" — a constant-rate
+   turn is the one thing this motion never does.
+
+   Verified numerically before use: poly(0) = 0 and poly(1) = 1 exactly,
+   and it stays inside [0,1] throughout. The keyframes below are that
+   function sampled at 27 points, not hand-authored.
+
+   Sign is negative because you asked for it backwards. --tx/--ty are
+   the drift target: the game stores a random per-trigger offset
+   (floatingItemWidth / floatingItemHeight on GameRenderer, which are
+   offsets and not dimensions despite the names), so no two pops travel
+   the same way. js sets them fresh each time. */
+.cat.is-pop { transition: none; opacity: 1; }
+.cat.is-pop img {
+  animation: totemPop 2s linear forwards;   /* 40 ticks. linear: the
+                                               curve is already in the
+                                               keyframes, so any easing
+                                               on top double-counts it */
+  backface-visibility: visible;             /* it turns past 90deg */
+}
+@keyframes totemPop {
+  0% { transform: translate3d(calc(var(--tx) * 0.0000), calc(var(--ty) * 0.0000), 0) rotateY(-0.00deg) rotateZ(6.00deg) scale(calc(var(--pk, 1) * 0.5500)); opacity: 0.0000; }
+  3.846% { transform: translate3d(calc(var(--tx) * 0.1348), calc(var(--ty) * 0.1348), 0) rotateY(-369.92deg) rotateZ(5.72deg) scale(calc(var(--pk, 1) * 0.9816)); opacity: 1.0000; }
+  7.692% { transform: translate3d(calc(var(--tx) * 0.2368), calc(var(--ty) * 0.2368), 0) rotateY(-609.46deg) rotateZ(4.90deg) scale(calc(var(--pk, 1) * 1.2610)); opacity: 1.0000; }
+  11.54% { transform: translate3d(calc(var(--tx) * 0.3128), calc(var(--ty) * 0.3128), 0) rotateY(-748.75deg) rotateZ(3.62deg) scale(calc(var(--pk, 1) * 1.4235)); opacity: 1.0000; }
+  15.38% { transform: translate3d(calc(var(--tx) * 0.3685), calc(var(--ty) * 0.3685), 0) rotateY(-824.31deg) rotateZ(2.00deg) scale(calc(var(--pk, 1) * 1.5117)); opacity: 1.0000; }
+  19.23% { transform: translate3d(calc(var(--tx) * 0.4088), calc(var(--ty) * 0.4088), 0) rotateY(-863.31deg) rotateZ(0.19deg) scale(calc(var(--pk, 1) * 1.5572)); opacity: 1.0000; }
+  23.08% { transform: translate3d(calc(var(--tx) * 0.4375), calc(var(--ty) * 0.4375), 0) rotateY(-882.70deg) rotateZ(-1.63deg) scale(calc(var(--pk, 1) * 1.5798)); opacity: 1.0000; }
+  26.92% { transform: translate3d(calc(var(--tx) * 0.4577), calc(var(--ty) * 0.4577), 0) rotateY(-892.06deg) rotateZ(-3.30deg) scale(calc(var(--pk, 1) * 1.5907)); opacity: 1.0000; }
+  30.77% { transform: translate3d(calc(var(--tx) * 0.4717), calc(var(--ty) * 0.4717), 0) rotateY(-896.45deg) rotateZ(-4.67deg) scale(calc(var(--pk, 1) * 1.5959)); opacity: 1.0000; }
+  34.62% { transform: translate3d(calc(var(--tx) * 0.4815), calc(var(--ty) * 0.4815), 0) rotateY(-898.47deg) rotateZ(-5.59deg) scale(calc(var(--pk, 1) * 1.5982)); opacity: 1.0000; }
+  38.46% { transform: translate3d(calc(var(--tx) * 0.4882), calc(var(--ty) * 0.4882), 0) rotateY(-899.38deg) rotateZ(-5.99deg) scale(calc(var(--pk, 1) * 1.5993)); opacity: 1.0000; }
+  42.31% { transform: translate3d(calc(var(--tx) * 0.4928), calc(var(--ty) * 0.4928), 0) rotateY(-899.77deg) rotateZ(-5.82deg) scale(calc(var(--pk, 1) * 1.5997)); opacity: 1.0000; }
+  46.15% { transform: translate3d(calc(var(--tx) * 0.4961), calc(var(--ty) * 0.4961), 0) rotateY(-899.93deg) rotateZ(-5.11deg) scale(calc(var(--pk, 1) * 1.5999)); opacity: 1.0000; }
+  50% { transform: translate3d(calc(var(--tx) * 0.4984), calc(var(--ty) * 0.4984), 0) rotateY(-899.99deg) rotateZ(-3.92deg) scale(calc(var(--pk, 1) * 1.6000)); opacity: 1.0000; }
+  53.85% { transform: translate3d(calc(var(--tx) * 0.5003), calc(var(--ty) * 0.5003), 0) rotateY(-900.00deg) rotateZ(-2.36deg) scale(calc(var(--pk, 1) * 1.6000)); opacity: 1.0000; }
+  57.69% { transform: translate3d(calc(var(--tx) * 0.5022), calc(var(--ty) * 0.5022), 0) rotateY(-899.98deg) rotateZ(-0.58deg) scale(calc(var(--pk, 1) * 1.6000)); opacity: 1.0000; }
+  61.54% { transform: translate3d(calc(var(--tx) * 0.5046), calc(var(--ty) * 0.5046), 0) rotateY(-899.91deg) rotateZ(1.25deg) scale(calc(var(--pk, 1) * 1.5999)); opacity: 1.0000; }
+  65.38% { transform: translate3d(calc(var(--tx) * 0.5085), calc(var(--ty) * 0.5085), 0) rotateY(-899.68deg) rotateZ(2.97deg) scale(calc(var(--pk, 1) * 1.5996)); opacity: 1.0000; }
+  69.23% { transform: translate3d(calc(var(--tx) * 0.5150), calc(var(--ty) * 0.5150), 0) rotateY(-899.00deg) rotateZ(4.41deg) scale(calc(var(--pk, 1) * 1.5988)); opacity: 1.0000; }
+  73.08% { transform: translate3d(calc(var(--tx) * 0.5257), calc(var(--ty) * 0.5257), 0) rotateY(-897.06deg) rotateZ(5.44deg) scale(calc(var(--pk, 1) * 1.5966)); opacity: 0.9925; }
+  76.92% { transform: translate3d(calc(var(--tx) * 0.5429), calc(var(--ty) * 0.5429), 0) rotateY(-891.83deg) rotateZ(5.95deg) scale(calc(var(--pk, 1) * 1.5905)); opacity: 0.9263; }
+  80.77% { transform: translate3d(calc(var(--tx) * 0.5694), calc(var(--ty) * 0.5694), 0) rotateY(-878.69deg) rotateZ(5.90deg) scale(calc(var(--pk, 1) * 1.5751)); opacity: 0.8247; }
+  84.62% { transform: translate3d(calc(var(--tx) * 0.6088), calc(var(--ty) * 0.6088), 0) rotateY(-847.94deg) rotateZ(5.31deg) scale(calc(var(--pk, 1) * 1.5393)); opacity: 0.6976; }
+  88.46% { transform: translate3d(calc(var(--tx) * 0.6656), calc(var(--ty) * 0.6656), 0) rotateY(-780.97deg) rotateZ(4.21deg) scale(calc(var(--pk, 1) * 1.4611)); opacity: 0.5492; }
+  92.31% { transform: translate3d(calc(var(--tx) * 0.7452), calc(var(--ty) * 0.7452), 0) rotateY(-646.00deg) rotateZ(2.71deg) scale(calc(var(--pk, 1) * 1.3037)); opacity: 0.3823; }
+  96.15% { transform: translate3d(calc(var(--tx) * 0.8541), calc(var(--ty) * 0.8541), 0) rotateY(-398.30deg) rotateZ(0.97deg) scale(calc(var(--pk, 1) * 1.0147)); opacity: 0.1988; }
+  100% { transform: translate3d(calc(var(--tx) * 1.0000), calc(var(--ty) * 1.0000), 0) rotateY(-0.00deg) rotateZ(-0.87deg) scale(calc(var(--pk, 1) * 0.5500)); opacity: 0.0000; }
+}
+
+/* ── the two fixed layers ─────────────────────────────────────────
+   The sky and the glass. Both are full-viewport, both are fixed, and
+   the content scrolls over them.
+
+   THIS BLOCK IS LOAD-BEARING AND WAS ONCE MISSING. Without it both
+   canvases fall back to being ordinary in-flow replaced elements
+   sized by their width/height attributes — which three.js sets to
+   innerWidth x innerHeight. Two viewport-tall boxes then stack in
+   normal flow above <main>, so at scroll 0 you are looking at the
+   starfield and the glass is a full screen further down, off the
+   bottom edge. On a landscape window that damage is easy to miss
+   because things still roughly line up; on a portrait window the
+   glass is simply not on screen at load, which looks exactly like a
+   camera or framing bug and is not one. `renderer.setSize(w, h,
+   false)` passes updateStyle = false on purpose, so the CSS size has
+   to come from here. If the object ever "disappears" again, check
+   that these rules still exist before touching fitCamera(). */
+.stars {
+  position: fixed; inset: 0;
+  display: block;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+.glass {
+  position: fixed; inset: 0;
+  z-index: 1;
+  pointer-events: none;          /* the canvas re-enables itself below */
+  transition: opacity .45s ease;
+}
+#glassCanvas {
+  display: block;                /* inline canvases sit on a baseline and
+                                    leave a few px of descender gap */
+  width: 100%; height: 100%;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;            /* or a drag on a phone scrolls the page
+                                    instead of turning the object */
+}
+#glassCanvas.dragging { cursor: grabbing; }
+
+/* ── sections ─────────────────────────────────────────────────────
+   main sits above both layers. It is pointer-transparent so that the
+   hero — which declares the same below — lets a drag reach the glass
+   underneath it; .sec turns hit-testing back on for the sections that
+   actually contain things to click. Without the `none` on main, main's
+   own box swallows the drag before it ever gets down to z-index 1. */
+main { position: relative; z-index: 2; pointer-events: none; }
+
+.sec {
+  pointer-events: auto;
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  align-items: center;
+  padding: clamp(90px, 14vh, 180px) var(--gutter);
+}
+.hero { pointer-events: none; }
+.hero a { pointer-events: auto; }
+
+.stage {
+  position: relative;
+  width: 100%;
+  max-width: 1080px;
+  margin-inline: auto;
+}
+
+/* parallax targets — main.js writes --ty, nothing else moves them */
+.el, .lay { transform: translate3d(0, var(--ty, 0), 0); }
+
+/* ── decorative cut-outs (inline SVG, zero image files) ─────────── */
+.el {
+  position: absolute;
+  color: var(--dim);
+  opacity: .3;
+  pointer-events: none;
+  z-index: 0;
+}
+/* Solid cut-outs, matching the reference site's own vocabulary.
+
+   Its silhouettes (recoverable from its contours data) are chunky
+   filled masses — a lopsided five-point star, a tilted die, a CD, a
+   flower — never thin outline icons. That was the mistake in the
+   previous pass: outline line-art reads as an icon set, not as paper
+   cut-outs scattered on a page.
+
+   These are generated with a low-frequency wobble so no edge is
+   perfectly circular, which is what makes them read as hand-cut.
+   Solid fills carry far more weight than a 1px stroke, so the large
+   masses sit much lower in opacity than the old outlines did.
+
+   `rotate` is the individual property, not `transform` — main.js owns
+   `transform` for the parallax, and the two compose without fighting. */
+.el--moon   { width: clamp(84px, 11vw, 168px);  right: 1%;   top: -16%;    opacity: .16; rotate: -10deg; }
+.el--star-a { width: clamp(26px, 3vw, 48px);    left: 5%;    top: 6%;      opacity: .32; color: var(--accent); }
+.el--star-b { width: 16px;                      right: 24%;  bottom: 2%;   opacity: .26; color: var(--accent); }
+
+.el--flower { width: clamp(62px, 8vw, 128px);   right: 5%;   top: -14%;    opacity: .15; rotate: 12deg; }
+.el--star-c { width: clamp(20px, 2.4vw, 34px);  left: -2%;   top: 16%;     opacity: .28; color: var(--accent); }
+
+.el--die    { width: clamp(66px, 8vw, 124px);   right: -2%;  bottom: -16%; opacity: .14; rotate: -12deg; }
+.el--disc   { width: clamp(80px, 10vw, 150px);  left: -8%;   top: 4%;      opacity: .12; rotate: 6deg; }
+
+.el--star-d { width: clamp(24px, 2.8vw, 44px);  right: 6%;   top: -10%;    opacity: .3;  color: var(--accent); }
+
+/* ── hero ───────────────────────────────────────────────────────── */
+.hero .stage { min-height: 46vh; }
+
+.lay--tag {
+  position: absolute; left: 0; bottom: -8vh;
+  margin: 0; max-width: 22ch;
+  color: var(--dim);
+  font-size: 16px;
+}
+
+.cue {
+  position: absolute; left: 50%; bottom: 36px;
+  translate: -50% 0;
+  z-index: 3;
+  display: grid; justify-items: center; gap: 10px;
+  text-decoration: none;
+  transition: transform .4s var(--bounce), opacity .4s ease;
+}
+.cue__label {
+  font: 400 16px/1 var(--font);
+  letter-spacing: 2px;
+  color: var(--dim);
+  transition: color .3s;
+}
+.cue__well {
+  width: 28px; height: 44px;
+  display: grid; place-items: start center;
+  padding-top: 9px;
+  border: 1px solid var(--dim);      /* --edge was too faint to find */
+  border-radius: 999px;
+  transition: border-color .3s;
+}
+.cue:hover { transform: translate(-50%, 4px); }
+.cue:hover .cue__label { color: var(--text); }
+.cue:hover .cue__well  { border-color: var(--text); }
+.cue i {
+  width: 3px; height: 8px; border-radius: 2px;
+  background: var(--accent);
+  animation: cue 2.1s var(--bounce) infinite;
+}
+
+/* the cue has done its job once you have started scrolling */
+body.is-scrolled .cue { opacity: 0; pointer-events: none; }
+@keyframes cue {
+  0%, 100% { transform: translateY(0);    opacity: 0; }
+  30%      { transform: translateY(3px);  opacity: 1; }
+  70%      { transform: translateY(15px); opacity: 0; }
+}
+
+/* ── headings + copy ────────────────────────────────────────────── */
+/* carries the accessible name only — the glass is the visible title */
+.lay--name { margin: 0; font-size: 0; line-height: 0; }
+
+.lay--h {
+  margin: 0 0 clamp(28px, 4vw, 52px);
+  font: 700 32px/1 var(--font-display);
+  letter-spacing: 1px;
+}
+
+.lay--bio { max-width: 46ch; }
+.lay--bio p { margin: 0 0 1.15em; }
+.bio__note { color: var(--dim); }
+
+/* ── work ───────────────────────────────────────────────────────── */
+.works { list-style: none; margin: 0; padding: 0; max-width: 780px; }
+
+.works li { border-top: 1px solid var(--rule); }
+.works li:last-child { border-bottom: 1px solid var(--rule); }
+
+.works a {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr auto;
+  align-items: baseline;
+  gap: clamp(12px, 2.5vw, 32px);
+  padding: clamp(18px, 2.4vw, 28px) 8px;
+  text-decoration: none;
+  border-radius: 12px;
+  transition: background .35s ease, padding-left .35s var(--bounce);
+}
+.works a:hover { background: rgba(184,146,255,.08); padding-left: 18px; }
+@supports (background: color-mix(in srgb, red 8%, transparent)) {
+  .works a:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+}
+
+.works__n    { font: 400 16px/1.5 var(--font); color: var(--dim); }
+.works__t    { font: 700 16px/1.5 var(--font-display); }
+.works__d    { display: block; color: var(--dim); font-size: 16px; margin-top: 4px; max-width: 52ch; }
+.works__meta { font: 400 16px/1.5 var(--font); color: var(--dim); white-space: nowrap; }
+.works a:hover .works__meta { color: var(--accent); }
+
+.works__empty { color: var(--dim); }
+
+/* ── contact ────────────────────────────────────────────────────── */
+.links { list-style: none; margin: 0 0 clamp(40px, 6vw, 72px); padding: 0; display: grid; gap: 4px; }
+.links a {
+  display: inline-block;
+  font: 700 32px/1.5 var(--font-display);
+  text-decoration: none;
+  transition: color .3s, transform .4s var(--bounce);
+}
+.links a:hover { color: var(--accent); transform: translateX(10px); }
+
+.colophon { color: var(--dim); font-size: 16px; margin: 0; }
+
+/* ── reveals ────────────────────────────────────────────────────── */
+.rev {
+  opacity: 0;
+  translate: 0 18px;
+  transition: opacity .85s ease, translate .85s var(--bounce);
+}
+.rev.is-shown { opacity: 1; translate: 0 0; }
+.el.rev       { opacity: 0; }
+.el.rev.is-shown { opacity: .3; }
+.el--star-a.rev.is-shown { opacity: .32; }
+.el--star-b.rev.is-shown { opacity: .26; }
+.el--star-c.rev.is-shown { opacity: .28; }
+.el--star-d.rev.is-shown { opacity: .3; }
+.el--moon.rev.is-shown   { opacity: .16; }
+.el--flower.rev.is-shown { opacity: .15; }
+.el--die.rev.is-shown    { opacity: .14; }
+.el--disc.rev.is-shown   { opacity: .12; }
+
+/* stagger the work rows in */
+.works li.rev { transition-delay: calc(var(--i, 0) * 70ms); }
+
+/* ── no-webgl fallback ──────────────────────────────────────────── */
+.nogl {
+  position: absolute; inset: 0;
+  display: grid; place-content: center; text-align: center;
+}
+.nogl b {
+  display: block;
+  font: 700 48px/1 var(--font-display);
+  color: var(--text);
+}
+
+/* Display sizes step up on wide screens. A media query keeps them on
+   the 16px grid; clamp() would land them on fractional pixels. */
+
+/* ── sans, bottom right ───────────────────────────────────────────
+   Hidden until the contact section comes into view. That is the whole
+   reason the sword errand works: while you are up at the top fetching
+   it he is genuinely not on screen, so coming back down to him is a
+   real return rather than a scroll past someone who never left. */
+.sans {
+  position: fixed;
+  right: clamp(14px, 3vw, 38px);
+  bottom: clamp(14px, 3vh, 34px);
+  z-index: 40;
+  opacity: 0; transform: translateY(12px);
+  transition: opacity .5s ease, transform .5s var(--bounce);
+}
+.sans.is-in { opacity: 1; transform: none; }
+.sans__btn {
+  display: block; padding: 0; border: 0; background: none;
+  line-height: 0; cursor: pointer;
+}
+.sans__btn img {
+  width: clamp(46px, 5.5vw, 62px); height: auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 5px 16px rgba(0,0,0,.55));
+  transition: transform .18s var(--bounce);
+}
+.sans__btn:hover img { transform: translateY(-4px); }
+.sans__btn:focus-visible { outline: 2px solid var(--edge); outline-offset: 5px; }
+
+/* the totem, popping over his head — same keyframes as the cat, just
+   scaled by --pk. small, as asked. */
+.pop {
+  position: absolute;
+  left: 50%; top: -30px; margin-left: -30px;
+  width: 60px; height: 60px;
+  display: grid; place-items: center;
+  pointer-events: none;
+  perspective: 600px;
+  --tx: 0px; --ty: 0px; --pk: .78;
+  z-index: 2;                  /* totem in front of its own sparks */
+  visibility: hidden;
+}
+.pop.is-pop { visibility: visible; }
+.pop img { width: 52px; height: 52px; image-rendering: pixelated; opacity: 0; }
+.pop.is-pop img { animation: totemRise 1.83s linear forwards; }
+@keyframes totemRise {
+  0% { transform: translate3d(calc(var(--tx) * 0.0000), calc(var(--ty) * 0.0000), 0) scale(calc(var(--pk, 1) * 0.4500)); opacity: 0.0000; }
+  5.556% { transform: translate3d(calc(var(--tx) * 0.1838), calc(var(--ty) * 0.1838), 0) scale(calc(var(--pk, 1) * 0.8430)); opacity: 0.9259; }
+  11.11% { transform: translate3d(calc(var(--tx) * 0.3054), calc(var(--ty) * 0.3054), 0) scale(calc(var(--pk, 1) * 1.0396)); opacity: 1.0000; }
+  16.67% { transform: translate3d(calc(var(--tx) * 0.3835), calc(var(--ty) * 0.3835), 0) scale(calc(var(--pk, 1) * 1.1223)); opacity: 1.0000; }
+  22.22% { transform: translate3d(calc(var(--tx) * 0.4320), calc(var(--ty) * 0.4320), 0) scale(calc(var(--pk, 1) * 1.1536)); opacity: 1.0000; }
+  27.78% { transform: translate3d(calc(var(--tx) * 0.4613), calc(var(--ty) * 0.4613), 0) scale(calc(var(--pk, 1) * 1.1647)); opacity: 1.0000; }
+  33.33% { transform: translate3d(calc(var(--tx) * 0.4786), calc(var(--ty) * 0.4786), 0) scale(calc(var(--pk, 1) * 1.1684)); opacity: 1.0000; }
+  38.89% { transform: translate3d(calc(var(--tx) * 0.4888), calc(var(--ty) * 0.4888), 0) scale(calc(var(--pk, 1) * 1.1696)); opacity: 1.0000; }
+  44.44% { transform: translate3d(calc(var(--tx) * 0.4948), calc(var(--ty) * 0.4948), 0) scale(calc(var(--pk, 1) * 1.1699)); opacity: 1.0000; }
+  50% { transform: translate3d(calc(var(--tx) * 0.4984), calc(var(--ty) * 0.4984), 0) scale(calc(var(--pk, 1) * 1.1700)); opacity: 1.0000; }
+  55.56% { transform: translate3d(calc(var(--tx) * 0.5011), calc(var(--ty) * 0.5011), 0) scale(calc(var(--pk, 1) * 1.1700)); opacity: 1.0000; }
+  61.11% { transform: translate3d(calc(var(--tx) * 0.5043), calc(var(--ty) * 0.5043), 0) scale(calc(var(--pk, 1) * 1.1699)); opacity: 1.0000; }
+  66.67% { transform: translate3d(calc(var(--tx) * 0.5103), calc(var(--ty) * 0.5103), 0) scale(calc(var(--pk, 1) * 1.1696)); opacity: 0.9469; }
+  72.22% { transform: translate3d(calc(var(--tx) * 0.5229), calc(var(--ty) * 0.5229), 0) scale(calc(var(--pk, 1) * 1.1681)); opacity: 0.8409; }
+  77.78% { transform: translate3d(calc(var(--tx) * 0.5479), calc(var(--ty) * 0.5479), 0) scale(calc(var(--pk, 1) * 1.1619)); opacity: 0.7079; }
+  83.33% { transform: translate3d(calc(var(--tx) * 0.5940), calc(var(--ty) * 0.5940), 0) scale(calc(var(--pk, 1) * 1.1388)); opacity: 0.5544; }
+  88.89% { transform: translate3d(calc(var(--tx) * 0.6732), calc(var(--ty) * 0.6732), 0) scale(calc(var(--pk, 1) * 1.0660)); opacity: 0.3838; }
+  94.44% { transform: translate3d(calc(var(--tx) * 0.8016), calc(var(--ty) * 0.8016), 0) scale(calc(var(--pk, 1) * 0.8703)); opacity: 0.1985; }
+  100% { transform: translate3d(calc(var(--tx) * 1.0000), calc(var(--ty) * 1.0000), 0) scale(calc(var(--pk, 1) * 0.4500)); opacity: 0.0000; }
+}
+
+/* the particle burst, sitting behind the totem. Fixed 180px buffer, so
+   there is no resize handler and no layout read in the draw loop. */
+.parts {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 180px; height: 180px;
+  margin: -90px 0 0 -90px;
+  pointer-events: none;
+  image-rendering: pixelated;
+  z-index: 1;
+}
+
+/* ── the sword ────────────────────────────────────────────────────
+   position:fixed and moved only by transform, so js can keep it
+   planted at a document coordinate during a scroll without ever
+   touching layout. */
+.sword {
+  position: fixed; left: 0; top: 0; z-index: 42;
+  width: clamp(74px, 9vw, 104px); height: clamp(74px, 9vw, 104px);
+  cursor: grab; touch-action: none;
+  will-change: transform;
+  filter: drop-shadow(0 6px 18px rgba(0,0,0,.5));
+}
+.sword img {
+  display: block; width: 100%; height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  transform-origin: 50% 78%;   /* pivot at the grip, not the middle,
+                                  so a swing hinges from the hand */
+  -webkit-user-drag: none; user-select: none;
+}
+.sword:active { cursor: grabbing; }
+
+/* ── the textbox ──────────────────────────────────────────────────
+   Black box, hard white border, square corners. The one place on this
+   site that is not set in a pixel face, because he is comic sans and
+   that is not negotiable — so the smoothing suppression the rest of
+   the page relies on has to be switched back off here, exactly like
+   the boot screen. */
+.tbox {
+  position: fixed; left: 50%;
+  bottom: clamp(88px, 15vh, 142px);
+  transform: translateX(-50%);
+  width: min(520px, calc(100vw - 40px));
+  /* TOP OF THE STACK, and it has to stay there. This sat at 44 and got
+     buried by anything that outranked it: the petting hand (46) drew
+     across the dog's own dialogue, the inside panel (55) slid over the
+     top of it, and the dev console (80) hid it completely. A dialogue
+     box is a modal statement — nothing on this page is ever more
+     important than the words currently being typed. If you add a new
+     layer, it goes BELOW this number, not above. */
+  z-index: 96;
+  display: grid; grid-template-columns: auto 1fr auto;
+  gap: 14px; align-items: start;
+  padding: 16px;
+  background: #000; border: 4px solid #fff;
+  cursor: pointer;
+  font-family: var(--font-talk);
+  -webkit-font-smoothing: antialiased;
+}
+.tbox__face img { width: 42px; height: auto; image-rendering: pixelated; }
+
+/* ── who is in the box ────────────────────────────────────────────
+   The portrait used to be his in every single box, including the
+   dog's and the television's. It follows the speaker now, and
+   narration drops the column entirely — which means the grid has to
+   be redeclared, since `auto 1fr auto` with the first child gone
+   would put the text in the auto track and squash it. */
+.tbox[data-who="narr"] { grid-template-columns: 1fr auto; }
+.tbox[data-who="narr"] .tbox__face { display: none; }
+.tbox[data-who="dog"] .tbox__face img { width: 46px; }
+.tbox[data-who="tv"]  .tbox__face img { width: 44px; }
+/* A hairline of the speaker's colour, so a glance at the frame tells
+   you who is talking without waiting for the portrait to register. */
+.tbox[data-who="dog"]  { border-color: #E4C46A; }
+.tbox[data-who="tv"]   { border-color: var(--accent); }
+.tbox[data-who="narr"] { border-color: #9C97AA; }
+.tbox__txt {
+  margin: 0; color: #fff;
+  font-size: 16px; line-height: 1.5;
+  min-height: 3em;
+}
+.tbox__more {
+  align-self: end; color: #fff; font-size: 16px;
+  animation: tblink 1s steps(2, jump-none) infinite;
+}
+@keyframes tblink { 0% { opacity: 1; } 50% { opacity: 0; } }
+
+
+/* ── swing trail ──────────────────────────────────────────────────
+   Six lagged copies, injected by sword.js. Selectors are doubled up
+   (`.sword img.sword__ghost`) because the plain `.sword img` rule sets
+   width/height to 100% and would otherwise outrank a single class. */
+.sword img.sword__ghost {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0; pointer-events: none;
+  transform-origin: 50% 78%;
+  filter: brightness(1.7) saturate(.35);   /* reads as speed, not as a second sword */
+}
+
+/* ── the two halves ───────────────────────────────────────────────
+   Sized so they reconstruct the whole sword exactly: the source is
+   12x30, the blade 12x16 and the hilt 12x15, so at 53.3% and 50% of
+   a square box every piece lands at the same 40% width and the seam
+   lines up. One row of overlap is deliberate — that is the jag. */
+.sword img.sword__half {
+  position: absolute; left: 50%;
+  width: auto; margin-left: -20%;
+  pointer-events: none;
+}
+.sword img.sword__half--blade { top: 0;    height: 53.3%; transform-origin: 50% 100%; }
+.sword img.sword__half--key   { bottom: 0; height: 50%;   transform-origin: 50% 0%; }
+
+.sword__half--blade.is-go { animation: bladeAway 1.5s cubic-bezier(.2,.7,.3,1) forwards; }
+.sword__half--key.is-go   { animation: keyStay   1.5s cubic-bezier(.2,.7,.3,1) forwards; }
+
+@keyframes bladeAway {
+  0%   { transform: translate(0,0)        rotate(0deg);    opacity: 1; }
+  10%  { transform: translate(7px,-7px)   rotate(-20deg);  opacity: 1; }
+  100% { transform: translate(130px,-160px) rotate(-520deg); opacity: 0; }
+}
+/* The hilt barely moves. It drops, wobbles, and stays — the contrast
+   with the blade leaving at speed is what makes it read as kept
+   rather than lost. */
+@keyframes keyStay {
+  0%   { transform: translate(0,0)     rotate(0deg); }
+  10%  { transform: translate(-4px,5px) rotate(10deg); }
+  45%  { transform: translate(-6px,15px) rotate(-5deg); }
+  100% { transform: translate(-6px,11px) rotate(0deg); }
+}
+
+/* a hit that lands */
+.sans.is-hit { animation: sansHit .38s steps(4, end); }
+@keyframes sansHit {
+  0%,100% { transform: translate(0,0); }
+  20%     { transform: translate(-5px, 2px); }
+  45%     { transform: translate(4px, -2px); }
+  70%     { transform: translate(-3px, 1px); }
+}
+
+/* ── what you're carrying ─────────────────────────────────────────
+   A stack, not six hand-positioned fixed elements. column-reverse so
+   new items appear at the bottom and push older ones up. */
+.chips {
+  position: fixed;
+  left: clamp(14px, 3vw, 38px); bottom: clamp(14px, 3vh, 34px);
+  /* ABOVE the full-screen sequences (.bh and .dk are both 70). What
+     you are carrying has to stay legible in the rooms where you use
+     it — the console exists to be charged inside .bh, and it had no
+     way to be seen there while the tray sat at 41. Still below the
+     deck (78) and the dialogue box (96). */
+  z-index: 74;
+  display: flex; flex-direction: column-reverse;
+  align-items: flex-start; gap: 8px;
+  pointer-events: none;                 /* only the chips themselves */
+}
+.chip {
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px 8px 10px;
+  background: var(--ink);
+  border: 2px solid var(--edge);
+  color: var(--text);
+  font: 400 16px/1 var(--font);
+  opacity: 0; transform: translateY(12px);
+  transition: opacity .45s ease, transform .45s var(--bounce);
+}
+.chip.is-in { opacity: 1; transform: none; }
+.chip img { display: block; image-rendering: pixelated; }
+
+
+
+/* ── "it went up there" ───────────────────────────────────────────
+   The old spawn threw the sword off the top edge and left you with no
+   idea where it had gone — a spatial-continuity failure, and a worse
+   problem than any of the easing. This marker appears only while the
+   sword is genuinely above the fold, and goes away the moment you can
+   see the thing itself. */
+.swcue {
+  position: fixed;
+  left: 50%; top: 12px;
+  transform: translate(-50%, -16px);
+  z-index: 44;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  background: var(--ink);
+  border: 2px solid var(--edge);
+  color: var(--dim);
+  font: 400 16px/1 var(--font);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .35s ease, transform .35s var(--bounce);
+}
+.swcue.is-on { opacity: 1; transform: translate(-50%, 0); }
+.swcue img { display: block; image-rendering: pixelated; }
+
+/* ── the key, once it exists ──────────────────────────────────────
+   Same contract as the sword: position:fixed, moved only by transform,
+   so the physics never touches layout. touch-action:none because a
+   throw is a drag and the page must not scroll underneath it. */
+.keyobj {
+  position: fixed; left: 0; top: 0; z-index: 43;
+  width: clamp(30px, 3.6vw, 44px); height: clamp(30px, 3.6vw, 44px);
+  cursor: grab; touch-action: none;
+  will-change: transform;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,.55));
+}
+.keyobj img {
+  display: block; width: 100%; height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  -webkit-user-drag: none; user-select: none;
+}
+.keyobj.is-held { cursor: grabbing; }
+
+
+/* ── a plain button, matching the switch's language ───────────────*/
+.btn {
+  font: 400 16px/1 var(--font);
+  color: var(--text);
+  background: var(--crypt);
+  border: 2px solid var(--edge);
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+.btn:hover { border-color: var(--accent); background: var(--ink); }
+
+/* ── the room ─────────────────────────────────────────────────────
+   Full-viewport, above everything, and it takes the scroll with it —
+   arrow keys drive the player, and without the lock the page would
+   scroll underneath every dodge. */
+.bh {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(8,8,11,.96);
+}
+.bh canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+body.is-playing { overflow: hidden; }
+
+.bh__msg {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%,-50%);
+  padding: 24px 32px;
+  background: var(--void);
+  border: 3px solid var(--bone);
+  color: var(--bone);
+  font: 400 16px/1.7 var(--font);
+  text-align: center;
+  white-space: nowrap;
+}
+.bh__msg small { color: var(--dim); }
+.bh__quit {
+  position: absolute; right: 20px; top: 20px;
+  font: 400 16px/1 var(--font);
+  color: var(--dim); background: none;
+  border: 2px solid var(--edge); padding: 8px 14px;
+  cursor: pointer;
+}
+.bh__quit:hover { color: var(--text); border-color: var(--accent); }
+.bh__keys {
+  position: absolute; left: 0; right: 0; bottom: 18px;
+  margin: 0; text-align: center;
+  font: 400 16px/1 var(--font); color: var(--dim);
+}
+
+/* ── the dog ──────────────────────────────────────────────────────*/
+/* Absolute inside .sec (already position:relative), so he sits at the
+   bottom of the last section — the bottom of the PAGE — and scrolls
+   with it instead of following the viewport. */
+.dog {
+  position: absolute;
+  right: clamp(84px, 12vw, 130px);
+  bottom: clamp(20px, 5vh, 60px);
+  z-index: 40;
+  opacity: 0; transform: translateY(14px) scale(.7);
+  transition: opacity .5s ease, transform .5s var(--bounce);
+}
+.dog.is-in { opacity: 1; transform: none; }
+.dog img { display: block; image-rendering: pixelated;
+           filter: drop-shadow(0 5px 16px rgba(0,0,0,.55)); }
+
+/* Chips stack upward from the bottom-left rather than overlapping.
+   roomChip is permanent once earned, so it takes the base slot. */
+.chip--btn {
+  font: 400 16px/1 var(--font);
+  cursor: pointer;
+  transition: opacity .45s ease, transform .45s var(--bounce), border-color .2s;
+}
+.chip--btn:hover { border-color: var(--accent); }
+
+
+/* the dog is clickable now */
+.dog__btn { display: block; padding: 0; border: 0; background: none;
+            line-height: 0; cursor: pointer; }
+.dog__btn:focus-visible { outline: 2px solid var(--edge); outline-offset: 5px; }
+
+
+/* ── the dog, awake then asleep ───────────────────────────────────
+   The idle only runs until he gives up the hammer. An animation that
+   never stops stops reading as alive and starts reading as a loop. */
+.dog__btn img { animation: dogIdle 1.9s steps(2, end) infinite; }
+.dog.is-settled .dog__btn img { animation: none; }
+@keyframes dogIdle {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50%      { transform: translateY(-2px) scaleY(1.04); }
+}
+
+/* the petting hand: one swipe per pet, restarted by class toggling */
+.pethand {
+  position: fixed; z-index: 46;
+  width: 58px; height: auto;
+  image-rendering: pixelated;
+  pointer-events: none;
+  opacity: 0;
+}
+.pethand.is-pet { animation: petSwipe .52s ease-out; }
+@keyframes petSwipe {
+  0%   { opacity: 0; transform: translate(-50%, -150%) rotate(-8deg); }
+  22%  { opacity: 1; transform: translate(-50%, -96%)  rotate(-2deg); }
+  55%  { opacity: 1; transform: translate(-50%, -74%)  rotate(3deg); }
+  78%  { opacity: 1; transform: translate(-50%, -92%)  rotate(-1deg); }
+  100% { opacity: 0; transform: translate(-50%, -140%) rotate(-6deg); }
+}
+
+/* ── asleep ───────────────────────────────────────────────────────*/
+.sleep {
+  position: absolute;
+  right: clamp(72px, 11vw, 150px);
+  bottom: clamp(20px, 5vh, 60px);
+  z-index: 40;
+  width: 250px; height: 140px;
+  opacity: 0; transition: opacity .7s ease;
+}
+.sleep.is-in { opacity: 1; }
+/* Direct children only. The console is a <button> now, and a blanket
+   rule on `.sleep img` would absolutely-position the sprite inside it
+   and tear it out of its own button. */
+.sleep > img { position: absolute; image-rendering: pixelated; }
+.sleep__blanket { left: 0; bottom: 0; width: 250px; }
+.sleep__sans    { left: 26px;  bottom: 16px; width: 54px;  transform: rotate(-90deg); }
+.sleep__dog     { left: 108px; bottom: 20px; width: 92px; }
+
+/* ── the console ──────────────────────────────────────────────────
+   It is a real object you take, so it has to look takeable: it bobs
+   until you pick it up, and it lifts under the cursor. */
+.sleep__sw {
+  position: absolute;
+  left: 190px; bottom: 16px;
+  padding: 6px; border: 0; background: none;
+  cursor: pointer; line-height: 0;
+  animation: swBob 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(184,146,255,.45));
+}
+.sleep__sw img { display: block; width: 46px; image-rendering: pixelated; }
+.sleep__sw:hover { filter: drop-shadow(0 0 12px rgba(184,146,255,.9)); }
+.sleep__sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sleep__sw.is-taken {
+  animation: none; pointer-events: none;
+  opacity: 0; transform: scale(.4); transition: opacity .34s ease, transform .34s ease;
+}
+@keyframes swBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+
+/* The flight into the dock. Fixed, so viewport rects go straight in
+   without worrying about which container each end lives in. */
+.swfly {
+  position: fixed; z-index: 90;
+  image-rendering: pixelated; pointer-events: none;
+  transition: transform .72s cubic-bezier(.5,-0.25,.3,1), opacity .72s ease-in;
+}
+.zzz {
+  position: absolute;
+  font: 400 16px/1 var(--font-quest);
+  color: var(--dim);
+  animation: zzzUp 3.2s linear infinite;
+}
+.zzz--1 { left: 66px;  bottom: 66px; animation-delay: 0s; }
+.zzz--2 { left: 84px;  bottom: 66px; animation-delay: 1.05s; }
+.zzz--3 { left: 102px; bottom: 66px; animation-delay: 2.1s; }
+@keyframes zzzUp {
+  0%   { opacity: 0; transform: translateY(0) scale(.7); }
+  18%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-52px) scale(1.5); }
+}
+
+/* ── the television ───────────────────────────────────────────────*/
+.tv {
+  position: absolute;
+  right: clamp(12px, 2vw, 30px);
+  bottom: clamp(20px, 5vh, 60px);
+  z-index: 40;
+  display: grid; justify-items: center; gap: 6px;
+  padding: 0; border: 0; background: none;
+  cursor: pointer;
+  opacity: 0; transition: opacity .7s ease;
+}
+.tv.is-in { opacity: 1; }
+.tv img { display: block; width: 96px; image-rendering: pixelated; }
+.tv__lbl { font: 400 16px/1 var(--font); color: var(--dim); }
+/* after the sword */
+.tv.is-broke img { filter: grayscale(1) brightness(.5); transform: rotate(-4deg); }
+.tv.is-broke .tv__lbl { color: #FF6B8A; }
+.tv.is-live img { filter: drop-shadow(0 0 14px rgba(184,146,255,.75)); }
+.tv.is-live .tv__lbl { color: var(--accent); }
+/* Charged and carrying it: the dock asks for it. Without this the only
+   signal that you CAN dock is a label nobody is reading. */
+.tv.is-ready img { animation: tvWant 1.5s ease-in-out infinite; }
+.tv.is-ready .tv__lbl { color: var(--accent); }
+@keyframes tvWant {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(184,146,255,.35)); }
+  50%      { filter: drop-shadow(0 0 13px rgba(184,146,255,.95)); }
+}
+
+/* ── the blackout ─────────────────────────────────────────────────
+   A fixed pseudo-element rather than a filter on body: a filter
+   creates a containing block and darkens EVERY descendant, including
+   the chips and the objectives panel you still need to read. A stacked
+   overlay lets specific layers sit above it. */
+body.is-blackout::before {
+  content: ''; position: fixed; inset: 0; z-index: 39;
+  background: rgba(0,0,0,.94);
+  pointer-events: none;
+}
+
+/* ── after the light ──────────────────────────────────────────────*/
+.dk { position: fixed; inset: 0; z-index: 70; background: #050507; }
+/* Walk mode paints the character straight onto the page, so the layer
+   itself must be see-through and must not eat clicks. */
+.dk.is-walk { background: transparent; pointer-events: none; }
+.dk.is-walk .bh__quit, .dk.is-walk .bh__keys { pointer-events: auto; }
+.dk canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+/* ── the sprite inspector ─────────────────────────────────────────
+   Dev only. Sits above the dev console (80) because it is launched
+   from it, and below the dialogue box, which is above everything. */
+.sheetbox {
+  position: fixed; inset: 0; z-index: 88;
+  background: rgba(8,8,11,.94);
+  overflow: auto; cursor: zoom-out;
+  padding: 40px;
+}
+.sheetbox__in { position: relative; display: inline-block; }
+.sheetbox__img {
+  display: block; image-rendering: pixelated;
+  outline: 1px solid #4FC3F7;
+}
+/* One rule per cell boundary. If a sprite is cut by a line, the frame
+   count in sheets.js is wrong. */
+.sheetbox__ln {
+  position: absolute; left: -8px; right: -8px; height: 1px;
+  background: #FF00A0;
+}
+.sheetbox__cap {
+  position: absolute; left: 100%; top: 0; margin-left: 16px;
+  white-space: nowrap;
+  font: 400 16px/1.4 var(--font); color: var(--bone);
+}
+
+/* ── the show ─────────────────────────────────────────────────────
+   Loud on purpose. This is the one screen in Act IV allowed to be
+   bright — a game show that respects the site's palette is not a game
+   show, and the tonal whiplash after New Home is the joke. */
+.quiz {
+  position: fixed; inset: 0; z-index: 76;
+  background: #1B0E2E;
+  display: grid; align-content: start; gap: 14px;
+  padding: clamp(18px, 4vw, 54px);
+  overflow: auto;
+}
+.quiz__top { display: flex; justify-content: space-between; font: 400 16px/1 var(--font); }
+.quiz__cat { color: #FFD34E; letter-spacing: 3px; }
+.quiz__num { color: var(--ghost); }
+.quiz__board { display: flex; flex-wrap: wrap; gap: 6px; }
+.quiz__board span {
+  font: 400 16px/1 var(--font); color: var(--ghost);
+  background: #2A1747; padding: 5px 9px;
+}
+.quiz__board b { color: #FFD34E; margin-right: 6px; }
+.quiz__host {
+  margin: 4px 0 0; min-height: 1.4em;
+  font: 400 16px/1.4 var(--font-talk); color: #FF8ACF;
+}
+.quiz__q { margin: 6px 0 0; font: 400 32px/1.2 var(--font-display); color: var(--bone); }
+.quiz__opts { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.quiz__o {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; text-align: left;
+  border: 3px solid #4A2C74; background: #24123D; color: var(--bone);
+  font: 400 16px/1.3 var(--font); cursor: pointer;
+  transition: transform .12s var(--bounce), border-color .15s, background-color .15s;
+}
+.quiz__o:hover { transform: translateY(-2px); border-color: #FFD34E; }
+.quiz__o b { color: #FFD34E; }
+.quiz__o.is-right { border-color: #7BE38A; background: #14331C; }
+.quiz__o.is-wrong { border-color: #FF6B8A; background: #331419; }
+.quiz__timer { height: 8px; background: #2A1747; }
+.quiz__timer i { display: block; height: 100%; width: 100%; background: #FFD34E; }
+.quiz__end { display: grid; gap: 4px; justify-items: start; margin-top: 10px; }
+.quiz__end b { font: 400 32px/1 var(--font-display); color: var(--bone); }
+.quiz__end em { font: 400 96px/1 var(--font-display); color: #FFD34E; font-style: normal; }
+.quiz__end p { margin: 0; font: 400 16px/1.5 var(--font); color: var(--ghost); }
+.quiz__small { color: #6E6880 !important; }
+
+/* ── through the crack ────────────────────────────────────────────*/
+.polt { position: fixed; inset: 0; z-index: 76; background: #04060A; }
+.polt canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+/* ── the crack ────────────────────────────────────────────────────
+   Four pixels in the corner of the panel. It glows, faintly, because
+   the merchant already taught you hours ago that this game points at
+   things by lighting them. */
+.crack {
+  position: absolute; right: 14px; bottom: 14px;
+  width: 10px; height: 10px; padding: 0; border: 0;
+  background: #000; cursor: pointer;
+  clip-path: polygon(0 40%, 40% 0, 55% 45%, 100% 60%, 60% 100%, 20% 70%);
+  opacity: 0; transition: opacity .8s ease, transform .3s var(--bounce);
+  box-shadow: 0 0 6px rgba(126,80,180,.7);
+}
+.crack.is-in { opacity: 1; }
+.crack[data-n="1"] { transform: scale(1.5); }
+.crack[data-n="2"] { transform: scale(2.4); box-shadow: 0 0 16px rgba(160,80,220,.9); }
+.crack.is-hit { animation: crackHit .3s steps(3, end); }
+@keyframes crackHit {
+  0%, 100% { filter: none; }
+  50%      { filter: invert(1); }
+}
+.crack.is-portal {
+  clip-path: circle(50%);
+  width: 54px; height: 54px; right: 8px; bottom: 8px;
+  background: radial-gradient(circle, #7FE3C4 0%, #1E3A44 45%, #04060A 100%);
+  box-shadow: 0 0 30px rgba(127,227,196,.85);
+  animation: crackSpin 4s linear infinite;
+}
+@keyframes crackSpin { to { transform: rotate(360deg); } }
+
+/* he sits down */
+.sleep__chair {
+  left: 18px; bottom: 12px; width: 46px;
+  opacity: 0; transition: opacity .7s ease;
+}
+.sleep__chair.is-in { opacity: 1; }
+
+/* ── the argument ─────────────────────────────────────────────────*/
+.fnf { position: fixed; inset: 0; z-index: 76; background: #120A1E; }
+.fnf canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+/* ── the pot ──────────────────────────────────────────────────────
+   A crafting grid is a spatial idea, so it is a real grid of real
+   buttons — keyboard reachable, screen-reader labelled, and the shape
+   is the puzzle. */
+.craft {
+  position: fixed; inset: 0; z-index: 76;
+  background: #170D1F;
+  display: grid; align-content: center; justify-items: center; gap: 18px;
+  padding: 40px;
+}
+.craft__h { margin: 0; font: 400 32px/1 var(--font-display); color: var(--bone); }
+.craft__say { margin: 0; font: 400 16px/1.4 var(--font-talk); color: #FF8ACF; min-height: 1.4em; }
+.craft__row { display: flex; align-items: center; gap: 28px; }
+.craft__grid { display: grid; grid-template-columns: repeat(3, 68px); gap: 6px; }
+.craft__cell {
+  width: 68px; height: 68px; padding: 0;
+  border: 3px solid #3A2C52; background: #201530;
+  cursor: pointer; display: grid; place-items: center;
+  transition: border-color .14s, background-color .14s;
+}
+.craft__cell:hover { border-color: #B892FF; }
+.craft__cell.is-full { background: #2C1D42; }
+.craft__cell img { width: 34px; image-rendering: pixelated; }
+.craft__out {
+  display: grid; gap: 4px; place-items: center;
+  min-width: 190px; padding: 20px 18px;
+  border: 3px dashed #3A2C52; background: none; color: var(--ghost);
+  font: 400 16px/1.3 var(--font); cursor: default;
+}
+.craft__out.is-ready {
+  border-style: solid; border-color: #7BE38A; color: var(--bone); cursor: pointer;
+  animation: craftReady 1.4s ease-in-out infinite;
+}
+.craft__out b { font: 400 16px/1 var(--font-display); color: #7BE38A; }
+@keyframes craftReady {
+  0%, 100% { box-shadow: 0 0 0 rgba(123,227,138,0); }
+  50%      { box-shadow: 0 0 18px rgba(123,227,138,.45); }
+}
+.craft__tray { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+.craft__item { width: 30px; image-rendering: pixelated; }
+.craft__n { font: 400 16px/1 var(--font); color: var(--ghost); margin-left: 8px; }
+
+/* the hallucination. Hue rotation only — the geometry stays put,
+   because moving both at once is disorienting for no gain. */
+body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) saturate(1.5); }
+@media (prefers-reduced-motion: reduce) {
+  body.is-trip .eng canvas, body.is-trip .craft { filter: saturate(1.2); }
+}
+
+/* ── act iv rooms ─────────────────────────────────────────────────
+   Same layer as the other full-screen scenes. The chip tray (74) and
+   the dialogue box (96) still sit above it, which is the point. */
+.eng { position: fixed; inset: 0; z-index: 70; background: #08080B; }
+.eng canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+/* ── what's on the television ─────────────────────────────────────
+   A handheld's home screen. It is the only screen on this site that
+   is allowed to look like a PRODUCT rather than like the page: real
+   status bar, real library shelf, real focus ring. The gag only lands
+   if the interface is convincing, so this is the one place the goth
+   restraint gets dropped for consumer-electronics blue. */
+.deck {
+  position: fixed; inset: 0; z-index: 78;
+  background: #0B0E14;
+  display: grid; grid-template-rows: auto 1fr auto;
+  opacity: 0; transition: opacity .28s ease;
+  overflow: hidden;
+}
+.deck.is-in { opacity: 1; }
+
+.deck__bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px clamp(18px, 4vw, 46px);
+  border-bottom: 2px solid #1B2130;
+  background: #10151E;
+  font: 400 16px/1 var(--font);
+}
+.deck__brand { color: var(--bone); letter-spacing: 2px; }
+.deck__stat { display: flex; align-items: center; gap: 14px; color: var(--ghost); }
+.deck__wifi { color: #4FC3F7; letter-spacing: -2px; font-size: 16px; }
+/* A battery outline with a real terminal nub on the end — the nub is
+   most of what makes the shape read as a battery at this size. */
+.deck__batt {
+  position: relative;
+  width: 34px; height: 15px;
+  border: 2px solid var(--ghost);
+  padding: 2px;
+  display: inline-block;
+}
+.deck__batt::after {
+  content: ''; position: absolute; left: 100%; top: 3px;
+  width: 3px; height: 5px; background: var(--ghost);
+}
+.deck__batt i { display: block; height: 100%; width: 100%; background: #7BE38A; }
+
+.deck__body {
+  display: grid; align-content: center; gap: 20px;
+  padding: 0 clamp(18px, 4vw, 46px);
+  min-height: 0;
+}
+.deck__h {
+  margin: 0; font: 400 16px/1 var(--font);
+  color: var(--ghost); letter-spacing: 4px; text-transform: uppercase;
+}
+
+/* One row that scrolls sideways. A console shelf is horizontal
+   because a stick is horizontal, and the horizontal-ness is most of
+   what stops this reading as a web page with cards on it. */
+.deck__shelf {
+  display: flex; gap: 18px;
+  margin: 0; padding: 10px 4px 18px; list-style: none;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+.deck__shelf::-webkit-scrollbar { display: none; }
+
+.deck__tile {
+  flex: none; width: 132px;
+  cursor: pointer;
+  transition: transform .18s var(--bounce);
+}
+.deck__art {
+  display: grid; place-content: center;
+  width: 132px; height: 132px;
+  border: 3px solid transparent;
+  image-rendering: pixelated;
+}
+.deck__art.is-sigil { display: grid; place-items: center; }
+.deck__art.is-sigil svg { width: 84px; height: 84px; }
+.deck__art b {
+  font: 400 48px/1 var(--font-display);
+  color: rgba(0,0,0,.42);
+  letter-spacing: 2px;
+}
+.deck__cap {
+  display: block; margin-top: 8px;
+  font: 400 16px/1.2 var(--font);
+  color: var(--ghost);
+}
+.deck__tile.is-on { transform: translateY(-8px) scale(1.06); }
+.deck__tile.is-on .deck__art { border-color: #4FC3F7; }
+.deck__tile.is-on .deck__cap { color: var(--bone); }
+/* The ones that don't run are visibly greyed, so the failure is a
+   promise the shelf already made rather than a surprise. */
+.deck__tile.is-dead .deck__art { filter: grayscale(.72) brightness(.72); }
+
+.deck__sel { display: grid; gap: 8px; justify-items: start; }
+.deck__t { margin: 0; font: 400 32px/1 var(--font-display); color: var(--bone); }
+.deck__m { margin: 0; font: 400 16px/1 var(--font); color: var(--ghost); }
+.deck__play {
+  margin-top: 6px;
+  padding: 12px 26px;
+  border: 0; background: #4FC3F7; color: #06121B;
+  font: 400 16px/1 var(--font); letter-spacing: 2px;
+  cursor: pointer;
+  transition: transform .14s var(--bounce), background-color .2s;
+}
+.deck__play:hover { background: #7BD8FF; transform: translateY(-2px); }
+.deck__err {
+  margin: 4px 0 0; font: 400 16px/1.4 var(--font);
+  color: #FF6B8A;
+}
+.deck__err.is-shake { animation: deckShake .34s steps(4, end); }
+@keyframes deckShake {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-5px); }
+  75%      { transform: translateX(5px); }
+}
+
+/* ── objectives ───────────────────────────────────────────────────*/
+.quest__t {
+  position: fixed; left: 0; top: 50%;
+  /* NO transform on the glyphs at all. `writing-mode: vertical-rl` on
+     its own already gives what is wanted: text running top-to-bottom
+     with each glyph correctly oriented.
+
+     Both previous attempts added a transform on top of it and both
+     were wrong for the same reason — they were fixing the WRITING
+     MODE, which was never broken. rotate(180deg) mirrored both axes
+     and read upside down; scaleX(-1) mirrored the glyphs left-to-right
+     so the letters came out backwards. The translateY is layout only
+     (it centres the tab) and does not touch glyph orientation. */
+  transform: translateY(-50%);
+  writing-mode: vertical-rl;
+  z-index: 42;
+  font: 400 16px/1 var(--font-quest);
+  color: var(--dim);
+  background: var(--ink);
+  border: 2px solid var(--edge); border-left: 0;
+  padding: 14px 8px;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+.quest__t:hover { color: var(--text); border-color: var(--accent); }
+.quest {
+  position: fixed; left: 0; top: 50%;
+  transform: translate(-100%, -50%);
+  z-index: 43;
+  width: min(320px, 84vw);
+  padding: 18px 20px;
+  background: var(--ink);
+  border: 2px solid var(--edge);
+  transition: transform .38s var(--bounce);
+}
+.quest.is-open { transform: translate(0, -50%); }
+.quest.is-hit { border-color: var(--accent); }
+.quest__h {
+  margin: 0 0 14px; font: 400 16px/1 var(--font-quest); color: var(--text);
+  display: flex; justify-content: space-between; gap: 12px;
+  /* clears the absolutely-positioned close button, which the
+     tally was sitting directly underneath */
+  padding-right: 34px;
+}
+.quest__n { color: var(--accent); }
+.quest__l { margin: 0; padding: 0; list-style: none; }
+/* act headers. The panel is grouped now that there are forty-five
+   steps — a flat list that long stops being a list. */
+.quest__g {
+  list-style: none;
+  margin: 14px 0 6px; padding: 0 0 4px;
+  border-bottom: 1px solid rgba(237,231,222,.14);
+  font: 400 16px/1.2 var(--font-quest);
+  color: var(--accent); letter-spacing: 1px;
+}
+.quest__g:first-child { margin-top: 0; }
+.quest__i {
+  display: flex; gap: 10px; align-items: baseline;
+  font: 400 16px/1.45 var(--font-quest); color: var(--dim);
+  margin-bottom: 6px;
+}
+.quest__i.is-done { color: var(--text); }
+.quest__i.is-done .quest__mark { color: var(--accent); }
+.quest__mark { width: 12px; flex: none; }
+/* Later steps are shown but not spelled out: seeing the whole chain
+   turns discovery into a checklist, hiding it means nobody knows there
+   IS a chain. */
+.quest__i.is-veiled { opacity: .38; }
+
+
+/* the switch, once it jams and once it is beyond jamming */
+.sw.is-stuck .sw__lever {
+  transform: translateY(11px);          /* wedged halfway, neither on nor off */
+  background: var(--blood);
+  transition: none;
+}
+.sw.is-stuck .sw__plate { border-color: var(--blood); }
+.sw.is-smashed .sw__plate {
+  border-color: var(--blood);
+  background: repeating-linear-gradient(45deg,
+    var(--void) 0 4px, var(--ink) 4px 8px);
+}
+.sw.is-smashed .sw__lever { opacity: 0; }   /* the lever is simply gone */
+
+/* objectives close button */
+.quest__x {
+  position: absolute; top: 10px; right: 10px;
+  width: 26px; height: 26px; padding: 0;
+  background: none; border: 2px solid var(--edge);
+  color: var(--text); font: 400 16px/1 var(--font-quest);
+  cursor: pointer;
+}
+.quest__x:hover { border-color: var(--accent); }
+
+/* ── dev console ──────────────────────────────────────────────────*/
+.dev {
+  position: fixed; left: 50%; top: 12%;
+  transform: translateX(-50%);
+  width: min(560px, 92vw);
+  z-index: 80;
+  background: var(--void);
+  border: 2px solid var(--accent);
+  padding: 14px;
+  font: 400 16px/1.5 var(--font);
+  color: var(--text);
+}
+.dev__out {
+  height: 190px; overflow-y: auto;
+  color: var(--dim);
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+}
+.dev__out div { margin: 0 0 2px; }
+.dev__row { display: flex; align-items: center; gap: 8px; }
+.dev__p { color: var(--accent); }
+.dev__in {
+  flex: 1;
+  font: 400 16px/1 var(--font);
+  color: var(--text);
+  background: var(--ink);
+  border: 2px solid var(--edge);
+  padding: 10px 12px;
+}
+.dev__in:focus { outline: none; border-color: var(--accent); }
+.dev__go {
+  font: 400 16px/1 var(--font);
+  color: var(--text); background: var(--crypt);
+  border: 2px solid var(--edge); padding: 10px 14px; cursor: pointer;
+}
+.dev__go:hover { border-color: var(--accent); }
+
+/* ── the room behind the door ─────────────────────────────────────*/
+.panel {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: min(420px, 92vw);
+  z-index: 55;
+  padding: clamp(24px, 4vw, 44px);
+  background: var(--ink);
+  border-left: 2px solid var(--edge);
+  color: var(--text);
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform .42s var(--bounce);
+}
+.panel.is-open { transform: none; }
+.panel__h { font: 400 32px/1.2 var(--font-display); margin: 0 0 24px; }
+.panel p { margin: 0 0 16px; font-size: 16px; line-height: 1.6; color: var(--dim); }
+/* what you walked in with */
+.panel__carry {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 22px !important; padding-top: 16px;
+  border-top: 1px solid rgba(237,231,222,.14);
+  color: var(--accent) !important; font-size: 15px !important;
+}
+.panel__carry img { image-rendering: pixelated; flex: none; }
+.panel code { font-family: var(--font); color: var(--accent); }
+.panel__x {
+  position: absolute; top: 16px; right: 16px;
+  width: 32px; height: 32px;
+  padding: 0;
+  background: none; border: 2px solid var(--edge);
+  color: var(--text); font: 400 16px/1 var(--font);
+  cursor: pointer;
+}
+.panel__x:hover { border-color: var(--accent); }
+
+@media (min-width: 760px) {
+  .lay--h     { font-size: 48px; }
+  .links a    { font-size: 48px; }
+  .nogl b     { font-size: 96px; }
+}
+
+/* ── motion off ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .el, .lay { transform: none !important; }
+  .rev { opacity: 1 !important; translate: none !important; }
+  .el.rev { opacity: .3 !important; }
+  .cue i { animation: none; }
+  .sw__lever { transition: none; }
+  .sw.is-broken .sw__lever,
+  .sw.is-broken .sw__plate,
+  .cat.is-on img,
+  .cat.is-pop img,
+  .pop.is-pop img { animation: none; transform: none; }
+  .sans { transition: none; }
+  .sans.is-hit { animation: none; }
+  .sword__half--blade.is-go,
+  .sword__half--key.is-go { animation: none; }
+  .chip, .panel, .swcue, .dog { transition: none; }
+  .tbox__more { animation: none; }
+  .cat.is-pop { opacity: 0; transition: opacity .3s ease; }
+  .cat img { transform: none; }
+}
+
+/* ── juice, for the DOM half ───────────────────────────────────────
+   The canvas scenes shake themselves via a ctx transform; page
+   elements need a keyframe. Same trauma source either way, so a hit
+   that shakes a fight also shakes the page when both are up.
+
+   Reduced motion kills it outright — screen shake is the single most
+   common accessibility complaint in games and this site already
+   promises AA in both themes. */
+.is-shook { animation: juiceShake .4s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes juiceShake {
+  10%, 90% { transform: translate(-2px, 1px) rotate(-.35deg); }
+  20%, 80% { transform: translate(4px, -2px) rotate(.5deg); }
+  30%, 50%, 70% { transform: translate(-6px, 2px) rotate(-.6deg); }
+  40%, 60% { transform: translate(6px, -1px) rotate(.6deg); }
+  100% { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-shook { animation: none; }
+}
+
+/* ── settings ───────────────────────────────────────────────────────
+   The accessibility panel. The backend lives in juice.js and
+   danmaku.js; this is the reachable front end. Sits at z-index 94 —
+   below the dialogue box (96), above everything else. */
+.sett {
+  position: fixed; inset: 0; z-index: 94;
+  display: grid; place-items: center;
+  padding: 24px;
+  background: rgba(8, 8, 11, 0.6);
+  opacity: 0; transition: opacity .18s ease-out;
+}
+.sett.is-in { opacity: 1; }
+.sett[hidden] { display: none; }
+.sett__box {
+  position: relative;
+  width: min(440px, 100%);
+  padding: 28px;
+  background: var(--ink);
+  border: 2px solid var(--edge);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .5);
+}
+.sett__h { margin: 0 0 8px; font: 400 32px/1 var(--font-quest); color: var(--text); }
+.sett__row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; padding: 14px 0;
+  border-top: 1px solid var(--rule);
+}
+.sett__lbl { font: 400 16px/1.4 var(--font); color: var(--text); cursor: pointer; }
+.sett__lbl small { display: block; margin-top: 4px; color: var(--dim); }
+.sett__sw {
+  position: relative; flex: none;
+  width: 52px; height: 30px; padding: 0;
+  background: var(--crypt); border: 2px solid var(--edge); border-radius: 15px;
+  cursor: pointer;
+}
+.sett__sw::after {
+  content: ''; position: absolute; left: 4px; top: 4px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--ghost);
+  transition: transform .18s ease-out;
+}
+.sett__sw[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+.sett__sw[aria-checked="true"]::after { transform: translateX(22px); background: var(--ink); }
+.sett__sw:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.sett__sw:disabled { opacity: .45; cursor: not-allowed; }
+/* Music volume. A range rather than a switch: zero is the mute, so
+   there is one control instead of two that can disagree. The thumb is
+   square on purpose — every other edge on this site is hard. */
+.sett__rng {
+  flex: none; width: 132px; height: 30px; margin: 0; padding: 0;
+  background: none; border: 0; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+}
+.sett__rng::-webkit-slider-runnable-track {
+  height: 6px; background: var(--crypt);
+  border: 2px solid var(--edge); border-radius: 0;
+}
+.sett__rng::-moz-range-track {
+  height: 6px; background: var(--crypt);
+  border: 2px solid var(--edge); border-radius: 0;
+}
+.sett__rng::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 22px; margin-top: -10px;
+  background: var(--accent); border: 0; border-radius: 0;
+}
+.sett__rng::-moz-range-thumb {
+  width: 14px; height: 22px;
+  background: var(--accent); border: 0; border-radius: 0;
+}
+.sett__rng:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* ── the frame-time meter ────────────────────────────────────────────
+   z-index 84: above the dev panel (80) and every scene, below the
+   sprite inspector (88) and well below the dialogue box (96). It is a
+   readout, so it must never be the thing covering the thing you are
+   measuring. Colour is the verdict; the numbers are p50 / p95 / worst. */
+.fps {
+  position: fixed; right: 12px; bottom: 12px; z-index: 84;
+  padding: 6px 10px;
+  font: 400 16px/1 var(--font-mono, monospace);
+  color: var(--ink); background: var(--ghost);
+  border: 2px solid var(--edge);
+  white-space: pre; pointer-events: none;
+  text-transform: lowercase;
+}
+.fps[hidden] { display: none; }
+.fps[data-v="ok"]   { background: #8CE99A; }
+.fps[data-v="warn"] { background: #F2D06B; }
+.fps[data-v="over"] { background: #F0A868; }
+.fps[data-v="fail"] { background: #E86A6A; }
+.sett__note { margin: 16px 0 0; font: 400 16px/1.4 var(--font); color: var(--dim); }
+.sett__x {
+  position: absolute; top: 16px; right: 16px;
+  width: 32px; height: 32px; padding: 0;
+  background: none; border: 2px solid var(--edge);
+  color: var(--text); font: 400 16px/1 var(--font);
+  cursor: pointer;
+}
+.sett__x:hover { border-color: var(--accent); }
+
+/* the gear — inline svg, no request, and a real gear rather than a
+   letter. Below the lights toggle (28px) and the objectives tab. */
+.sett__btn {
+  position: fixed; right: var(--gutter); top: 96px; z-index: 40;
+  width: 48px; height: 48px; padding: 10px;
+  background: var(--ink); border: 2px solid var(--edge); border-radius: 12px;
+  color: var(--dim); cursor: pointer;
+}
+.sett__btn:hover, .sett__btn:focus-visible {
+  color: var(--accent); border-color: var(--accent); outline: none;
+}
+.sett__btn svg { width: 100%; height: 100%; display: block; }
+
+/* larger text is a zoom, not a font-size — the Undertale faces are
+   drawn on a 16px grid, so resampling a single size would blur the
+   typeface. Scaling the whole page keeps the grid intact. */
+html.text-lg { zoom: 1.25; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   thumb controls
+
+   Act IV was keyboard-only, so on a phone the game stopped after Act
+   III. js/core/touch.js draws this and synthesises real key events, so
+   no scene needed changing.
+
+   Sits at z 92: above every scene (70-78) and above the sprite
+   inspector and the flying console, but BELOW the dialogue box at 96,
+   which stays the top layer. While the box is up the pad hides
+   entirely — the box is modal, tapping it advances it, and two
+   competing targets on a small screen is how you mis-tap.
+
+   Goth in the material, cute in the motion: the nub overshoots home. */
+
+.tpad {
+  position: fixed; inset: auto 0 0 0; z-index: 92;
+  height: 200px; pointer-events: none;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 0 24px 28px;
+  /* the pad must never scroll or zoom the page under it */
+  touch-action: none;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tpad[hidden] { display: none !important; }
+
+/* ── the stick ─────────────────────────────────────────────────── */
+.tpad__stick {
+  pointer-events: auto; touch-action: none;
+  position: relative;
+  width: 136px; height: 136px; border-radius: 50%;
+  background: rgba(12, 10, 18, 0.58);
+  border: 2px solid rgba(184, 146, 255, 0.30);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: border-color .18s ease, background .18s ease;
+}
+.tpad__stick[hidden] { display: none !important; }
+.tpad__stick.is-down {
+  border-color: rgba(184, 146, 255, 0.72);
+  background: rgba(18, 14, 28, 0.72);
+}
+.tpad__nub {
+  position: absolute; left: 50%; top: 50%;
+  width: 58px; height: 58px; margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: rgba(184, 146, 255, 0.34);
+  border: 2px solid rgba(184, 146, 255, 0.62);
+  /* overshoot on the way home — the one cute thing on an otherwise
+     flat control */
+  transition: transform .22s cubic-bezier(.34, 1.56, .64, 1);
+}
+.tpad__stick.is-down .tpad__nub { transition: transform .04s linear; }
+
+/* ── the buttons ───────────────────────────────────────────────── */
+.tpad__acts {
+  pointer-events: auto;
+  display: grid; gap: 12px;
+  grid-template-columns: auto auto;
+  align-items: end;
+}
+.tpad__b {
+  pointer-events: auto; touch-action: none;
+  font: 16px/1 'Determination Mono', ui-monospace, monospace;
+  color: var(--text);
+  min-width: 72px; min-height: 72px;      /* >= 44px, comfortably */
+  padding: 0 10px;
+  border-radius: 50%;
+  background: rgba(12, 10, 18, 0.58);
+  border: 2px solid rgba(184, 146, 255, 0.30);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+  transition: transform .12s cubic-bezier(.34, 1.56, .64, 1),
+              background .12s ease, border-color .12s ease;
+}
+.tpad__b[hidden] { display: none !important; }
+.tpad__b.is-down {
+  transform: scale(.9);
+  background: rgba(184, 146, 255, 0.28);
+  border-color: rgba(184, 146, 255, 0.75);
+}
+/* the primary action is the big one, bottom-right under the thumb */
+.tpad__b--a { grid-column: 2; grid-row: 2; min-width: 88px; min-height: 88px; font-size: 16px; }
+.tpad__b--b { grid-column: 1; grid-row: 2; opacity: .82; }
+.tpad__b--x { grid-column: 2; grid-row: 1; opacity: .82; }
+
+/* Short screens: a 200px pad eats a phone in landscape. Shrink rather
+   than overlap the play area. */
+@media (max-height: 480px) {
+  .tpad { height: 148px; padding: 0 16px 14px; }
+  .tpad__stick { width: 104px; height: 104px; }
+  .tpad__nub { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
+  .tpad__b { min-width: 60px; min-height: 60px; }
+  .tpad__b--a { min-width: 72px; min-height: 72px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tpad__nub, .tpad__b { transition: none; }
+}
