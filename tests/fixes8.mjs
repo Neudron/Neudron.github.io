@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { fileURLToPath } from 'node:url';
+import { stranded, roomCount } from './reach.mjs';
 
 /* The suites live in site/tests/, so the site is one level up. Resolving
    from import.meta.url rather than hard-coding a path is what lets them
@@ -95,6 +96,32 @@ console.log('\n2. walkable');
   ok('>>> spawns on open ground, not inside a tree <<<',
      typeof p.x === 'number' && p.x > 0 && p.y > 0);
   NEU.engine.leave();
+
+  /* Standing on floor is not the same as being able to LEAVE. a2_path
+     shipped with its two lit paths separated by a full-width band of
+     undergrowth: you arrived on the top one, the east exit was on the
+     bottom one, and pressing e at the end of the walk did nothing. */
+  const zoneA = ['rooms-a.js'];
+  const lost = stranded(ROOT, zoneA);
+  ok('>>> every spawn can walk to every exit in its room <<<', lost.length === 0);
+  if (lost.length) console.log('       ' + lost.join('\n       '));
+  /* if the loader ever stops seeing rooms the check above passes for
+     free, so say out loud how many it flooded */
+  ok('and the proof actually saw the rooms', roomCount(ROOT, zoneA) === 11);
+
+  /* The specific geometry that was missing: a2's two paths are joined at
+     both walls, so "hold right until you stop, then hold down" arrives
+     at the exit and the same move mirrored gets you home. */
+  const a2 = loadA2();
+  ok('a2 joins its paths at the west wall', [4, 5, 6].every(y => a2[y][1] === ','));
+  ok('>>> and at the east wall, where the exit is <<<',
+     [4, 5, 6].every(y => a2[y][24] === ','));
+  function loadA2() {
+    const rooms = {};
+    const fake = { NEU: { engine: { register: (id, d) => { rooms[id] = d; }, tileset: () => {} } } };
+    new Function('window', fs.readFileSync(path.join(ROOT,'js','act4','rooms-a.js'),'utf8'))(fake);
+    return rooms.a2_path.tiles.split('\n').filter(r => r.length);
+  }
 }
 
 /* ═══ 3. every room's spawn is on walkable ground ═════════════════

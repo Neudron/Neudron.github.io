@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { fileURLToPath } from 'node:url';
+import { stranded, roomCount } from './reach.mjs';
 
 /* The suites live in site/tests/, so the site is one level up. Resolving
    from import.meta.url rather than hard-coding a path is what lets them
@@ -123,6 +124,15 @@ console.log('\n2. no room is a trap');
   }
   ok('>>> all 18 rooms enterable with a valid spawn <<<', bad.length === 0);
   if (bad.length) console.log('       ' + bad.join(', '));
+
+  /* A room you can enter but cannot leave is still a trap. See
+     reach.mjs: a2_path spawned you on floor, in a corridor with no way
+     through to its own exit. */
+  const ZONES = ['rooms-a.js', 'rooms-d.js'];
+  const lost = stranded(ROOT, ZONES);
+  ok('>>> and every spawn can walk to every exit <<<', lost.length === 0);
+  if (lost.length) console.log('       ' + lost.join('\n       '));
+  ok('the proof covered all 18', roomCount(ROOT, ZONES) === 18);
 }
 
 /* ═══ 3. the fire door ════════════════════════════════════════════*/

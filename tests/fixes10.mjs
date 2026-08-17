@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { fileURLToPath } from 'node:url';
+import { stranded, roomCount } from './reach.mjs';
 
 /* The suites live in site/tests/, so the site is one level up. Resolving
    from import.meta.url rather than hard-coding a path is what lets them
@@ -92,6 +93,14 @@ console.log('\n1. the complete map');
   }
   ok('>>> every one of the 31 is enterable <<<', bad2.length === 0);
   if (bad2.length) console.log('       ' + bad2.join(', '));
+
+  /* Enterable is not the same as leavable. See reach.mjs: a2_path passed
+     every check above with its exit walled off from where you spawn. */
+  const ZONES = ['rooms-a.js', 'rooms-d.js', 'rooms-g.js'];
+  const lost = stranded(ROOT, ZONES);
+  ok('>>> and you can walk from every spawn to every exit <<<', lost.length === 0);
+  if (lost.length) console.log('       ' + lost.join('\n       '));
+  ok('the proof covered all 31', roomCount(ROOT, ZONES) === 31);
 }
 
 /* ═══ 2. the prize rooms ══════════════════════════════════════════*/

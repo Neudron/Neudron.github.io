@@ -132,7 +132,21 @@
 
   /* ══ A2 — the long walk ══════════════════════════════════════════
      The first mushroom. You cannot take it and the game says why in
-     one line, which is the entire setup for a payoff two hours away. */
+     one line, which is the entire setup for a payoff two hours away.
+
+     THE TWO LIT PATHS MUST STAY JOINED AT BOTH ENDS. You arrive on the
+     top path and the exit east is on the BOTTOM one, so the columns at
+     x=1 and x=24 are the only reason this room can be finished at all.
+     Without them row 5 is solid undergrowth from wall to wall, the two
+     corridors never touch, and a player who walks east and presses e
+     gets silence — which is what shipped first and what the
+     reachability proof in fixes8 now exists to catch.
+
+     One cell wide and lit, same as the descents in A1, because A1
+     already taught "lit ground is walkable" and this room should not
+     have to teach it twice. They sit hard against the walls on purpose:
+     hold right until you stop and you are standing in the gap, so the
+     turn costs no aiming. */
   E.register('a2_path', {
     tileset: 'woods',
     tiles: [
@@ -140,9 +154,9 @@
       '#~~~~~~~~~~~~~~~~~~~~~~~~#',
       '#~~..~~~~..~~~~~~..~~~~~~#',
       '#,,,,,,,,,,,,,,,,,,,,,,,,#',
-      '#~~..~~~~..~~~~..~~~~..~~#',
-      '#~~~~~~~~~~~~~~~~~~~~~~~~#',
-      '#....~~~~....~~~~....~~~~#',
+      '#,~..~~~~..~~~~..~~~~..~,#',
+      '#,~~~~~~~~~~~~~~~~~~~~~~,#',
+      '#,...~~~~....~~~~....~~~,#',
       '#,,,,,,,,,,,,,,,,,,,,,,,,#',
       '#~~~~~~~~~~~~~~~~~~~~~~~~#',
       '##########################'
