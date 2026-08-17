@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { fileURLToPath } from 'node:url';
+import { stranded, roomCount, badSpawns, untouchable, unsolvable } from './reach.mjs';
 
 /* The suites live in site/tests/, so the site is one level up. Resolving
    from import.meta.url rather than hard-coding a path is what lets them
@@ -92,6 +93,25 @@ console.log('\n1. the complete map');
   }
   ok('>>> every one of the 31 is enterable <<<', bad2.length === 0);
   if (bad2.length) console.log('       ' + bad2.join(', '));
+
+  /* Enterable is not the same as leavable. See reach.mjs: a2_path passed
+     every check above with its exit walled off from where you spawn. */
+  const ZONES = ['rooms-a.js', 'rooms-d.js', 'rooms-g.js'];
+  const lost = stranded(ROOT, ZONES);
+  ok('>>> and you can walk from every spawn to every exit <<<', lost.length === 0);
+  if (lost.length) console.log('       ' + lost.join('\n       '));
+  ok('the proof covered all 31', roomCount(ROOT, ZONES) === 31);
+  const wrongDoor = badSpawns(ROOT, ZONES);
+  ok('>>> no exit in the game asks for a spawn that is not there <<<', wrongDoor.length === 0);
+  if (wrongDoor.length) console.log('       ' + wrongDoor.join('\n       '));
+  /* h1_storm's door trigger was sealed inside its own frame, and it is
+     the only way into h2_machine and h3_trip. */
+  const sealed = untouchable(ROOT, ZONES);
+  ok('>>> every entity in the game can be touched <<<', sealed.length === 0);
+  if (sealed.length) console.log('       ' + sealed.join('\n       '));
+  const { unsolvable: dead } = unsolvable(ROOT, ZONES);
+  ok('>>> every block puzzle in the game is solvable <<<', dead.length === 0);
+  if (dead.length) console.log('       ' + dead.join('\n       '));
 }
 
 /* ═══ 2. the prize rooms ══════════════════════════════════════════*/
@@ -217,6 +237,37 @@ console.log('\n6. crafting');
   ok('and gives soup', NEU.save.has('soup') === true);
 }
 
+/* 6b. the pot traps Tab and gives the focus back. A grid you arrow
+   through needs a way in and a way out that does not strand the
+   player behind the overlay — and leaving must return them to the
+   thing they were on before. */
+{
+  const { w, NEU } = boot();
+  const kd = (key, shiftKey) => {
+    const e = new w.KeyboardEvent('keydown',
+      { key, shiftKey, bubbles: true, cancelable: true });
+    w.dispatchEvent(e);
+    return e;
+  };
+  const settBtn = w.document.getElementById('sansBtn');
+  settBtn.focus();                       /* the gear — what had focus */
+  NEU.craft.open();
+  await wait(80);                        /* open() defers focusCell */
+  ok('focus enters the grid', /craft__cell/.test(w.document.activeElement.className));
+  const quit = w.document.getElementById('craftQuit');
+  quit.focus();
+  const t1 = kd('Tab', false);
+  ok('>>> Tab from the quit button wraps to the grid <<<',
+     t1.defaultPrevented && /craft__cell/.test(w.document.activeElement.className));
+  w.document.querySelector('.craft__cell').focus();
+  const t2 = kd('Tab', true);
+  ok('>>> Shift+Tab from the first cell wraps to quit <<<',
+     t2.defaultPrevented && w.document.activeElement === quit);
+  NEU.craft.close();
+  ok('>>> closing gives the focus back to the gear <<<',
+     w.document.activeElement === settBtn);
+}
+
 /* ═══ 7. the crack ════════════════════════════════════════════════*/
 console.log('\n7. three clicks');
 {
@@ -253,6 +304,20 @@ console.log('\n8. what is through it');
   ok('no clone yet', NEU.polt.clone === false);
   NEU.polt.close();
 
+  /* Quitting the fight without killing him must put the crack back.
+     Before the fix, opened stayed true forever: the finale was
+     unreachable, and the save sat at a portal that would never open
+     again. */
+  NEU.crack.arm();
+  NEU.crack.hit(); NEU.crack.hit(); NEU.crack.hit();
+  ok('the crack opens again', NEU.crack.opened === true);
+  NEU.polt.open();
+  NEU.polt.close();
+  ok('>>> walking away from the fight re-arms the crack <<<',
+     NEU.crack.opened === false && NEU.crack.clicks === 0);
+  NEU.crack.hit();
+  ok('...and the three clicks are fresh', NEU.crack.clicks === 1);
+
   ok('>>> three phases at 50% and 20% <<<',
      /pct <= 0\.50 && phase < 2/.test(P) && /pct <= 0\.20 && phase < 3/.test(P));
   ok('the hooks detach in phase 2', /h\.free = true/.test(P));
@@ -266,7 +331,42 @@ console.log('\n8. what is through it');
   ok('shots turn back once, like expert mode', /b\.k === 1 && b\.age > 0\.9 && !b\.turned/.test(P));
   ok('>>> depth is a scalar, camera never rotates <<<', /Depth is a scalar, not a matrix/.test(P));
   ok('and the reason is written down', /unreadable/.test(P));
+  ok('>>> bullets face the way they travel <<<',
+     /drawSheet\(key, bl\.x, bl\.y, 1, null, Math\.atan2\(bl\.vy, bl\.vx\)\)/.test(P));
+  ok('>>> the charge glow is NOT hidden in the fallback branch <<<',
+     P.indexOf("o.kind === 'body' && glow > 0") > -1 &&
+     P.indexOf("o.kind === 'body' && glow > 0") < P.indexOf('if (drew) return;'));
   ok('winning throws you back out', /picks you up by a tooth/.test(P));
+}
+
+/* 8b. the copy comes apart where it stands. The clone-check used to
+   sit INSIDE the boss-range guard, and the clone mirrors the boss
+   across the arena — a player standing on the copy could be told the
+   boss was out of reach. The check must precede the guard, and the
+   copy must die from its own side: stand where the mirror converges
+   and one hit takes it, WITHOUT touching the original. */
+{
+  const { w, NEU } = boot();
+  const P = read('act4/boss-polt.js');
+  NEU.polt.open();
+  ok('>>> the clone check comes BEFORE the boss-range guard <<<',
+     P.indexOf('clone && Math.hypot(px - clone.x') > -1 &&
+     P.indexOf('clone && Math.hypot(px - clone.x') < P.indexOf('> 40) return'));
+  const kd = (key) => w.dispatchEvent(new w.KeyboardEvent('keydown', { key, bubbles: true }));
+  const ku = (key) => w.dispatchEvent(new w.KeyboardEvent('keyup', { key, bubbles: true }));
+  await wait(3000);                  /* he walks down to you */
+  for (let i = 0; i < 24; i++) { kd('z'); ku('z'); await wait(5); }
+  ok('phase 3 reached', NEU.polt.phase === 3);
+  ok('the clone exists', NEU.polt.clone === true);
+  await wait(120);                   /* a few steps: it mirrors away */
+  kd('ArrowUp');                     /* walk to the arena centre */
+  await wait(720);                   /* 180px at 250px/s */
+  ku('ArrowUp');
+  await wait(900);                   /* he catches up; the mirror is you */
+  kd('z'); ku('z');
+  ok('>>> standing on the copy kills it, boss untouched <<<',
+     NEU.polt.clone === false && NEU.polt.hp === 6 && NEU.polt.phase === 3);
+  NEU.polt.close();
 }
 
 /* ═══ 9. the ending ═══════════════════════════════════════════════*/
@@ -285,6 +385,26 @@ console.log('\n9. the hotdog');
   NEU.act4.ending();
   ok('finishing sets the flag', NEU.save.flagged('act4_done') === true);
   ok('and ticks the last step', NEU.quest.has('a4_end') === true);
+}
+
+/* ═══ 10a. regression: Enter on deckQuit does not launch ══════════
+   The keydown handler used to steal Enter from the quit button,
+   starting a game the player just tried to leave. In jsdom the
+   native button-click that Enter triggers does not fire, so the
+   deck stays open — that IS the signal that launch() was not called
+   (launch closes the deck and schedules g.run()). */
+{
+  const { w, NEU } = boot();
+  NEU.deck.open();
+  const q = w.document.getElementById('deckQuit');
+  q.focus();
+  const evt = new w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+  w.dispatchEvent(evt);
+  /* launch() would have called close(); the deck is still open → launch
+     was not invoked. (In a real browser the native click would also
+     close it, but jsdom does not synthesize that click synchronously.) */
+  ok('>>> Enter on deckQuit does not launch <<<', NEU.deck.running === true);
+  NEU.deck.close();
 }
 
 /* ═══ 10. every module loaded clean ═══════════════════════════════*/

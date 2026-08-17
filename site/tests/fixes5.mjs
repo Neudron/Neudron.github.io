@@ -222,6 +222,13 @@ console.log('\n6. not everything is sans');
   w.document.getElementById('tv').click(); await wait(20);
   ok('>>> the television is not sans <<<', who() === 'tv');
 
+  /* the dog left with him. goToSleep used to hide the dog but leave
+     dogOut true, so grantDogFood and summonDog both no-opped for the
+     rest of the page — the feed sequence could never replay without
+     the cosmolight reset. */
+  ok('>>> the dog flag follows the dog off the page <<<',
+     NEU.sans.dogOut === false);
+
   /* narration, via the hammer hand-off: line 1 narrates, line 2 is him */
   const src = fs.readFileSync(path.join(ROOT, 'js', 'game/sans.js'), 'utf8');
   ok('hammer line is narrated, then his',
@@ -273,6 +280,20 @@ console.log('\n7. regression — the hammer loop still runs twice');
   ok('second run: dog gives a hammer again', b.gotHammer === true);
   ok('second run: the grey door lets you through again', b.talked === true);
   ok('>>> second run: the light can be fixed again <<<', b.fixed === true);
+}
+
+/* ═══ 8. regression: CARRY-mode stray tap drops the sword home ═══
+   In CARRY (coarse pointer) mode the pointerup handler used to do
+   nothing when the tap missed sans — leaving state='held' forever
+   (re-grab requires 'stuck'). The fix adds `else flyHome()` plus a
+   pointercancel handler in the CARRY branch. */
+{
+  const src = fs.readFileSync(path.join(ROOT, 'js', 'game/sans.js'), 'utf8');
+  const i = src.indexOf('if (CARRY) {');
+  const j = src.indexOf('} else {', i);
+  const branch = src.slice(i, j);
+  ok('CARRY branch has a stray-tap drop path', /else\s+flyHome\(\)/.test(branch));
+  ok('CARRY branch also handles pointercancel', /pointercancel/.test(branch));
 }
 
 console.log('\n' + (fail ? `${fail} FAILED, ${pass} passed` : `ALL PASS (${pass})`));

@@ -207,6 +207,36 @@ console.log('\n6. prefers-reduced-motion still forces everything');
   ok('panel still opens', w.document.querySelector('.sett').hidden === false);
 }
 
+/* 6b. the dialog never focuses a disabled switch. Under reduced motion
+   the shake and flash switches are disabled, and focusing a disabled
+   element is a no-op: the old open() landed on <body> and the first
+   Tab then had to rescue the dialog instead of moving inside it. */
+{
+  const { w, NEU } = boot(true);
+  const panel = w.document.querySelector('.sett');
+  NEU.settings.open();
+  ok('>>> focus starts on the first ENABLED switch, not the disabled one <<<',
+     w.document.activeElement === w.document.getElementById('settText'));
+  const kd = (key, shiftKey) => {
+    const e = new w.KeyboardEvent('keydown',
+      { key, shiftKey, bubbles: true, cancelable: true });
+    w.dispatchEvent(e);                          /* returns !prevented */
+    return e;
+  };
+  w.document.activeElement.blur();              /* the stranded case */
+  const t1 = kd('Tab', false);
+  ok('>>> Tab from outside wraps into the panel <<<',
+     t1.defaultPrevented &&
+     w.document.activeElement === panel.querySelector('.sett__x'));
+  panel.querySelector('.sett__x').focus();
+  const t2 = kd('Tab', true);
+  ok('>>> Shift+Tab from the first control stays trapped <<<',
+     t2.defaultPrevented);
+  ok('>>> the trap and the opener both skip disabled switches <<<',
+     /not\(:disabled\)/.test(S) && /focusables/.test(S));
+  NEU.settings.close();
+}
+
 /* ═══ 7. the flash audit — nothing loops above 3Hz ════════════════*/
 console.log('\n7. 3Hz audit, measured not assumed');
 {
@@ -274,6 +304,15 @@ console.log('\n9. the dev console can open it');
   NEU.dev.run('help');
   const help = w.document.getElementById('devOut').textContent;
   ok('help mentions it', /set\s+open the settings panel/.test(help));
+}
+
+/* ═══ 9a. regression: `goto` actually teleports ═══════════════════
+   The command used to be a stub that only listed rooms. */
+{
+  const { w, NEU } = boot();
+  NEU.dev.run('goto h3_trip');
+  ok('>>> goto teleports to the named room <<<', NEU.engine.running && NEU.engine.room === 'h3_trip');
+  NEU.engine.leave();
 }
 
 /* ═══ 10. harness honesty — the reduced check is not a tautology ══*/

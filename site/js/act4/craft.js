@@ -112,7 +112,22 @@
     if (btns[focusIdx]) btns[focusIdx].focus();
   }
 
+  /* The panel's focusables, live — the grid is rebuilt on every click,
+     so the list must be queried at keydown time, not cached. */
+  function focusables() {
+    var out = [], all = wrap.querySelectorAll('button'), k;
+    for (k = 0; k < all.length; k++) {
+      if (!all[k].hidden && !all[k].disabled) out.push(all[k]);
+    }
+    return out;
+  }
+
+  var lastFocus = null;
+
   function open() {
+    /* Where to put the player back when they leave. Same courtesy the
+       quiz and the settings panel give. Only captured once. */
+    if (!lastFocus) lastFocus = document.activeElement;
     wrap.hidden = false;
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
@@ -127,6 +142,8 @@
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
+    if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) {} }
+    lastFocus = null;
   }
 
   if (outEl) outEl.addEventListener('click', take);
@@ -139,6 +156,20 @@
   addEventListener('keydown', function (e) {
     if (wrap.hidden) return;
     if (e.key === 'Escape') { e.preventDefault(); close(); if (NEU.engine) NEU.engine.enter('h3_trip', 'in'); return; }
+    if (e.key === 'Tab') {
+      /* Without the trap a Tab from the last cell walked straight out
+         of the overlay and left the player behind it, arrow-keying a
+         grid that was no longer on screen. */
+      var els = focusables();
+      if (!els.length) return;
+      var i = Array.prototype.indexOf.call(els, document.activeElement);
+      if (e.shiftKey) {
+        if (i <= 0) { e.preventDefault(); els[els.length - 1].focus(); }
+      } else {
+        if (i === -1 || i >= els.length - 1) { e.preventDefault(); els[0].focus(); }
+      }
+      return;
+    }
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       focusIdx = (focusIdx % 3 === 0) ? focusIdx + 2 : focusIdx - 1;

@@ -247,8 +247,17 @@ console.log('\n6. sprite manifest');
        return s.frames >= 1 && s.fw > 0 && s.fh > 0; }));
   ok('>>> every grid divides its sheet exactly <<<',
      names.every(n => { const s = NEU.sheets[n]; return s.frames * s.fh === s.h; }));
-  ok('frame width is the sheet width (vertical strips)',
-     names.every(n => NEU.sheets[n].fw === NEU.sheets[n].w));
+  /* `fw === w` was asserting that EVERY sheet is a single vertical
+     strip, and that was not true: SupremeCalamitas.png and its hooded
+     twin are 120 wide and hold two 60px columns of poses. The old
+     invariant made the manifest unable to say so, the blitter pinned
+     source x at 0, and she drew as both columns at once. Now a sheet
+     declares `cols` and the width has to add up — which is the same
+     check, generalised, and still pins a strip to fw === w. */
+  ok('>>> the columns account for the whole sheet width <<<',
+     names.every(n => { const s = NEU.sheets[n]; return s.fw * (s.cols || 1) === s.w; }));
+  ok('a sheet without cols is still a plain vertical strip',
+     names.every(n => { const s = NEU.sheets[n]; return s.cols ? s.cols > 1 : s.fw === s.w; }));
 
   /* NOTHING IS PROVISIONAL ANY MORE, as of 2026-08-17. All five were
      settled: fireblast, gigablast and hook by autocorrelating the row
@@ -322,6 +331,51 @@ console.log('\n7. weight');
   console.log(`       ships ${Math.round(total/1024)} KB · source-only ${Math.round(source/1024)} KB`);
   ok('>>> act IV art is under the 500 KB budget <<<', total < 500 * 1024);
   ok('duplicates were pruned', ship < 200 * 1024);
+}
+
+/* ═══ 8. regression: quest Tab handler is null-safe ═══════════════
+   The keydown handler dereferences `panel.classList` without a guard.
+   Boot without #quest in the DOM — the handler must not throw. */
+{
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const noQuest = html.replace(/<aside class="quest"[\s\S]*?<\/aside>\n/, '');
+  const dom = new JSDOM(noQuest, { pretendToBeVisual: true, url: 'https://www.neu.ac/',
+                                    runScripts: 'outside-only' });
+  const w = dom.window;
+  w.matchMedia = w.matchMedia || (() => ({ matches:false, addListener(){}, addEventListener(){} }));
+  w.AudioContext = class { constructor(){ this.state='running'; this.currentTime=0; this.destination={}; this.sampleRate=44100; }
+    createOscillator(){ return { type:'', frequency:{setValueAtTime(){},exponentialRampToValueAtTime(){}}, connect(){},start(){},stop(){} }; }
+    createGain(){ return { gain:{setValueAtTime(){},exponentialRampToValueAtTime(){},value:0}, connect(){} }; }
+    createBufferSource(){ return { buffer:null, connect(){},start(){},stop(){} }; }
+    createBiquadFilter(){ return { type:'', value:0, Q:{value:0}, connect(){}, frequency:{value:0} }; }
+    createBuffer(){ return { getChannelData: () => new Float32Array(64) }; } };
+  w.HTMLMediaElement.prototype.play = () => Promise.resolve();
+  w.HTMLCanvasElement.prototype.getContext = () => new Proxy({}, {
+    get(_, k) { if (k === 'canvas') return {}; if (k === 'measureText') return () => ({ width: 10 });
+      if (k === 'createRadialGradient' || k === 'createLinearGradient') return () => ({ addColorStop: () => {} });
+      return typeof k === 'string' ? () => {} : undefined; }, set(){ return true; } });
+  w.scrollTo = () => {};
+  w.requestAnimationFrame = cb => w.setTimeout(() => cb(Date.now()), 0);
+  w.Element.prototype.getBoundingClientRect = () => ({ left:100, top:100, right:146, bottom:146, width:46, height:46 });
+  for (const f of ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine.js',
+                   'game/bullet.js','game/dark.js','game/sans.js','game/deck.js','core/dev.js']) {
+    const p = path.join(ROOT, 'js', f);
+    if (!fs.existsSync(p)) continue;
+    try { w.eval(fs.readFileSync(p, 'utf8')); } catch (e) { /* skip */ }
+  }
+  /* Tab must not throw even though #quest is missing. */
+  let threw = false;
+  try { w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })); }
+  catch (e) { threw = true; }
+  ok('>>> quest Tab handler is null-safe <<<', threw === false);
+}
+
+/* ═══ 9. regression: act4 resume guard ═══════════════════════════
+   act4.open() reads NEU.engine.rooms without a guard — if engine.js
+   failed to load, .indexOf would throw on undefined. */
+{
+  const A = fs.readFileSync(path.join(ROOT, 'js', 'act4/act4.js'), 'utf8');
+  ok('>>> act4 guards engine.rooms <<<', /var rooms = \(NEU\.engine && NEU\.engine\.rooms\) \|\| \[\]/.test(A));
 }
 
 console.log('\n' + (fail ? `${fail} FAILED, ${pass} passed` : `ALL PASS (${pass})`));

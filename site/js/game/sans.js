@@ -1024,11 +1024,15 @@
   if (CARRY) {
     /* Touch: you cannot hold a finger down and scroll with it, so the
        press-and-hold contract is impossible here. Tap to pick up, tap
-       sans to swing. */
+       sans to swing. A tap that lands on neither drops the sword back
+       home — otherwise the blade is stranded mid-scroll with no way to
+       re-grab it (grabbing requires the 'stuck' state). */
     addEventListener('pointerup', function (e) {
       if (state !== 'held') return;
       if (overSans(e.clientX, e.clientY)) attempt(e.clientX, e.clientY);
+      else flyHome();
     });
+    addEventListener('pointercancel', function () { if (state === 'held') flyHome(); });
   } else {
     addEventListener('pointerup', function (e) { attempt(e.clientX, e.clientY); });
     addEventListener('pointercancel', function () { if (state === 'held') flyHome(); });
@@ -1333,6 +1337,11 @@
     if (asleep) return;
     asleep = true; wantSleep = false;
     if (dogEl)   { dogEl.classList.remove('is-in'); setTimeout(function () { dogEl.hidden = true; }, 520); }
+    /* The dog is leaving the page with him, so the flag has to follow
+       the DOM — otherwise a slept-through visit keeps telling
+       grantDogFood and summonDog that the dog is still out, and the
+       feed sequence can never be replayed without the cosmolight. */
+    if (dogOut) dogOut = false;
     sans.classList.remove('is-in');
     setTimeout(function () { sans.hidden = true; }, 520);
     if (sleepEl) {

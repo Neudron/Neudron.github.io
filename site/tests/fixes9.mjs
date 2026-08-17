@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { fileURLToPath } from 'node:url';
+import { stranded, roomCount, badSpawns, untouchable } from './reach.mjs';
 
 /* The suites live in site/tests/, so the site is one level up. Resolving
    from import.meta.url rather than hard-coding a path is what lets them
@@ -123,6 +124,21 @@ console.log('\n2. no room is a trap');
   }
   ok('>>> all 18 rooms enterable with a valid spawn <<<', bad.length === 0);
   if (bad.length) console.log('       ' + bad.join(', '));
+
+  /* A room you can enter but cannot leave is still a trap. See
+     reach.mjs: a2_path spawned you on floor, in a corridor with no way
+     through to its own exit. */
+  const ZONES = ['rooms-a.js', 'rooms-d.js'];
+  const lost = stranded(ROOT, ZONES);
+  ok('>>> and every spawn can walk to every exit <<<', lost.length === 0);
+  if (lost.length) console.log('       ' + lost.join('\n       '));
+  ok('the proof covered all 18', roomCount(ROOT, ZONES) === 18);
+  const wrongDoor = badSpawns(ROOT, ZONES);
+  ok(">>> and no exit asks for a spawn that isn't there <<<", wrongDoor.length === 0);
+  if (wrongDoor.length) console.log('       ' + wrongDoor.join('\n       '));
+  const sealed = untouchable(ROOT, ZONES);
+  ok('>>> every entity is reachable <<<', sealed.length === 0);
+  if (sealed.length) console.log('       ' + sealed.join('\n       '));
 }
 
 /* ═══ 3. the fire door ════════════════════════════════════════════*/
@@ -262,6 +278,36 @@ console.log('\n8. playing it');
      NEU.quiz.ranks.every(r => NEU.save.flagged('rank:' + r[0])));
   ok('the objective ticked', NEU.quest.has('a4_rank') === true);
   NEU.quiz.close();
+}
+
+/* ═══ 10. regression: npcs are not embedded in walls ══════════════
+   Two act4 npcs were placed on '#' tiles, making them unreachable. */
+{
+  const G = fs.readFileSync(path.join(ROOT,'js','act4','rooms-g.js'),'utf8');
+  ok('>>> h3_trip pot npc moved off the wall <<<', /x:\s*10,\s*y:\s*3/.test(G));
+
+  const D = fs.readFileSync(path.join(ROOT,'js','act4','rooms-d.js'),'utf8');
+  ok('>>> d2 mush5 npc moved off the wall <<<', /x:\s*14,\s*y:\s*3,\s*colour:\s*'#C4705F',\s*mush:\s*'mush5'/.test(D));
+}
+
+/* ═══ 11. regression: rhythm retry preserves the round ═════════════
+   After a loss, Enter should restart the current round, not round 0. */
+{
+  const R = fs.readFileSync(path.join(ROOT,'js','act4','rhythm.js'),'utf8');
+  ok('Enter calls retry, not open', /if\s*\(!running\s*&&\s*e\.key\s*===\s*'Enter'\)\s*\{\s*e\.preventDefault\(\);\s*retry\(\)/.test(R));
+  ok('open() still resets round to 0', /round\s*=\s*0/.test(R));
+  const retryStart = R.indexOf('function retry()');
+  const openStart = R.indexOf('function open()', retryStart);
+  const retryBody = R.slice(retryStart, openStart);
+  ok('retry() does not reset round', !/round\s*=\s*0/.test(retryBody));
+}
+
+/* ═══ 12. regression: rhythm response timing ══════════════════════
+   The response phase must start when the player's bar arrives, not
+   400 ms early (which made the first note a guaranteed MISS). */
+{
+  const R = fs.readFileSync(path.join(ROOT,'js','act4','rhythm.js'),'utf8');
+  ok('>>> response timeout has no -400 early-start <<<', !/1400\s*\+\s*4\s*\*\s*beatLen\(\s*\)\s*\*\s*1000\s*-\s*400/.test(R));
 }
 
 console.log('\n' + (fail ? `${fail} FAILED, ${pass} passed` : `ALL PASS (${pass})`));

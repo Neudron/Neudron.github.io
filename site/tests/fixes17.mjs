@@ -147,6 +147,27 @@ console.log('\n1. quiz focus  <- the last unmanaged overlay');
   ok('quiz stopped', NEU.quiz.running === false);
 }
 
+/* 1b. no phantom show. A pending "next question" timer must not
+   survive close(). Before the fix, closing mid-show left the
+   setTimeout alive: ask() kept rebuilding the board on a hidden
+   wrapper, ran the whole show to a phantom "D-" finish, and marked
+   a4_rank behind the player's back. Fresh boot, first show, closed
+   before the first question even renders. */
+console.log('\n1b. closing kills the pending ask timer');
+{
+  const { w, NEU } = boot();
+  const doc = w.document;
+  NEU.quiz.fast(true);
+  NEU.quiz.open();
+  NEU.quiz.close();
+  await wait(80);   /* any stale timer would have fired by now */
+  ok('>>> closing mid-show kills the pending ask timer <<<',
+     doc.querySelectorAll('#quizOpts .quiz__o').length === 0);
+  ok('...and nothing was auto-marked behind the player\'s back',
+     !NEU.save.flagged('quiz_rank'));
+  ok('...and the show never started', NEU.quiz.index === 0);
+}
+
 /* ═══ 2. every modal overlay traps, not just this one ═════════════*/
 console.log('\n2. no overlay is left unmanaged');
 {

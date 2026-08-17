@@ -322,6 +322,30 @@ console.log('\n7. ducking');
      /getElementById\('tbox'\)/.test(M));
 }
 
+/* 7b. the duck must survive the build. If a conversation starts before
+   the first gesture arms the context, the duck gain used to be created
+   at 1 and the early-return in duck() kept it there until the next
+   transition — a pre-arm talk was audible at full volume. */
+{
+  const { w, NEU } = boot();
+  const gains = [];
+  const orig = w.AudioContext.prototype.createGain;
+  w.AudioContext.prototype.createGain = function () {
+    const g = orig.call(this);
+    gains.push(g);
+    return g;
+  };
+  NEU.music.duck(true);              /* the box is up before anything armed */
+  ok('ducked before the first gesture', NEU.music.ducked === true);
+  gesture(w);                        /* arms → build() creates bus + duck gain */
+  ok('the duck gain was built mid-duck', NEU.music.ducked === true && gains.length >= 2);
+  ok('>>> and it started ducked, not at full volume <<<',
+     Math.abs(gains[1].gain.value - 0.34) < 0.001);
+  NEU.music.duck(false);
+  ok('and the next transition still brings it back up',
+     NEU.music.ducked === false && Math.abs(gains[1].gain.value - 1) < 0.001);
+}
+
 /* ═══ 8. adaptive intensity ═══════════════════════════════════════*/
 console.log('\n8. layers arrive as the boss falls');
 {
@@ -446,8 +470,8 @@ console.log('\n11. volume, and that it persists');
 
   /* The Tab trap collected only buttons. The moment a slider went in,
      Tab walked out of a dialog marked aria-modal. */
-  ok('>>> the Tab trap includes inputs, not just buttons <<<',
-     /querySelectorAll\('button, input'\)/.test(S));
+   ok('>>> the Tab trap includes inputs, not just buttons <<<',
+      /querySelectorAll\('button:not\(:disabled\), input:not\(:disabled\)'\)/.test(S));
 
   gesture(w);
   NEU.music.play('woods');

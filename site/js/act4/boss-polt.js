@@ -245,12 +245,16 @@
   }
 
   function tryHit() {
-    if (Math.hypot(px - bx, py - by) > 40) return;
+    /* The clone check has to come before the boss-range guard: the
+       clone mirrors the boss across the arena, so when you are close
+       enough to hit it the boss is on the far side — a range guard
+       against the boss would make the copy indestructible. */
     if (clone && Math.hypot(px - clone.x, py - clone.y) < 30) {
       clone = null;
       say("* the copy comes apart. the original notices.");
       return;
     }
+    if (Math.hypot(px - bx, py - by) > 40) return;
     bossHP--;
     if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
     if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(bx, by, 7, COL.ectoHi); }
@@ -310,38 +314,13 @@
      changes read without a single new sprite. Missing art draws
      magenta rather than nothing; a silently absent sprite gets
      mistaken for a logic bug and costs an hour. */
-  var imgs = {};
-  function imgOf(src) {
-    if (imgs[src]) return imgs[src];
-    var i = new Image(); i.onerror = function () { i.__failed = true; };
-    i.src = src; imgs[src] = i; return i;
-  }
-  function sheetOK(sh) {
-    if (!sh) return null;
-    var im = imgOf(sh.src);
-    return (im.complete && im.naturalWidth && !im.__failed) ? im : null;
-  }
-  function drawSheet(key, x, y, scale, glowKeys) {
-    var sh = NEU.sheets && NEU.sheets[key];
-    var im = sheetOK(sh);
-    if (!im) return false;
-    var fr = ((performance.now() / (1000 / (sh.fps || 10))) | 0) % sh.frames;
-    var dw = sh.fw * scale, dh = sh.fh * scale;
-    ctx.drawImage(im, 0, fr * sh.fh, sh.fw, sh.fh,
-                  (x - dw / 2) | 0, (y - dh / 2) | 0, dw | 0, dh | 0);
-    if (glowKeys) {
-      ctx.globalCompositeOperation = 'lighter';
-      for (var g = 0; g < glowKeys.length; g++) {
-        var gs = NEU.sheets && NEU.sheets[glowKeys[g]], gi = sheetOK(gs);
-        if (!gi) continue;
-        ctx.globalAlpha = 0.55;
-        ctx.drawImage(gi, 0, fr * gs.fh, gs.fw, gs.fh,
-                      (x - dw / 2) | 0, (y - dh / 2) | 0, dw | 0, dh | 0);
-      }
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    return true;
+  /* One blitter for the whole site, in data/sheets.js. The local copy
+     this replaces was the third of three identical image caches. */
+  function drawSheet(key, x, y, scale, glowKeys, rot) {
+    if (!NEU.sheetDraw) return false;
+    return NEU.sheetDraw(ctx, key, x, y, {
+      scale: scale, glowKeys: glowKeys, rot: rot, now: performance.now()
+    });
   }
 
   function frame() {
@@ -358,10 +337,30 @@
 
     /* chains first, behind everything */
     if (phase !== 2) {
-      ctx.strokeStyle = 'rgba(127,227,196,.28)'; ctx.lineWidth = 2;
+      /* Real chain links, not a translucent line. The header of this
+         file has always said the chains are drawn; PolterghastChain.png
+         has been sitting in the manifest unreferenced the whole time.
+         Links are stepped along the tether and rotated to face it, with
+         the old stroke kept as the fallback so a missing file degrades
+         to the previous look instead of to nothing. */
+      var link = NEU.sheets && NEU.sheets.chain;
+      var haveLink = !!(NEU.sheetReady && NEU.sheetReady(link));
+      if (!haveLink) { ctx.strokeStyle = 'rgba(127,227,196,.28)'; ctx.lineWidth = 2; }
       for (var i = 0; i < hooks.length; i++) {
         var p1 = proj(bx, by, bz), p2 = proj(hooks[i].x, hooks[i].y, 0);
-        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        if (!haveLink) {
+          ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+          continue;
+        }
+        var dx2 = p2.x - p1.x, dy2 = p2.y - p1.y;
+        var len = Math.hypot(dx2, dy2);
+        var ang = Math.atan2(dy2, dx2) - Math.PI / 2;   // art points up
+        var step = link.fh * 0.7;                        // overlap so it reads solid
+        var n = Math.max(1, Math.min(24, (len / step) | 0));
+        for (var s2 = 1; s2 <= n; s2++) {
+          var t2 = s2 / (n + 1);
+          drawSheet('chain', p1.x + dx2 * t2, p1.y + dy2 * t2, 0.7, null, ang);
+        }
       }
     }
 
@@ -386,6 +385,7 @@
          health bar is. The clone is the same body tinted red by an
          extra pass, because it IS the same body. */
       var glows = phase >= 3 ? ['polterG1', 'polterG2'] : phase >= 2 ? ['polterG1'] : null;
+      var w = 44 * s, h = 44 * s;
       var drew = drawSheet('polter', p.x, p.y, s * 0.42, glows);
       if (o.kind === 'clone' && drew) {
         ctx.globalCompositeOperation = 'lighter';
@@ -395,19 +395,21 @@
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
       }
-      if (drew) return;
-      var w = 44 * s, h = 44 * s;
-      ctx.fillStyle = o.kind === 'clone' ? '#5A2A3E' : '#1E3A44';
-      ctx.fillRect((p.x - w / 2) | 0, (p.y - h / 2) | 0, w | 0, h | 0);
-      ctx.fillStyle = o.kind === 'clone' ? COL.red : COL.ecto;
-      ctx.fillRect((p.x - w / 2 + 4) | 0, (p.y - h / 2 + 4) | 0, (w - 8) | 0, (h - 8) | 0);
+      /* glowing red = it is about to charge. announced, always. This
+         has to sit OUTSIDE the fallback branch: with the sheets
+         loaded, drew is true and a glow nested in the fallback would
+         never render — the charge would come without the telegraph. */
       if (o.kind === 'body' && glow > 0) {
-        /* glowing red = it is about to charge. announced, always. */
         ctx.globalAlpha = Math.min(1, glow);
         ctx.fillStyle = COL.red;
         ctx.fillRect((p.x - w / 2 - 4) | 0, (p.y - h / 2 - 4) | 0, (w + 8) | 0, (h + 8) | 0);
         ctx.globalAlpha = 1;
       }
+      if (drew) return;
+      ctx.fillStyle = o.kind === 'clone' ? '#5A2A3E' : '#1E3A44';
+      ctx.fillRect((p.x - w / 2) | 0, (p.y - h / 2) | 0, w | 0, h | 0);
+      ctx.fillStyle = o.kind === 'clone' ? COL.red : COL.ecto;
+      ctx.fillRect((p.x - w / 2 + 4) | 0, (p.y - h / 2 + 4) | 0, (w - 8) | 0, (h - 8) | 0);
     });
 
     for (var b = 0; b < bullets.length; b++) {
@@ -415,7 +417,9 @@
       /* Potent shots in later phases; the plain ones in P1. Falls back
          to a square, which is what the whole fight was until now. */
       var key = bl.k === 1 ? 'potentShot' : 'pShot';
-      if (!drawSheet(key, bl.x, bl.y, 1)) {
+      /* Rotated to face the way it is travelling, like the dart in the
+         other fight — a spiked shot drawn straight reads as a blob. */
+      if (!drawSheet(key, bl.x, bl.y, 1, null, Math.atan2(bl.vy, bl.vx))) {
         ctx.fillStyle = bl.c;
         ctx.fillRect((bl.x - bl.r) | 0, (bl.y - bl.r) | 0, sz, sz);
       }
@@ -490,6 +494,11 @@
     if (NEU.quest) NEU.quest.lock(false);
     if (NEU.save && NEU.save.flagged('polt_dead') && NEU.act4 && NEU.act4.ending) {
       NEU.act4.ending();
+    } else if (NEU.crack && NEU.crack.reset) {
+      /* Left without killing him: put the crack back so the finale
+         is still reachable. A permanent "opened" crack is a save
+         that can never finish the game. */
+      NEU.crack.reset();
     }
   }
 

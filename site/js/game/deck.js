@@ -338,7 +338,13 @@
       }
       return;
     }
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); launch(); }
+    if (e.key === 'Enter' || e.key === ' ') {
+      /* Enter on the quit button means "close", and the native click
+         already handles that. Stealing it to launch would start a
+         game the player just tried to leave. */
+      if (document.activeElement === q) return;
+      e.preventDefault(); launch();
+    }
   });
 
   if (elPlay) elPlay.addEventListener('click', launch);

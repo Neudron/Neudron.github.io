@@ -63,6 +63,16 @@
   var line = '', lineT = 0;
   var bx = 0, by = 0;        // her position
   var dying = 0;
+  /* Attack timers outlive the attack that scheduled them — a gigablast
+     that is mid-spread when she phases out would keep dropping bullets
+     into the wall interlude. Track them so a phase transition can kill
+     the stragglers. */
+  var sched = [];
+  function later(fn, ms) { var id = setTimeout(fn, ms); sched.push(id); return id; }
+  function clearSched() {
+    for (var i = 0; i < sched.length; i++) clearTimeout(sched[i]);
+    sched = [];
+  }
 
   /* ── her voice ──────────────────────────────────────────────────
      Six real Calamity .ogg files, one per attack family. The pooled
@@ -163,7 +173,7 @@
   function gigablast(n) {
     sfxPlay('giga');
     for (var i = 0; i < n; i++) {
-      setTimeout(function () {
+      later(function () {
         if (!running) return;
         bullets.push({ x: bx, y: by + 20, vx: 0, vy: 0, r: 12, c: COL.dark,
                        k: 2, age: 0, fuse: 2.1 });
@@ -177,7 +187,7 @@
     var left = px < AX + AW / 2;
     var x = left ? AX - 20 : AX + AW + 20;
     for (var i = 0; i < 7; i++) {
-      setTimeout(function (k) {
+      later(function (k) {
         return function () {
           if (!running) return;
           shot(x, py + (k - 3) * 26, (left ? 1 : -1) * 90, 0, 5, COL.brim, 3);
@@ -196,6 +206,7 @@
   /* ── the interludes ─────────────────────────────────────────────*/
   function startWall(n) {
     mode = 'wall'; wallT = 0; wallN = n; walls = []; bullets = [];
+    clearSched();
     invuln = true;
     sfxPlay('maelstrom');
     say(n === 0 ? "* the room fills up."
@@ -211,7 +222,7 @@
       /* down / right / left, then left+right, then down+left+right —
          the order the game uses, so anyone who knows it is rewarded. */
       var dirs = [['d','r','l'], ['u','r'], ['d','l','r']][wallN] || ['d'];
-      dirs.forEach(function (d, i) { setTimeout(function () { wallLine(d); }, i * 240); });
+      dirs.forEach(function (d, i) { later(function () { wallLine(d); }, i * 240); });
     }
     if (wallT > 4.6) {
       bullets = []; invuln = false;
@@ -250,6 +261,7 @@
   /* ── the brothers ───────────────────────────────────────────────*/
   function startBrothers() {
     mode = 'brothers'; invuln = true; bullets = [];
+    clearSched();
     bros = [
       { side: -1, x: AX + 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'slash' },
       { side:  1, x: AX + AW - 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'fist' }
@@ -320,8 +332,7 @@
     } else if (k === 'h') { hellbarrage(); stepT = 1.5 * fast; }
     else if (k === 'g2')  { gigablast(2); stepT = 1.5 * fast; }
     else if (k === 'g4')  { gigablast(phase === 2 ? 3 : 4); stepT = 2.2 * fast; }
-    else if (k === 'c')   { if (phase === 2 && Math.random() < 0.5) { stepT = 0.3; }
-                            else { charge(); stepT = 1.0 * fast; } }
+    else if (k === 'c')   { charge(); stepT = 1.0 * fast; }
   }
 
   function brothersTick(dt) {
@@ -343,7 +354,7 @@
     if (!bros.length) {
       invuln = false; phase = 2; mode = 'fight';
       say("* she laughs. that is the first noise she has made.");
-      setTimeout(function () { if (running) say("* now she is trying."); }, 2200);
+      later(function () { if (running) say("* now she is trying."); }, 2200);
     }
   }
 
@@ -394,7 +405,36 @@
      while she is vulnerable is the attack — which is why the charge
      is dangerous and also the opening. */
   function tryHit() {
-    if (invuln || mode !== 'fight' || sep) return;
+    /* The interludes are not shielded — they are the strike target
+       while she is invincible. The sepulcher's hearts shatter one at
+       a time; a brother takes eight hits. Before the fix, nothing in
+       the fight could damage either, so she stayed invincible forever
+       and the fight could not be won. */
+    if (sep) {
+      for (var i = 0; i < hearts.length; i++) {
+        if (Math.hypot(px - hearts[i].x, py - hearts[i].y) < 16) {
+          var hx = hearts[i].x, hy = hearts[i].y;
+          hearts.splice(i, 1);
+          if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+          if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(hx, hy, 8, COL.brimHi); }
+          return;
+        }
+      }
+      return;
+    }
+    if (mode === 'brothers') {
+      for (var j = 0; j < bros.length; j++) {
+        if (Math.hypot(px - bros[j].x, py - bros[j].y) < 22) {
+          bros[j].hp--;
+          if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+          if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(bros[j].x, bros[j].y, 8, COL.brimHi); }
+          if (bros[j].hp <= 0) bros.splice(j, 1);
+          return;
+        }
+      }
+      return;
+    }
+    if (invuln || mode !== 'fight') return;
     if (Math.hypot(px - bx, py - by) > 34) return;
     bossHP -= 1;
     if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
@@ -413,6 +453,7 @@
 
   function win() {
     mode = 'won'; running = false; bullets = [];
+    clearSched();
     if (NEU.juice) { NEU.juice.hit('huge', { colour: '#FF6B4A' });
                      NEU.juice.burst(bx, by, 60, COL.brim, 260); }
     if (NEU.save) { NEU.save.give('ashes'); NEU.save.flag('scal_dead', 1); }
@@ -429,6 +470,7 @@
 
   function startDeath() {
     running = false; dying = performance.now();
+    clearSched();
     if (dm.resetDeath) dm.resetDeath();
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     requestAnimationFrame(deathStep);
@@ -468,7 +510,14 @@
     /* her */
     if (mode !== 'won') {
       var bodyKey = mode === 'intro' ? 'scalHood' : 'scal';
-      if (!sprite(bodyKey, bx, by, 1, 0, phase === 2)) {
+      /* Column 0 is the front-facing pose set — she looks at you, and
+         frames 12 and 16 are the casting flare. Column 1 is the same
+         woman turned away, which is the wrong read for a boss you are
+         fighting. Scale 2 because that is the pixel size the rest of
+         this layer draws at (the soul is stamped at 2 in danmaku.js);
+         at scale 1 she was 60px of fine detail in a 700px arena and
+         read as a smudge rather than as a sprite. */
+      if (!sprite(bodyKey, bx, by, 2, 0, phase === 2, 0)) {
         ctx.fillStyle = '#FF00A0';
         ctx.fillRect((bx - 20) | 0, (by - 26) | 0, 40, 52);
       }
@@ -520,7 +569,14 @@
     /* her bar. It DOES move — that is the difference between this
        fight and the one on the television, and the contrast only
        lands because that one refused to. */
-    var bw = 260, bx2 = ((w - bw) / 2) | 0, by2 = AY - 44;
+    /* Her bar clears her sprite rather than cutting across it. She
+       hovers centred on AY-24 and is 120 tall at scale 2, so she owns
+       AY-84 upward; the bar used to sit at AY-44, straight through her
+       chest. Moving HER instead would change the fight: the player is
+       clamped to AY+7 and a strike needs to be within 34, so her
+       resting height is load-bearing. Floored at 40 so a short viewport
+       keeps the bar on screen. */
+    var bw = 260, bx2 = ((w - bw) / 2) | 0, by2 = Math.max(40, AY - 128);
     ctx.fillStyle = '#22222E'; ctx.fillRect(bx2, by2, bw, 8);
     ctx.fillStyle = invuln ? '#4A4560' : COL.dark;
     ctx.fillRect(bx2, by2, (bw * Math.max(0, bossHP / bossMax)) | 0, 8);
@@ -553,40 +609,15 @@
      so a missing file degrades to the old look rather than to a
      blob. Projectiles rotate to face travel — the sheets are drawn
      upright and Terraria spins them in code. */
-  var imgs = {};
-  function imgOf(src) {
-    if (imgs[src]) return imgs[src];
-    var i = new Image(); i.onerror = function () { i.__failed = true; };
-    i.src = src; imgs[src] = i; return i;
-  }
-  function sheetOK(sh) {
-    if (!sh) return null;
-    var im = imgOf(sh.src);
-    return (im.complete && im.naturalWidth && !im.__failed) ? im : null;
-  }
-  function sprite(key, x, y, scale, rot, glow) {
-    var sh = NEU.sheets && NEU.sheets[key];
-    var im = sheetOK(sh);
-    if (!im) return false;
-    var fr = ((performance.now() / (1000 / (sh.fps || 10))) | 0) % sh.frames;
-    var dw = sh.fw * scale, dh = sh.fh * scale;
-    ctx.save();
-    ctx.translate(x, y);
-    if (rot) ctx.rotate(rot);
-    ctx.drawImage(im, 0, fr * sh.fh, sh.fw, sh.fh,
-                  (-dw / 2) | 0, (-dh / 2) | 0, dw | 0, dh | 0);
-    if (glow) {
-      /* Phase 2 is the same art with an additive pass — which is what
-         the delivered sheet made true, and what the game does too. */
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = 0.5;
-      ctx.drawImage(im, 0, fr * sh.fh, sh.fw, sh.fh,
-                    (-dw / 2) | 0, (-dh / 2) | 0, dw | 0, dh | 0);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    ctx.restore();
-    return true;
+  /* One blitter for the whole site, in data/sheets.js — see the note
+     there. The local copy this replaces pinned source x at 0, which is
+     why her two-column sheet drew as two overlapping women. */
+  function sprite(key, x, y, scale, rot, glow, col) {
+    if (!NEU.sheetDraw) return false;
+    return NEU.sheetDraw(ctx, key, x, y, {
+      scale: scale, rot: rot, glow: glow, col: col,
+      now: performance.now()
+    });
   }
 
   /* ── input ──────────────────────────────────────────────────────*/
@@ -647,5 +678,7 @@
                get hp() { return bossHP; },
                get phase() { return phase; },
                get mode() { return mode; },
+               get hearts() { return hearts.length; },
+               get bros() { return bros.length; },
                cycle: CYCLE };
 })();

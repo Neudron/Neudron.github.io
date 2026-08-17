@@ -1213,16 +1213,27 @@ body.is-blackout::before {
 .craft__h { margin: 0; font: 400 32px/1 var(--font-display); color: var(--bone); }
 .craft__say { margin: 0; font: 400 16px/1.4 var(--font-talk); color: #FF8ACF; min-height: 1.4em; }
 .craft__row { display: flex; align-items: center; gap: 28px; }
-.craft__grid { display: grid; grid-template-columns: repeat(3, 68px); gap: 6px; }
+/* The slot is Terraria's own inventory back, which has been sitting in
+   the manifest unreferenced while these cells were a flat fill and a
+   3px border. It is 52x52, so the cell is 104 — exactly 2x. A 68px cell
+   would resample 52 by 1.307 and hand some source pixels two screen
+   pixels and others one, which is precisely the mush `image-rendering:
+   pixelated` exists to avoid. Everything here is a whole multiple of
+   the source. */
+.craft__grid { display: grid; grid-template-columns: repeat(3, 104px); gap: 8px; }
 .craft__cell {
-  width: 68px; height: 68px; padding: 0;
-  border: 3px solid #3A2C52; background: #201530;
+  width: 104px; height: 104px; padding: 0; border: 0;
+  background: url('../img/act4/terraria/slot.png') center / 104px 104px no-repeat;
+  image-rendering: pixelated;
   cursor: pointer; display: grid; place-items: center;
-  transition: border-color .14s, background-color .14s;
+  transition: filter .14s;
 }
-.craft__cell:hover { border-color: #B892FF; }
-.craft__cell.is-full { background: #2C1D42; }
-.craft__cell img { width: 34px; image-rendering: pixelated; }
+/* No border to recolour any more, so hover and full state are done with
+   filters on the art itself — which keeps the slot looking like one
+   object instead of art inside a box. */
+.craft__cell:hover { filter: brightness(1.35); }
+.craft__cell.is-full { filter: brightness(1.15) saturate(1.2); }
+.craft__cell img { width: 44px; image-rendering: pixelated; }
 .craft__out {
   display: grid; gap: 4px; place-items: center;
   min-width: 190px; padding: 20px 18px;
@@ -1252,8 +1263,8 @@ body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) satura
 /* ── act iv rooms ─────────────────────────────────────────────────
    Same layer as the other full-screen scenes. The chip tray (74) and
    the dialogue box (96) still sit above it, which is the point. */
-.eng { position: fixed; inset: 0; z-index: 70; background: #08080B; }
-.eng canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.eng { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 70; background: #08080B; display: grid; place-items: center; transform-origin: center center; }
+.eng canvas { display: block; max-width: 100%; max-height: 100%; image-rendering: pixelated; }
 
 /* ── what's on the television ─────────────────────────────────────
    A handheld's home screen. It is the only screen on this site that
@@ -1695,9 +1706,8 @@ body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) satura
 /* the gear — inline svg, no request, and a real gear rather than a
    letter. Below the lights toggle (28px) and the objectives tab. */
 .sett__btn {
-  position: fixed; right: var(--gutter); top: 96px; z-index: 40;
+  position: fixed; left: var(--gutter); top: 96px; z-index: 40;
   width: 48px; height: 48px; padding: 10px;
-  background: var(--ink); border: 2px solid var(--edge); border-radius: 12px;
   color: var(--dim); cursor: pointer;
 }
 .sett__btn:hover, .sett__btn:focus-visible {
@@ -1709,6 +1719,7 @@ body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) satura
    drawn on a 16px grid, so resampling a single size would blur the
    typeface. Scaling the whole page keeps the grid intact. */
 html.text-lg { zoom: 1.25; }
+html.text-lg .eng { zoom: 0.8; }
 
 /* ═══════════════════════════════════════════════════════════════════
    thumb controls

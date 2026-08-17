@@ -118,8 +118,14 @@ for (const [what, re] of [
   ['changing scene releases',  /releaseAll\(\);\s*\/\* never carry a key across scenes/],
   /* a timer that outlives its scene is the same bug as a stuck key */
   ['releaseAll also kills a running repeat',
-   /function releaseAll\(\)\s*\{\s*killRepeat\(\)/],
-  ['the stick hands its stopper to releaseAll', /killRepeat = stopRepeat/]
+    /function releaseAll\(\)\s*\{\s*killRepeat\(\)/],
+  ['the stick hands its stopper to releaseAll', /killRepeat = stopRepeat/],
+  /* LOW 15: releaseAll must also clear the stick pointer latch */
+  ['releaseAll also clears the stick pointer latch', /clearStick\(\)/],
+  ['clearStick is wired to end(null) (skips pointer-id guard)',
+   /clearStick\s*=\s*function\s*\(\s*\)\s*\{\s*end\(null\)/],
+  /* LOW 16: a physical keyup must invalidate the pad's held latch */
+  ['physical keyup clears the pad latch', /held\[e\.key\]\s*=\s*false/]
 ]) ok(what, re.test(T));
 
 console.log('\n6. behaviour, in a real DOM');
@@ -204,6 +210,25 @@ if (NT) {
   ok('>>> switching scenes leaves no key held <<<',
      Object.keys(NT.held).length === 0);
   ok('and adopts the new profile', NT.scene === 'scal');
+
+  /* LOW 15: releaseAll clears the stick's pointer latch */
+  const stick = w.document.querySelector('.tpad__stick');
+  if (stick) {
+    stick.classList.add('is-down');
+    NT._release();
+    ok('>>> releaseAll removes the stuck stick class <<<', !stick.classList.contains('is-down'));
+  } else {
+    ok('stick element exists for the latch test', false);
+  }
+
+  /* LOW 16: a physical keyup clears the pad's held latch */
+  NT._send('ArrowLeft', true);
+  ok('pad holds ArrowLeft', !!NT.held.ArrowLeft);
+  w.dispatchEvent(new w.KeyboardEvent('keyup', { key: 'ArrowLeft', bubbles: true }));
+  ok('>>> physical keyup clears the pad latch <<<', !NT.held.ArrowLeft);
+  /* re-sending should work now (the latch was cleared) */
+  NT._send('ArrowLeft', true);
+  ok('pad can re-arm after a physical keyup', !!NT.held.ArrowLeft);
 }
 
 console.log('\n7. it is wired in and does not break the rules');
