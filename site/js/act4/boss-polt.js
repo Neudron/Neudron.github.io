@@ -462,7 +462,13 @@
   }
   addEventListener('keydown', function (e) {
     if (wrap.hidden) return;
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (NEU.engine && NEU.engine.confirmExit) {
+        NEU.engine.confirmExit('Polterghast', close);
+      } else { close(); }
+      return;
+    }
     if (!running && !dying && e.key === 'Enter') { e.preventDefault(); open(); return; }
     if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); tryHit(); return; }
     var n = keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
