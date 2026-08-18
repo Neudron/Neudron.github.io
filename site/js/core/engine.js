@@ -366,8 +366,20 @@
     return best;
   }
 
+  /* ── interaction state ──────────────────────────────────────────────
+   Track last interacted entity to prevent dialog reset on rapid E presses. */
+  var lastInteractedEntity = null, lastInteractedTime = 0;
+  const INTERACT_COOLDOWN = 500; // ms
+
   function fire(e) {
     if (!e) return;
+    var now = Date.now();
+    /* Prevent dialog reset on repeated E press on same entity */
+    if (e === lastInteractedEntity && now - lastInteractedTime < INTERACT_COOLDOWN) {
+      return;
+    }
+    lastInteractedEntity = e;
+    lastInteractedTime = now;
     if (e.t === 'exit') {
       /* A locked door says what it is waiting for. "Nothing happens"
          is the least useful sentence a game can produce. */
@@ -801,6 +813,28 @@
     return true;
   }
 
+  /* ESC confirmation dialog utility */
+  function confirmExit(minigameName, onConfirm) {
+    if (document.getElementById('confirmExit')) return;
+    var overlay = document.createElement('div');
+    overlay.id = 'confirmExit';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:95;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="background:#1A1016;padding:32px 48px;border:2px solid #E23B55;border-radius:4px;text-align:center;">' +
+      '<p style="font:24px \"Determination Mono\",monospace;color:#EDE7DE;margin:0 0 16px;">Leave ' + minigameName + '?</p>' +
+      '<p style="font:16px \"Undertale Sans\",cursive;color:#8A8598;margin:0 0 24px;">Enter = Yes &nbsp;·&nbsp; Escape = No</p>' +
+      '<div style="font:14px monospace;color:#555;">Progress will be lost.</div></div>';
+    document.body.appendChild(overlay);
+    function cleanup() {
+      document.body.removeChild(overlay);
+      document.removeEventListener('keydown', onKey);
+    }
+    function onKey(e) {
+      if (e.key === 'Enter') { cleanup(); onConfirm(); }
+      else if (e.key === 'Escape') { cleanup(); }
+    }
+    document.addEventListener('keydown', onKey);
+  }
+
   function leave() {
     running = false;
     wrap.hidden = true;
@@ -826,6 +860,7 @@
 
   NEU.engine = {
     register: register, tileset: tileset, enter: enter, leave: leave, go: go,
+    confirmExit: confirmExit,
     where: function () { return room ? { room: room.id, spawn: room.__spawn } : null; },
     get running() { return running; },
     get room() { return room ? room.id : null; },

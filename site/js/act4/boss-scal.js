@@ -43,7 +43,7 @@
   var COL = { bone: '#EDE7DE', soul: '#E23B55', dim: '#8A8598', void_: '#08080B',
               brim: '#FF4A2A', brimHi: '#FFC46A', dark: '#8C2F4A' };
 
-  var PLAYER_R = (dm.soul && dm.soul.R) || 3.2, SPEED = dm.SPEED || 250,
+  var PLAYER_R = (dm.soul && dm.soul.R) || 6, SPEED = dm.SPEED || 250,
       FOCUS = dm.FOCUS || 108, IFRAMES = dm.IFRAMES || 1.1;
   var MAXHP = 5;
 
@@ -63,6 +63,7 @@
   var line = '', lineT = 0;
   var bx = 0, by = 0;        // her position
   var dying = 0;
+  var showHitboxes = false;  // F3 toggle
   /* Attack timers outlive the attack that scheduled them — a gigablast
      that is mid-spread when she phases out would keep dropping bullets
      into the wall interlude. Track them so a phase transition can kill
@@ -162,11 +163,10 @@
   }
 
   function fireblast() {
-    /* Homes, then bursts into a ring. Slow enough to run from, which
-       is the point — it forces you to move while everything else is
-       trying to make you stand still. */
+    /* Homes to player continuously, bursts into 12 darts within 150px (real: 224 Terraria px).
+       Source: inertia 100, homeSpeed 9 (13 revenge), rotation = vel + PI/2. */
     sfxPlay('fireblast');
-    var b = { x: bx, y: by + 20, vx: 0, vy: 0, r: 8, c: COL.brimHi, k: 1, age: 0, fuse: 1.6 };
+    var b = { x: bx, y: by + 20, vx: 0, vy: 0, r: 8, c: COL.brimHi, k: 1, age: 0, burst: false };
     bullets.push(b);
   }
 
@@ -176,7 +176,7 @@
       later(function () {
         if (!running) return;
         bullets.push({ x: bx, y: by + 20, vx: 0, vy: 0, r: 12, c: COL.dark,
-                       k: 2, age: 0, fuse: 2.1 });
+                       k: 2, age: 0, burst: false });
       }, i * 520);
     }
   }
@@ -200,8 +200,13 @@
     var a = Math.atan2(py - by, px - bx);
     bxv = Math.cos(a) * 420; byv = Math.sin(a) * 420;
     chargeT = 0.55;
+    chargeTelegraph = 0.5; // telegraph time before dash
+    scalAnimState = 'charge_telegraph';
+    scalAnimFrame = 0;
+    scalAnimTimer = 0;
   }
-  var bxv = 0, byv = 0, chargeT = 0;
+  var bxv = 0, byv = 0, chargeT = 0, chargeTelegraph = 0, chargeBurst = 0, chargeBurstMax = 0, chargeGap = 0;
+  var scalAnimState = 'idle', scalAnimFrame = 0, scalAnimTimer = 0, scalAnimPrevState = 'idle';
 
   /* ── the interludes ─────────────────────────────────────────────*/
   function startWall(n) {
@@ -249,11 +254,10 @@
 
   function spawnSepulcher() {
     mode = 'fight'; invuln = true;
-    sep = { x: AX + AW / 2, y: AY + AH - 40, t: 0 };
+    sep = { x: AX + AW / 2, y: AY + AH - 40, vx: 0, vy: 0, t: 0, attackCd: 0 };
     hearts = [];
     for (var i = 0; i < 6; i++) {
-      hearts.push({ x: AX + 40 + (i % 3) * 40 + (i > 2 ? AW - 200 : 0),
-                    y: AY + 34 + ((i / 3) | 0) * 34, hp: 1 });
+      hearts.push({ hp: 1, offset: i });
     }
     say("* she is behind it. kill the hearts.");
   }
@@ -263,8 +267,8 @@
     mode = 'brothers'; invuln = true; bullets = [];
     clearSched();
     bros = [
-      { side: -1, x: AX + 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'slash' },
-      { side:  1, x: AX + AW - 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'fist' }
+      { side: -1, x: AX + 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'slash', attackCount: 0, enraged: false },
+      { side:  1, x: AX + AW - 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'fist', attackCount: 0, enraged: false }
     ];
     say("* she calls her brothers. she does not fight while they do.");
   }
@@ -302,19 +306,93 @@
 
   function fightTick(dt) {
     /* she hovers above you unless charging */
-    if (chargeT > 0) {
+    if (chargeTelegraph > 0) {
+      chargeTelegraph -= dt;
+      scalAnimState = 'charge_telegraph';
+      /* Telegraph: glow red, slight shake */
+      if (NEU.juice && chargeTelegraph < 0.1) NEU.juice.hit('small');
+    } else if (chargeT > 0) {
       chargeT -= dt; bx += bxv * dt; by += byv * dt;
       bx = Math.min(Math.max(bx, AX), AX + AW);
       by = Math.min(Math.max(by, AY - 30), AY + AH);
+      scalAnimState = 'charging';
+      /* Multi-charge burst: after dash ends, queue next if any left */
+      if (chargeT <= 0 && chargeBurst < chargeBurstMax - 1) {
+        chargeBurst++;
+        chargeGap = 0.45; // gap between dashes
+        var a = Math.atan2(py - by, px - bx);
+        bxv = Math.cos(a) * 420; byv = Math.sin(a) * 420;
+        chargeT = 0.55;
+        chargeTelegraph = 0.3; // shorter telegraph for subsequent dashes
+      }
+    } else if (chargeGap > 0) {
+      chargeGap -= dt;
+      scalAnimState = 'charge_recovery';
     } else {
       bx += ((px) - bx) * Math.min(1, dt * 1.8);
       by += ((AY - 24) - by) * Math.min(1, dt * 2.2);
+      /* Idle or casting based on attack */
+      if (stepT < 0.3) {
+        scalAnimState = 'casting';
+      } else {
+        scalAnimState = phase === 2 ? 'idle_fast' : 'idle';
+      }
     }
 
     if (sep) {
       sep.t += dt;
-      if (!hearts.length) { sep = null; invuln = false; say("* she steps out from behind it."); }
+      if (sep.attackCd > 0) sep.attackCd -= dt;
+
+      /* Sepulcher chases the player (real AI: sepMaxSpeed=20, acceleration 0.175+).
+         Game scale: ~180 px/s max, gentle acceleration. */
+      var maxSpeed = 180;
+      var accel = 35;
+      var dx = px - sep.x, dy = py - sep.y;
+      var dist = Math.hypot(dx, dy) || 1;
+      var tx = (dx / dist) * maxSpeed, ty = (dy / dist) * maxSpeed;
+      sep.vx += (tx - sep.vx) * Math.min(1, dt * accel / maxSpeed);
+      sep.vy += (ty - sep.vy) * Math.min(1, dt * accel / maxSpeed);
+      sep.x += sep.vx * dt;
+      sep.y += sep.vy * dt;
+      sep.x = Math.min(Math.max(sep.x, AX + 40), AX + AW - 40);
+      sep.y = Math.min(Math.max(sep.y, AY + 40), AY + AH - 40);
+
+      /* Proximity ring burst (real: within 110 Terraria px ≈ 150 game px, 30 darts, cd 150 frames = 2.5s).
+         Burst speed ~150 px/s. */
+      if (sep.attackCd <= 0 && dist < 150) {
+        sep.attackCd = 2.5;
+        sfxPlay('giga-hit');
+        for (var q = 0; q < 30; q++) {
+          var ang = q * Math.PI * 2 / 30;
+          shot(sep.x, sep.y, Math.cos(ang) * 150, Math.sin(ang) * 150, 3, COL.brim, 4);
+        }
+        if (NEU.juice) NEU.juice.burst(sep.x, sep.y, 12, COL.brimHi, 1.2);
+      }
+
+      /* Hearts follow the worm body (energy balls embedded every 2nd segment).
+         Position them in a ring around the head for simplicity. */
+      for (var i = 0; i < hearts.length; i++) {
+        var h = hearts[i];
+        var hang = sep.t * 1.2 + h.offset * 1.1;
+        var hrad = 28;
+        h.x = sep.x + Math.cos(hang) * hrad;
+        h.y = sep.y + Math.sin(hang) * hrad;
+      }
+
+      if (!hearts.length) {
+        sep = null; invuln = false;
+        say("* she steps out from behind it.");
+      }
       return;
+    }
+
+    /* Charge burst handling: don't advance cycle until burst complete */
+    if (chargeBurstMax > 0) {
+      if (chargeBurst >= chargeBurstMax && chargeT <= 0 && chargeGap <= 0) {
+        chargeBurstMax = 0; // burst complete, allow next attack
+      } else {
+        return; // wait for burst to finish
+      }
     }
 
     stepT -= dt;
@@ -332,25 +410,87 @@
     } else if (k === 'h') { hellbarrage(); stepT = 1.5 * fast; }
     else if (k === 'g2')  { gigablast(2); stepT = 1.5 * fast; }
     else if (k === 'g4')  { gigablast(phase === 2 ? 3 : 4); stepT = 2.2 * fast; }
-    else if (k === 'c')   { charge(); stepT = 1.0 * fast; }
+    else if (k === 'c') {
+      /* Multi-charge burst: real SC does 2 or 4 consecutive dashes.
+         Cycle positions (0-indexed): 3,7,12,15,17,19.
+         Phase 1: 4,2,2,4,2,2. Phase 2: half (2,1,1,2,1,1). */
+      var chargeIdx = 0;
+      if (step_ - 1 === 3) chargeIdx = 0;       // 1st charge: 4 (p1) / 2 (p2)
+      else if (step_ - 1 === 7) chargeIdx = 1;  // 2nd: 2 / 1
+      else if (step_ - 1 === 12) chargeIdx = 2; // 3rd: 2 / 1
+      else if (step_ - 1 === 15) chargeIdx = 3; // 4th: 4 / 2
+      else if (step_ - 1 === 17) chargeIdx = 4; // 5th: 2 / 1
+      else if (step_ - 1 === 19) chargeIdx = 5; // 6th: 2 / 1
+      var p1Bursts = [4,2,2,4,2,2];
+      var p2Bursts = [2,1,1,2,1,1];
+      chargeBurstMax = phase === 2 ? p2Bursts[chargeIdx] : p1Bursts[chargeIdx];
+      chargeBurst = 0;
+      chargeGap = 0;
+      charge();
+      stepT = 0.55 + 0.5; // telegraph + first dash
+    }
   }
 
   function brothersTick(dt) {
+    /* Both alive: 25% DR (handled in tryHit). Fire every 0.83s (50 frames).
+       Every 7th volley = big attack. When one dies, survivor enrages. */
     for (var i = 0; i < bros.length; i++) {
       var b = bros[i];
+      if (b.hp <= 0) continue; // dead, will be cleaned up below
+
+      var interval = b.enraged ? 0.55 : 0.83; // enraged = faster
       b.t -= dt;
       b.y += Math.sin(t * 1.6 + i) * 22 * dt;
       if (b.t <= 0) {
-        b.t = 1.15;
+        b.t = interval;
+        b.attackCount++;
+        var isBigAttack = (b.attackCount % 7 === 0);
         var a = Math.atan2(py - b.y, px - b.x);
-        if (b.kind === 'fist') {
-          shot(b.x, b.y, Math.cos(a) * 240, Math.sin(a) * 240, 7, COL.brimHi);
+
+        if (isBigAttack) {
+          /* Big attack every 7th: fist = 2 fists, slash = predictive lunge (3 slashes ahead) */
+          if (b.kind === 'fist') {
+            /* Two fists from opposite sides */
+            for (var s = -1; s <= 1; s += 2) {
+              var aa = a + s * 0.25;
+              shot(b.x, b.y, Math.cos(aa) * 280, Math.sin(aa) * 280, 7, COL.brimHi);
+            }
+          } else {
+            /* Slash: predictive lunge - aim ahead of player */
+            var pvx = 0, pvy = 0; // could track player velocity
+            var predX = px + pvx * 0.5, predY = py + pvy * 0.5;
+            var aa = Math.atan2(predY - b.y, predX - b.x);
+            for (var j = -1; j <= 1; j++)
+              shot(b.x, b.y, Math.cos(aa + j * 0.12) * 340, Math.sin(aa + j * 0.12) * 340, 5, COL.brim);
+          }
         } else {
-          for (var j = -1; j <= 1; j++)
-            shot(b.x, b.y, Math.cos(a + j * 0.16) * 300, Math.sin(a + j * 0.16) * 300, 5, COL.brim);
+          /* Normal attack */
+          if (b.kind === 'fist') {
+            shot(b.x, b.y, Math.cos(a) * 240, Math.sin(a) * 240, 7, COL.brimHi);
+          } else {
+            var spread = b.enraged ? 0.2 : 0.16;
+            var count = b.enraged ? 5 : 3;
+            var start = -(count - 1) / 2;
+            for (var j = 0; j < count; j++)
+              shot(b.x, b.y, Math.cos(a + (start + j) * spread) * 300, Math.sin(a + (start + j) * spread) * 300, 5, COL.brim);
+          }
         }
       }
     }
+
+    /* Remove dead brothers */
+    for (var i = bros.length - 1; i >= 0; i--) {
+      if (bros[i].hp <= 0) {
+        var dead = bros.splice(i, 1)[0];
+        if (NEU.juice) NEU.juice.burst(dead.x, dead.y, 15, dead.kind === 'fist' ? COL.brimHi : COL.brim, 1.5);
+        /* Survivor enrages */
+        if (bros.length === 1) {
+          bros[0].enraged = true;
+          say(dead.kind === 'fist' ? "* the swordsman falls. the mage rages." : "* the mage falls. the swordsman rages.");
+        }
+      }
+    }
+
     if (!bros.length) {
       invuln = false; phase = 2; mode = 'fight';
       say("* she laughs. that is the first noise she has made.");
@@ -364,24 +504,41 @@
       var b = bullets[i];
       b.age += dt;
       if (b.k === 1 || b.k === 2) {
-        /* homing until the fuse, then a ring */
-        b.fuse -= dt;
-        if (b.fuse > 0.35) {
-          var a = Math.atan2(py - b.y, px - b.x);
-          var sp = b.k === 2 ? 90 : 140;
-          b.vx += (Math.cos(a) * sp - b.vx) * dt * 2.4;
-          b.vy += (Math.sin(a) * sp - b.vy) * dt * 2.4;
-        } else if (b.fuse <= 0) {
-          var n = b.k === 2 ? 22 : 10;
-          sfxPlay(b.k === 2 ? 'giga-hit' : 'fireblast-hit');
-          for (var q = 0; q < n; q++) {
-            var ang = q * Math.PI * 2 / n;
-            shot(b.x, b.y, Math.cos(ang) * 130, Math.sin(ang) * 130, 3, COL.brim);
+        /* Distance-triggered burst (real: fireblast 224px, gigablast 224px).
+           Game scale: burst at ~150px. Fireblast homes with inertia, gigablast preserves speed. */
+        if (!b.burst) {
+          var dx = px - b.x, dy = py - b.y;
+          var dist = Math.hypot(dx, dy) || 1;
+          if (b.k === 1) {
+            /* Fireblast: inertia 100, homeSpeed ~140 */
+            var sp = 140;
+            b.vx += (dx / dist * sp - b.vx) * dt * 2.4;
+            b.vy += (dy / dist * sp - b.vy) * dt * 2.4;
+          } else {
+            /* Gigablast: preserve speed, steer toward player (vel*24 + dir)/25 */
+            var sp = Math.hypot(b.vx, b.vy) || 130;
+            var tx = dx / dist * sp, ty = dy / dist * sp;
+            b.vx = (b.vx * 24 + tx) / 25;
+            b.vy = (b.vy * 24 + ty) / 25;
           }
-          continue;
+          /* Proximity burst */
+          if (dist < 150) {
+            b.burst = true;
+            var n = b.k === 2 ? 28 : 12;
+            sfxPlay(b.k === 2 ? 'giga-hit' : 'fireblast-hit');
+            for (var q = 0; q < n; q++) {
+              var ang = q * Math.PI * 2 / n;
+              shot(b.x, b.y, Math.cos(ang) * 130, Math.sin(ang) * 130, 3, COL.brim, 4);
+            }
+            if (NEU.juice) NEU.juice.burst(b.x, b.y, 10, b.k === 2 ? COL.brimHi : COL.brim, 1.2);
+            continue; // parent projectile dies after burst
+          }
+        } else {
+          continue; // already burst, don't keep
         }
       }
       if (b.k === 3) { b.vx *= 1 + dt * 1.6; }   // hellblasts accelerate
+      if (b.k === 4) { b.vx *= 1 + dt * 0.5; b.vy *= 1 + dt * 0.5; } // ring darts accelerate (BrimstoneBarrage ~1.01x)
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.x < AX - 60 || b.x > AX + AW + 60 || b.y < AY - 60 || b.y > AY + AH + 60) continue;
       keep.push(b);
@@ -412,7 +569,7 @@
        and the fight could not be won. */
     if (sep) {
       for (var i = 0; i < hearts.length; i++) {
-        if (Math.hypot(px - hearts[i].x, py - hearts[i].y) < 16) {
+        if (Math.hypot(px - hearts[i].x, py - hearts[i].y) < 18) {
           var hx = hearts[i].x, hy = hearts[i].y;
           hearts.splice(i, 1);
           if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
@@ -424,18 +581,26 @@
     }
     if (mode === 'brothers') {
       for (var j = 0; j < bros.length; j++) {
-        if (Math.hypot(px - bros[j].x, py - bros[j].y) < 22) {
-          bros[j].hp--;
+        if (Math.hypot(px - bros[j].x, py - bros[j].y) < 28) {
+          var b = bros[j];
+          /* 25% DR while both brothers alive */
+          var dmg = (bros.length === 2) ? 0.75 : 1;
+          b.dmgAccum = (b.dmgAccum || 0) + dmg;
+          if (b.dmgAccum >= 1) {
+            var hits = Math.floor(b.dmgAccum);
+            b.hp -= hits;
+            b.dmgAccum -= hits;
+          }
           if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
-          if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(bros[j].x, bros[j].y, 8, COL.brimHi); }
-          if (bros[j].hp <= 0) bros.splice(j, 1);
+          if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(b.x, b.y, 8, COL.brimHi); }
+          /* Death handled in brothersTick */
           return;
         }
       }
       return;
     }
     if (invuln || mode !== 'fight') return;
-    if (Math.hypot(px - bx, py - by) > 34) return;
+    if (Math.hypot(px - bx, py - by) > 40) return;
     bossHP -= 1;
     if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
     /* Landing one is SMALL — it happens often, and shaking hard on
@@ -507,17 +672,45 @@
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
     frame();
 
+    /* SC animation frame mapping (21 frames × 2 cols):
+     idle: frames 0-3 (fps 4)
+     idle_fast: frames 0-3 (fps 6, phase 2)
+     charge_telegraph: frames 4-7 (fps 8)
+     charging: frames 8-11 (fps 16)
+     charge_recovery: frames 11-8 reverse (fps 8)
+     casting: frames 12-16 (fps 10) - frames 12,16 are flare
+   */
+    function getScalAnim() {
+      if (scalAnimState !== scalAnimPrevState) {
+        scalAnimTimer = 0;
+        scalAnimPrevState = scalAnimState;
+      }
+      scalAnimTimer += 1/60;
+      var f = 0, col = 0, fps = 12;
+      switch (scalAnimState) {
+        case 'idle':
+          fps = 4; f = (scalAnimTimer * fps) % 4; col = 0; break;
+        case 'idle_fast':
+          fps = 6; f = (scalAnimTimer * fps) % 4; col = 0; break;
+        case 'charge_telegraph':
+          fps = 8; f = 4 + ((scalAnimTimer * fps) % 4); col = 1; break;
+        case 'charging':
+          fps = 16; f = 8 + ((scalAnimTimer * fps) % 4); col = 1; break;
+        case 'charge_recovery':
+          fps = 8; f = 11 - ((scalAnimTimer * fps) % 4); col = 1; break;
+        case 'casting':
+          fps = 10; f = 12 + ((scalAnimTimer * fps) % 5); col = 0; break;
+        default:
+          f = 0; col = 0;
+      }
+      return { frame: f | 0, col: col };
+    }
+
     /* her */
     if (mode !== 'won') {
       var bodyKey = mode === 'intro' ? 'scalHood' : 'scal';
-      /* Column 0 is the front-facing pose set — she looks at you, and
-         frames 12 and 16 are the casting flare. Column 1 is the same
-         woman turned away, which is the wrong read for a boss you are
-         fighting. Scale 2 because that is the pixel size the rest of
-         this layer draws at (the soul is stamped at 2 in danmaku.js);
-         at scale 1 she was 60px of fine detail in a 700px arena and
-         read as a smudge rather than as a sprite. */
-      if (!sprite(bodyKey, bx, by, 2, 0, phase === 2, 0)) {
+      var anim = (mode === 'intro') ? { frame: 0, col: 0 } : getScalAnim();
+      if (!sprite(bodyKey, bx, by, 2, 0, phase === 2, anim.col, anim.frame)) {
         ctx.fillStyle = '#FF00A0';
         ctx.fillRect((bx - 20) | 0, (by - 26) | 0, 40, 52);
       }
@@ -536,7 +729,12 @@
               : b.k === 3 ? 'hellblast' : 'dart';
       var sc = b.k === 1 ? 0.65 : b.k === 2 ? 0.75
             : b.k === 3 ? 0.5 : 0.55;
-      if (!sprite(key, b.x, b.y, sc, Math.atan2(b.vy, b.vx))) {
+      /* Source: fireblast/gigablast/dart are vertical sprites → rotation = atan2(vy,vx) + PI/2.
+         hellblast is horizontal → rotation = atan2(vy,vx). */
+      var brot = (b.k === 1 || b.k === 2 || b.k === 4)
+        ? Math.atan2(b.vy, b.vx) + Math.PI / 2
+        : Math.atan2(b.vy, b.vx);
+      if (!sprite(key, b.x, b.y, sc, brot)) {
         ctx.fillStyle = b.c;
         ctx.fillRect((b.x - b.r) | 0, (b.y - b.r) | 0, sz, sz);
         if (b.k === 2) { ctx.fillStyle = COL.brimHi; ctx.fillRect((b.x - 3) | 0, (b.y - 3) | 0, 6, 6); }
@@ -549,9 +747,12 @@
         ctx.fillRect((hx - 7) | 0, (hy - 7) | 0, 14, 14);
       }
     }
-    if (sep && !sprite('sepulcher', sep.x, sep.y, 1.1, 0)) {
-      ctx.fillStyle = '#3A2140';
-      ctx.fillRect((sep.x - 18) | 0, (sep.y - 18) | 0, 36, 36);
+    if (sep) {
+      var srot = Math.atan2(sep.vy, sep.vx) + Math.PI / 2;
+      if (!sprite('sepulcher', sep.x, sep.y, 1.1, srot)) {
+        ctx.fillStyle = '#3A2140';
+        ctx.fillRect((sep.x - 18) | 0, (sep.y - 18) | 0, 36, 36);
+      }
     }
     for (var r = 0; r < bros.length; r++) {
       var br = bros[r], rot = Math.atan2(py - br.y, px - br.x);
@@ -600,6 +801,36 @@
       ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
       ctx.fillText(line, AX, AY + AH + 40);
     }
+
+    /* F3 hitbox debug */
+    if (showHitboxes) {
+      ctx.strokeStyle = '#00FF00'; ctx.lineWidth = 1;
+      /* player */
+      ctx.beginPath(); ctx.arc(px, py, PLAYER_R, 0, Math.PI * 2); ctx.stroke();
+      /* SC */
+      if (mode === 'fight' && !invuln) {
+        ctx.beginPath(); ctx.arc(bx, by, 40, 0, Math.PI * 2); ctx.stroke();
+      }
+      /* bullets */
+      for (var i = 0; i < bullets.length; i++) {
+        var b = bullets[i];
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.stroke();
+      }
+      /* hearts */
+      for (var q = 0; q < hearts.length; q++) {
+        var h = hearts[q];
+        ctx.beginPath(); ctx.arc(h.x, h.y, 18, 0, Math.PI * 2); ctx.stroke();
+      }
+      /* sepulcher */
+      if (sep) {
+        ctx.beginPath(); ctx.arc(sep.x, sep.y, 30, 0, Math.PI * 2); ctx.stroke();
+      }
+      /* brothers */
+      for (var r = 0; r < bros.length; r++) {
+        var br = bros[r];
+        ctx.beginPath(); ctx.arc(br.x, br.y, 28, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
   }
 
   /* ── the real art ────────────────────────────────────────────────
@@ -612,10 +843,10 @@
   /* One blitter for the whole site, in data/sheets.js — see the note
      there. The local copy this replaces pinned source x at 0, which is
      why her two-column sheet drew as two overlapping women. */
-  function sprite(key, x, y, scale, rot, glow, col) {
+  function sprite(key, x, y, scale, rot, glow, col, frame) {
     if (!NEU.sheetDraw) return false;
     return NEU.sheetDraw(ctx, key, x, y, {
-      scale: scale, rot: rot, glow: glow, col: col,
+      scale: scale, rot: rot, glow: glow, col: col, frame: frame,
       now: performance.now()
     });
   }
@@ -631,8 +862,16 @@
     return null;
   }
   addEventListener('keydown', function (e) {
-    if (wrap.hidden || !NEU.scal.active) return;
-    if (e.key === 'Escape') { close(); return; }
+    if (wrap.hidden || !NEU.scal.active || NEU.activeMinigame !== 'scal') return;
+    if (e.key === 'F3') { showHitboxes = !showHitboxes; return; }
+    if (e.key === 'Escape') {
+      /* Only allow ESC confirm in intro/win/pause, not mid-fight */
+      if (mode === 'fight' || mode === 'wall' || mode === 'brothers') return;
+      if (NEU.engine && NEU.engine.confirmExit) {
+        NEU.engine.confirmExit('Supreme Calamitas', close);
+      } else { close(); }
+      return;
+    }
     if (!running && !dying && e.key === 'Enter') { open(); return; }
     if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); tryHit(); return; }
     var n = keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
@@ -646,6 +885,7 @@
   var active = false;
   function open() {
     active = true;
+    NEU.activeMinigame = 'scal';
     wrap.hidden = false;
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
@@ -664,6 +904,7 @@
   }
   function close() {
     active = false; running = false; dying = 0;
+    NEU.activeMinigame = null;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);

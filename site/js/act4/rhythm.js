@@ -271,7 +271,13 @@
   }
   addEventListener('keydown', function (e) {
     if (wrap.hidden) return;
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (NEU.engine && NEU.engine.confirmExit) {
+        NEU.engine.confirmExit('Rhythm Game', close);
+      } else { close(); }
+      return;
+    }
     if (!running && e.key === 'Enter') { e.preventDefault(); retry(); return; }
     var l = laneOf(e);
     if (l >= 0) { e.preventDefault(); if (!keys[LANES[l]]) press(l); keys[LANES[l]] = true; }

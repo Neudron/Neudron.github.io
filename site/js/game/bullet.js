@@ -41,9 +41,10 @@
 
   var dm = NEU.danmaku || {};
   var SURVIVE   = 20;          // seconds
-  var PLAYER_R  = (dm.soul && dm.soul.R) || 3.2; // the TRUE hitbox. the sprite is much bigger.
+  var PLAYER_R  = (dm.soul && dm.soul.R) || 6; // TRUE hitbox (matches scale 2 soul sprite ~60px visual, 6px radius)
   var SPEED     = dm.SPEED || 258, FOCUS_SPEED = dm.FOCUS || 112;
   var MAX_B     = 700;
+  var BL_HALF = 24; // was 17, matches visual beam width at game scale
 
   var COL = { bone: '#EDE7DE', lilac: '#B892FF', blood: '#C2405F',
               dim: '#8A8598', soul: '#E23B55', void_: '#08080B' };
@@ -617,8 +618,13 @@
   }
 
   addEventListener('keydown', function (e) {
-    if (wrap.hidden) return;
-    if (e.key === 'Escape') { close(); return; }
+    if (wrap.hidden || NEU.activeMinigame !== 'bullet') return;
+    if (e.key === 'Escape') {
+      if (NEU.engine && NEU.engine.confirmExit) {
+        NEU.engine.confirmExit('Bullet Hell', close);
+      } else { close(); }
+      return;
+    }
     if (!running && e.key === 'Enter') { begin(); return; }
 
     var n = keyName(e);
@@ -649,6 +655,7 @@
   var endless = false;
   function open(opts) {
     endless = !!(opts && opts.endless);
+    NEU.activeMinigame = 'bullet';
     wrap.hidden = false;
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
@@ -663,6 +670,7 @@
        on the way out rather than making the label wait for the next
        scroll to notice. */
     if (NEU.tvState) NEU.tvState();
+    NEU.activeMinigame = null;
   }
 
   var startBtn = document.getElementById('bhStart');

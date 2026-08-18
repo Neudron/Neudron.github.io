@@ -288,7 +288,13 @@
 
   addEventListener('keydown', function (e) {
     if (!open_) return;
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (NEU.engine && NEU.engine.confirmExit) {
+        NEU.engine.confirmExit('Quiz', close);
+      } else { close(); }
+      return;
+    }
     if (e.key === 'Tab') {
       var els = focusables();
       if (!els.length) { e.preventDefault(); return; }
