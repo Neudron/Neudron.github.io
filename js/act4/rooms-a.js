@@ -322,6 +322,12 @@
         lines: ['a riddle, cut into the wall.',
                 'i am what the fire leaves, what the bowl wants,',
                 'and what her door is paid with. press the right stone.'] },
+      /* A hint the player asked for by walking up to it. Signs only
+         repeat what the room already showed them; the castle's rooms
+         tell you the rules once and expect you to walk them again. */
+      { t: 'sign', x: 2, y: 2,
+        lines: ['a wall of three loose stones, each with a word.',
+                'the bowl wants what the fire leaves.'] },
       { t: 'exit', x: 15, y: 4, to: 'b3_braziers', spawn: 'west', locked: 'solved:b2_blocks' },
       { t: 'exit', x: 0, y: 4, to: 'b1_throne', spawn: 'north' }
     ],
@@ -364,6 +370,9 @@
       { t: 'npc', x: 15, y: 2, colour: '#4A4560',
         lines: ['a plaque. four notches, worn in a particular order.',
                 'third. first. fourth. second.'] },
+      { t: 'sign', x: 2, y: 2,
+        lines: ['four braziers and one order.',
+                'the plaque is on the east wall. read it before you touch the braziers.'] },
       { t: 'exit', x: 17, y: 5, to: 'b4_ice', spawn: 'west', locked: 'solved:b3_braziers' },
       { t: 'exit', x: 0, y: 5, to: 'b2_blocks', spawn: 'west' }
     ],
@@ -442,6 +451,9 @@
       { t: 'plate', x: 11, y: 2, slideOnly: true },
       { t: 'plate', x: 11, y: 7, slideOnly: true },
       { t: 'plate', x: 3, y: 7, slideOnly: true },
+      { t: 'sign', x: 13, y: 2,
+        lines: ['step onto the ice and you will not stop until it runs out.',
+                'let it carry you onto the plates. three slides.'] },
       { t: 'exit', x: 14, y: 5, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice' },
       { t: 'exit', x: 0, y: 5, to: 'b3_braziers', spawn: 'west' }
     ],
@@ -505,6 +517,9 @@
       { t: 'plate', x: 12, y: 4, id: 'R' },
       { t: 'npc', x: 7, y: 1, colour: '#8A8598', mirror: true,
         run: function (c) { mirrorTurn(c); } },
+      { t: 'sign', x: 9, y: 1,
+        lines: ['the mirror holds whatever it looks at.',
+                'stand on the other plate.'] },
       { t: 'exit', x: 17, y: 5, to: 'b6_dark', spawn: 'west', locked: 'solved:b5_two' },
       { t: 'exit', x: 0, y: 5, to: 'b4_ice', spawn: 'west' }
     ],
@@ -678,8 +693,24 @@
   });
 
   function enterArena(c) {
-    if (NEU.scal && NEU.scal.open) { c.leave(); setTimeout(function () { NEU.scal.open(); }, 320); }
-    else c.say(['it will not open yet.'], 'narr');
+    if (NEU.scal && NEU.scal.open) {
+      c.leave();
+      setTimeout(function () {
+        /* Her face, her lines — then the fight the moment the box
+           closes. She introduces herself before the pattern does. */
+        if (NEU.talk) NEU.talk(['"you came all the way down here."',
+                                '"sit down. this will take a while."',
+                                '"do not die. i want the whole fight."'], 'scal');
+        var tries = 0;
+        var wait = setInterval(function () {
+          tries++;
+          if (!NEU.tboxOpen || !NEU.tboxOpen() || tries > 60) {
+            clearInterval(wait);
+            NEU.scal.open();
+          }
+        }, 250);
+      }, 320);
+    } else c.say(['it will not open yet.'], 'narr');
   }
 
   /* Locked exits: an exit with `locked` refuses until the flag is set,

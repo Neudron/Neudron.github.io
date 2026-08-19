@@ -397,7 +397,9 @@
   var tface = document.getElementById('tboxFace');
   var tfaceImg = document.getElementById('tboxFaceImg');
   var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/dog.svg', tv: 'img/tv.svg',
-               witch: 'img/act4/witch-face.png' };
+               witch: 'img/act4/witch-face.png',
+               scal: 'img/act4/calamity/scal-head.png',
+               scalHood: 'img/act4/calamity/scal-head-hood.png' };
 
   /* Only the src is set here. Whether the portrait shows at all is a
      css question, because hiding it also has to re-do the box's grid
