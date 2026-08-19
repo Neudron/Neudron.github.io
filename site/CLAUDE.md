@@ -85,12 +85,16 @@ Session opener and the per-session loop are in `memory/workflow-chat.md`.
 
 ## Open items (not actioned — needs the user)
 
-- **PR #1** (`copilot/link-neuac-domain` → main) is still open and contains an
-  old 70-byte page. Merging it overwrites the live site within a minute.
-- **Enforce HTTPS** is unticked in Settings → Pages.
-- `js/boss.js` is dead code — unreferenced since the deck replaced it. Delete
-  from `Documents\neu\site` and `_deploy` when convenient.
-- `.well-known/discord` is parked in `Documents\neu\_removed-from-main` if
-  Discord verification is wanted back.
+- **Enforce HTTPS** is unticked in Settings → Pages. `gh` is not on PATH here,
+  so it cannot be ticked from the API without a token. One click in the Pages
+  settings; the custom domain already answers 301 → https.
 - Placeholder art still in use: `dog.svg`, `hammer.svg`, `clicker.svg`,
   `hand.svg`, `blanket.svg`, `switch2.svg`, `tv.svg`.
+
+Resolved since this list was written: PR #1 is closed, not merged (checked via
+the API, 2026-08-17 — the 70-byte page never reached `main`); `js/boss.js` is
+gone; `.well-known/discord` is **live** at `site/.well-known/discord` (serves
+200). Since the 2026-08-19 deploy the repo root *is* the site content (the
+`site/` subfolder, `_scripts/` and `_removed-from-main/` were dropped from
+`main`; `_scripts/` and the docs live in the local workshop repo at
+`Documents\neu`).
