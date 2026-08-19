@@ -51,9 +51,11 @@ memory/
 # ADDED 2026-08-19. Neu's call: every .md on this machine is a working
 # doc and stays out of the public repo. CLAUDE.md is the agent brief
 # (memory index, house rules, deploy notes) — useful locally, noise
-# publicly. .well-known/README.md is the same. The .well-known/discord
-# file itself still ships — that one is a public token by design.
+# publicly. README.md is the run/test/deploy doc — same reason. The
+# .well-known/discord file itself still ships — that one is a public
+# token by design.
 CLAUDE.md
+README.md
 .well-known/README.md
 
 # ── build artefacts / experiments ────────────────────────────────
