@@ -118,7 +118,7 @@ console.log('\n1. sepulcher sheets + worm body');
   ok('spawn seeds a trail (initial straight body)',
      /sep\.trail\.push\(\{ x: sep\.x, y: sep\.y - k \* 1\.5 \}\)/.test(B));
   ok('trail records only while moving', /hypot\(sep\.vx, sep\.vy\) > 1/.test(B));
-  ok('wormSegments walks the trail at 26px spacing', /budget = 26/.test(B));
+  ok('wormSegments walks the trail at 66px spacing', /budget = 66/.test(B));
   ok('segments computed every tick', /sep\.segs = wormSegments\(\)/.test(B));
   ok('draw renders alternating body sprites', /sKey = s % 2 \? 'sepulBodyAlt' : 'sepulBody'/.test(B));
   ok('tail drawn at the trail end', /sprite\('sepulTail'/.test(B));
@@ -128,7 +128,7 @@ console.log('\n1. sepulcher sheets + worm body');
 console.log('\n2. hearts orbit a body segment');
 {
   const B = read('act4/boss-scal.js');
-  ok('hearts anchor to a segment, not sep.x', /anchor = sep\.segs\[Math\.min\(2, sep\.segs\.length - 1\)\]/.test(B));
+  ok('hearts anchor to body segments 1..3, not the head', /si = Math\.min\(4, 2 \+ \(\(h\.offset \/ 2\) \| 0\)\)/.test(B));
   ok('>>> hearts never referenced the head position <<<',
      !/h\.x = sep\.x \+ Math\.cos\(hang\) \* hrad/.test(B));
 }
@@ -206,7 +206,7 @@ console.log('\n7. bh__keys says what the active game does');
   NEU.scal.open();
   await until(() => NEU.scal.mode === 'fight' && NEU.scal.hearts === 6);
   ok('>>> SC fight: no "survive 20s" on her wrapper <<<', !/survive 20s/.test(hint.textContent));
-  ok('and her controls are listed', /z to strike/.test(hint.textContent) && /esc to leave/.test(hint.textContent));
+  ok('and her controls are listed', /f to strike/.test(hint.textContent) && /z for rage/.test(hint.textContent) && /x to shield/.test(hint.textContent) && /esc to leave/.test(hint.textContent));
   NEU.scal.close();
   ok('>>> the bullet hint comes back <<<', /survive 20s/.test(hint.textContent));
 }
@@ -250,8 +250,8 @@ console.log('\n10. fireblast holds the beat');
 console.log('\n11. brothers take a breath');
 {
   const B = read('act4/boss-scal.js');
-  ok('>>> volleys are counted and capped <<<', /b\.volley >= \(b\.enraged \? 3 : 5\)/.test(B));
-  ok('>>> and end in a pause <<<', /b\.barrageCd = b\.enraged \? 0\.8 : 1\.2/.test(B));
+  ok('>>> volleys are counted and capped <<<', /b\.volley >= \(b\.enraged \? 2 : 5\)/.test(B));
+  ok('>>> and end in a pause <<<', /b\.barrageCd = b\.enraged \? 0\.9 : 1\.2/.test(B));
   ok('>>> the pause swaps their sides <<<', /b\.side \*= -1/.test(B) && /AX \+ AW - 60/.test(B));
   ok('brothers still enrage', /bros\[0\]\.enraged = true/.test(B));
   ok('>>> phase 2 still arrives after they fall <<<', /phase = 2; mode = 'fight'/.test(B));

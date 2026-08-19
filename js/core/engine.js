@@ -379,7 +379,7 @@
   function interactive(e) {
     return typeof e.run === 'function' ||
            e.t === 'exit' || e.t === 'pickup' || e.t === 'save' ||
-           e.t === 'npc'  || e.t === 'altar';
+           e.t === 'npc'  || e.t === 'altar' || e.t === 'sign';
   }
 
   /* A pushable block is worth an `e` prompt even though pressing e goes
@@ -443,6 +443,13 @@
       NEU.save && NEU.save.capture();
       NEU.save && NEU.save.flush();
       say(['saved.'], 'narr');
+      NEU.sfx && NEU.sfx.tick && NEU.sfx.tick();
+      return;
+    }
+    if (e.t === 'sign') {
+      /* A hint the player asked for by walking up to it. Signs are
+         read, never consumed, and they always answer in narration. */
+      say(e.lines || ['a wooden sign. nothing else.'], 'narr');
       NEU.sfx && NEU.sfx.tick && NEU.sfx.tick();
       return;
     }
@@ -801,6 +808,17 @@
   function drawEnt(e, now) {
     var p = entAt(e);
     var sx = ((p.x - camX) * SCALE) | 0, sy = ((p.y - camY) * SCALE) | 0;
+    if (e.t === 'sign') {
+      /* a post, a board, two carved lines — the castle's hints */
+      ctx.fillStyle = '#6B4F2F';
+      ctx.fillRect(sx - 11, sy - 26, 22, 18);
+      ctx.fillStyle = '#3E2F1D';
+      ctx.fillRect(sx - 2, sy - 8, 4, 8);
+      ctx.fillStyle = '#C8B48A';
+      ctx.fillRect(sx - 7, sy - 22, 14, 2);
+      ctx.fillRect(sx - 5, sy - 17, 10, 2);
+      return;
+    }
     var sheet = e.sheet && NEU.sheets && NEU.sheets[e.sheet];
     if (sheet) {
       /* One blitter, in data/sheets.js — it is the only thing that
@@ -871,6 +889,11 @@
   }
   addEventListener('keydown', function (e) {
     if (!running) return;
+    /* A minigame owns the page while it is open — the fight canvas
+       sits over the room, but the room's keydown still listened to
+       the same window and walked the character underneath it, and
+       Escape left the room while the fight's own overlay was up. */
+    if (NEU.activeMinigame) return;
     if (e.key === 'Escape') { e.preventDefault(); leave(); return; }
     if (e.key === 'e' || e.key === 'E') {
       e.preventDefault();
@@ -885,7 +908,7 @@
     var n = keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
   });
   addEventListener('keyup', function (e) {
-    if (!running) return;
+    if (!running || NEU.activeMinigame) return;
     var n = keyName(e); if (n) keys[n] = false;
   });
   /* Alt-tab away with a key held and the keyup never arrives — the
