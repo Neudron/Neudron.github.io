@@ -85,16 +85,14 @@ Session opener and the per-session loop are in `memory/workflow-chat.md`.
 
 ## Open items (not actioned — needs the user)
 
-- **Enforce HTTPS** is unticked in Settings → Pages. `gh` is not on PATH here,
-  so it cannot be ticked from the API without a token. One click in the Pages
-  settings; the custom domain already answers 301 → https.
 - Placeholder art still in use: `dog.svg`, `hammer.svg`, `clicker.svg`,
   `hand.svg`, `blanket.svg`, `switch2.svg`, `tv.svg`.
 
 Resolved since this list was written: PR #1 is closed, not merged (checked via
 the API, 2026-08-17 — the 70-byte page never reached `main`); `js/boss.js` is
 gone; `.well-known/discord` is **live** at `site/.well-known/discord` (serves
-200). Since the 2026-08-19 deploy the repo root *is* the site content (the
-`site/` subfolder, `_scripts/` and `_removed-from-main/` were dropped from
-`main`; `_scripts/` and the docs live in the local workshop repo at
-`Documents\neu`).
+200); **Enforce HTTPS is ticked** (2026-08-19 — verified: http answers 301 →
+https, TLS serves 200). Since the 2026-08-19 deploy the repo root *is* the
+site content (the `site/` subfolder, `_scripts/` and `_removed-from-main/`
+were dropped from `main`; `_scripts/` and the docs live in the local workshop
+repo at `Documents\neu`).
