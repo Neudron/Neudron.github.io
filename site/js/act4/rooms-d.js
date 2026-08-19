@@ -91,7 +91,7 @@
     entities: [
       { t: 'save', x: 4, y: 8 },
       { t: 'npc', x: 9, y: 5, colour: '#E4C46A', run: function (c) { shop(c); } },
-      { t: 'npc', x: 13, y: 6, colour: '#8A8598',
+      { t: 'npc', x: 13, y: 6, colour: '#8A8598', sheet: 'axe',
         lines: ['an axe, on the counter, behind the till.',
                 'it is not on the board with the prices.'] },
       { t: 'exit', x: 23, y: 4, to: 'd2_alley', spawn: 'west' },
@@ -176,12 +176,12 @@
     ].join('\n'),
     spawns: { west: { x: 1, y: 4, face: 'right' }, east: { x: 16, y: 4, face: 'left' } },
     entities: [
-      { t: 'npc', x: 5, y: 3, colour: '#C4705F', mush: 'mush3',
+      { t: 'npc', x: 5, y: 3, colour: '#C4705F', mush: 'mush3', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush3'); } },
       { t: 'npc', x: 12, y: 6, colour: '#4A4560',
         lines: ['someone has written NEU on the wall.',
                 'someone else has crossed it out and written it again, worse.'] },
-      { t: 'npc', x: 14, y: 3, colour: '#C4705F', mush: 'mush5',
+      { t: 'npc', x: 14, y: 3, colour: '#C4705F', mush: 'mush5', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush5'); } },
       { t: 'exit', x: 17, y: 4, to: 'd3_square', spawn: 'west' },
       { t: 'exit', x: 0, y: 4, to: 'd1_street', spawn: 'east' }
@@ -215,9 +215,9 @@
       { t: 'save', x: 3, y: 2 },
       { t: 'npc', x: 9, y: 4, colour: '#4A4560',
         lines: ['a fountain with no water and no fish and a great deal of confidence.'] },
-      { t: 'npc', x: 15, y: 8, colour: '#C4705F', mush: 'mush4',
+      { t: 'npc', x: 15, y: 8, colour: '#C4705F', mush: 'mush4', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush4'); } },
-      { t: 'npc', x: 4, y: 8, colour: '#B892FF', run: function (c) { drink(c); } },
+      { t: 'npc', x: 4, y: 8, colour: '#B892FF', sheet: 'recall', run: function (c) { drink(c); } },
       { t: 'exit', x: 0, y: 5, to: 'd2_alley', spawn: 'east' }
     ],
     onEnter: function (c) {

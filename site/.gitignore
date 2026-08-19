@@ -13,12 +13,11 @@ tests/node_modules/
 tests/package-lock.json
 
 # ── sprite sources ───────────────────────────────────────────────
-# The Deltarune/Calamity rips are 2.5 MB and exist only so tiles and
+# The Deltarune/Calamity/Terraria/Undertale rips exist only so tiles and
 # frames can be cropped out of them. The crops ship; the sources do
 # not. js/data/sheets.js keeps the manifest (NEU.sheetSources) and
 # tests/fixes14.mjs §5 asserts no shipped module points at one.
-img/act4/deltarune/
-sr-*.png
+img/act4/*/sr-*.png
 
 # ── the documentation ────────────────────────────────────────────
 # ADDED 2026-08-17. This site is a puzzle game and memory/story.md is

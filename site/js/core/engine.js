@@ -245,6 +245,10 @@
     return null;
   }
 
+  var lastReset = 0;
+  var slideD = 0;   /* direction of an active ice slide; 0 = not sliding */
+  var slideDead = false;  /* the direction a slide just died in — a held key must not re-commit */
+
   /* ── push blocks ────────────────────────────────────────────────
      Walk into one and it moves a whole cell in the direction you are
      facing, if the cell beyond is clear. Grid-snapped rather than
@@ -283,6 +287,22 @@
     return true;
   }
 
+  /* A slide dies on the last ice cell. If that cell holds a slideOnly
+     plate, the plate locks — arming by landing, never by walking up
+     to it, which is what keeps the ice route honest. */
+  function stopSlide() {
+    var ci = Math.floor(px / TILE), cj = Math.floor((py - 1) / TILE);
+    var pl = entHere(ci, cj, 'plate');
+    if (pl && pl.slideOnly && !pl.armed) {
+      pl.armed = true;
+      if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+      if (NEU.juice) NEU.juice.hit('small');
+    }
+    slideD = 0;
+    slideDead = true;
+    checkPuzzle();
+  }
+
   /* A room is solved when every plate has a block on it. Rooms can
      override with their own `solved(ctx)` for the ones that are not
      about blocks. */
@@ -308,8 +328,22 @@
 
   function resetPuzzle() {
     if (!room) return;
+    /* R-spam is the cheese: brute-forcing a puzzle by resetting every
+       second is not solving it. The room needs a moment to settle, and
+       it says so instead of silently ignoring the press. */
+    if (performance.now() - lastReset < 4000) {
+      say(['the room is still settling. give it a moment.'], 'narr');
+      return;
+    }
+    lastReset = performance.now();
     room.__solved = false;
+    slideD = 0;
+    slideDead = false;
     ents = spawnEnts(room);
+    /* Rooms keep their own working state (a light sequence, a carried
+       torch, a mirror that was turned) in closures that re-spawning
+       entities cannot reach — give them a hook so a reset is honest. */
+    if (room.onReset) room.onReset();
     say(['the room resets itself. it has done this before.'], 'narr');
   }
 
@@ -418,7 +452,32 @@
          depending on the state of the world, and a fixed `lines`
          array cannot do that. */
       if (typeof e.run === 'function') { e.run(API); return; }
-      say(e.lines || ['...'], e.who || 'narr'); return;
+      /* E while a talk is showing is a no-op. Restarting a dialogue
+         mid-line read as the box resetting under your thumb. */
+      if (NEU.tboxOpen && NEU.tboxOpen()) return;
+      var dk = 'd:' + room.id + ':' + e.x + ',' + e.y;
+      var at = NEU.save ? (NEU.save.flag(dk) || 0) : 0;
+      var base = e.lines || ['...'];
+      var total = base.length;
+      var who = e.who || 'narr';
+      /* Picked up where they left off: resume from the line they were
+         at, capped with a closing beat. Finished talks replay whole. */
+      var lines = (at > 0 && at < total)
+        ? base.slice(at).concat(e.close || ['...'])
+        : base;
+      say(lines, who);
+      if (NEU.talkWatch) {
+        var seen = at;
+        NEU.talkWatch(function (i) {
+          if (i < 0) {
+            NEU.talkUnwatch();
+            if (NEU.save) NEU.save.flag(dk, seen >= total ? 0 : seen);
+            return;
+          }
+          seen = at + i;
+        });
+      }
+      return;
     }
     if (e.t === 'altar') {
       if (!NEU.save || !NEU.save.has(e.needs)) {
@@ -509,6 +568,11 @@
     walked = 0; face = s.face || 'down';
     room.__spawn = spawn;
     camSnap();
+    /* A room change must not carry the old room's dialogue. The talk
+       box is global; without this, walking through a door while a line
+       is typing leaves that text on screen for good — the new room's
+       onEnter only replaces it if the room actually has lines to say. */
+    if (NEU.talk && NEU.talk.close) NEU.talk.close();
     if (room.onEnter) room.onEnter(API);
     if (NEU.save) NEU.save.capture();
   }
@@ -570,13 +634,22 @@
       var vy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
       moving = !!(vx || vy);
       if (vx && vy) { vx *= 0.7071; vy *= 0.7071; }
-      if (moving) {
+      /* A fresh press is a fresh commitment; the key that killed a
+         slide must not immediately re-commit to the same line, or
+         walking off the end of the ice would stutter frame by frame. */
+      if (!vx && !vy) slideDead = false;
+      if (moving && !slideD) {
         face = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'right' : 'left')
                                            : (vy > 0 ? 'down' : 'up');
         var before = px, bY = py;
         var p = sweep(px, py, vx * SPEED * dt, vy * SPEED * dt);
         px = p.x; py = p.y;
         walked += Math.hypot(px - before, py - bY);
+        /* Ice catches you: the moment your feet are on it, you are
+           committed to that line of travel. No turning, no stopping —
+           that is the whole puzzle. */
+        var eci = Math.floor(px / TILE), ecj = Math.floor((py - 1) / TILE);
+        if (at(eci, ecj) === 'i' && !slideDead) slideD = face;
         checkTriggers();
         /* A room's solved() can become true on a WALK, not just on a
            push — b5 needs you standing on one plate while the block
@@ -584,6 +657,28 @@
            move. Check every moving frame; __solved makes it a no-op
            once the room is done. */
         checkPuzzle();
+      } else if (slideD) {
+        /* Sliding: input does nothing until the ice runs out. */
+        face = slideD;
+        var d = DIRV[slideD];
+        var ci = Math.floor(px / TILE), cj = Math.floor((py - 1) / TILE);
+        var ni = ci + d[0], nj = cj + d[1];
+        /* Predict before moving: the slide dies when the cell ahead is
+           not ice, so the stop lands exactly ON the last ice cell —
+           checking after the move would overshoot by a frame and miss
+           the plate that sits there. */
+        if (at(ci, cj) !== 'i' || at(ni, nj) !== 'i') {
+          stopSlide();
+          checkTriggers();
+          checkPuzzle();
+        } else {
+          var bp = px, bq = py;
+          var sp2 = sweep(px, py, d[0] * SPEED * dt, d[1] * SPEED * dt);
+          px = sp2.x; py = sp2.y;
+          walked += Math.hypot(px - bp, py - bq);
+          checkTriggers();
+          checkPuzzle();
+        }
       }
       camFollow();
     }
@@ -675,9 +770,15 @@
     /* A room can be dark. Same STEPPED falloff as the blackout — five
        discrete rings, not a soft vignette, because every other pixel
        on this site has a hard edge and a smooth gradient reads as a
-       different program. */
-    if (room.dark) {
-      var g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, room.dark * SCALE / 2);
+       different program. `dark` may be a number or a hook (b6's goes
+       out when its torch is placed); a `light` hook (a carried torch)
+       centres the light on the returned point instead of the room. */
+    var darkAmt = typeof room.dark === 'function' ? room.dark(API) : room.dark;
+    if (darkAmt > 0) {
+      var lt = room.light ? room.light(API) : null;
+      var lx = lt ? ((lt.x - camX) * SCALE) : w / 2;
+      var ly = lt ? ((lt.y - camY) * SCALE) : h / 2;
+      var g = ctx.createRadialGradient(lx, ly, 0, lx, ly, darkAmt * SCALE / 2);
       g.addColorStop(0.00, 'rgba(0,0,0,0)');
       g.addColorStop(0.45, 'rgba(0,0,0,0)');
       g.addColorStop(0.46, 'rgba(0,0,0,0.55)');
@@ -716,8 +817,9 @@
     }
     if (e.t === 'plate') {
       /* Drawn UNDER everything and inset, so a block sitting on one is
-         still visibly a block on a plate rather than a block. */
-      var lit = !!entHere(e.x, e.y, 'block');
+         still visibly a block on a plate rather than a block. A slide-
+         armed plate stays lit once it locks. */
+      var lit = !!entHere(e.x, e.y, 'block') || !!e.armed;
       ctx.fillStyle = lit ? '#7BE38A' : '#4A4560';
       ctx.fillRect(sx - 6 * SCALE / 2, sy - 6 * SCALE / 2 - 2, 6 * SCALE, 6 * SCALE / 2);
       return;
@@ -829,11 +931,26 @@
       document.removeEventListener('keydown', onKey);
     }
     function onKey(e) {
+      /* The overlay listens on document and the minigames on window —
+         without stopping the bubble, Escape to decline would clean the
+         overlay up, the window handler would see the keypress and
+         immediately build a new one. The decline became a re-ask. */
+      e.stopPropagation();
       if (e.key === 'Enter') { cleanup(); onConfirm(); }
       else if (e.key === 'Escape') { cleanup(); }
     }
     document.addEventListener('keydown', onKey);
   }
+
+  /* The room's quit button is the same exit as its ESC: rooms cost
+     nothing to leave, so it goes straight out — the save point is
+     never far. It sat unwired, doing nothing, since the button was
+     added to the markup. */
+  var engQuitBtn = document.getElementById('engQuit');
+  if (engQuitBtn) engQuitBtn.addEventListener('click', function () {
+    if (!running) return;
+    leave();
+  });
 
   function leave() {
     running = false;
@@ -855,6 +972,9 @@
     ents: function () { return ents; },
     solved: function (id) { return NEU.save ? NEU.save.flagged('solved:' + id) : false; },
     markSolved: function (id) { NEU.save && NEU.save.flag('solved:' + id, 1); },
+    /* the live room definition — rooms with hooks (dark, light, onReset)
+       expose their state through it, and tests read it the same way */
+    get room() { return room; },
     get player() { return { x: px, y: py, face: face }; }
   };
 

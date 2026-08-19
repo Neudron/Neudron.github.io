@@ -318,7 +318,11 @@
   }
 
   var q = document.getElementById('fnfQuit');
-  if (q) q.addEventListener('click', close);
+  if (q) q.addEventListener('click', function () {
+    /* same path as ESC: a confirmed exit, since the round is on the line */
+    if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Rhythm Game', close);
+    else close();
+  });
 
   NEU.rhythm = { open: open, close: close,
                  get running() { return running; },
