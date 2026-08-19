@@ -111,7 +111,7 @@ console.log('\n2. Calamitas draws from her sheets');
      alone would report all three gone because the lines live elsewhere. */
   const SHEETS = fs.readFileSync(path.join(ROOT, 'js', 'data', 'sheets.js'), 'utf8');
   ok('>>> the sprite helper exists <<<',
-     /function sprite\(key, x, y, scale, rot, glow, col\)/.test(SCAL) &&
+     /function sprite\(key, x, y, scale, rot, glow, col, frame\)/.test(SCAL) &&
      /NEU\.sheetDraw = function/.test(SHEETS));
   ok('it rotates to face travel', /ctx\.rotate\(o\.rot\)/.test(SHEETS) &&
      /Math\.atan2\(b\.vy, b\.vx\)/.test(SCAL));
@@ -166,7 +166,8 @@ console.log('\n3. her voice');
   ok('gigablast plays its charge', /sfxPlay\('giga'\)/.test(SCAL));
   ok('hellbarrage plays its charge', /sfxPlay\('hellblast'\)/.test(SCAL));
   ok('the walls play the maelstrom', /sfxPlay\('maelstrom'\)/.test(SCAL));
-  ok('the ring burst plays the hit', /sfxPlay\(b\.k === 2 \? 'giga-hit' : 'fireblast-hit'\)/.test(SCAL));
+  ok('the ring burst plays the hit', /sfxPlay\('giga-hit'\)/.test(SCAL) &&
+     /sfxPlay\('fireblast-hit'\)/.test(SCAL));
   ok('>>> pools are built when the fight opens, not at boot <<<',
      /preloadSfx\(\);/.test(SCAL) &&
      SCAL.indexOf('preloadSfx();') > SCAL.indexOf('function open()'));
@@ -207,7 +208,11 @@ console.log('\n4. the fight still boots and steps');
    The cycle is fixed ("twenty steps, exactly as in the game"). A
    Math.random() in the charge branch randomizes it. */
 {
-  ok('>>> no Math.random in the charge branch <<<', !/else if \(k === 'c'\)[\s\S]*?Math\.random/.test(SCAL));
+  /* The charge branch itself must stay deterministic; the fireblast
+     pause later in the file legitimately rolls Math.random, so the
+     lookahead is bounded to the branch. */
+  ok('>>> no Math.random in the charge branch <<<',
+     !/else if \(k === 'c'\) \{[\s\S]{0,600}?Math\.random/.test(SCAL));
 }
 
 console.log('\nfixes13: ' + pass + ' ok, ' + fail + ' fail');

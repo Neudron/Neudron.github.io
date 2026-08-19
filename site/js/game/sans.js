@@ -393,34 +393,46 @@
      — the dog handing over the hammer is narration first and him
      second, and forcing that into one voice loses the beat. */
   var queue = [], queueV = [], typing = null, curV = 'sans';
+  var curIdx = 0, curTotal = 0, watch = null;
   var tface = document.getElementById('tboxFace');
   var tfaceImg = document.getElementById('tboxFaceImg');
-  var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/dog.svg', tv: 'img/tv.svg' };
+  var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/dog.svg', tv: 'img/tv.svg',
+               witch: 'img/act4/witch-face.png' };
 
   /* Only the src is set here. Whether the portrait shows at all is a
      css question, because hiding it also has to re-do the box's grid
      columns — doing that from js would mean the layout rule lived in
-     two files. */
+     two files. A speaker with no face in FACE hides the portrait: it
+     used to keep the PREVIOUS speaker's face, which is how narration
+     and the witch wore Sans's. */
   function setFace(who) {
     var src = FACE[who];
+    if (tface) tface.hidden = !src;
     if (src && tfaceImg && tfaceImg.getAttribute('src') !== src) {
       tfaceImg.setAttribute('src', src);
     }
-    if (tface) tface.hidden = false;
   }
   function say(lines, who) {
     queue = lines.slice();
     queueV = lines.map(function (_, i) {
       return Array.isArray(who) ? (who[i] || 'narr') : (who || 'sans');
     });
+    curIdx = 0; curTotal = lines.length;
     tbox.hidden = false;
     next();
   }
   function next() {
     clearInterval(typing); clearTimeout(next.hold);
-    if (!queue.length) { tbox.hidden = true; return; }
+    if (!queue.length) {
+      tbox.hidden = true;
+      /* the talk ended or was cut short — the watcher wants to know */
+      if (watch) watch(-1, -1);
+      return;
+    }
     var line = queue.shift(), i = 0;
     curV = queueV.shift() || 'sans';
+    curIdx++;
+    if (watch) watch(curIdx, curTotal);
     /* The box wears the speaker too. His portrait sat in the corner of
        EVERY box on the page — including the dog's and the television's
        — which is the loudest reason it all read as him talking. The
@@ -453,7 +465,21 @@
      talks through this — same typing, same voices, same portraits,
      same z-index, no second box to keep in sync. */
   NEU.talk = function (lines, who) { say(lines, who); };
+  /* Clear the box without saying anything new — rooms call this on
+     entry so a door does not carry the last room's half-typed line. */
+  NEU.talk.close = function () {
+    clearInterval(typing); clearTimeout(next.hold);
+    queue = [];
+    if (tbox) tbox.hidden = true;
+    if (watch) watch(-1, -1);
+  };
   NEU.hush = function () { shutUp(); };
+  /* Watchers get (index, total) as each line starts and (-1, -1) when
+     the box closes, interrupted or finished — the engine uses it to
+     remember where a dialogue was abandoned. */
+  NEU.talkWatch = function (fn) { watch = fn; };
+  NEU.talkUnwatch = function () { watch = null; };
+  NEU.tboxOpen = function () { return !tbox.hidden; };
 
   /* Kills the box mid-sentence. Needed because he can be scrolled off
      screen while still talking, and a dialog box for someone who is no
@@ -461,6 +487,7 @@
   function shutUp() {
     clearInterval(typing); clearTimeout(next.hold);
     queue = []; queueV = []; ttxt.textContent = ''; tbox.hidden = true;
+    if (watch) watch(-1, -1);
   }
 
   /* ── the small totem pop ────────────────────────────────────────

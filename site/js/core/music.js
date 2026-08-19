@@ -8,9 +8,9 @@
    about ten megabytes. This is a site people open on a phone, on
    data, and Act IV sits three hours into a chain — nobody is going
    to wait through a download to hear a forest. The whole music layer
-   is oscillators and one noise buffer built at runtime: fourteen
-   kilobytes of javascript that gzips to about four, and zero bytes of
-   audio requested, ever.
+   is oscillators and one noise buffer built at runtime: twenty-four
+   kilobytes of javascript that gzips to about four, and zero bytes
+   of audio requested, ever.
 
    The second reason is the better one. A recorded loop cannot answer
    the game. This one can: layers arrive as a boss loses health, the

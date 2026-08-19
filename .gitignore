@@ -31,7 +31,7 @@ _scripts/out/
 # 2.5 MB of Deltarune/Calamity rips that exist only so tiles and frames
 # can be cropped out of them. The crops are tracked; the rips are not.
 # They are re-downloadable and they are not our work.
-site/img/act4/deltarune/
+site/img/act4/deltarune/sr-*.png
 
 # ── backups of things this repo now replaces ─────────────────────
 # _scripts\orig holds zipped copies of files before they were changed,

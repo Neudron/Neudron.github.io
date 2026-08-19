@@ -163,7 +163,7 @@
     ].join('\n'),
     spawns: { west: { x: 1, y: 3, face: 'right' }, east: { x: 24, y: 7, face: 'left' } },
     entities: [
-      { t: 'npc', x: 8, y: 6, colour: '#C4705F', mush: 'mush1',
+      { t: 'npc', x: 8, y: 6, colour: '#C4705F', mush: 'mush1', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush1'); } },
       { t: 'npc', x: 17, y: 2, colour: '#4A4560',
         lines: ['the trees here have no bark on the north side.',
@@ -268,50 +268,72 @@
     }
   }
 
-  /* ══ B2 — blocks and plates ══════════════════════════════════════
-     Teaches the rule. Two blocks, two plates, no way to get it wrong
-     permanently — and R resets, which is announced the first time you
-     enter rather than hidden in a manual. */
-  /* The first draft of this room was a ring corridor and it took
-     FOURTEEN pushes to solve — the solver said so before a player ever
-     had to sit through it. A tutorial that long is not teaching, it is
-     just walking. This version is two pushes, and the two pushes go in
-     opposite directions, because the actual lesson is "you push away
-     from yourself, so stand on the far side". */
+  /* ══ B2 — the riddle stones ══════════════════════════════════════
+     Teaches the rule: read the room, press e on the thing you believe,
+     and r if you are wrong — which is announced the first time you
+     enter rather than hidden in a manual. There are no blocks here and
+     never will be; every other room in the castle had one until this
+     one taught the press and the reset. The answer is on the wall and
+     the two wrong stones are not "the game is unfair", they are the
+     lesson that a wrong press costs nothing but your time. */
+  var b2picked = '';
+  function pickStone(c, word) {
+    if (b2picked) return;   /* one press per attempt; r to try again */
+    b2picked = word;
+    var es = c.ents();
+    for (var i = 0; i < es.length; i++)
+      if (es[i].t === 'npc' && es[i].stone)
+        es[i].colour = es[i].stone === word ? '#E4C46A' : '#2A2A38';
+    if (word === 'ash') {
+      c.markSolved('b2_blocks');
+      if (NEU.quest) NEU.quest.bump('a4_rooms', 1);
+      if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+      c.say(['the ash stone sinks into the wall.',
+             'the way east is open.']);
+      return;
+    }
+    if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
+    c.say(['the ' + word + ' stone stays exactly where it is.',
+           'the door does not move. it is not a conversation.']);
+  }
+
   E.register('b2_blocks', {
     tileset: 'castle',
     tiles: [
       '################',
       '#..............#',
       '#....######....#',
-      '#....#....#....#',
+      '#..............#',
       '#.........,,,,,#',
-      '#....#....#....#',
+      '#..............#',
       '#....######....#',
       '#..............#',
       '################'
     ].join('\n'),
     spawns: { west: { x: 2, y: 4, face: 'right' } },
     entities: [
-      { t: 'plate', x: 6, y: 3 },
-      { t: 'plate', x: 8, y: 5 },
-      { t: 'block', x: 6, y: 4, solid: true, push: true },
-      { t: 'block', x: 8, y: 4, solid: true, push: true },
+      { t: 'npc', x: 6, y: 4, colour: '#564B66', solid: true, stone: 'friend',
+        run: function (c) { pickStone(c, 'friend'); } },
+      { t: 'npc', x: 8, y: 4, colour: '#564B66', solid: true, stone: 'ash',
+        run: function (c) { pickStone(c, 'ash'); } },
+      { t: 'npc', x: 10, y: 4, colour: '#564B66', solid: true, stone: 'please',
+        run: function (c) { pickStone(c, 'please'); } },
+      { t: 'npc', x: 13, y: 2, colour: '#4A4560',
+        lines: ['a riddle, cut into the wall.',
+                'i am what the fire leaves, what the bowl wants,',
+                'and what her door is paid with. press the right stone.'] },
       { t: 'exit', x: 15, y: 4, to: 'b3_braziers', spawn: 'west', locked: 'solved:b2_blocks' },
       { t: 'exit', x: 0, y: 4, to: 'b1_throne', spawn: 'north' }
     ],
     onEnter: function (c) {
       if (c.flagged('b2_seen')) return;
       c.flag('b2_seen', 1);
-      say(c, ['two plates in the floor, and two blocks that are not on them.',
-              'stand against a block and press e. it goes away from you.',
+      say(c, ['the way east is a wall of three loose stones.',
+              'each one has a word. one of them is the word.',
+              'read the riddle. press e on the stone you believe.',
               'press r if you make a mess of it. the room does not mind.']);
     },
-    onSolved: function (c) {
-      c.markSolved('b2_blocks');
-      if (NEU.quest) NEU.quest.bump('a4_rooms', 1);
-      say(c, ['something heavy moves in the wall.', 'the way east is open.']);
-    }
+    onReset: function () { b2picked = ''; }
   });
 
   /* ══ B3 — the braziers ═══════════════════════════════════════════
@@ -351,7 +373,8 @@
       c.flag('b3_seen', 1);
       say(c, ['four braziers, all cold.',
               'there is a plaque on the east wall. it is worth reading.']);
-    }
+    },
+    onReset: function () { b3seq = []; }
   });
 
   var b3seq = [];
@@ -380,68 +403,90 @@
     }
   }
 
-  /* ══ B4 — the ice ════════════════════════════════════════════════
-     You cannot stop. Step onto ice and you slide until something stops
-     you, which turns movement itself into the puzzle. The layout is
-     small on purpose: a big ice room is not four times harder, it is
-     four times more walking between attempts.
+  /* ══ B4 — the ice ring ═══════════════════════════════════════════
+     The floor teaches the slide: step onto ice and you commit to that
+     line of travel until the ice runs out — no turning, no stopping,
+     no walking across a corner. Three plates sit on the last ice cell
+     of three different slide lines, and a plate only locks when a
+     slide dies on it (slideOnly). Walking up to one is the wrong move
+     by design; the whole room is about reading the lines the ice
+     gives you.
 
-     THE BLOCK STARTS ON THE ICE AND THE PLATE IS OFF IT, at the far end
-     of the run. That pairing is the puzzle and both halves are load
-     bearing. The block began at (3,1) on the dry corridor above the
-     ring, where pushing it south needed the pusher to stand at (3,0) —
-     the outer wall — so it could only ever be shoved along row 1 and
-     never touched the ice at all. The plate was at (7,5), inside the
-     core, in a three-cell slot walled at both ends: pushing a block in
-     from either side needed the pusher standing in the wall at (5,5) or
-     (9,5). The room could not be solved by anyone.
-
-     Now: the block sits on the top ice row and the plate is the dry cell
-     the slide dies on. You arrive from the west, so the side you reach
-     first pushes it the WRONG way — you have to go round the ring and
-     push from (11,2). That is B2's lesson ("stand on the far side")
-     bent by the fact that the block no longer stops when you do. */
+     Solvable in three slides, no brute force:
+       1. walk up to (1,2), step east onto (3,2) → slide east along the
+          top row, which dies on its last ice cell (11,2) → plate locks.
+       2. step south: the ice underfoot commits you again → slide down
+          the east column, dying on (11,7) → plate locks.
+       3. step west → slide along the bottom row, dying on (3,7)
+          → plate locks. The way opens.
+     The puzzle is not "find the plates", it is "understand that the
+     ice decides where you stop". The old version was a block-push
+     with the block born on the ice; that read as a physics quirk and
+     was retired with the rest of the castle's blocks. */
   E.register('b4_ice', {
     tileset: 'castle',
     tiles: [
       '################',
       '#..............#',
       '#..iiiiiiiii...#',
-      '#..i#######i...#',
+      '#..i.......i...#',
       '#..i...#...i...#',
-      '#..i.#...#.i,,,#',
-      '#..i...#...i...#',
+      '#..i.......i,,,#',
+      '#..i.......i...#',
       '#..iiiiiiiii...#',
       '#..............#',
       '################'
     ].join('\n'),
     spawns: { west: { x: 1, y: 5, face: 'right' } },
     entities: [
-      { t: 'plate', x: 2, y: 2 },
-      { t: 'block', x: 10, y: 2, solid: true, push: true },
-      { t: 'exit', x: 15, y: 5, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice' },
+      { t: 'plate', x: 11, y: 2, slideOnly: true },
+      { t: 'plate', x: 11, y: 7, slideOnly: true },
+      { t: 'plate', x: 3, y: 7, slideOnly: true },
+      { t: 'exit', x: 14, y: 5, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice' },
       { t: 'exit', x: 0, y: 5, to: 'b3_braziers', spawn: 'west' }
     ],
     onEnter: function (c) {
       if (c.flagged('b4_seen')) return;
       c.flag('b4_seen', 1);
-      say(c, ['the floor in the middle is polished to a mirror.',
-              'the block will not stop once it starts.']);
+      say(c, ['the middle of the room is polished to a mirror.',
+              'step onto the ice and you will not stop until the ice runs out.',
+              'three plates. they lock only when a slide lands on them.']);
+    },
+    /* The engine's default "every plate has a block" rule cannot know
+       about slides, so this room owns its win condition: all three
+       slide-only plates must be armed. */
+    solved: function (c) {
+      var es = c.ents(), any = false;
+      for (var i = 0; i < es.length; i++)
+        if (es[i].t === 'plate') { any = true; if (!es[i].armed) return false; }
+      return any;
     },
     onSolved: function (c) {
       c.markSolved('b4_ice');
       if (NEU.quest) NEU.quest.bump('a4_rooms', 3);
-      say(c, ['it settles onto the plate and stays there.']);
+      say(c, ['the third plate locks with a heavy clunk.',
+              'the east wall slides open.']);
     }
   });
 
-  /* ══ B5 — two switches, one of you ═══════════════════════════════
-     The room B2 taught you how to solve, made impossible. Two plates,
-     both must be held, one block. The answer is the mirror on the
-     north wall: stand on one plate and the reflection stands on the
-     other. It is nonsense and the room knows it is nonsense, which is
-     why it works — the castle has been established as a place that
-     locks its own doors for fun. */
+  /* ══ B5 — two plates, one of you ════════════════════════════════
+     Teaches that not every press is a push. The mirror holds the
+     second plate: stand in front of it, press e, and it turns to
+     face one plate or the other. The room only answers when you
+     stand where the mirror is looking — you hold one plate, the
+     mirror's gaze holds the other. It is nonsense and the room knows
+     it is nonsense, which is why it works: the castle locks its own
+     doors for fun. The old version used a push block; the block is
+     gone with the rest of them, and the mirror carries the whole
+     room now. */
+  var b5face = 0;   /* 0 = turned away, 1 = looks at the east plate, 2 = looks at the west plate */
+  function mirrorTurn(c) {
+    b5face = (b5face + 1) % 3;
+    if (b5face === 0) c.say(['the mirror turns away from the room.'], 'narr');
+    else if (b5face === 1) c.say(['the mirror looks east. whatever stands over the east plate stands on the west one too.'], 'narr');
+    else c.say(['the mirror looks west. whatever stands over the west plate stands on the east one too.'], 'narr');
+    if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+  }
   E.register('b5_two', {
     tileset: 'castle',
     tiles: [
@@ -458,61 +503,70 @@
     entities: [
       { t: 'plate', x: 5, y: 4, id: 'L' },
       { t: 'plate', x: 12, y: 4, id: 'R' },
-      /* Row 5, NOT row 6. On row 6 the block sat against the bottom wall,
-         and pushing it north needs the pusher standing south of it — in
-         row 7, which is the wall. It could only ever slide left and right
-         along the bottom of the room and never reached either plate, so
-         the one arrangement this room is about was unreachable. From row
-         5 you stand below it, push it up, then walk it sideways onto
-         whichever plate you are not going to stand on yourself. */
-      { t: 'block', x: 8, y: 5, solid: true, push: true },
       { t: 'npc', x: 7, y: 1, colour: '#8A8598', mirror: true,
-        lines: ['a mirror, floor to ceiling, badly cleaned.',
-                'the room in it is the same room. you are in it, standing where you are standing.'] },
+        run: function (c) { mirrorTurn(c); } },
       { t: 'exit', x: 17, y: 5, to: 'b6_dark', spawn: 'west', locked: 'solved:b5_two' },
       { t: 'exit', x: 0, y: 5, to: 'b4_ice', spawn: 'west' }
     ],
-    /* One plate under the block, and you standing on the other. The
-       mirror does the rest — or rather, the mirror is the excuse. */
+    /* One plate under the mirror's gaze, and you standing on the
+       other. The mirror turns with e; the room counts what it looks
+       at as held. */
     solved: function (c) {
+      if (!b5face) return false;
       var p = c.player;
       var cx = Math.floor(p.x / 16), cy = Math.floor((p.y - 1) / 16);
       var onL = (cx === 5 && cy === 4), onR = (cx === 12 && cy === 4);
-      var bL = !!c.entHere(5, 4, 'block'), bR = !!c.entHere(12, 4, 'block');
-      return (onL && bR) || (onR && bL);
+      return (b5face === 1 && onR) || (b5face === 2 && onL);
     },
     onEnter: function (c) {
       if (c.flagged('b5_seen')) return;
       c.flag('b5_seen', 1);
-      say(c, ['two plates. one block.',
-              'that is one block fewer than the arithmetic wants.']);
+      say(c, ['two plates. there is nobody to hold the second one.',
+              'the mirror on the north wall has opinions. press e on it.']);
     },
     onSolved: function (c) {
       c.markSolved('b5_two');
       if (NEU.quest) NEU.quest.bump('a4_rooms', 4);
-      say(c, ['both plates go down at once.',
-              'you are standing on one of them. you are not standing on the other one.',
+      say(c, ['the plate under you sinks.', 'the mirror holds the other one.',
               'the door opens anyway.']);
-    }
+    },
+    onReset: function () { b5face = 0; }
   });
 
-  /* ══ B6 — the dark one ═══════════════════════════════════════════
+/* ══ B6 — the torch ═════════════════════════════════════════════
      A callback, not a reskin: the torch from the blackout, in a room
      that is about remembering a shape rather than finding a door.
 
-     THE SPAWN MUST OPEN ONTO THE MIDDLE CORRIDOR. There used to be a
-     wall stub at (2,5), one cell east of where you land, and it made the
-     room impossible: you spawn facing right, the block is at (3,5), and
-     pushing it east needs the pusher west of it — in the cell that stub
-     occupied. The block could be shoved up and down inside column 3 and
-     nothing else, so the plate at (10,5) was unreachable. With (2,5)
-     open you walk straight out of the spawn into the push, and the block
-     goes the length of the dark corridor ahead of you, which is the room
-     working as intended rather than a new idea. The four blind alcoves
-     are untouched — they are the shape you are meant to remember. */
+     The dark is a function, not a number: the room answers the
+     darkness every frame, and the answer changes the moment the
+     torch is seated. While you carry the torch the light follows you
+     through the room (the engine's `light` hook) — the dark stops
+     being a wall the moment the light comes with you, which is the
+     whole lesson. Take it at (2,5), put it in the socket at (10,5),
+     and the lights come back. The four blind alcoves are untouched —
+     they are the shape you are meant to remember. */
+  var b6carry = false, b6lit = false;
+  function takeTorch(c) {
+    if (b6carry) { c.say(['you already have it.'], 'narr'); return; }
+    b6carry = true;
+    /* the torch leaves the wall when it leaves the room with you —
+       it was solid so it could be found by touch in the dark */
+    var es = c.ents();
+    for (var i = 0; i < es.length; i++)
+      if (es[i].torch) es[i].dead = true;
+    if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+    c.say(['you take the torch. the light walks with you.'], 'narr');
+  }
+  function placeTorch(c) {
+    if (!b6carry) { c.say(['a socket in the wall, empty.', 'it is waiting for a light.'], 'narr'); return; }
+    b6carry = false; b6lit = true;
+    c.markSolved('b6_dark');
+    if (NEU.quest) NEU.quest.bump('a4_rooms', 5);
+    if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+    c.say(['it fits. light pours back into the room.'], 'narr');
+  }
   E.register('b6_dark', {
     tileset: 'castle',
-    dark: 108,
     tiles: [
       '####################',
       '#..................#',
@@ -527,8 +581,10 @@
     ].join('\n'),
     spawns: { west: { x: 1, y: 5, face: 'right' } },
     entities: [
-      { t: 'plate', x: 10, y: 5 },
-      { t: 'block', x: 3, y: 5, solid: true, push: true },
+      { t: 'npc', x: 2, y: 5, colour: '#E4A64A', solid: true, torch: true,
+        run: function (c) { takeTorch(c); } },
+      { t: 'npc', x: 10, y: 5, colour: '#5A5470', socket: true,
+        run: function (c) { placeTorch(c); } },
       { t: 'exit', x: 19, y: 5, to: 'b7_altar', spawn: 'north', locked: 'solved:b6_dark' },
       { t: 'exit', x: 0, y: 5, to: 'b5_two', spawn: 'west' }
     ],
@@ -538,11 +594,9 @@
       say(c, ['the lights here have been out for some time.',
               'you have done this before.']);
     },
-    onSolved: function (c) {
-      c.markSolved('b6_dark');
-      if (NEU.quest) NEU.quest.bump('a4_rooms', 5);
-      say(c, ['the last door in the castle gives up.']);
-    }
+    dark: function () { return b6lit ? 0 : 108; },
+    light: function (c) { return b6carry ? { x: c.player.x, y: c.player.y } : null; },
+    onReset: function () { b6carry = false; b6lit = false; }
   });
 
   /* ══ B7 — the altar ══════════════════════════════════════════════
@@ -573,7 +627,7 @@
         lines: ['you tip the ashes in.',
                 'the bowl takes them without a sound, which is worse than a sound.',
                 'a door opens in the east wall. it is on fire. it does not seem bothered.'] },
-      { t: 'npc', x: 12, y: 3, colour: '#C4705F', mush: 'mush2',
+      { t: 'npc', x: 12, y: 3, colour: '#C4705F', mush: 'mush2', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush2'); } },
       { t: 'exit', x: 15, y: 5, to: 'a3_fork', spawn: 'altar' },
       { t: 'exit', x: 0, y: 5, to: 'b8_arena', spawn: 'west', locked: 'solved:b6_dark' },

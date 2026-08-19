@@ -217,16 +217,13 @@ console.log('\n4. puzzles');
   ok('>>> the solved map is the shipped map <<<',
      grid.every(row => src.includes("'" + row + "'")));
 
-  /* Every block puzzle, proved solvable BY A PLAYER — the pusher has to
-     walk to the cell it pushes from, and the BFS above over block
-     positions alone does not say that. b4, b5 and b6 all passed the
-     weaker proof while being impossible. */
-  const { unsolvable: dead, lengths } = unsolvable(ROOT, ['rooms-a.js']);
-  ok('>>> every block puzzle has a solution a player can walk <<<', dead.length === 0);
-  if (dead.length) console.log('       ' + dead.join('\n       '));
-  ok('and all four castle puzzles were checked', Object.keys(lengths).length === 4);
-  for (const id of Object.keys(lengths))
-    console.log('       ' + id + ': ' + lengths[id] + ' moves (walk + push)');
+  /* The old block puzzles are gone. b2 is riddle stones, b4 is an ice
+     ring with slide-only plates, b5 is the mirror, b6 is the torch —
+     none of them has a push block, so the block BFS skips them all by
+     design. The new win conditions are driven in 4b-4e below; this
+     static line just proves the redesign removed every block. */
+  const blocks = [...src.matchAll(/\{ t: 'block'/g)];
+  ok('>>> no block entities remain in the castle <<<', blocks.length === 0);
 
   /* B3: the order is stated in the room and matched by the check. */
   ok('b3 order is declared once', /B3_ORDER = \[2, 0, 3, 1\]/.test(src));
@@ -237,61 +234,87 @@ console.log('\n4. puzzles');
 
   /* B5 is deliberately unsolvable by the B2 rule. */
   ok('b5 overrides the plate rule', /solved: function \(c\)/.test(src));
-  ok('>>> b5 needs you standing on one plate <<<', /onL && bR\) \|\| \(onR && bL/.test(src));
+  ok('>>> and the mirror is the second plate <<<',
+     /b5face === 1 && onR\) \|\| \(b5face === 2 && onL/.test(src));
 }
 
-/* ═══ 4b. pressing e actually pushes ══════════════════════════════
-   The static proofs above check that a LAYOUT admits a solution. They
-   cannot see whether the push works at all, and it did not: the E
-   handler was `if (nearest()) fire(it); else tryPush()`, and `nearest`
-   happily returned the block itself. fire() has no branch for a block,
-   so it returned in silence and tryPush() was never reached — standing
-   correctly against a block with open floor beyond and pressing e did
-   nothing, in every room, for every block. Every puzzle in the game was
-   unsolvable while passing every solvability test we had.
-
-   So this drives the real engine: walk east out of b2's spawn until the
-   block stops you, press e, and watch the block move. Frames come off a
-   manual queue because jsdom's clock will not produce the fixed
-   timestep the sweep needs. */
-console.log('\n4b. the push');
+/* ═══ 4b. the riddle stones ══════════════════════════════════════
+   b2 is no longer a block push — it is three stones, one press each,
+   and the press must reach the stone in front of you rather than
+   pushing it. Wrong press says so and the room stays locked; R
+   resets the attempt but is on a 4s settle timer so brute force
+   costs more than it buys. */
+console.log('\n4b. the riddle stones');
 {
   const { w, NEU } = boot();
   let frames = [];
   w.requestAnimationFrame = cb => { frames.push(cb); return frames.length; };
   let t = w.performance.now();
+  /* the R settle timer reads performance.now() directly — drive it
+     from the pumped clock so the cooldown behaves like real time */
+  w.performance.now = () => t;
   const pump = n => { for (let i = 0; i < n; i++) { const q = frames; frames = []; t += 16; for (const cb of q) cb(t); } };
   const key = (ty, k) => w.dispatchEvent(new w.KeyboardEvent(ty, { key: k, bubbles: true }));
-  const blocks = () => NEU.engine.api.ents().filter(e => e.t === 'block').map(b => [b.x, b.y]);
+  const stones = () => NEU.engine.api.ents().filter(e => e.stone).map(b => b.x + ',' + b.y + ':' + b.colour);
+  const dim = c => c.endsWith(':#2A2A38'), lit = c => c.endsWith(':#E4C46A'),
+        cold = c => c.endsWith(':#564B66');
 
   NEU.engine.enter('b2_blocks', 'west');
-  ok('b2 loaded with both blocks', JSON.stringify(blocks()) === '[[6,4],[8,4]]');
+  ok('b2 loaded with all three stones', stones().length === 3);
 
   key('keydown', 'ArrowRight'); pump(60); key('keyup', 'ArrowRight');
   const p = NEU.engine.api.player;
-  ok('walking east stops you against the block',
+  ok('walking east stops you against the first stone',
      Math.floor(p.x / 16) === 5 && p.face === 'right');
 
-  const before = JSON.stringify(blocks());
   key('keydown', 'e'); key('keyup', 'e'); pump(4);
-  const after = JSON.stringify(blocks());
-  ok('>>> e pushes the block away from you <<<', before !== after);
-  ok('and it moves exactly one cell, in the direction you face',
-     after === '[[7,4],[8,4]]');
+  ok('>>> pressing e on a stone is a press, not a push <<<',
+     NEU.save.flagged('solved:b2_blocks') !== true);
+  ok('the wrong stone dims, the room stays locked',
+     stones().some(dim) && stones().some(lit));
+  ok('and one press per attempt — only the pressed stone lights',
+     stones().filter(lit).length === 1);
 
-  /* the same press must still talk to an npc when one is in reach —
-     that is what the nearest()-first ordering was for */
+  /* reset is settled: wrong stone stays lit-dim until r. Walk clear,
+     wait out the settle, reset, then take the correct stone. */
+  key('keydown', 'ArrowLeft'); pump(60); key('keyup', 'ArrowLeft');
+  pump(250);                       /* 4s settle */
+  key('keydown', 'r'); key('keyup', 'r'); pump(4);
+  ok('r restores the stones', stones().length === 3 &&
+     stones().every(cold));
+
+  key('keydown', 'ArrowRight'); pump(70); key('keyup', 'ArrowRight');  // to (5,4), stopped by stone 1
+  key('keydown', 'e'); key('keyup', 'e'); pump(4);                     // wrong again — friend is not ash
+  ok('the friend stone is still not the answer',
+     NEU.save.flagged('solved:b2_blocks') !== true);
+
+  key('keydown', 'ArrowLeft'); pump(60); key('keyup', 'ArrowLeft');
+  pump(250);
+  key('keydown', 'r'); key('keyup', 'r'); pump(4);
+key('keydown', 'ArrowRight'); pump(60); key('keyup', 'ArrowRight');  // (5,4)
+  key('keydown', 'ArrowRight'); pump(10); key('keyup', 'ArrowRight');  // pass stone 1? no — solid
+  ok('the first stone still stops you before the ash stone',
+     Math.floor(NEU.engine.api.player.x / 16) === 5);
+  /* the ash stone is second — the room is a queue you press in order,
+     and stone 1 blocks the whole row east of it, so the only way
+     beside the queue is from below: down to row 5, east to (8,5),
+     right under the ash stone. From there ash is dead ahead and the
+     reach is decisive — no tie with its neighbour. */
+  key('keydown', 'ArrowDown'); pump(10); key('keyup', 'ArrowDown');     // (5,5)
+  key('keydown', 'ArrowRight'); pump(30); key('keyup', 'ArrowRight');   // (8,5), under ash
+  key('keydown', 'e'); key('keyup', 'e'); pump(4);
+  ok('>>> pressing the ash stone solves the room <<<',
+     NEU.save.flagged('solved:b2_blocks') === true);
   NEU.engine.leave();
 }
 
-/* 4c. the walk. checkPuzzle() used to live only inside tryPush(): the
-   game could be SOLVED only by pushing the block onto a plate while
-   already standing on the other. b5's second plate needs the walk
-   itself to be the last move — block on one plate, player steps onto
-   the other — and nothing ever looked. Push the block east onto plate
-   R, then walk onto plate L and the room must solve itself. (The
-   engine walks 100px/s = 1.6px/frame = ten frames per cell.) */
-console.log('\n4c. the walk solves the second plate');
+/* 4c. the mirror. b5 used to be a block push with you standing on the
+   other plate; the block is gone and the mirror is the whole room
+   now. The room must solve when the mirror looks at the plate you are
+   NOT standing on — walk onto plate R, turn the mirror to face east,
+   and the room answers. checkPuzzle() runs every moving frame, so the
+   walk onto the plate is the last move. */
+console.log('\n4c. the mirror holds the second plate');
 {
   const { w, NEU } = boot();
   let frames = [];
@@ -299,31 +322,96 @@ console.log('\n4c. the walk solves the second plate');
   let t = w.performance.now();
   const pump = n => { for (let i = 0; i < n; i++) { const q = frames; frames = []; t += 16; for (const cb of q) cb(t); } };
   const key = (ty, k) => w.dispatchEvent(new w.KeyboardEvent(ty, { key: k, bubbles: true }));
-  const blocks = () => NEU.engine.api.ents().filter(e => e.t === 'block').map(b => [b.x, b.y]);
 
   NEU.engine.enter('b5_two', 'west');
-  ok('b5 loaded, block at 8,5', JSON.stringify(blocks()) === '[[8,5]]');
+  ok('b5 loaded, no blocks left', NEU.engine.api.ents().filter(e => e.t === 'block').length === 0);
+  ok('the mirror is there to press', !!NEU.engine.api.ents().find(e => e.mirror));
 
-  key('keydown', 'ArrowRight'); pump(60); key('keyup', 'ArrowRight');  // to (7,5), beside the block
-  key('keydown', 'ArrowDown'); pump(10); key('keyup', 'ArrowDown');    // to (7,6), below it
-  key('keydown', 'ArrowRight'); pump(10); key('keyup', 'ArrowRight');  // to (8,6)
-  key('keydown', 'ArrowUp'); pump(2); key('keyup', 'ArrowUp');         // face up, bump the block
-  key('keydown', 'e'); key('keyup', 'e'); pump(4);                     // push it north to 8,4
-  ok('block pushed up off the floor row', JSON.stringify(blocks()) === '[[8,4]]');
-
-  key('keydown', 'ArrowLeft'); pump(10); key('keyup', 'ArrowLeft');    // to (7,6)
-  key('keydown', 'ArrowUp'); pump(20); key('keyup', 'ArrowUp');        // to (7,4), west of it
-  key('keydown', 'ArrowRight'); pump(2); key('keyup', 'ArrowRight');   // face east, bump the block
-  for (let i = 0; i < 4; i++) {                                        // walk it east to plate R at 12,4
-    key('keydown', 'e'); key('keyup', 'e'); pump(4);
-    if (i < 3) { key('keydown', 'ArrowRight'); pump(10); key('keyup', 'ArrowRight'); }
-  }
-  ok('block walked east onto plate R', JSON.stringify(blocks()) === '[[12,4]]');
-
-  key('keydown', 'ArrowLeft'); pump(50); key('keyup', 'ArrowLeft');    // walk west onto plate L at 5,4
+  /* spawn (1,5). up to the mirror at (7,1), turn it east (face 1),
+     back down, then walk east and up onto plate R at (12,4). */
+  key('keydown', 'ArrowUp'); pump(30); key('keyup', 'ArrowUp');        // to (1,2)
+  key('keydown', 'ArrowRight'); pump(55); key('keyup', 'ArrowRight');  // to (7,2), under the mirror
+  key('keydown', 'e'); key('keyup', 'e'); pump(4);                     // turn it → looks east
+  key('keydown', 'ArrowDown'); pump(30); key('keyup', 'ArrowDown');    // back to row 5
+  key('keydown', 'ArrowRight'); pump(55); key('keyup', 'ArrowRight');  // to (12,5)
+  key('keydown', 'ArrowUp'); pump(10); key('keyup', 'ArrowUp');        // onto plate R at (12,4)
   pump(8);
-  ok('>>> walking onto the free plate solves the room <<<',
+  ok('>>> mirror east + you on the east plate solves the room <<<',
      NEU.save.flagged('solved:b5_two') === true);
+  NEU.engine.leave();
+}
+
+/* 4d. the ice ring. The engine's ice-slide is the puzzle: step onto
+   ice and you commit to that line until it runs out, and a slide-only
+   plate arms only when a slide dies on it. The plates sit on the last
+   ice cell of three lines: (11,2) east of the top row, (11,7) south of
+   the east column, (3,7) west of the bottom row. Drive the three-slide
+   route — each slide ends on an armed plate and the next one starts
+   from it. */
+console.log('\n4d. the ice ring locks on the slides');
+{
+  const { w, NEU } = boot();
+  let frames = [];
+  w.requestAnimationFrame = cb => { frames.push(cb); return frames.length; };
+  let t = w.performance.now();
+  const pump = n => { for (let i = 0; i < n; i++) { const q = frames; frames = []; t += 16; for (const cb of q) cb(t); } };
+  const key = (ty, k) => w.dispatchEvent(new w.KeyboardEvent(ty, { key: k, bubbles: true }));
+  const plates = () => NEU.engine.api.ents().filter(e => e.t === 'plate').map(p => p.x + ',' + p.y + (p.armed ? ':armed' : ''));
+
+  NEU.engine.enter('b4_ice', 'west');
+  ok('b4 loaded with three slide-only plates', plates().length === 3);
+
+  key('keydown', 'ArrowUp'); pump(32); key('keyup', 'ArrowUp');        // (1,2), dry
+  key('keydown', 'ArrowRight'); pump(18); key('keyup', 'ArrowRight');  // step onto (3,2): ice commits you
+  pump(100);                                                            // slide east along the top row
+  ok('slide one dies on (11,2) and arms it', plates().includes('11,2:armed'));
+
+  key('keydown', 'ArrowDown'); pump(8); key('keyup', 'ArrowDown');     // tap south: the commit fires, the slide runs out
+  pump(70);                                                            // and dies on (11,7)
+  ok('slide two dies on (11,7) and arms it', plates().includes('11,7:armed'));
+
+  pump(2);                                                             // a real release between slides
+  key('keydown', 'ArrowLeft'); pump(100); key('keyup', 'ArrowLeft');   // step west: slide along the bottom row
+  ok('slide three dies on (3,7) and arms it', plates().includes('3,7:armed'));
+  pump(8);
+  ok('>>> all three armed solves the room <<<',
+     NEU.save.flagged('solved:b4_ice') === true);
+  NEU.engine.leave();
+}
+
+/* 4e. the torch. b6 is dark and the dark follows the light: carry the
+   torch and the light hook follows you; seat it in the socket and the
+   dark drops to zero. The exit stays locked until the socket is fed.
+   The room's own hooks are the observables — the dark and light are
+   functions the engine asks every frame. */
+console.log('\n4e. the torch and the socket');
+{
+  const { w, NEU } = boot();
+  let frames = [];
+  w.requestAnimationFrame = cb => { frames.push(cb); return frames.length; };
+  let t = w.performance.now();
+  const pump = n => { for (let i = 0; i < n; i++) { const q = frames; frames = []; t += 16; for (const cb of q) cb(t); } };
+  const key = (ty, k) => w.dispatchEvent(new w.KeyboardEvent(ty, { key: k, bubbles: true }));
+
+  NEU.engine.enter('b6_dark', 'west');
+  const api = NEU.engine.api;
+  const room = api.room;
+  ok('b6 loads dark', room.dark() === 108);
+  ok('torch at (2,5), socket at (10,5)',
+     !!api.ents().find(e => e.torch) && !!api.ents().find(e => e.socket));
+  ok('the dark is centred on the room until the torch is taken',
+     room.light(api) === null);
+
+  key('keydown', 'e'); key('keyup', 'e'); pump(4);
+  ok('>>> pressing the torch takes it and the light follows you <<<',
+     room.light(api) !== null && room.light(api).x === api.player.x);
+
+  key('keydown', 'ArrowRight'); pump(60); key('keyup', 'ArrowRight');  // (7,5), past the torch wall
+  key('keydown', 'ArrowRight'); pump(30); key('keyup', 'ArrowRight');  // (10,5), at the socket
+  key('keydown', 'e'); key('keyup', 'e'); pump(4);
+  ok('>>> seating it wakes the room <<<',
+     room.dark() === 0 && NEU.save.flagged('solved:b6_dark') === true);
+  ok('and the torch leaves the wall with you', !api.ents().find(e => e.torch && !e.dead));
   NEU.engine.leave();
 }
 
@@ -388,13 +476,15 @@ console.log('\n6. calamitas');
 }
 
 /* 6b. the win path. tryHit() used to bail on `invuln || mode !== 'fight'
-   || sep` — and she is invuln for both interludes, so the sepulchre's
+   || sep` — and she is invincible for both interludes, so the sepulchre's
    six hearts and her two brothers were untouchable, she never came out
    of her invincibility, and the fight could not be won. Drive the whole
    thing: shatter the hearts, strike her eighteen times, kill both
    brothers, and she must drop into phase 2. (Arena in jsdom: 1024x768,
-   so AX=162 AY=178 AW=700 AH=460; player walks 4px/frame straight,
-   2.828px/frame diagonal.) */
+   so AX=162 AY=178 AW=700 AH=460; the soul walks 4px/frame straight,
+   2.828px/frame diagonal, and has MAXHP=5 — contact damage is lethal,
+   so the drive dodges: she and the worm only hurt while charging, and
+   darts are dodged perpendicular to their path.) */
 console.log('\n6b. the sepulchre, the brothers, and the win');
 {
   const { w, NEU } = boot();
@@ -403,71 +493,204 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
   let t = w.performance.now();
   const pump = n => { for (let i = 0; i < n; i++) { const q = frames; frames = []; t += 16; for (const cb of q) cb(t); } };
   const key = (ty, k) => w.dispatchEvent(new w.KeyboardEvent(ty, { key: k, bubbles: true }));
-  const hold = (k, n) => { key('keydown', k); pump(n); key('keyup', k); };
   const z = () => { key('keydown', 'z'); key('keyup', 'z'); };
+  const run = (dx, dy, n) => {
+    if (dx < 0) key('keydown', 'ArrowLeft'); else if (dx > 0) key('keydown', 'ArrowRight');
+    if (dy < 0) key('keydown', 'ArrowUp'); else if (dy > 0) key('keydown', 'ArrowDown');
+    pump(n);
+    key('keyup', 'ArrowLeft'); key('keyup', 'ArrowRight'); key('keyup', 'ArrowUp'); key('keyup', 'ArrowDown');
+  };
+  /* Aggressive dodge for the hearts phase: the sepulcher's ring bursts
+     spray radial darts all around it, and a dart that is closing on
+     the soul's neighbourhood is worth dodging — there is no aim to
+     stale. */
+  const dodge = () => {
+    const bs = NEU.scal.bullets;
+    for (const b of bs) {
+      const dx = b.x - NEU.scal.px, dy = b.y - NEU.scal.py;
+      const d = Math.hypot(dx, dy);
+      if (d > 130) continue;
+      if (dx * b.vx + dy * b.vy >= 0) continue;   /* not closing */
+      if (Math.abs(b.vx) > Math.abs(b.vy)) run(0, b.vy >= 0 ? -1 : 1, 12);
+      else run(b.vx >= 0 ? -1 : 1, 0, 12);
+      return true;
+    }
+    return false;
+  };
 
   NEU.scal.open();
-  pump(500);   /* intro (2.6s) + first wall (4.6s) → sepulchre */
+  pump(163);   /* intro (2.6s) — the soul is frozen */
+  /* wall(0): the soul climbs to the top band in the wall's last
+     moments so the worm's spawn burst cannot reach it. The climb
+     crosses only horizontal dart rows whose darts have already
+     passed the soul's column. */
+  for (let i = 0; i < 400 && NEU.scal.mode === 'wall';) {
+    if (i >= 235 && NEU.scal.py > 380) { run(0, -1, 10); i += 10; }
+    else { pump(1); i++; }
+  }
   ok('>>> the sepulchre descends with six hearts <<<',
      NEU.scal.mode === 'fight' && NEU.scal.hearts === 6);
 
-  /* hearts: row 1 at (202,212) (242,212) (282,212); row 2 at
-   (702,246) (742,246) (782,246) — the second row is 34px lower */
-  key('keydown', 'ArrowLeft'); key('keydown', 'ArrowUp');
-  pump(129);   /* diagonal: 2.828px/frame → (169,213) — px clamps at AX+7 */
-  key('keyup', 'ArrowLeft'); key('keyup', 'ArrowUp');
-  hold('ArrowRight', 9);
-  z();
-  ok('>>> a touch shatters a heart <<<', NEU.scal.hearts === 5);
-  hold('ArrowRight', 10); z();
-  hold('ArrowRight', 10); z();
-  hold('ArrowRight', 105); hold('ArrowDown', 9); z();
-  hold('ArrowRight', 10); z();
-  hold('ArrowRight', 10); z();
+  /* The hearts orbit a body segment at radius 24 and shatter under the
+     soul's strike (z) within 18px. The worm dashes at the soul every
+     1.45s, so the drive works the REST windows: dodge the dash, walk
+     onto the ring while the worm is still, strike the heart that the
+     orbit sweeps through the soul (one per ~0.9s), dodge again. */
+  let shattered = 0, before = NEU.scal.hearts;
+  const checkDrop = () => {
+    if (NEU.scal.hearts < before) { shattered += before - NEU.scal.hearts; before = NEU.scal.hearts; }
+  };
+  /* The worm's body trails its head, so its heart-bearing segment (and
+     the hearts) snaps toward the soul during a lunge and rests near it
+     afterwards. So the soul stays close: when the dash starts (the aim
+     locks at the soul's then-position), step once perpendicular to the
+     locked aim — 48px clears the 30px contact radius — then hold still
+     through the rest of the busy window and strike hearts as they
+     orbit within reach during the cooldown. */
+  let dashStep = false;
+  const perpWorm = () => {
+    const v = NEU.scal.wormVel;
+    if (v && (v.x !== 0 || v.y !== 0)) {
+      run(Math.sign(v.y) || 1, Math.sign(-v.x) || 1, 12);
+      return true;
+    }
+    return false;
+  };
+  pump(1);   /* the spawn tick updates the heart positions */
+  for (let g = 0; g < 400 && NEU.scal.hearts > 0 && NEU.scal.running; g++) {
+    if (NEU.scal.wormBusy) {
+      if (!dashStep) dashStep = perpWorm();
+      pump(1);   /* time must advance even while holding */
+      checkDrop();
+      continue;
+    }
+    dashStep = false;
+    if (dodge()) { checkDrop(); continue; }
+    const pts = NEU.scal.heartPos;
+    if (!pts.length) break;
+    let best = null, bd = Infinity;
+    for (const p of pts) {
+      const d = Math.hypot(p.x - NEU.scal.px, p.y - NEU.scal.py);
+      if (d < bd) { bd = d; best = p; }
+    }
+    if (bd < 18) { z(); pump(3); checkDrop(); continue; }
+    if (bd <= 28) { pump(2); checkDrop(); continue; }   /* on the ring: hold, let the orbit bring the heart in */
+    const dx = best.x - NEU.scal.px, dy = best.y - NEU.scal.py;
+    const sp = dx !== 0 && dy !== 0 ? 2.828 : 4;
+    run(Math.sign(dx), Math.sign(dy), Math.min(12, Math.max(1, Math.ceil(bd / sp))));
+    checkDrop();
+  }
+  ok('>>> a touch shatters a heart, one per touch <<<', shattered === 6);
   ok('>>> all six hearts die <<<', NEU.scal.hearts === 0);
   pump(2);
   ok('>>> she steps out of her invincibility <<<', NEU.scal.mode === 'fight');
 
-  /* she hovers above, following the player with a slow lerp — stand
-     under her, let her drift overhead, then strike. Her health gates
-     two more wall interludes at 75% and 50%, so the win path is:
-     6 touches → wall → 6 touches → wall → 6 touches → brothers. */
-  hold('ArrowUp', 24);   /* py clamps at AY+7 = 185 */
-  pump(90);              /* she catches up; dist drops under 34 */
-  for (let i = 0; i < 6; i++) z();
-  pump(2);
+  /* Strike her only when she is in reach and NOT charging — her
+     telegraph and dash are contact damage, and her dash aims at the
+     soul. She hovers at the top wall (by → AY-24) and her x chases the
+     soul, so the soul walks up into reach when she drifts far. */
+  const strike = want => {
+    const target = NEU.scal.hp - want;
+    for (let g = 0; g < 900 && NEU.scal.hp > target; g++) {
+      if (NEU.scal.charging) { run(1, 1, 45); continue; }
+      const d = Math.hypot(NEU.scal.px - NEU.scal.bx, NEU.scal.py - NEU.scal.by);
+      if (d < 40) { z(); pump(1); }
+      else if (Math.abs(NEU.scal.py - NEU.scal.by) > 6) {
+        run(0, Math.sign(NEU.scal.by - NEU.scal.py), Math.min(40, Math.ceil(Math.abs(NEU.scal.py - NEU.scal.by) / 4)));
+      } else { pump(2); }
+    }
+    return NEU.scal.hp <= target;
+  };
+
   ok('>>> six touches open the first mid-fight wall <<<',
-     NEU.scal.mode === 'wall' && NEU.scal.hp === 18);
+     strike(6) && NEU.scal.mode === 'wall' && NEU.scal.hp === 18);
+  /* U1: the rage bar only fills while a heart is missing. The wall
+     after six clean strikes is under 20s of missing a heart, so rage
+     must have STARTED but not yet paid out. */
+  ok('>>> rage is filling while hearts are missing <<<',
+     NEU.scal.rage > 0 && NEU.scal.rage < 1);
+  ok('>>> a full rage bar would heal, but it needs ~20s <<<',
+     NEU.scal.rage >= 0 && NEU.scal.rage < 0.8);
+  /* U2: twenty-plus seconds of grazing near bullets has fed tp, and
+     the meter caps at 1. */
+  ok('>>> grazing bullets fills tp <<<', NEU.scal.tp > 0 && NEU.scal.tp <= 1);
   pump(290);             /* wall(1) lasts 4.6s */
-  for (let i = 0; i < 6; i++) z();
-  pump(2);
   ok('>>> six more call the second wall <<<',
-     NEU.scal.mode === 'wall' && NEU.scal.hp === 12);
+     strike(6) && NEU.scal.mode === 'wall' && NEU.scal.hp >= 12 && NEU.scal.hp <= 15);
   pump(290);             /* wall(2) */
-  for (let i = 0; i < 6; i++) z();
-  pump(2);
   ok('>>> eighteen touches call the brothers <<<',
-     NEU.scal.mode === 'brothers' && NEU.scal.bros === 2 && NEU.scal.hp === 6);
+     strike(6) && NEU.scal.mode === 'brothers' && NEU.scal.bros === 2 &&
+     NEU.scal.hp >= 6 && NEU.scal.hp <= 9);
 
-  /* brothers at (802, 408+drift) and (222, 408+drift). The bob's phase
-     depends on the global fight timer, so instead of guessing it the
-     player sweeps vertically past the brother's whole range while
-     z-spamming: every frame lands a hit while |py - broY| < 22, and
-     the 4px/frame sweep guarantees a pass within range no matter where
-     the wobble is. */
-  hold('ArrowRight', 5);                    /* under bro1's column */
-  key('keydown', 'ArrowDown');
-  for (let i = 0; i < 70; i++) { z(); pump(1); }
-  key('keyup', 'ArrowDown');
-  ok('>>> a brother dies in eight touches <<<', NEU.scal.bros === 1);
-  hold('ArrowLeft', 146);                   /* to bro0's column */
-  key('keydown', 'ArrowUp');
-  for (let i = 0; i < 40; i++) { z(); pump(1); }
-  key('keyup', 'ArrowUp');
+  /* Brothers at the wall columns (222 and 802), bobbing ±22px in y and
+     swapping sides after every volley pause — broPos is read live so
+     the walk re-aims if a swap happens mid-approach. Touch radius is
+     28px, so the soul parks at |dx|<=8 and |dy|<=24 and z-storms: the
+     bob cannot escape the radius and eleven touches (25% DR while both
+     stand) land in ~20 frames — well inside one volley window, so the
+     storm eats at most one hit while IFRAMES (1.1s) covers the next
+     volley (0.83s apart). The approach runs straight: the brothers aim
+     at the soul's position at fire time, so a continuously moving soul
+     is never where the dart lands. Target the NEAREST brother and stop
+     when the headcount drops: brothers splice out of bros on death, so
+     their array indices shift mid-fight and cannot be trusted. When
+     the survivor enrages it swaps sides every ~2.45s — faster than a
+     580px crossing — so do not chase it; the swap brings it back to
+     the column the soul is already standing on. */
+  const killBro = target => {
+    for (let h = 0; h < 300 && NEU.scal.bros > target && NEU.scal.running; h++) {
+      const bs = NEU.scal.broPos;
+      if (!bs.length) return true;
+      let best = bs[0], bd = Infinity;
+      for (const p of bs) {
+        const d = Math.hypot(p.x - NEU.scal.px, p.y - NEU.scal.py);
+        if (d < bd) { bd = d; best = p; }
+      }
+      const dx = best.x - NEU.scal.px, dy = best.y - NEU.scal.py;
+      if (Math.abs(dx) > 8) {
+        if (NEU.scal.bros === 1) { pump(1); continue; }   /* survivor: wait for the swap */
+        const sp = dx !== 0 && dy !== 0 ? 2.828 : 4;
+        run(Math.sign(dx), Math.sign(dy), Math.min(25, Math.max(1, Math.ceil(Math.hypot(dx, dy) / sp))));
+        continue;
+      }
+      if (Math.abs(dy) > 24) run(0, Math.sign(dy), Math.min(25, Math.ceil(Math.abs(dy) / 4)));
+      else { z(); pump(1); }   /* inside the touch radius: storm */
+    }
+    return NEU.scal.bros <= target;
+  };
+  ok('>>> a brother dies in twelve touches <<<', killBro(1) && NEU.scal.bros === 1);
   ok('>>> both brothers fall: phase 2 begins <<<',
-     NEU.scal.bros === 0 && NEU.scal.phase === 2 && NEU.scal.mode === 'fight');
+     killBro(0) && NEU.scal.bros === 0 && NEU.scal.phase === 2 && NEU.scal.mode === 'fight');
 
+NEU.scal.close();
+}
+
+/* ═══ 6c. U1/U2 wiring: the shield and the resets ════════════════*/
+console.log('\n6c. the shield and the meters');
+{
+  const { w, NEU } = boot();
+  let frames = [];
+  w.requestAnimationFrame = cb => { frames.push(cb); return frames.length; };
+  let t = w.performance.now();
+  w.performance.now = () => t;
+  const pump = n => { for (let i = 0; i < n; i++) { const q = frames; frames = []; t += 16; for (const cb of q) cb(t); } };
+  const key = (ty, k) => w.dispatchEvent(new w.KeyboardEvent(ty, { key: k, bubbles: true }));
+
+  NEU.scal.open();
+  pump(163);   /* intro — the soul is frozen, nothing has grazed */
+  ok('meters start empty', NEU.scal.tp === 0 && NEU.scal.rage === 0 && NEU.scal.shieldT === 0);
+  key('keydown', 'x'); key('keyup', 'x'); pump(2);
+  ok('>>> x with an empty tp does nothing <<<', NEU.scal.shieldT === 0 && NEU.scal.tp === 0);
   NEU.scal.close();
+
+  const src = fs.readFileSync(path.join(ROOT,'js','act4','boss-scal.js'), 'utf8');
+  ok('the shield eats the hit inside hitPlayer', /if \(shieldT > 0\) \{/.test(src) &&
+     /shieldT = 0;/.test(src));
+  ok('x spends full tp', /if \(tp < 1\)/.test(src) && /shieldT = 2\.5/.test(src));
+  ok('rage heals exactly one heart', /rage \+= dt \/ 20/.test(src) &&
+     /hp = Math\.min\(MAXHP, hp \+ 1\)/.test(src));
+  ok('a fresh fight resets both meters', /rage = 0; tp = 0; shieldT = 0;/.test(src));
+  NEU.engine.leave();
 }
 
 /* ═══ 7. the drop and the altar ═══════════════════════════════════*/

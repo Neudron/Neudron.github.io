@@ -310,13 +310,16 @@ Three bullet-hell interludes mark the phase boundaries — they're survivable by
 standing in the right gap, and they exist so you can feel progress in a fight
 whose health bar you're too busy to look at:
 
-- **On spawn** — walls of hellblasts, then the **Sepulcher** with ten Brimstone
-  Hearts. Kill the hearts to kill it. She is invincible until it dies, *and the
+- **On spawn** — walls of hellblasts, then the **Sepulcher** with six Brimstone
+  Hearts. Kill the hearts to kill it — a soul-touch shatters one at a time as
+  they orbit it. She is invincible until it dies, *and the
   bar says "calamitas — shielded"* rather than silently eating your hits.
 - **75%** — adds fireblasts from offscreen.
 - **50%** — adds gigablasts.
 - **Then the brothers.** Cataclysm on the right throwing fists, Catastrophe on
-  the left throwing slashes. She is invincible while they live.
+  the left throwing slashes. She is invincible while they live. They bob as
+  they fight and swap sides between volleys; while both stand they share 25%
+  damage reduction, so each costs eleven touches; the survivor enrages.
 
 Both brothers dead: she laughs. Phase two — a glowing aura, faster attacks,
 half the charges, and she **resumes the cycle where it left off**.
@@ -326,6 +329,12 @@ television refused to.
 
 She drops **Ashes of Annihilation**, sits back down, and says: *"the small one
 was me. obviously."*
+
+The soul is **five hits**, not three — a bullet-hell marathon where the
+mid-fight walls would otherwise be the boss's easiest attack. Touching her
+hurts once, but only while she is charging or mid-dash; her wake-up is safe.
+Her twenty-step cycle never rolls a die, so the fight is learnable, not a
+coin flip.
 
 ## The fire door
 

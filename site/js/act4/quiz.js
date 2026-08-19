@@ -314,7 +314,11 @@
   });
 
   var q = document.getElementById('quizQuit');
-  if (q) q.addEventListener('click', close);
+  if (q) q.addEventListener('click', function () {
+    /* same path as ESC: a confirmed exit, since the score is on the line */
+    if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Quiz', close);
+    else close();
+  });
 
   NEU.quiz = { open: open, close: close,
                fast: function (on) { fast = !!on; },

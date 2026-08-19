@@ -675,8 +675,15 @@
 
   var startBtn = document.getElementById('bhStart');
   if (startBtn) startBtn.addEventListener('click', open);
+  /* The SC fight shares this button and this wrapper (#bh), so the
+     handler must route by whichever game is actually up — and it must
+     confirm like ESC does instead of vanishing without a word. */
   var quitBtn = document.getElementById('bhQuit');
-  if (quitBtn) quitBtn.addEventListener('click', close);
+  if (quitBtn) quitBtn.addEventListener('click', function () {
+    if (NEU.activeMinigame !== 'bullet') return;
+    if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Bullet Hell', close);
+    else close();
+  });
 
   NEU.bullet = { open: open, close: close, get endless() { return endless; }, get running() { return running; },
                  get won() { return won; } };

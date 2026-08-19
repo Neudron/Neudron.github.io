@@ -56,7 +56,7 @@ for (const [f, name] of SCENES) {
 console.log('\n3. the profiles cover every scene, with the right keys');
 
 const T = read('core/touch.js');
-const profs = [...T.matchAll(/\{\s*id:\s*'([a-z0-9]+)'[\s\S]*?\}(?=,\s*\n\n|\s*\];)/g)]
+const profs = [...T.matchAll(/\{\s*id:\s*'([a-z0-9]+)'[\s\S]*?(?=[\r\n]{2,}\s*\{ id:|\s*\];)/g)]
   .map(m => ({ id: m[1], body: m[0] }));
 ok('touch.js defines profiles (' + profs.length + ')', profs.length >= 9);
 
