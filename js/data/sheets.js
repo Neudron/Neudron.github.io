@@ -140,6 +140,15 @@
     sepulcher: { src: IMG + 'calamity/SepulcherHead.png',
                  w: 62,  h: 88,   frames: 1,  fw: 62,  fh: 88, fps: 0,  confirmed: true,
                  note: 'seen 2026-08-17: one head, not two frames. fps 0 — nothing to animate' },
+    /* the worm's body and tail. Single frames each, measured directly
+       2026-08-18: Body 82x72, BodyAlt 86x82, Tail 54x54. The fight used
+       to draw the head alone because these were never registered. */
+    sepulBody: { src: IMG + 'calamity/SepulcherBody.png',
+                 w: 82,  h: 72,   frames: 1,  fw: 82,  fh: 72, fps: 0,  confirmed: true },
+    sepulBodyAlt: { src: IMG + 'calamity/SepulcherBodyAlt.png',
+                 w: 86,  h: 82,   frames: 1,  fw: 86,  fh: 82, fps: 0,  confirmed: true },
+    sepulTail: { src: IMG + 'calamity/SepulcherTail.png',
+                 w: 54,  h: 54,   frames: 1,  fw: 54,  fh: 54, fps: 0,  confirmed: true },
     heart:     { src: IMG + 'calamity/BrimstoneHeart.png',
                  w: 44,  h: 372,  frames: 6,  fw: 44,  fh: 62, fps: 10, confirmed: true,
                  note: 'seen 2026-08-17: six beats, 62px grid. sheet re-padded 370 -> 372' },

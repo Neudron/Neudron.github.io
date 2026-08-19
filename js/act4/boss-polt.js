@@ -509,7 +509,11 @@
   }
 
   var q = document.getElementById('poltQuit');
-  if (q) q.addEventListener('click', close);
+  if (q) q.addEventListener('click', function () {
+    /* same path as ESC: a confirmed exit, since the fight is on the line */
+    if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Polterghast', close);
+    else close();
+  });
 
   NEU.polt = { open: open, close: close,
                get running() { return running; },

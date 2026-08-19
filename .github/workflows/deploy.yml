@@ -43,10 +43,10 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload the site folder (no build step)
+      - name: Upload the whole repo (no build step)
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'site'
+          path: '.'
 
       - name: Deploy
         id: deployment

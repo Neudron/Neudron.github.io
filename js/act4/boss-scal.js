@@ -54,6 +54,12 @@
 
   var running = false, last = 0, t = 0;
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
+  /* U1/U2: your two resources. Rage builds while you are missing
+     hearts and spends itself as one recovered heart. TP builds by
+     grazing bullets and spends itself as a barrier that takes one
+     hit. Both are the fight rewarding you for doing what the fight
+     already asked you to do. */
+  var rage = 0, tp = 0, shieldT = 0;
   var AX = 0, AY = 0, AW = 0, AH = 0;
   var bullets = [], step_ = 0, stepT = 0, phase = 1;
   var bossHP = 1, bossMax = 1, invuln = false;
@@ -153,12 +159,26 @@
   /* ── her attacks ────────────────────────────────────────────────*/
   function dartBurst() {
     /* Eight darts with even gaps, aimed down the screen from above
-       her. The GAPS are the attack — a solid wall would be a wall. */
-    var n = 8, span = AW * 0.9, x0 = AX + AW / 2 - span / 2;
-    for (var i = 0; i < n; i++) {
-      /* one slot is deliberately left out, and it moves each burst */
-      if (i === (Math.random() * n) | 0) continue;
-      shot(x0 + (i + 0.5) * (span / n), by + 20, 0, 150 + phase * 30, 4, COL.brim);
+       her. The GAPS are the attack — a solid wall would be a wall.
+       The mod fires 3-4 bursts per attack (~20 frames apart), with the
+       gap moving between bursts, so a position that is safe standing
+       still is never safe standing still twice. */
+    scalAnimState = 'casting';
+    var bursts = 3 + (Math.random() * 2 | 0);
+    for (var b = 0; b < bursts; b++) {
+      later(function (k) {
+        return function () {
+          if (!running) return;
+          var n = 8, span = AW * 0.9, x0 = AX + AW / 2 - span / 2;
+          /* one slot is deliberately left out, and it walks across the
+             line each burst (deterministic, so the dodge is learnable) */
+          var hole = Math.floor(span / n * 1.5 * k) % n;
+          for (var i = 0; i < n; i++) {
+            if (i === hole) continue;
+            shot(x0 + (i + 0.5) * (span / n), by + 20, 0, 150 + phase * 30, 4, COL.brim);
+          }
+        };
+      }(b), b * 340);
     }
   }
 
@@ -166,12 +186,14 @@
     /* Homes to player continuously, bursts into 12 darts within 150px (real: 224 Terraria px).
        Source: inertia 100, homeSpeed 9 (13 revenge), rotation = vel + PI/2. */
     sfxPlay('fireblast');
+    scalAnimState = 'casting';
     var b = { x: bx, y: by + 20, vx: 0, vy: 0, r: 8, c: COL.brimHi, k: 1, age: 0, burst: false };
     bullets.push(b);
   }
 
   function gigablast(n) {
     sfxPlay('giga');
+    scalAnimState = 'gigablast';
     for (var i = 0; i < n; i++) {
       later(function () {
         if (!running) return;
@@ -184,6 +206,7 @@
   function hellbarrage() {
     /* From beside you, horizontally, accelerating. */
     sfxPlay('hellblast');
+    scalAnimState = 'hellblast';
     var left = px < AX + AW / 2;
     var x = left ? AX - 20 : AX + AW + 20;
     for (var i = 0; i < 7; i++) {
@@ -225,8 +248,9 @@
     if (beat > walls.length - 1 && beat < 3) {
       walls.push(beat);
       /* down / right / left, then left+right, then down+left+right —
-         the order the game uses, so anyone who knows it is rewarded. */
-      var dirs = [['d','r','l'], ['u','r'], ['d','l','r']][wallN] || ['d'];
+         the order the game uses, so anyone who knows it is rewarded.
+         Was dirs[wallN]: every beat fired the first wall's triple. */
+      var dirs = [['d','r','l'], ['u','r'], ['d','l','r']][beat] || ['d'];
       dirs.forEach(function (d, i) { later(function () { wallLine(d); }, i * 240); });
     }
     if (wallT > 4.6) {
@@ -254,7 +278,10 @@
 
   function spawnSepulcher() {
     mode = 'fight'; invuln = true;
-    sep = { x: AX + AW / 2, y: AY + AH - 40, vx: 0, vy: 0, t: 0, attackCd: 0 };
+    sep = { x: AX + AW / 2, y: AY + AH - 40, vx: 0, vy: 0, t: 0, attackCd: 0,
+            trail: [], segs: [], chargeT: 0, telegraph: 0, cd: 0.6 };
+    /* an initial straight body so the worm has segments before it moves */
+    for (var k = 0; k < 60; k++) sep.trail.push({ x: sep.x, y: sep.y - k * 1.5 });
     hearts = [];
     for (var i = 0; i < 6; i++) {
       hearts.push({ hp: 1, offset: i });
@@ -267,8 +294,8 @@
     mode = 'brothers'; invuln = true; bullets = [];
     clearSched();
     bros = [
-      { side: -1, x: AX + 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'slash', attackCount: 0, enraged: false },
-      { side:  1, x: AX + AW - 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'fist', attackCount: 0, enraged: false }
+      { side: -1, x: AX + 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'slash', attackCount: 0, enraged: false, volley: 0, barrageCd: 0 },
+      { side:  1, x: AX + AW - 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'fist', attackCount: 0, enraged: false, volley: 0, barrageCd: 0 }
     ];
     say("* she calls her brothers. she does not fight while they do.");
   }
@@ -281,7 +308,20 @@
     /* Hit-stop: hold the frame, keep rendering. Skipping the render
        too would read as a dropped frame rather than a held one. */
     if (NEU.juice && NEU.juice.frozen()) { draw(now); return; }
-    t += dt;
+t += dt;
+
+    /* Rage: missing hearts fill it, a full bar pays one heart back.
+       The bar is the deal, so the heal is announced the same way the
+       rest of her lines are. */
+    if (hp < MAXHP && !dying) {
+      rage += dt / 20;              /* ~20s of missing a heart */
+      if (rage >= 1) {
+        rage = 0;
+        hp = Math.min(MAXHP, hp + 1);
+        say('* the bloom tops up. one heart back.');
+      }
+    }
+    if (shieldT > 0) shieldT -= dt;
 
     if (mode !== 'intro' && mode !== 'won') movePlayer(dt);
     if (inv > 0) inv -= dt;
@@ -304,7 +344,35 @@
     py = Math.min(Math.max(py + vy * sp * dt, AY + 7), AY + AH - 7);
   }
 
+  /* Walk the trail placing a segment every 26px, so the body keeps
+     constant spacing whether the worm is creeping or dashing. */
+  function wormSegments() {
+    if (!sep) return [];
+    var segs = [];
+    var prev = { x: sep.x, y: sep.y }, budget = 26;
+    for (var i = 0; i < sep.trail.length && segs.length < 6; i++) {
+      var p = sep.trail[i];
+      budget -= Math.hypot(p.x - prev.x, p.y - prev.y);
+      if (budget <= 0) { segs.push(p); prev = p; budget = 26; }
+    }
+    return segs;
+  }
+
   function fightTick(dt) {
+    /* Contact damage: she hurts on touch only while telegraphing or
+       dashing; the sepulcher hurts only while it is charging at you.
+       (Wiki: SC "only deals contact damage while charging".) */
+    if (inv <= 0) {
+      var touching = false;
+      if ((chargeTelegraph > 0 || chargeT > 0) &&
+          Math.hypot(px - bx, py - by) < 34) touching = true;
+      if (sep && sep.chargeT > 0) {
+        if (Math.hypot(px - sep.x, py - sep.y) < 30) touching = true;
+        for (var s = 0; s < sep.segs.length && !touching; s++)
+          if (Math.hypot(px - sep.segs[s].x, py - sep.segs[s].y) < 26) touching = true;
+      }
+      if (touching && hitPlayer()) return;
+    }
     /* she hovers above you unless charging */
     if (chargeTelegraph > 0) {
       chargeTelegraph -= dt;
@@ -343,22 +411,43 @@
       sep.t += dt;
       if (sep.attackCd > 0) sep.attackCd -= dt;
 
-      /* Sepulcher chases the player (real AI: sepMaxSpeed=20, acceleration 0.175+).
-         Game scale: ~180 px/s max, gentle acceleration. */
-      var maxSpeed = 180;
-      var accel = 35;
-      var dx = px - sep.x, dy = py - sep.y;
-      var dist = Math.hypot(dx, dy) || 1;
-      var tx = (dx / dist) * maxSpeed, ty = (dy / dist) * maxSpeed;
-      sep.vx += (tx - sep.vx) * Math.min(1, dt * accel / maxSpeed);
-      sep.vy += (ty - sep.vy) * Math.min(1, dt * accel / maxSpeed);
-      sep.x += sep.vx * dt;
-      sep.y += sep.vy * dt;
-      sep.x = Math.min(Math.max(sep.x, AX + 40), AX + AW - 40);
-      sep.y = Math.min(Math.max(sep.y, AY + 40), AY + AH - 40);
+      /* Trail of past positions — the body follows it. Only record while
+         actually moving, so the worm keeps its stretched-out body through
+         its cooldown instead of collapsing into the head. */
+      if (Math.hypot(sep.vx, sep.vy) > 1 || sep.chargeT > 0) {
+        sep.trail.unshift({ x: sep.x, y: sep.y });
+        if (sep.trail.length > 260) sep.trail.pop();
+      }
+
+      /* Charge cycle: telegraph, dash, cooldown (real AI: sepMaxSpeed=20,
+         acceleration 0.175 — a lunge, not a drift. The old gentle chase
+         made the worm barely faster than the player.) */
+      if (sep.telegraph > 0) {
+        sep.telegraph -= dt;
+        if (sep.telegraph <= 0) {
+          var a2 = Math.atan2(py - sep.y, px - sep.x);
+          sep.vx = Math.cos(a2) * 340; sep.vy = Math.sin(a2) * 340;
+          sep.chargeT = 0.55;
+          if (NEU.juice) NEU.juice.hit('small');
+        }
+      } else if (sep.chargeT > 0) {
+        sep.chargeT -= dt;
+        sep.x += sep.vx * dt; sep.y += sep.vy * dt;
+        sep.x = Math.min(Math.max(sep.x, AX + 40), AX + AW - 40);
+        sep.y = Math.min(Math.max(sep.y, AY + 40), AY + AH - 40);
+        if (sep.chargeT <= 0) { sep.cd = 0.55; sep.vx = 0; sep.vy = 0; }
+      } else if (sep.cd > 0) {
+        sep.cd -= dt;
+      } else {
+        sep.telegraph = 0.35;
+      }
+
+      /* Body segments along the trail (drawn by draw()) */
+      sep.segs = wormSegments();
 
       /* Proximity ring burst (real: within 110 Terraria px ≈ 150 game px, 30 darts, cd 150 frames = 2.5s).
          Burst speed ~150 px/s. */
+      var dist = Math.hypot(px - sep.x, py - sep.y) || 1;
       if (sep.attackCd <= 0 && dist < 150) {
         sep.attackCd = 2.5;
         sfxPlay('giga-hit');
@@ -369,19 +458,22 @@
         if (NEU.juice) NEU.juice.burst(sep.x, sep.y, 12, COL.brimHi, 1.2);
       }
 
-      /* Hearts follow the worm body (energy balls embedded every 2nd segment).
-         Position them in a ring around the head for simplicity. */
+      /* Hearts follow the worm body (energy balls embedded every 2nd segment),
+         orbiting a body segment rather than the head. */
       for (var i = 0; i < hearts.length; i++) {
         var h = hearts[i];
         var hang = sep.t * 1.2 + h.offset * 1.1;
-        var hrad = 28;
-        h.x = sep.x + Math.cos(hang) * hrad;
-        h.y = sep.y + Math.sin(hang) * hrad;
+        var hrad = 24;
+        var anchor = sep.segs[Math.min(2, sep.segs.length - 1)] || sep;
+        h.x = anchor.x + Math.cos(hang) * hrad;
+        h.y = anchor.y + Math.sin(hang) * hrad;
       }
 
       if (!hearts.length) {
         sep = null; invuln = false;
         say("* she steps out from behind it.");
+        /* pause before she resumes the cycle — the interlude should land */
+        stepT = 1.2;
       }
       return;
     }
@@ -432,8 +524,10 @@
   }
 
   function brothersTick(dt) {
-    /* Both alive: 25% DR (handled in tryHit). Fire every 0.83s (50 frames).
-       Every 7th volley = big attack. When one dies, survivor enrages. */
+    /* Both alive: 25% DR (handled in tryHit). Fire in barrages with
+       pauses — every 0.83s (50 frames) while active, then a hold while
+       they swap sides. Every 7th volley = big attack. When one dies,
+       the survivor enrages: faster volleys, shorter pauses. */
     for (var i = 0; i < bros.length; i++) {
       var b = bros[i];
       if (b.hp <= 0) continue; // dead, will be cleaned up below
@@ -441,9 +535,22 @@
       var interval = b.enraged ? 0.55 : 0.83; // enraged = faster
       b.t -= dt;
       b.y += Math.sin(t * 1.6 + i) * 22 * dt;
-      if (b.t <= 0) {
+      if (b.barrageCd > 0) {
+        b.barrageCd -= dt;
+        if (b.barrageCd <= 0) {
+          b.side *= -1;
+          b.x = b.side < 0 ? AX + 60 : AX + AW - 60;
+          if (NEU.juice) NEU.juice.hit('small');
+        }
+      }
+      if (b.t <= 0 && b.barrageCd <= 0) {
         b.t = interval;
         b.attackCount++;
+        b.volley = (b.volley || 0) + 1;
+        if (b.volley >= (b.enraged ? 3 : 5)) {
+          b.volley = 0;
+          b.barrageCd = b.enraged ? 0.8 : 1.2;
+        }
         var isBigAttack = (b.attackCount % 7 === 0);
         var a = Math.atan2(py - b.y, px - b.x);
 
@@ -493,9 +600,29 @@
 
     if (!bros.length) {
       invuln = false; phase = 2; mode = 'fight';
+      stepT = 1.0; /* the laugh is the interlude; let it land */
       say("* she laughs. that is the first noise she has made.");
       later(function () { if (running) say("* now she is trying."); }, 2200);
     }
+  }
+
+  /* One damage source for bullets and contact alike. A standing
+     barrier eats the hit instead of you — one hit, then it is gone,
+     and it does not hand you invulnerability for free. */
+  function hitPlayer() {
+    if (shieldT > 0) {
+      shieldT = 0;
+      if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+      if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(px, py, 12, '#B8E6FF'); }
+      return false;
+    }
+    hp--; inv = IFRAMES;
+    if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
+    /* Taking a hit is a MEDIUM event. The player needs to feel it
+       without the screen becoming unreadable mid-pattern. */
+    if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
+    if (hp <= 0) { startDeath(); return true; }
+    return false;
   }
 
   function moveBullets(dt) {
@@ -505,11 +632,31 @@
       b.age += dt;
       if (b.k === 1 || b.k === 2) {
         /* Distance-triggered burst (real: fireblast 224px, gigablast 224px).
-           Game scale: burst at ~150px. Fireblast homes with inertia, gigablast preserves speed. */
+           Game scale: burst at ~150px. Fireblast homes with inertia, then
+           PAUSES and explodes — the game holds it a beat before the burst,
+           which is what makes it dodgeable; gigablast preserves speed. */
         if (!b.burst) {
           var dx = px - b.x, dy = py - b.y;
           var dist = Math.hypot(dx, dy) || 1;
-          if (b.k === 1) {
+          var reach = b.k === 1 ? 170 : 150;
+          if (b.k === 1 && b.pauseT === undefined && (dist < reach || b.age > 3.5)) {
+            b.pauseT = 0.55 + Math.random() * 0.25;
+          }
+          if (b.pauseT) {
+            b.pauseT -= dt;
+            if (b.pauseT <= 0) {
+              b.burst = true;
+              var nn = 12;
+              sfxPlay('fireblast-hit');
+              for (var qq = 0; qq < nn; qq++) {
+                var aq = qq * Math.PI * 2 / nn;
+                shot(b.x, b.y, Math.cos(aq) * 130, Math.sin(aq) * 130, 3, COL.brim, 4);
+              }
+              if (NEU.juice) NEU.juice.burst(b.x, b.y, 10, COL.brim, 1.2);
+              continue;
+            }
+            b.vx = 0; b.vy = 0;
+          } else if (b.k === 1) {
             /* Fireblast: inertia 100, homeSpeed ~140 */
             var sp = 140;
             b.vx += (dx / dist * sp - b.vx) * dt * 2.4;
@@ -522,15 +669,15 @@
             b.vy = (b.vy * 24 + ty) / 25;
           }
           /* Proximity burst */
-          if (dist < 150) {
+          if (dist < 150 && b.k === 2) {
             b.burst = true;
-            var n = b.k === 2 ? 28 : 12;
-            sfxPlay(b.k === 2 ? 'giga-hit' : 'fireblast-hit');
+            var n = 28;
+            sfxPlay('giga-hit');
             for (var q = 0; q < n; q++) {
               var ang = q * Math.PI * 2 / n;
               shot(b.x, b.y, Math.cos(ang) * 130, Math.sin(ang) * 130, 3, COL.brim, 4);
             }
-            if (NEU.juice) NEU.juice.burst(b.x, b.y, 10, b.k === 2 ? COL.brimHi : COL.brim, 1.2);
+            if (NEU.juice) NEU.juice.burst(b.x, b.y, 10, COL.brimHi, 1.2);
             continue; // parent projectile dies after burst
           }
         } else {
@@ -544,14 +691,13 @@
       keep.push(b);
       if (inv <= 0 && mode !== 'won') {
         var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
-        if (dx * dx + dy * dy < rr * rr) {
-          hp--; inv = IFRAMES;
-          if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
-          /* Taking a hit is a MEDIUM event. The player needs to feel it
-             without the screen becoming unreadable mid-pattern. */
-          if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
-          if (hp <= 0) { startDeath(); return; }
-        }
+        /* Graze: a bullet within 26px of the soul feeds TP, whether
+           it hits or not. Same rule as the hit check — a near miss is
+           still contact with the pattern, and the pattern pays for
+           that. */
+        if (dx * dx + dy * dy < (b.r + 26) * (b.r + 26))
+          tp = Math.min(1, tp + dt * 0.4);
+        if (dx * dx + dy * dy < rr * rr && hitPlayer()) return;
       }
     }
     bullets = keep;
@@ -672,39 +818,47 @@
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
     frame();
 
-    /* SC animation frame mapping (21 frames × 2 cols):
-     idle: frames 0-3 (fps 4)
-     idle_fast: frames 0-3 (fps 6, phase 2)
-     charge_telegraph: frames 4-7 (fps 8)
-     charging: frames 8-11 (fps 16)
-     charge_recovery: frames 11-8 reverse (fps 8)
-     casting: frames 12-16 (fps 10) - frames 12,16 are flare
-   */
+    /* Frame mapping from the mod source (SupremeCalamitas.cs): the
+       sheet is 21 rows x 2 columns and frame.Y = frameCounter(0-5) +
+       FrameType*6, so each FrameType is a 6-frame band that wraps
+       into column 1 when it crosses row 20. Bands:
+         0 UpwardDraft (idle)         — col 0 rows 0-5
+         1 FasterUpwardDraft (dash)   — col 0 rows 6-11
+         2 Casting                    — col 0 rows 12-17
+         3 BlastCast (gigablast)      — col 0 rows 18-20, col 1 rows 0-2
+         4 BlastPunchCast (P2 giga)   — col 1 rows 3-8
+         5 OutwardHandCast (hellblast)— col 1 rows 9-14
+         6 PunchHandCast (P2 hell)    — col 1 rows 15-20
+       The old mapping here was invented from the row count alone and
+       showed the wrong poses for every state. */
     function getScalAnim() {
       if (scalAnimState !== scalAnimPrevState) {
         scalAnimTimer = 0;
         scalAnimPrevState = scalAnimState;
       }
       scalAnimTimer += 1/60;
-      var f = 0, col = 0, fps = 12;
-      switch (scalAnimState) {
-        case 'idle':
-          fps = 4; f = (scalAnimTimer * fps) % 4; col = 0; break;
-        case 'idle_fast':
-          fps = 6; f = (scalAnimTimer * fps) % 4; col = 0; break;
-        case 'charge_telegraph':
-          fps = 8; f = 4 + ((scalAnimTimer * fps) % 4); col = 1; break;
-        case 'charging':
-          fps = 16; f = 8 + ((scalAnimTimer * fps) % 4); col = 1; break;
-        case 'charge_recovery':
-          fps = 8; f = 11 - ((scalAnimTimer * fps) % 4); col = 1; break;
-        case 'casting':
-          fps = 10; f = 12 + ((scalAnimTimer * fps) % 5); col = 0; break;
-        default:
-          f = 0; col = 0;
-      }
-      return { frame: f | 0, col: col };
+      var st = scalAnimState;
+      if (st === 'gigablast' && phase === 2) st = 'gigablast_p2';
+      if (st === 'hellblast' && phase === 2) st = 'hellblast_p2';
+      var b = BANDS[st] || BANDS.idle;
+      var c = b.rev
+        ? 5 - Math.floor(scalAnimTimer * b.fps) % 6
+        : Math.floor(scalAnimTimer * b.fps) % 6;
+      var fy = b.t * 6 + c;             // frame.Y, 0-41
+      return { frame: fy % 21, col: (fy / 21) | 0 };
     }
+    var BANDS = {
+      idle:            { t: 0, fps: 4 },
+      idle_fast:       { t: 1, fps: 6 },
+      charge_telegraph:{ t: 0, fps: 6 },
+      charging:        { t: 1, fps: 16 },
+      charge_recovery: { t: 1, fps: 8, rev: true },
+      casting:         { t: 2, fps: 10 },
+      gigablast:       { t: 3, fps: 10 },
+      gigablast_p2:    { t: 4, fps: 10 },
+      hellblast:       { t: 5, fps: 10 },
+      hellblast_p2:    { t: 6, fps: 10 }
+    };
 
     /* her */
     if (mode !== 'won') {
@@ -720,6 +874,16 @@
         ctx.fillStyle = COL.brim;
         ctx.fillRect((bx - 10) | 0, (by + 20) | 0, 20, 20);
       }
+    }
+
+    /* her telegraph — the wind-up ring before a charge */
+    if (chargeTelegraph > 0 && mode === 'fight') {
+      ctx.strokeStyle = 'rgba(255,74,42,0.65)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(bx, by, 34 + (0.5 - chargeTelegraph) * 26, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
     }
 
     for (var i = 0; i < bullets.length; i++) {
@@ -749,9 +913,34 @@
     }
     if (sep) {
       var srot = Math.atan2(sep.vy, sep.vx) + Math.PI / 2;
+      /* body and tail follow the trail the head left behind */
+      for (var s = 0; s < sep.segs.length; s++) {
+        var sp = sep.segs[s];
+        var sKey = s % 2 ? 'sepulBodyAlt' : 'sepulBody';
+        if (!sprite(sKey, sp.x, sp.y, 0.8, srot)) {
+          ctx.fillStyle = '#3A2140';
+          ctx.fillRect((sp.x - 12) | 0, (sp.y - 12) | 0, 24, 24);
+        }
+      }
+      if (sep.trail.length) {
+        var tail = sep.trail[sep.trail.length - 1];
+        if (!sprite('sepulTail', tail.x, tail.y, 0.9, srot)) {
+          ctx.fillStyle = '#2A1830';
+          ctx.fillRect((tail.x - 8) | 0, (tail.y - 8) | 0, 16, 16);
+        }
+      }
       if (!sprite('sepulcher', sep.x, sep.y, 1.1, srot)) {
         ctx.fillStyle = '#3A2140';
         ctx.fillRect((sep.x - 18) | 0, (sep.y - 18) | 0, 36, 36);
+      }
+      /* telegraph glow — the wind-up ring before it charges */
+      if (sep.telegraph > 0) {
+        ctx.strokeStyle = 'rgba(255,74,42,0.65)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(sep.x, sep.y, 20 + (0.35 - sep.telegraph) * 26, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.lineWidth = 1;
       }
     }
     for (var r = 0; r < bros.length; r++) {
@@ -766,6 +955,17 @@
 
     if (mode !== 'won' && dm.soul && dm.soul.draw)
       dm.soul.draw(ctx, px, py, inv, COL.soul);
+
+    /* U2: the barrier ring, drawn over the soul so the shield reads
+       as worn by her rather than painted on the arena. */
+    if (shieldT > 0) {
+      ctx.strokeStyle = 'rgba(184,230,255,0.8)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(px, py, 16 + Math.sin(now / 90) * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
 
     /* her bar. It DOES move — that is the difference between this
        fight and the one on the television, and the contrast only
@@ -791,6 +991,21 @@
     ctx.fillText('HP ' + Math.max(0, hp) + '/' + MAXHP, AX, AY + AH + 12);
     ctx.fillStyle = COL.dim;
     ctx.fillText('shift to focus  ·  z near her to strike', AX + 120, AY + AH + 12);
+
+    /* U1/U2 meters, under the HP line: tp left, rage right, both
+       full-bright when they are spendable. The labels sit at the same
+       baseline as the HP text because this row is "yours". */
+    var bY = AY + AH + 30;
+    ctx.fillStyle = '#22222E'; ctx.fillRect(AX, bY, 96, 5);
+    ctx.fillStyle = shieldT > 0 ? '#B8E6FF' : (tp >= 1 ? '#7BE38A' : '#4A4560');
+    ctx.fillRect(AX, bY, (96 * tp) | 0, 5);
+    ctx.fillStyle = COL.dim;
+    ctx.fillText('tp', AX + 102, bY - 4);
+    ctx.fillStyle = '#22222E'; ctx.fillRect(AX + 128, bY, 96, 5);
+    ctx.fillStyle = rage >= 1 ? '#E4C46A' : '#4A4560';
+    ctx.fillRect(AX + 128, bY, (96 * rage) | 0, 5);
+    ctx.fillStyle = COL.dim;
+    ctx.fillText('rage', AX + 230, bY - 4);
 
     if (NEU.juice) NEU.juice.drawParts(ctx, 1 / 60);
     if (NEU.juice) NEU.juice.end(ctx, shook);
@@ -865,8 +1080,10 @@
     if (wrap.hidden || !NEU.scal.active || NEU.activeMinigame !== 'scal') return;
     if (e.key === 'F3') { showHitboxes = !showHitboxes; return; }
     if (e.key === 'Escape') {
-      /* Only allow ESC confirm in intro/win/pause, not mid-fight */
-      if (mode === 'fight' || mode === 'wall' || mode === 'brothers') return;
+      /* ESC works through the whole fight now. Leaving mid-fight costs
+         the run, so that is the confirmed exit; the win and death
+         screens are over and close clean. */
+      if (mode === 'won' || dying) { close(); return; }
       if (NEU.engine && NEU.engine.confirmExit) {
         NEU.engine.confirmExit('Supreme Calamitas', close);
       } else { close(); }
@@ -874,6 +1091,15 @@
     }
     if (!running && !dying && e.key === 'Enter') { open(); return; }
     if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); tryHit(); return; }
+    if (e.key === 'x' || e.key === 'X') {
+      /* U2: the barrier. Full tp spends itself as one held hit. */
+      if (shieldT > 0) { say('* the barrier is already up.'); return; }
+      if (tp < 1) { say('* the barrier wants full tp. graze to fill it.'); return; }
+      tp = 0; shieldT = 2.5;
+      if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+      say('* the barrier blooms. it will take one hit.');
+      return;
+    }
     var n = keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
   });
   addEventListener('keyup', function (e) {
@@ -883,6 +1109,7 @@
 
   /* ── open / close ───────────────────────────────────────────────*/
   var active = false;
+  var keysOrig = null;
   function open() {
     active = true;
     NEU.activeMinigame = 'scal';
@@ -890,8 +1117,16 @@
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
     if (msg) msg.hidden = true;
+    /* This wrapper's hint belongs to the bullet minigame ("survive 20s")
+       and she shares the wrapper with it — say what this fight does. */
+    var keysEl = document.querySelector('#bh .bh__keys');
+    if (keysEl) {
+      if (keysOrig === null) keysOrig = keysEl.innerHTML;
+      keysEl.innerHTML = 'arrows / wasd &nbsp;&middot;&nbsp; shift to focus &nbsp;&middot;&nbsp; z to strike &nbsp;&middot;&nbsp; x to shield &nbsp;&middot;&nbsp; esc to leave';
+    }
     layout();
     t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; marks = {};
+    rage = 0; tp = 0; shieldT = 0;
     bossMax = 24; bossHP = bossMax; phase = 1; step_ = 0; stepT = 1.2;
     hearts = []; sep = null; bros = []; invuln = true; dying = 0;
     preloadSfx();
@@ -908,10 +1143,28 @@
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
+    /* her fight borrowed the bullet minigame's hint; give it back */
+    if (keysOrig !== null) {
+      var keysEl = document.querySelector('#bh .bh__keys');
+      if (keysEl) keysEl.innerHTML = keysOrig;
+      keysOrig = null;
+    }
     /* Back to the room you came from, win or lose. */
     if (NEU.engine) NEU.engine.enter(NEU.save && NEU.save.flagged('scal_dead') ? 'b7_altar' : 'b8_arena',
                                      NEU.save && NEU.save.flagged('scal_dead') ? 'north' : 'west');
   }
+
+  /* The quit button is the bullet minigame's, shared with this fight —
+     route it like the keyboard ESC instead of letting the other game's
+     handler run against a fight it knows nothing about. */
+  var bhQuitBtn = document.getElementById('bhQuit');
+  if (bhQuitBtn) bhQuitBtn.addEventListener('click', function () {
+    if (!active || NEU.activeMinigame !== 'scal') return;
+    if (mode === 'won' || dying) { close(); return; }
+    if (NEU.engine && NEU.engine.confirmExit) {
+      NEU.engine.confirmExit('Supreme Calamitas', close);
+    } else { close(); }
+  });
 
   NEU.scal = { open: open, close: close,
                get running() { return running; },
@@ -921,5 +1174,22 @@
                get mode() { return mode; },
                get hearts() { return hearts.length; },
                get bros() { return bros.length; },
+               /* live positions for the win-path test: it walks the
+                  soul, and she and the worm move with the fight */
+               get px() { return px; },
+               get py() { return py; },
+               get soulHP() { return hp; },
+               get rage() { return rage; },
+               get tp() { return tp; },
+               get shieldT() { return shieldT; },
+               get bx() { return bx; },
+               get by() { return by; },
+               get charging() { return chargeTelegraph > 0 || chargeT > 0; },
+               get wormBusy() { return !!sep && (sep.telegraph > 0 || sep.chargeT > 0); },
+               get wormPos() { return sep ? { x: sep.x, y: sep.y } : null; },
+               get wormVel() { return sep ? { x: sep.vx, y: sep.vy } : null; },
+               get heartPos() { return hearts.map(function (h) { return { x: h.x, y: h.y }; }); },
+               get broPos() { return bros.map(function (b) { return { x: b.x, y: b.y }; }); },
+               get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy }; }); },
                cycle: CYCLE };
 })();
