@@ -625,7 +625,14 @@
       } else { close(); }
       return;
     }
-    if (!running && e.key === 'Enter') { begin(); return; }
+    if (!running && e.key === 'Enter') {
+      /* This fights SC's death screen for the Enter key: her handler
+         owns the key while her fight is up, and the room's restart
+         must not hear the retry meant for her. */
+      if (NEU.activeMinigame !== 'bullet') return;
+      e.preventDefault(); e.stopPropagation();
+      begin(); return;
+    }
 
     var n = keyName(e);
     if (n) { keys[n] = true; e.preventDefault(); }
