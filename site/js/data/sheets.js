@@ -137,25 +137,49 @@
          transparent rows by whatever scraped it. `pad-sheet.mjs` put
          them back; the original is kept at
          `_scripts/orig/BrimstoneHeart.png.orig`. */
-    sepulcher: { src: IMG + 'calamity/SepulcherHead.png',
-                 w: 62,  h: 88,   frames: 1,  fw: 62,  fh: 88, fps: 0,  confirmed: true,
-                 note: 'seen 2026-08-17: one head, not two frames. fps 0 — nothing to animate' },
-    /* the worm's body and tail. Single frames each, measured directly
-       2026-08-18: Body 82x72, BodyAlt 86x82, Tail 54x54. The fight used
-       to draw the head alone because these were never registered. */
-    sepulBody: { src: IMG + 'calamity/SepulcherBody.png',
-                 w: 82,  h: 72,   frames: 1,  fw: 82,  fh: 72, fps: 0,  confirmed: true },
-    sepulBodyAlt: { src: IMG + 'calamity/SepulcherBodyAlt.png',
-                 w: 86,  h: 82,   frames: 1,  fw: 86,  fh: 82, fps: 0,  confirmed: true },
-    sepulTail: { src: IMG + 'calamity/SepulcherTail.png',
-                 w: 54,  h: 54,   frames: 1,  fw: 54,  fh: 54, fps: 0,  confirmed: true },
-    heart:     { src: IMG + 'calamity/BrimstoneHeart.png',
+heart:     { src: IMG + 'calamity/BrimstoneHeart.png',
+                  w: 44,  h: 372,  frames: 6,  fw: 44,  fh: 62, fps: 10, confirmed: true,
+                  note: 'seen 2026-08-17: six beats, 62px grid. sheet re-padded 370 -> 372' },
+
+    /* the drop */
+    ashes:     { src: IMG + 'calamity/AshesofAnnihilation.png',
+                  w: 56,  h: 360,  frames: 6,  fw: 56,  fh: 60, fps: 8,  confirmed: true },
+
+    /* her shield (the boss is "shielded" behind it while invincible —
+       the mod summons ForcefieldTexture + the top/bottom arcs around
+       the charge telegraph, from SupremeCalamitas.cs) */
+    scalShield: { src: IMG + 'calamity/scal-forcefield.png',
                  w: 44,  h: 372,  frames: 6,  fw: 44,  fh: 62, fps: 10, confirmed: true,
                  note: 'seen 2026-08-17: six beats, 62px grid. sheet re-padded 370 -> 372' },
 
     /* the drop */
     ashes:     { src: IMG + 'calamity/AshesofAnnihilation.png',
                  w: 56,  h: 360,  frames: 6,  fw: 56,  fh: 60, fps: 8,  confirmed: true },
+
+    /* her shield (the boss is "shielded" behind it while invincible —
+       the mod summons ForcefieldTexture + the top/bottom arcs around
+       the charge telegraph, from SupremeCalamitas.cs) */
+    scalShield: { src: IMG + 'calamity/scal-forcefield.png',
+                 w: 72,  h: 72,   frames: 1,  fw: 72,  fh: 72,  fps: 0,  confirmed: true },
+    scalShieldTop: { src: IMG + 'calamity/scal-shield-top.png',
+                 w: 76,  h: 86,   frames: 1,  fw: 76,  fh: 86,  fps: 0,  confirmed: true },
+    scalShieldBot: { src: IMG + 'calamity/scal-shield-bottom.png',
+                 w: 50,  h: 42,   frames: 1,  fw: 50,  fh: 42,  fps: 0,  confirmed: true },
+    /* the rage / adrenaline meters, straight from UI/Rippers/ in the
+       mod repo. The fills crop by ratio; the borders frame them; the
+       *FullAnimation sheets play when the bar is complete. */
+    rageBar:   { src: IMG + 'calamity/rage-bar.png',
+                 w: 80,  h: 36,   frames: 1,  fw: 80,  fh: 36,  fps: 0,  confirmed: true },
+    rageBorder:{ src: IMG + 'calamity/rage-bar-border.png',
+                 w: 104, h: 36,   frames: 1,  fw: 104, fh: 36,  fps: 0,  confirmed: true },
+    rageAnim:  { src: IMG + 'calamity/rage-full-anim.png',
+                 w: 152, h: 380,  frames: 10, fw: 152, fh: 38,  fps: 10, confirmed: true },
+    tpBar:     { src: IMG + 'calamity/tp-bar.png',
+                 w: 80,  h: 36,   frames: 1,  fw: 80,  fh: 36,  fps: 0,  confirmed: true },
+    tpBorder:  { src: IMG + 'calamity/tp-bar-border.png',
+                 w: 104, h: 480,  frames: 10, fw: 104, fh: 48,  fps: 10, confirmed: true },
+    tpAnim:    { src: IMG + 'calamity/tp-full-anim.png',
+                 w: 172, h: 700,  frames: 10, fw: 172, fh: 70,  fps: 10, confirmed: true },
 
     /* ── Polterghast ─────────────────────────────────────────────
        Three files, identical geometry: body, glowmask, second

@@ -111,7 +111,7 @@ console.log('\n2. Calamitas draws from her sheets');
      alone would report all three gone because the lines live elsewhere. */
   const SHEETS = fs.readFileSync(path.join(ROOT, 'js', 'data', 'sheets.js'), 'utf8');
   ok('>>> the sprite helper exists <<<',
-     /function sprite\(key, x, y, scale, rot, glow, col, frame\)/.test(SCAL) &&
+     /function sprite\(key, x, y, scale, rot, glow, col, frame, alpha\)/.test(SCAL) &&
      /NEU\.sheetDraw = function/.test(SHEETS));
   ok('it rotates to face travel', /ctx\.rotate\(o\.rot\)/.test(SHEETS) &&
      /Math\.atan2\(b\.vy, b\.vx\)/.test(SCAL));

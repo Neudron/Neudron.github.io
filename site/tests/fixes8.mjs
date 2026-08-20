@@ -440,10 +440,12 @@ console.log('\n6. calamitas');
 
   const c = NEU.scal.cycle;
   const charges = c.map((k,i)=>k==='c'?i+1:0).filter(Boolean);
-  ok('charges land at 4, 8, 13, 16, 18, 20',
-     JSON.stringify(charges) === JSON.stringify([4,8,13,16,18,20]));
+  ok('charges land at 4, 9, 16, 18, 20',
+     JSON.stringify(charges) === JSON.stringify([4,9,16,18,20]));
+  ok('dives land at 5 and 13', c.filter(k=>k==='m').length === 2 &&
+     JSON.stringify(c.map((k,i)=>k==='m'?i+1:0).filter(Boolean)) === JSON.stringify([5,13]));
   ok('dart bursts appear 6 times', c.filter(k=>k==='d').length === 6);
-  ok('hellblast barrages appear 4 times', c.filter(k=>k==='h').length === 4);
+  ok('hellblast barrages appear 3 times', c.filter(k=>k==='h').length === 3);
   ok('two-giga appears twice', c.filter(k=>k==='g2').length === 2);
   ok('four-giga appears twice', c.filter(k=>k==='g4').length === 2);
 
@@ -455,7 +457,14 @@ console.log('\n6. calamitas');
   ok('three bullet-hell interludes', /startWall\(0\)/.test(src) &&
      /startWall\(1\)/.test(src) && /startWall\(2\)/.test(src));
   ok('the brothers show up', /startBrothers/.test(src));
-  ok('>>> her bar actually moves <<<', /bossHP -= 1/.test(src));
+  ok('the Sepulcher starts with enough trail for six 66px body segments',
+     /for \(var k = 0; k < 300; k\+\+\) sep\.trail\.push/.test(src));
+  ok('Sepulcher hearts trail on body segments beyond its proximity ring',
+     /var si = Math\.min\(4, 2 \+ \(\(h\.offset \/ 2\) \| 0\)\);/.test(src) &&
+     /h\.x = seg\.x \+ Math\.cos\(dir\) \* 34/.test(src));
+  ok('destroying a heart cannot pull survivors toward the Sepulcher head',
+     /var si = Math\.min\(4, 2 \+ \(\(h\.offset \/ 2\) \| 0\)\);/.test(src));
+  ok('>>> her bar actually moves <<<', /bossHP -= mult/.test(src));
   ok('she is visibly shielded while invincible', /calamitas — shielded/.test(src));
   /* The additive pass moved into the one shared blitter in
      data/sheets.js when three copies of it were collapsed into one, so
@@ -491,9 +500,15 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
   let frames = [];
   w.requestAnimationFrame = cb => { frames.push(cb); return frames.length; };
   let t = w.performance.now();
-  const pump = n => { for (let i = 0; i < n; i++) { const q = frames; frames = []; t += 16; for (const cb of q) cb(t); } };
+  const damage = [];
+  const pump = n => { for (let i = 0; i < n; i++) {
+    const hpBefore = NEU.scal.soulHP, q = frames; frames = []; t += 16;
+    for (const cb of q) cb(t);
+    if (NEU.scal.soulHP < hpBefore) damage.push({ t: Math.round(t), hp: NEU.scal.soulHP, bullets: NEU.scal.bullets.length, wormBusy: NEU.scal.wormBusy });
+  } };
   const key = (ty, k) => w.dispatchEvent(new w.KeyboardEvent(ty, { key: k, bubbles: true }));
-  const z = () => { key('keydown', 'z'); key('keyup', 'z'); };
+  /* f strikes; z spends a full rage bar and never strikes. */
+  const f = () => { key('keydown', 'f'); key('keyup', 'f'); };
   const run = (dx, dy, n) => {
     if (dx < 0) key('keydown', 'ArrowLeft'); else if (dx > 0) key('keydown', 'ArrowRight');
     if (dy < 0) key('keydown', 'ArrowUp'); else if (dy > 0) key('keydown', 'ArrowDown');
@@ -532,13 +547,18 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
      NEU.scal.mode === 'fight' && NEU.scal.hearts === 6);
 
   /* The hearts orbit a body segment at radius 24 and shatter under the
-     soul's strike (z) within 18px. The worm dashes at the soul every
+     soul's strike (f) within 18px. The worm dashes at the soul every
      1.45s, so the drive works the REST windows: dodge the dash, walk
      onto the ring while the worm is still, strike the heart that the
      orbit sweeps through the soul (one per ~0.9s), dodge again. */
-  let shattered = 0, before = NEU.scal.hearts;
+  let shattered = 0, before = NEU.scal.hearts, closestHeart = Infinity, strikeAttempts = 0, heartDamageStart = damage.length;
   const checkDrop = () => {
-    if (NEU.scal.hearts < before) { shattered += before - NEU.scal.hearts; before = NEU.scal.hearts; }
+    if (NEU.scal.hearts < before) {
+      shattered += before - NEU.scal.hearts;
+      before = NEU.scal.hearts;
+      return true;
+    }
+    return false;
   };
   /* The worm's body trails its head, so its heart-bearing segment (and
      the hearts) snaps toward the soul during a lunge and rests near it
@@ -551,7 +571,7 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
   const perpWorm = () => {
     const v = NEU.scal.wormVel;
     if (v && (v.x !== 0 || v.y !== 0)) {
-      run(Math.sign(v.y) || 1, Math.sign(-v.x) || 1, 12);
+      run(Math.sign(v.y) || 1, Math.sign(-v.x) || 1, 16);
       return true;
     }
     return false;
@@ -573,28 +593,42 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
       const d = Math.hypot(p.x - NEU.scal.px, p.y - NEU.scal.py);
       if (d < bd) { bd = d; best = p; }
     }
-    if (bd < 18) { z(); pump(3); checkDrop(); continue; }
+    closestHeart = Math.min(closestHeart, bd);
+    if (bd < 18) {
+      strikeAttempts++; f(); pump(3);
+      checkDrop();
+      continue;
+    }
     if (bd <= 28) { pump(2); checkDrop(); continue; }   /* on the ring: hold, let the orbit bring the heart in */
     const dx = best.x - NEU.scal.px, dy = best.y - NEU.scal.py;
     const sp = dx !== 0 && dy !== 0 ? 2.828 : 4;
     run(Math.sign(dx), Math.sign(dy), Math.min(12, Math.max(1, Math.ceil(bd / sp))));
     checkDrop();
   }
+  if (shattered !== 6) console.log('       heart diagnostic:', JSON.stringify({ shattered, hearts: NEU.scal.hearts, closestHeart: Math.round(closestHeart), strikeAttempts, soulHP: NEU.scal.soulHP, tp: NEU.scal.tp, shieldT: NEU.scal.shieldT, mode: NEU.scal.mode, damage: damage.slice(heartDamageStart) }));
   ok('>>> a touch shatters a heart, one per touch <<<', shattered === 6);
   ok('>>> all six hearts die <<<', NEU.scal.hearts === 0);
   pump(2);
   ok('>>> she steps out of her invincibility <<<', NEU.scal.mode === 'fight');
 
-  /* Strike her only when she is in reach and NOT charging — her
-     telegraph and dash are contact damage, and her dash aims at the
-     soul. She hovers at the top wall (by → AY-24) and her x chases the
-     soul, so the soul walks up into reach when she drifts far. */
+/* Strike her only when she is in reach and NOT charging/diving — her
+     telegraph, dash, and dive sweep are contact damage. She hovers at the
+     top wall (by → AY-24) and her x chases the soul, so the soul walks up
+     into reach when she drifts far. The dive sweeps horizontally at the
+     row where the soul stood when the dive began — move perpendicular
+     (vertically) to escape the 32px contact band. */
   const strike = want => {
     const target = NEU.scal.hp - want;
     for (let g = 0; g < 900 && NEU.scal.hp > target; g++) {
       if (NEU.scal.charging) { run(1, 1, 45); continue; }
+      if (NEU.scal.diving) {
+        /* dive sweeps horizontally — dodge vertically away from its row */
+        const dy = NEU.scal.py - NEU.scal.by;
+        run(0, Math.sign(dy) || 1, 30);
+        continue;
+      }
       const d = Math.hypot(NEU.scal.px - NEU.scal.bx, NEU.scal.py - NEU.scal.by);
-      if (d < 40) { z(); pump(1); }
+      if (d < 40) { f(); pump(1); }
       else if (Math.abs(NEU.scal.py - NEU.scal.by) > 6) {
         run(0, Math.sign(NEU.scal.by - NEU.scal.py), Math.min(40, Math.ceil(Math.abs(NEU.scal.py - NEU.scal.by) / 4)));
       } else { pump(2); }
@@ -647,20 +681,33 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
         if (d < bd) { bd = d; best = p; }
       }
       const dx = best.x - NEU.scal.px, dy = best.y - NEU.scal.py;
-      if (Math.abs(dx) > 8) {
-        if (NEU.scal.bros === 1) { pump(1); continue; }   /* survivor: wait for the swap */
+if (Math.abs(dx) > 8) {
+        if (NEU.scal.bros === 1) {
+          /* Survivor enraged: fires 3-projectile horizontal spread every 0.7s.
+             Proactively wiggle vertically. Use shield (x) when HP is low and TP is full. */
+          const wiggle = (h % 8 < 4) ? 1 : -1;
+          run(0, wiggle, 4);
+          if (NEU.scal.soulHP <= 2 && NEU.scal.tp >= 1 && NEU.scal.shieldT === 0) {
+            key('keydown', 'x'); key('keyup', 'x');
+          }
+          if (dodge()) continue;
+          continue;
+        }
         const sp = dx !== 0 && dy !== 0 ? 2.828 : 4;
         run(Math.sign(dx), Math.sign(dy), Math.min(25, Math.max(1, Math.ceil(Math.hypot(dx, dy) / sp))));
         continue;
       }
       if (Math.abs(dy) > 24) run(0, Math.sign(dy), Math.min(25, Math.ceil(Math.abs(dy) / 4)));
-      else { z(); pump(1); }   /* inside the touch radius: storm */
+      else { f(); pump(1); }   /* inside the touch radius: storm */
     }
     return NEU.scal.bros <= target;
   };
   ok('>>> a brother dies in twelve touches <<<', killBro(1) && NEU.scal.bros === 1);
+  const bothBrothersFall = killBro(0);
+  if (!bothBrothersFall || NEU.scal.bros !== 0 || NEU.scal.phase !== 2)
+    console.log('       brothers diagnostic:', JSON.stringify({ bothBrothersFall, bros: NEU.scal.bros, phase: NEU.scal.phase, mode: NEU.scal.mode, soulHP: NEU.scal.soulHP, bullets: NEU.scal.bullets.length }));
   ok('>>> both brothers fall: phase 2 begins <<<',
-     killBro(0) && NEU.scal.bros === 0 && NEU.scal.phase === 2 && NEU.scal.mode === 'fight');
+     bothBrothersFall && NEU.scal.bros === 0 && NEU.scal.phase === 2 && NEU.scal.mode === 'fight');
 
 NEU.scal.close();
 }
@@ -687,8 +734,13 @@ console.log('\n6c. the shield and the meters');
   ok('the shield eats the hit inside hitPlayer', /if \(shieldT > 0\) \{/.test(src) &&
      /shieldT = 0;/.test(src));
   ok('x spends full tp', /if \(tp < 1\)/.test(src) && /shieldT = 2\.5/.test(src));
-  ok('rage heals exactly one heart', /rage \+= dt \/ 20/.test(src) &&
-     /hp = Math\.min\(MAXHP, hp \+ 1\)/.test(src));
+  ok('z spends a full rage bar for eight seconds',
+     /e\.key === 'z' \|\| e\.key === 'Z'/.test(src) &&
+     /rage = 0; rageMode = 1; rageModeT = 8;/.test(src));
+  ok('f remains the strike key and rage never heals',
+     /e\.key === 'f' \|\| e\.key === 'F'/.test(src) &&
+     /tryHit\(\); return;/.test(src) &&
+     !/hp = Math\.min\(MAXHP, hp \+ 1\)/.test(src));
   ok('a fresh fight resets both meters', /rage = 0; tp = 0; shieldT = 0;/.test(src));
   NEU.engine.leave();
 }

@@ -1,0 +1,1 @@
+Script to generate Sepulcher energy ball sprite (5 frames of 20x20)
