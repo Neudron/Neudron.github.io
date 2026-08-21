@@ -13,7 +13,7 @@ than trusting the plan document.
 | | |
 |---|---|
 | Acts | I–IV complete. 31 rooms, 3 bosses, quiz, rhythm game, crafting grid, merchant shop |
-| Tests | **1334 checks, 16 suites, all green** — re-verified 2026-08-21 by running every suite. fixes5 (53) fixes6 (48) fixes7 (73) fixes8 (104) fixes9 (70) fixes10 (97) fixes11 (75) fixes12 (63) fixes13 (79) fixes14 (70) fixes15 (106) fixes16 (185) **fixes17 (307)** fixes18 (89) playthrough (45) |
+| Tests | **1340 checks, 16 suites, all green** — re-verified 2026-08-21 by running every suite. fixes5 (53) fixes6 (48) fixes7 (73) fixes8 (104) fixes9 (70) fixes10 (97) fixes11 (75) fixes12 (63) fixes13 (79) fixes14 (70) fixes15 (106) fixes16 (185) **fixes17 (313)** fixes18 (89) playthrough (45) |
 | Location | repo root at `Documents\neu` (site/ flattened to root 2026-08-21); tests in `tests/` |
 | Deployed | ✅ **YES — 2026-08-21.** `70a9a71` is live at **https://www.neu.ac**. Previous deploys this session: `9158ca9` (robots.txt), `d1d0eeb` (og.png fix). Deploy workflow stages only web-facing files (`index.html css js fonts img audio CNAME .nojekyll og.png robots.txt .well-known`) to `_stage/` before uploading — `memory/`, `tests/`, `_scripts/` never reach Pages. Verified: all 30 JS files, 44 sprites, 6 tilesets, audio, og.png, robots.txt → 200; `memory/story.md` → 404 (walkthrough protected). GitHub Actions: last 5 runs all `completed/success`. |
 
