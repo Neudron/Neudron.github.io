@@ -138,26 +138,12 @@
       c.say(["you have the one that does anything.", "the rest is atmosphere."], 'narr');
       return;
     }
-    if (shopStep === 0) {
-      shopStep = 1;
-      c.say(["everything on the board, nothing behind it.",
-             "board's over there. don't ask about the axe."], 'dog');
-      return;
-    }
-    /* The list is read out, then the lit one is taken. Reading the
-       whole thing first is what makes the glow mean something. */
-    var lines = STOCK.map(function (s) {
-      return s[0] + ' — ' + s[1] + (s[2] ? '  <<' : '');
-    });
-    c.say(['the board:'].concat(lines.slice(0, 5)), 'narr');
-    setTimeout(function () {
-      c.say(lines.slice(5).concat([
-        'one of the names is lit. none of the others are.',
-        'you take the Recall Potion. he does not stop you.']), 'narr');
-      if (NEU.save) NEU.save.give('recall');
-      if (NEU.quest) NEU.quest.mark('a4_recall');
-      if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
-    }, 7000);
+    /* Open the graphical shop board — a real interface with
+       selectable rows, prices, and per-item quips. The text dump it
+       replaced is gone. The engine pauses while it is up. */
+    c.leave();
+    if (NEU.shop) NEU.shop.open(shopStep);
+    shopStep = 1;
   }
 
   /* ══ D2 / D3 — the rest of the city ══════════════════════════════*/

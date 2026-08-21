@@ -37,7 +37,7 @@
   .boot, .ctl, .glass, .stars, .cue, .cat,
   .sans, .sword, .tbox, .chip, .panel, .keyobj, .swcue,
   .bh, .dog, .dev, .chips, .dk, .quest, .quest__t,
-  .sleep, .tv, .pethand, .deck, .swfly, .eng, .sheetbox, .quiz, .fnf, .craft, .polt, .crack { display: none !important; }
+  .sleep, .tv, .pethand, .deck, .swfly, .eng, .sheetbox, .quiz, .fnf, .craft, .polt, .crack, .shop { display: none !important; }
   body.is-booting { overflow: auto !important; }
   .lay, .el { opacity: 1 !important; transform: none !important; }
 </style></noscript>
@@ -204,6 +204,17 @@
   <div class="bh__msg" id="fnfMsg" hidden></div>
   <button class="bh__quit" id="fnfQuit">esc</button>
   <p class="bh__keys">arrows / wasd &nbsp;&middot;&nbsp; hit them when they land</p>
+</div>
+
+<!-- ═══ the stall ═════════════════════════════════════════════════════ -->
+<div class="shop" id="shop" hidden aria-label="shop">
+  <h2 class="shop__h">the stall</h2>
+  <p class="shop__say" id="shopSay"></p>
+  <div class="shop__board" id="shopBoard" role="list"></div>
+  <div class="shop__bar">
+    <span class="shop__gold" id="shopGold">0g</span>
+    <button class="bh__quit" id="shopQuit">esc</button>
+  </div>
 </div>
 
 <!-- ═══ the pot ═════════════════════════════════════════════════════ -->
@@ -419,6 +430,7 @@
 <script src="js/act4/act4.js"></script>
 <script src="js/act4/rooms-a.js"></script>
 <script src="js/act4/rooms-d.js"></script>
+<script src="js/act4/shop.js"></script>
 <script src="js/act4/boss-scal.js"></script>
 <script src="js/act4/rooms-g.js"></script>
 <script src="js/act4/quiz.js"></script>

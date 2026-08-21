@@ -50,7 +50,7 @@ function boot() {
     ({ left:100, top:100, right:146, bottom:146, width:46, height:46, x:100, y:100 });
 
   for (const f of ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine.js','game/bullet.js','game/dark.js',
-                   'game/sans.js','act4/act4.js','act4/rooms-a.js','act4/rooms-d.js',
+                   'game/sans.js','act4/act4.js','act4/rooms-a.js','act4/rooms-d.js','act4/shop.js',
                    'act4/boss-scal.js','act4/quiz.js','game/deck.js','core/dev.js']) {
     const p = path.join(ROOT, 'js', f);
     if (!fs.existsSync(p)) { console.log('  !! missing ' + f); continue; }
@@ -64,6 +64,7 @@ function boot() {
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const A = fs.readFileSync(path.join(ROOT,'js','act4','rooms-a.js'), 'utf8');
 const D = fs.readFileSync(path.join(ROOT,'js','act4','rooms-d.js'), 'utf8');
+const S = fs.readFileSync(path.join(ROOT,'js','act4','shop.js'), 'utf8');
 
 /* ═══ 1. the whole map connects ═══════════════════════════════════*/
 console.log('\n1. eighteen rooms, no dangling exits');
@@ -160,12 +161,19 @@ console.log('\n3. ashes → fire door → city');
 /* ═══ 4. the merchant ═════════════════════════════════════════════*/
 console.log('\n4. the shop');
 {
-  ok('ten items on the board', (D.match(/\['a |\['half|\['Recall|\['an axe/g) || []).length >= 9);
+  ok('ten items on the board', (S.match(/name:/g) || []).length >= 9);
   ok('>>> exactly one is marked as lit <<<',
-     (D.match(/, true\]/g) || []).length === 1);
-  ok('the lit one is the Recall Potion', /\['Recall Potion', '—', true\]/.test(D));
-  ok('the axe is present and refused', /\['an axe', 'not for sale'/.test(D));
-  ok('he says not to ask about it', /don't ask about the axe/.test(D));
+     (S.match(/glow:\s*true/g) || []).length === 1);
+  ok('the lit one is the Recall Potion', /name:\s*'Recall Potion'[^}]*glow:\s*true/.test(S));
+  ok('the axe is present and refused', /name:\s*'an axe'[^}]*not for sale/.test(S));
+  ok('he says not to ask about it', /don't ask about the axe/.test(S));
+  ok('>>> the shop is a real graphical panel <<<', /NEU\.shop\s*=/.test(S));
+  ok('with arrow-key navigation', /ArrowUp/.test(S) && /ArrowDown/.test(S));
+  ok('and enter to select', /'Enter'/.test(S));
+  ok('and a quit button', /shopQuit/.test(S));
+  ok('that gives recall on select', /NEU\.save\.give\(item\.give\)/.test(S) && /give:\s*'recall'/.test(S));
+  ok('and marks the quest', /NEU\.quest\.mark\('a4_recall'\)/.test(S));
+  ok('room-d opens NEU.shop', /NEU\.shop\.open/.test(D));
 
   const { NEU } = boot();
   NEU.engine.enter('d1_street', 'fire');
