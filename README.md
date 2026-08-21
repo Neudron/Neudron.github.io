@@ -33,14 +33,14 @@ The suites run in **jsdom under node**, against the real files — no browser,
 no headless Chrome.
 
 ```bash
-cd tests
-npm install jsdom        # once; this is the only dependency in the project
-node fixes5.mjs          # ... through fixes17.mjs
-node playthrough.mjs     # a full scripted run of the whole game
+node tests/run-all.mjs   # every suite, ~90s, hard 60s timeout each
+# or one at a time:
+node tests/fixes5.mjs    # ... through fixes18.mjs
+node tests/playthrough.mjs   # a full scripted run of the whole game
 ```
 
-Run them one at a time; the whole set takes a few minutes. **1400+ checks
-across 16 files**, all passing.
+**1,487 checks across 15 files** (plus `reach.mjs`, the shared walkability
+library), all passing.
 
 Before anything else, the syntax gate — it is instant and catches most
 mistakes:
@@ -68,21 +68,23 @@ minute and there is no staging step. Hence the prompt.
 ## Layout
 
 ```
-site/
-  index.html            every <script> tag, in load order
-  css/style.css         one stylesheet, ~1700 lines, with a TOC at the top
-  js/
-    core/   quest save juice danmaku engine music perf settings touch dev
-    page/   main stars scene            the website itself
-    game/   sword sans bullet dark deck  acts I-III
-    act4/   act4 rooms-* boss-* quiz rhythm craft crack
-    data/   data sheets                  projects list, sprite manifest
-  img/ audio/ fonts/    assets, all self-hosted
-  memory/               ALL the documentation. Start at PLAN.md
-  tests/                the jsdom suites
+index.html              every <script> tag, in load order
+css/style.css           one stylesheet, ~1900 lines, with a TOC at the top
+js/
+  core/   quest save juice danmaku engine music perf settings touch dev
+  page/   main stars scene            the website itself
+  game/   sword sans bullet dark deck  acts I-III
+  act4/   act4 rooms-* boss-* quiz rhythm craft crack shop
+  data/   data sheets                  projects list, sprite manifest
+img/ audio/ fonts/    assets, all self-hosted
+memory/               ALL the documentation. Start at PLAN.md
+tests/                the jsdom suites
 _deploy/                a clone of the Pages repo. Push from here, via the script
 _scripts/               one-off tools; not part of the site
 ```
+
+(The repo was flattened 2026-08-21 — everything that used to live under
+`site/` is now at the root.)
 
 **Load order matters** and is enforced by the order of the `<script>` tags.
 `core/quest.js` is first because it owns the single copy of progress;
@@ -123,7 +125,7 @@ These are not aspirations; there are tests that fail when they are broken.
 - **WCAG AA in both themes, every scene keyboard-only,
   `prefers-reduced-motion` honoured, nothing flashing above 3Hz** — the last
   one measured rather than assumed.
-- **Act IV art stays under 500 KB.** Currently 313 KB.
+- **Act IV art stays under 500 KB.** Currently 187 KB.
 - **The soundtrack downloads nothing.** It is synthesised in Web Audio,
   because eight zones of recorded loops is about ten megabytes and this is a
   site people open on a phone.
@@ -134,9 +136,9 @@ This file is the front door. Everything else is in `memory/` — which is
 **deliberately not published**. `memory/story.md` is the complete walkthrough
 of the game in plain prose, and `chain.md`, `plan-act4.md` and
 `build-notes.md` between them give away every room, boss and mechanic. They
-were shipping by accident, because `memory/` sits inside `site/` and the
-mirror took everything; `site/.gitignore` now excludes the folder and the
-reasoning is written out there. Delete two lines to undo it.
+were shipping by accident back when the deploy mirrored the whole tree; the
+deploy workflow now stages only web-facing files into `_stage/` before
+uploading, so `memory/`, `tests/` and `_scripts/` never reach Pages.
 
 So if you are reading this on the web, the table below is a map of a folder
 you cannot see. Clone it and you get the lot.
