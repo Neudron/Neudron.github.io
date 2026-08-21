@@ -129,6 +129,7 @@
        quiz and the settings panel give. Only captured once. */
     if (!lastFocus) lastFocus = document.activeElement;
     wrap.hidden = false;
+    NEU.activeMinigame = 'craft';       /* the room underneath must not move or take Escape */
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
     grid = [null,null,null, null,null,null, null,null,null];
@@ -139,6 +140,7 @@
     setTimeout(focusCell, 50);
   }
   function close() {
+    if (NEU.activeMinigame === 'craft') NEU.activeMinigame = null;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);

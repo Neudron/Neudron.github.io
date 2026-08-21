@@ -300,6 +300,7 @@
   }
   function open() {
     wrap.hidden = false;
+    NEU.activeMinigame = 'rhythm';      /* the room underneath must not move or take Escape */
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
     if (msg) msg.hidden = true;
@@ -311,6 +312,8 @@
   }
   function close() {
     running = false;
+    /* release the input claim before handing control back to the room */
+    if (NEU.activeMinigame === 'rhythm') NEU.activeMinigame = null;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);

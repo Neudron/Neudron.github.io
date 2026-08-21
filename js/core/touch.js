@@ -52,9 +52,13 @@
      the rhythm game, where one deliberate flick is one note hit and a
      repeat would spam the lane. */
   var PROFILES = [
-    { id: 'engine', on: function () { return NEU.engine && NEU.engine.running; },
-      a: 'e',     aLabel: 'talk',   b: 'Escape',
-      x: 'r',     xLabel: 'reset',  stick: true },
+    /* Scene profiles first, the engine LAST: an overlay opens while
+       NEU.engine.running is still true, so if 'engine' came first it
+       would shadow every overlay and put talk/reset buttons on a
+       menu that wants arrows and Enter. */
+
+    { id: 'shop',   on: function () { return NEU.shop && NEU.shop.active; },
+      a: 'Enter', aLabel: 'take',   b: 'Escape', stick: true, repeat: true },
 
     { id: 'scal',   on: function () { return NEU.scal && NEU.scal.running; },
       a: 'Enter', aLabel: 'ok',     b: 'Escape',
@@ -82,7 +86,12 @@
 
     { id: 'deck',   on: function () { return NEU.deck && NEU.deck.running; },
       a: 'Enter', aLabel: 'open',   b: 'Escape',
-      x: 'Tab',   xLabel: 'next',   stick: true, repeat: true }
+      x: 'Tab',   xLabel: 'next',   stick: true, repeat: true },
+
+    /* the fallback world — see the note at the top of the list */
+    { id: 'engine', on: function () { return NEU.engine && NEU.engine.running; },
+      a: 'e',     aLabel: 'talk',   b: 'Escape',
+      x: 'r',     xLabel: 'reset',  stick: true }
   ];
 
   /* ── should we be visible at all ───────────────────────────────── */

@@ -479,6 +479,7 @@
 
   function open() {
     wrap.hidden = false;
+    NEU.activeMinigame = 'polt';        /* the room underneath must not move or take Escape */
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
     if (msg) msg.hidden = true;
@@ -495,6 +496,7 @@
   }
   function close() {
     running = false; dying = 0;
+    if (NEU.activeMinigame === 'polt') NEU.activeMinigame = null;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
