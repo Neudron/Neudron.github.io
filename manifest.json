@@ -1,0 +1,23 @@
+{
+  "name": "neu",
+  "short_name": "neu",
+  "description": "a small corner of the internet",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08080B",
+  "theme_color": "#08080B",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

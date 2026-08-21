@@ -646,6 +646,27 @@ console.log('\n10. .well-known');
   const GI = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
   ok('no ignore rule swallows .well-known',
      !GI.split('\n').some(l => l.trim() && !l.startsWith('#') && /well-known/.test(l)));
+
+  /* apple-touch-icon.png and manifest.json are referenced by index.html
+     but live at root — same trap as og.png. If they're not in the cp
+     list they 404 on the live site. This actually happened. */
+  ok('>>> the deploy stages apple-touch-icon.png <<<',
+     /cp.*\bapple-touch-icon\.png\b/.test(wf));
+  ok('>>> the deploy stages manifest.json <<<',
+     /cp.*\bmanifest\.json\b/.test(wf));
+
+  /* The files must also be tracked in git — untracked files don't
+     exist in the CI checkout. */
+  ok('>>> apple-touch-icon.png is tracked <<<',
+     fs.existsSync(path.join(ROOT, 'apple-touch-icon.png')));
+  ok('>>> manifest.json is tracked <<<',
+     fs.existsSync(path.join(ROOT, 'manifest.json')));
+
+  /* index.html must reference both. */
+  ok('>>> index.html links apple-touch-icon <<<',
+     /rel="apple-touch-icon"/.test(idx));
+  ok('>>> index.html links manifest.json <<<',
+     /rel="manifest"\s+href="manifest\.json"/.test(idx));
 }
 
 console.log('\n11. the docs have a backup, and it actually reaches them');
