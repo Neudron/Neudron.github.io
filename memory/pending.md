@@ -15,7 +15,7 @@ than trusting the plan document.
 | Acts | I–IV complete. 31 rooms, 3 bosses, quiz, rhythm game, crafting grid, merchant shop |
 | Tests | **1487 checks, 15 suites, all green** — re-verified 2026-08-22 via `node tests/run-all.mjs` (per-suite 60s timeout). fixes5 (53) fixes6 (48) fixes7 (73) fixes8 (104) fixes9 (70) fixes10 (97) fixes11 (75) fixes12 (63) fixes13 (79) fixes14 (70) fixes15 (112) fixes16 (185) **fixes17 (313)** fixes18 (100) playthrough (45). `reach.mjs` is a shared library, not a suite |
 | Location | repo root at `Documents\neu` (site/ flattened to root 2026-08-21); tests in `tests/` |
-| Deployed | ✅ **YES — 2026-08-21.** `cb5d599` live at **https://www.neu.ac**. Since then (2026-08-22, pushed same day): `c9d380b` ledger, `62eb514` **input-ownership fix** (see below), `81f5564` phone ergonomics CSS. Deploy workflow stages only web-facing files (`index.html css js fonts img audio CNAME .nojekyll og.png robots.txt manifest.json apple-touch-icon.png .well-known`) to `_stage/` before uploading — `memory/`, `tests/`, `_scripts/` never reach Pages. Verified: all JS files, sprites, tilesets, audio, og.png, robots.txt → 200; `memory/story.md` → 404 (walkthrough protected) |
+| Deployed | ✅ **YES — 2026-08-22.** `234ea51` is live at **https://www.neu.ac**. Deploy workflow stages only web-facing files (`index.html css js fonts img audio CNAME .nojekyll og.png robots.txt sitemap.xml manifest.json apple-touch-icon.png .well-known`) to `_stage/` before uploading — `memory/`, `tests/`, `_scripts/`, `_sources/` never reach Pages. Live-verified after deploy: sitemap.xml, robots.txt (+Sitemap line), canonical + JSON-LD in the served HTML, shop.js → all 200; `memory/story.md` → 404 (walkthrough protected). GitHub Actions run for `234ea51`: completed/success |
 
 **Phases 1–3 of PLAN.md are done and verified, plus 2.4, 2.5, 4a, 4b and 5:**
 
@@ -88,6 +88,34 @@ was still running and pressed Escape:
 - **Runner:** `tests/run-all.mjs` — every suite with a hard 60s kill.
   fixes5 (~28s) and fixes18 (~30s) are legitimately slow jsdom boots and
   kept tripping short shell timeouts.
+
+Later the same day, against goal "fully mobile + re-gather sprites":
+
+- **Mobile verified on a real rendering engine**, not just jsdom:
+  `_scripts/cdp-mobile.mjs` drives headless Chrome at 390×844 dpr3 with
+  touch + coarse-pointer emulation over raw CDP (opensteer needs AF_UNIX,
+  which Windows lacks). Results: thumb pad claims `engine`, switches to
+  `shop` when the stall opens, engine survives beneath it; a real
+  touch-event tap selects a shop row and produces its quip; board fits,
+  rows are 46px tall; craft cells shrink to 98px; zero runtime errors.
+  CSS fixes that came out of the audit: craft cells fluid
+  (`min(104px, (100vw−96px)/3)` — 3×104px was wider than a 320px phone),
+  `button { touch-action: manipulation }` so rapid taps never fire
+  double-tap zoom, `.tpad` spends `env(safe-area-inset-*)`, `.eng`
+  gained `100svh`.
+- **Sprites re-gathered from source.** 47 verbatim textures from
+  `CalamityTeam/CalamityModPublic @ 1.4.4` into gitignored
+  `_sources/calamity/` (reproducible: `_scripts/fetch-sprite-sources.ps1`),
+  then `_scripts/verify-sprites.mjs` decoded both sides and compared
+  pixels: **37/37 shipped Calamity sprites are faithful** — 36 byte-exact,
+  `BrimstoneHeart.png` equal after transparent-border trim, **zero
+  mismatches**. The three TP files have no upstream: tp-bar is a recolor
+  of RageBar (identical alpha mask); the 10-frame border and full-anim
+  are Polterghast-styled wiki originals. Provenance written into
+  `memory/assets.md`.
+- **SEO surface shipped:** self-canonical + `WebSite` JSON-LD +
+  `sitemap.xml` + robots `Sitemap:` line, all three URLs agreeing;
+  fixes17 asserts agreement, parseability, staging, and live files.
 
 ---
 
