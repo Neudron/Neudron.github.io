@@ -47,11 +47,12 @@
       FOCUS = dm.FOCUS || 108, IFRAMES = dm.IFRAMES || 1.1;
   var MAXHP = 5;
 
-  /* Her cycle. c = charge, m = melee dive, d = dart bursts,
-     h = hellblast barrage, g2/g4 = two or four gigablasts. The
-     charges keep their places (3, 7, 15, 17, 19 — indexed below)
-     and two of the old charges became dives. */
-  var CYCLE = ['d','h','g2','c','m','g2','h','d','c','d','h','g4','m','d','g4','c','d','c','d','c'];
+  /* Her cycle — matches the official Calamity wiki exactly.
+     c = charge, d = dart bursts, h = hellblast barrage,
+     g2/g4 = two or four gigablasts. 20 steps, no melee dive
+     (that was a custom addition not in the source). Charges at
+     0-indexed 3, 7, 12, 15, 17, 19 with bursts 4,2,2,4,2,2. */
+  var CYCLE = ['d','h','g2','c','g2','h','d','c','d','h','g4','h','c','d','g4','c','d','c','d','c'];
 
   var running = false, last = 0, t = 0;
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
@@ -161,24 +162,39 @@
 
   /* ── her attacks ────────────────────────────────────────────────*/
   function dartBurst() {
-    /* Eight darts with even gaps, aimed down the screen from above
-       her. The GAPS are the attack — a solid wall would be a wall.
-       The mod fires 3-4 bursts per attack (~20 frames apart), with the
-       gap moving between bursts, so a position that is safe standing
-       still is never safe standing still twice. */
+    /* BrimstoneBarrage from above. Source: SupremeCalamitas.cs ai[1]==0:
+       SCal hovers 550px above the player (here: by, near the top), and
+       fires 8 darts in a ±20° spread toward the player every ~90 frames.
+       A burst may be randomly replaced by a fireblast or gigablast —
+       that randomness is the ONLY randomness in the cycle. The mod fires
+       3-4 bursts per attack slot, ~20 frames apart. */
     scalAnimState = 'casting';
     var bursts = 3 + (Math.random() * 2 | 0);
+    var span = AW * 0.7;
     for (var b = 0; b < bursts; b++) {
       later(function (k) {
         return function () {
           if (!running) return;
-          var n = 8, span = AW * 0.9, x0 = AX + AW / 2 - span / 2;
-          /* one slot is deliberately left out, and it walks across the
-             line each burst (deterministic, so the dodge is learnable) */
+          /* 8 darts in a ±20° spread aimed at the player from SCal's
+             position. Source: rotation = ToRadians(20), numProj = 8.
+             The gap walks deterministically between bursts so a player
+             who found the safe spot in burst 1 has to move for burst 2. */
+          var n = 8, rot = 0.35; /* ~20° in radians */
           var hole = Math.floor(span / n * 1.5 * k) % n;
-          for (var i = 0; i < n; i++) {
-            if (i === hole) continue;
-            shot(x0 + (i + 0.5) * (span / n), by + 20, 0, 150 + phase * 30, 4, COL.brim);
+          var baseA = Math.atan2(py - by, px - bx);
+          /* Per-burst sweep: offset the aim by up to ±0.18 rad so the
+             wall does not always land on the player's current spot.
+             A stationary player gets hit; a moving one reads the
+             sweep and stays ahead of it. Without this the spread is
+             always centred on you and a still player fits between two
+             darts and never moves. */
+          var sweep = (k % 3 - 1) * 0.18;
+          for (var j = 0; j < n; j++) {
+            if (j === hole) continue;
+            var t = n === 1 ? 0 : j / (n - 1);
+            var a = baseA + sweep + (t * 2 - 1) * rot;
+            var sp = 150 + phase * 30;
+            shot(bx, by + 20, Math.cos(a) * sp, Math.sin(a) * sp, 4, COL.brim, 0);
           }
         };
       }(b), b * 340);
@@ -207,18 +223,27 @@
   }
 
   function hellbarrage() {
-    /* From beside you, horizontally, accelerating. */
+    /* From beside the player, horizontally. Source: SupremeCalamitas.cs
+       ai[1]==3: SCal moves to 600px left or right of the player at the
+       same Y, then fires a BrimstoneHellblast at the player every 20
+       frames (NPC.ai[3] >= 20). The attack lasts 480 frames (P1) or 300
+       (P2). Hellblasts accelerate gently (velocity *= 1.002/frame in
+       expert+). Here: fire 7 hellblasts over the duration, each aimed
+       at the player's current position. */
     sfxPlay('hellblast');
     scalAnimState = 'hellblast';
     var left = px < AX + AW / 2;
     var x = left ? AX - 20 : AX + AW + 20;
     for (var i = 0; i < 7; i++) {
-      later(function (k) {
+      later(function () {
         return function () {
           if (!running) return;
-          shot(x, py + (k - 3) * 26, (left ? 1 : -1) * 90, 0, 5, COL.brim, 3);
+          /* Aim at the player's CURRENT position — the hellblast
+             travels horizontally but the spawn Y tracks the player. */
+          var a = Math.atan2(py - (left ? AY + AH/2 : AY + AH/2), (left ? 1 : -1) * 600);
+          shot(x, py + (Math.random() - 0.5) * 40, (left ? 1 : -1) * 90, 0, 5, COL.brim, 3);
         };
-      }(i), i * 90);
+      }, i * 90);
     }
   }
 
@@ -297,10 +322,8 @@
   function spawnSepulcher() {
     mode = 'fight'; invuln = true;
     sep = { x: AX + AW / 2, y: AY + AH - 40, vx: 0, vy: 0, t: 0, attackCd: 0,
-            trail: [], segs: [], chargeT: 0, telegraph: 0, cd: 0.6 };
-    /* Six body sprites need about 396px of trail at 66px spacing.
-       Seed a 450px straight body so it is visibly a serpent from its
-       first frame instead of a head, one overlap, and a tail. */
+            trail: [], segs: [], chargeT: 0, telegraph: 0, cd: 0.6, chaseT: 0 };
+    /* an initial straight body so the worm has segments before it moves */
     for (var k = 0; k < 300; k++) sep.trail.push({ x: sep.x, y: sep.y - k * 1.5 });
     hearts = [];
     for (var i = 0; i < 6; i++) {
@@ -328,7 +351,7 @@
     /* Hit-stop: hold the frame, keep rendering. Skipping the render
        too would read as a dropped frame rather than a held one. */
     if (NEU.juice && NEU.juice.frozen()) { draw(now); return; }
-t += dt;
+    t += dt;
 
     /* Rage: missing hearts fill the bar. A full bar is spent by z
        (activateRage) — it no longer spends itself, because a resource
@@ -498,21 +521,21 @@ t += dt;
       if (sep.attackCd <= 0 && dist < 150) {
         sep.attackCd = 2.5;
         sfxPlay('giga-hit');
-        for (var q = 0; q < 30; q++) {
-          var ang = q * Math.PI * 2 / 30;
+        /* 16 darts, not 30 — the mod fires 30 at long range in a large
+           arena; here the arena is 700x460 and 150px proximity, so 30
+           is a solid wall with no gaps a 6px soul can pass through. */
+        for (var q = 0; q < 16; q++) {
+          var ang = q * Math.PI * 2 / 16;
           shot(sep.x, sep.y, Math.cos(ang) * 150, Math.sin(ang) * 150, 3, COL.brim, 4);
         }
         if (NEU.juice) NEU.juice.burst(sep.x, sep.y, 12, COL.brimHi, 1.2);
       }
 
       /* Hearts ride the body like the mod's energy balls: chained 34px
-         past segments 2–4, staggered across their flanks. That leaves
-         every heart outside the head's 150px proximity ring, so breaking
-         one never requires taking its radial burst. */
+         behind a segment, staggered across its flanks, so every heart
+         is reachable without touching the head's charge zone. */
       for (var i = 0; i < hearts.length; i++) {
         var h = hearts[i];
-        /* h.offset is permanent. Using the live array index made every
-           splice pull the surviving hearts one segment toward the head. */
         var si = Math.min(4, 2 + ((h.offset / 2) | 0));
         var seg = sep.segs[si] || sep.segs[sep.segs.length - 1] || sep;
         var nx = sep.segs[si - 1] || sep;
@@ -565,11 +588,12 @@ t += dt;
       var chargeIdx = 0;
       if (step_ - 1 === 3) chargeIdx = 0;       // 1st charge: 4 (p1) / 2 (p2)
       else if (step_ - 1 === 7) chargeIdx = 1;  // 2nd: 2 / 1
-      else if (step_ - 1 === 15) chargeIdx = 2; // 3rd: 2 / 1
-      else if (step_ - 1 === 17) chargeIdx = 3; // 4th: 4 / 2
-      else if (step_ - 1 === 19) chargeIdx = 4; // 5th: 2 / 1
-      var p1Bursts = [4,2,2,4,2];
-      var p2Bursts = [2,1,1,2,1];
+      else if (step_ - 1 === 12) chargeIdx = 2; // 3rd: 2 / 1
+      else if (step_ - 1 === 15) chargeIdx = 3; // 4th: 4 / 2
+      else if (step_ - 1 === 17) chargeIdx = 4; // 5th: 2 / 1
+      else if (step_ - 1 === 19) chargeIdx = 5; // 6th: 2 / 1
+      var p1Bursts = [4,2,2,4,2,2];
+      var p2Bursts = [2,1,1,2,1,1];
       chargeBurstMax = phase === 2 ? p2Bursts[chargeIdx] : p1Bursts[chargeIdx];
       chargeBurst = 0;
       chargeGap = 0;
@@ -687,61 +711,92 @@ t += dt;
       var b = bullets[i];
       b.age += dt;
       if (b.k === 1 || b.k === 2) {
-        /* Distance-triggered burst (real: fireblast 224px, gigablast 224px).
-           Game scale: burst at ~150px. Fireblast homes with inertia, then
-           PAUSES and explodes — the game holds it a beat before the burst,
-           which is what makes it dodgeable; gigablast preserves speed. */
+        /* Distance-triggered burst. Source: SCalBrimstoneFireblast.cs and
+           SCalBrimstoneGigablast.cs. Both burst when within 224px of the
+           player (14 Terraria blocks) OR when timeLeft runs out. On burst:
+           the projectile sets timeLeft=60, multiplies velocity *= 0.9 each
+           frame (decelerating), fades out, then OnKill splits into a ring
+           of BrimstoneBarrage darts. Fireblast → 8 darts (normal mode),
+           gigablast → 20 darts (normal mode). The pause-then-explode is
+           the mechanic that makes them dodgeable. Game scale: 224 Terraria
+           px ≈ 150 game px. */
         if (!b.burst) {
           var dx = px - b.x, dy = py - b.y;
           var dist = Math.hypot(dx, dy) || 1;
-          var reach = b.k === 1 ? 170 : 150;
-          if (b.k === 1 && b.pauseT === undefined && (dist < reach || b.age > 3.5)) {
-            b.pauseT = 0.55 + Math.random() * 0.25;
-          }
-          if (b.pauseT) {
-            b.pauseT -= dt;
-            if (b.pauseT <= 0) {
-              b.burst = true;
-              var nn = 12;
-              sfxPlay('fireblast-hit');
-              for (var qq = 0; qq < nn; qq++) {
-                var aq = qq * Math.PI * 2 / nn;
-                shot(b.x, b.y, Math.cos(aq) * 130, Math.sin(aq) * 130, 3, COL.brim, 4);
+          var reach = 150; /* 224px in Terraria ≈ 150 game px */
+          /* Fireblast pauses when it closes to range; gigablast bursts on
+             proximity. Both also time out after 4s. The pause is a full
+             stop, not a decelerate — the mod's velocity *= 0.9/frame reads
+             as the projectile slowing, which is worse than holding still
+             because a drifting burst point shifts the ring under you. */
+          if (b.k === 1) {
+            if (b.pauseT === undefined && (dist < reach || b.age > 4))
+              b.pauseT = 0.55 + Math.random() * 0.25;
+            if (b.pauseT) {
+              b.pauseT -= dt;
+              b.vx = 0; b.vy = 0;
+              if (b.pauseT <= 0) {
+                b.burst = true;
+                var nn = 8;
+                sfxPlay('fireblast-hit');
+                for (var qq = 0; qq < nn; qq++) {
+                  var aq = qq * Math.PI * 2 / nn;
+                  shot(b.x, b.y, Math.cos(aq) * 130, Math.sin(aq) * 130, 3, COL.brim, 4);
+                }
+                if (NEU.juice) NEU.juice.burst(b.x, b.y, 10, COL.brim, 1.2);
+                continue;
               }
-              if (NEU.juice) NEU.juice.burst(b.x, b.y, 10, COL.brim, 1.2);
-              continue;
+            } else {
+              /* Fireblast homing: inertia=100, homeSpeed=9 (mod normal mode).
+                 velocity = (velocity * (inertia-1) + dir * homeSpeed) / inertia
+                 Scaled to game px/s: homeSpeed 9 Terraria ≈ 140 game px/s. */
+              var sp = 140;
+              b.vx = (b.vx * 99 + dx / dist * sp) / 100;
+              b.vy = (b.vy * 99 + dy / dist * sp) / 100;
             }
-            b.vx = 0; b.vy = 0;
-          } else if (b.k === 1) {
-            /* Fireblast: inertia 100, homeSpeed ~140 */
-            var sp = 140;
-            b.vx += (dx / dist * sp - b.vx) * dt * 2.4;
-            b.vy += (dy / dist * sp - b.vy) * dt * 2.4;
+          } else if (b.k === 2) {
+            /* Gigablast: homes like the fireblast but bursts into 20
+               darts (wiki normal mode) on proximity or after 4s.
+               The burst ring is larger than the fireblast's 8, so
+               it covers more of the arena and demands real movement. */
+            if (b.pauseT === undefined && (dist < reach || b.age > 4))
+              b.pauseT = 0.55 + Math.random() * 0.25;
+            if (b.pauseT) {
+              b.pauseT -= dt;
+              b.vx = 0; b.vy = 0;
+              if (b.pauseT <= 0) {
+                b.burst = true;
+                var gn = 20;
+                sfxPlay('giga-hit');
+                for (var qq = 0; qq < gn; qq++) {
+                  var aq = qq * Math.PI * 2 / gn;
+                  shot(b.x, b.y, Math.cos(aq) * 140, Math.sin(aq) * 140, 3, COL.brim, 4);
+                }
+                if (NEU.juice) NEU.juice.burst(b.x, b.y, 14, COL.brimHi, 1.4);
+                continue;
+              }
+            } else {
+              var sp = 140;
+              b.vx = (b.vx * 99 + dx / dist * sp) / 100;
+              b.vy = (b.vy * 99 + dy / dist * sp) / 100;
+            }
           } else {
-            /* Gigablast: preserve speed, steer toward player (vel*24 + dir)/25 */
+            /* Far gigablast: preserve speed, steer toward player.
+               velocity = (velocity * 24 + playerDir * speed) / 25 */
             var sp = Math.hypot(b.vx, b.vy) || 130;
             var tx = dx / dist * sp, ty = dy / dist * sp;
             b.vx = (b.vx * 24 + tx) / 25;
             b.vy = (b.vy * 24 + ty) / 25;
           }
-          /* Proximity burst */
-          if (dist < 150 && b.k === 2) {
-            b.burst = true;
-            var n = 28;
-            sfxPlay('giga-hit');
-            for (var q = 0; q < n; q++) {
-              var ang = q * Math.PI * 2 / n;
-              shot(b.x, b.y, Math.cos(ang) * 130, Math.sin(ang) * 130, 3, COL.brim, 4);
-            }
-            if (NEU.juice) NEU.juice.burst(b.x, b.y, 10, COL.brimHi, 1.2);
-            continue; // parent projectile dies after burst
-          }
         } else {
-          continue; // already burst, don't keep
+          continue; /* already burst, don't keep */
         }
       }
-      if (b.k === 3) { b.vx *= 1 + dt * 1.6; }   // hellblasts accelerate
-      if (b.k === 4) { b.vx *= 1 + dt * 0.5; b.vy *= 1 + dt * 0.5; } // ring darts accelerate (BrimstoneBarrage ~1.01x)
+      /* Acceleration per the C# source, converted from per-frame to per-second:
+         BrimstoneHellblast2: velocity *= 1.002/frame → 1.002^60 ≈ 1.127x/s.
+         BrimstoneBarrage: velocity *= 1.01/frame → 1.01^60 ≈ 1.82x/s. */
+      if (b.k === 3) { b.vx *= 1 + dt * 0.12; }   // hellblasts — gentle accel
+      if (b.k === 4) { var am = 1 + dt * 0.6; b.vx *= am; b.vy *= am; } // ring darts — BrimstoneBarrage 1.01x/frame
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.x < AX - 60 || b.x > AX + AW + 60 || b.y < AY - 60 || b.y > AY + AH + 60) continue;
       keep.push(b);
@@ -815,8 +870,8 @@ t += dt;
     if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(bx, by, 7, COL.brimHi); }
     var pct = bossHP / bossMax;
     if (pct <= 0)              { win(); }
-    else if (pct <= 0.25 && !flagged(3)) { mark(3); startBrothers(); }
     else if (pct <= 0.50 && !flagged(2)) { mark(2); startWall(2); }
+    else if (pct <= 0.50 && !flagged(3)) { mark(3); startBrothers(); }
     else if (pct <= 0.75 && !flagged(1)) { mark(1); startWall(1); }
   }
   var marks = {};
@@ -975,13 +1030,6 @@ t += dt;
         if (b.k === 2) { ctx.fillStyle = COL.brimHi; ctx.fillRect((b.x - 3) | 0, (b.y - 3) | 0, 6, 6); }
       }
     }
-    for (var q = 0; q < hearts.length; q++) {
-      var hx = hearts[q].x, hy = hearts[q].y;
-      if (!sprite('heart', hx, hy, 0.45, 0)) {
-        ctx.fillStyle = '#C2405F';
-        ctx.fillRect((hx - 7) | 0, (hy - 7) | 0, 14, 14);
-      }
-    }
     if (sep) {
       var srot = Math.atan2(sep.vy, sep.vx) + Math.PI / 2;
       /* body and tail follow the trail the head left behind */
@@ -1016,11 +1064,11 @@ t += dt;
     }
     /* hearts ride ON the body — drawn after it, so the six of them
        read against the worm instead of disappearing under it. */
-    for (var q2 = 0; q2 < hearts.length; q2++) {
-      var hx2 = hearts[q2].x, hy2 = hearts[q2].y;
-      if (!sprite('heart', hx2, hy2, 0.45, 0)) {
+    for (var q = 0; q < hearts.length; q++) {
+      var hx = hearts[q].x, hy = hearts[q].y;
+      if (!sprite('heart', hx, hy, 0.45, 0)) {
         ctx.fillStyle = '#C2405F';
-        ctx.fillRect((hx2 - 7) | 0, (hy2 - 7) | 0, 14, 14);
+        ctx.fillRect((hx - 7) | 0, (hy - 7) | 0, 14, 14);
       }
     }
     for (var r = 0; r < bros.length; r++) {
@@ -1078,7 +1126,7 @@ t += dt;
     ctx.fillStyle = COL.bone;
     ctx.fillText('HP ' + Math.max(0, hp) + '/' + MAXHP, AX, AY + AH + 12);
     ctx.fillStyle = COL.dim;
-    ctx.fillText('shift to focus  ·  z near her to strike', AX + 120, AY + AH + 12);
+    ctx.fillText('shift to focus  ·  f near her to strike', AX + 120, AY + AH + 12);
 
     /* U1/U2 meters, left of the box like the mod's UI — the fill sheet
        cropped to the filled ratio under its border, and the full
@@ -1229,6 +1277,7 @@ t += dt;
     if (e.key === 'f' || e.key === 'F') { e.preventDefault(); tryHit(); return; }
     if (e.key === 'x' || e.key === 'X') {
       /* U2: the barrier. Full tp spends itself as one held hit. */
+      e.preventDefault();
       if (shieldT > 0) { say('* the barrier is already up.'); return; }
       if (tp < 1) { say('* the barrier wants full tp. graze to fill it.'); return; }
       tp = 0; shieldT = 2.5;
@@ -1263,6 +1312,8 @@ t += dt;
     layout();
     t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; marks = {};
     rage = 0; tp = 0; shieldT = 0;
+    rageMode = 0; rageModeT = 0;
+    diveT = 0;
     bossMax = 24; bossHP = bossMax; phase = 1; step_ = 0; stepT = 1.2;
     hearts = []; sep = null; bros = []; invuln = true; dying = 0;
     preloadSfx();
@@ -1330,9 +1381,9 @@ t += dt;
                get shieldT() { return shieldT; },
                get bx() { return bx; },
                get by() { return by; },
-get charging() { return chargeTelegraph > 0 || chargeT > 0; },
-                get diving() { return diveT > 0; },
-                get wormBusy() { return !!sep && (sep.telegraph > 0 || sep.chargeT > 0); },
+               get charging() { return chargeTelegraph > 0 || chargeT > 0; },
+               get diving() { return diveT > 0; },
+               get wormBusy() { return !!sep && (sep.telegraph > 0 || sep.chargeT > 0); },
                get wormPos() { return sep ? { x: sep.x, y: sep.y } : null; },
                get wormVel() { return sep ? { x: sep.vx, y: sep.vy } : null; },
                get heartPos() { return hearts.map(function (h) { return { x: h.x, y: h.y }; }); },

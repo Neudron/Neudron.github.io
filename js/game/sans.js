@@ -396,7 +396,7 @@
   var curIdx = 0, curTotal = 0, watch = null;
   var tface = document.getElementById('tboxFace');
   var tfaceImg = document.getElementById('tboxFaceImg');
-  var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/dog.svg', tv: 'img/tv.svg',
+  var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/annoying-dog.gif', tv: 'img/tv.svg',
                witch: 'img/act4/witch-face.png',
                scal: 'img/act4/calamity/scal-head.png',
                scalHood: 'img/act4/calamity/scal-head-hood.png' };

@@ -1,47 +1,15 @@
 /* music.js — the Act IV soundtrack. Synthesised, not sampled.
-   ───────────────────────────────────────────────────────────────────
-   Act IV had no music layer at all. Everything in it was either a
-   one-shot sound effect or silence.
+   ──────────────────────────────────────────────────────────────────
+   No audio files: 8 zones at 96 kbps is ~10 MB, this is a phone site,
+   and Act IV is 3 hours in. Oscillators + one noise buffer at runtime.
+   A recorded loop cannot answer the game — this does: layers on
+   boss HP, ducks under dialogue, no restart between same-zone rooms.
 
-   WHY THERE ARE NO AUDIO FILES HERE.
-   Eight zones at two minutes each, encoded at a polite 96 kbps, is
-   about ten megabytes. This is a site people open on a phone, on
-   data, and Act IV sits three hours into a chain — nobody is going
-   to wait through a download to hear a forest. The whole music layer
-   is oscillators and one noise buffer built at runtime: twenty-four
-   kilobytes of javascript that gzips to about four, and zero bytes
-   of audio requested, ever.
-
-   The second reason is the better one. A recorded loop cannot answer
-   the game. This one can: layers arrive as a boss loses health, the
-   whole bed ducks under dialogue, and moving between two rooms of the
-   same zone does not restart anything.
-
-   HOW IT DECIDES WHAT TO PLAY.
-   It asks. Nothing calls into this module — no scene was changed to
-   add music, exactly as no scene was changed to add thumb controls.
-   A 250ms poll reads which scene is running and, in a room, asks the
-   engine which tileset it is standing on. **The tileset name IS the
-   track name.** That is deliberate: a second room-id → zone map would
-   drift the first time a room changed tileset, and fixes16 asserts
-   every registered tileset has a track so adding a zone without music
-   fails loudly instead of going quiet.
-
-   TIMING COMES FROM AudioContext.currentTime, NEVER from a timer.
-   Same rule as rhythm.js. setInterval drifts by tens of milliseconds
-   under load, which on a 16th-note grid is audible as a limp. The
-   interval only decides *when to schedule*; every note is stamped
-   with an exact context time computed by adding step durations.
-
-   NOTHING SOUNDS BEFORE A USER GESTURE. The context is not even
-   constructed until the first pointerdown/keydown/touchstart. A track
-   asked for earlier is remembered and starts when the gesture lands.
-
-   prefers-reduced-motion does NOT silence this. That preference is a
-   statement about vestibular safety, not about sound, and reading it
-   as "no audio" takes the soundtrack away from people who never asked
-   for that. Anyone who wants it gone has a volume slider in settings
-   that goes to zero and persists.                                   */
+   Polls, never called — a 250ms tick reads the scene + engine
+   tileset. The tileset name IS the track name (no room→zone map to
+   drift). Timing from AudioContext.currentTime, not setInterval. No
+   sound before a user gesture. prefers-reduced-motion is NOT silenced
+   (vestibular, not audio). Volume slider in settings → zero.        */
 
 (function () {
   'use strict';

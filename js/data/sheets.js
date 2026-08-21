@@ -137,21 +137,29 @@
          transparent rows by whatever scraped it. `pad-sheet.mjs` put
          them back; the original is kept at
          `_scripts/orig/BrimstoneHeart.png.orig`. */
+heart:     { src: IMG + 'calamity/BrimstoneHeart.png',
+                  w: 44,  h: 372,  frames: 6,  fw: 44,  fh: 62, fps: 10, confirmed: true,
+                  note: 'seen 2026-08-17: six beats, 62px grid. sheet re-padded 370 -> 372' },
+
+    /* the Sepulcher — the worm she hides behind. Source:
+       SepulcherHead.cs: single-frame NPC, width=62 height=64 (the
+       sprite file is 62x88; the NPC hitbox is smaller than the art).
+       Body segments alternate Body/BodyAlt like the mod alternates
+       SepulcherBody and SepulcherBodyEnergyBall — but here both are
+       solid body sprites, since the energy balls (hearts) are drawn
+       separately. Tail is the single last segment.
+       The mod spawns 52 segments (minLength=51, maxLength=52); odd
+       indices are energy balls (hearts), even are body, index 51 is
+       the tail. Arms spawn every 4 segments starting at index 3. */
     sepulcher: { src: IMG + 'calamity/SepulcherHead.png',
-                 w: 62,  h: 88,   frames: 1,  fw: 62,  fh: 88, fps: 0,  confirmed: true,
-                 note: 'seen 2026-08-17: one head, not two frames. fps 0 — nothing to animate' },
-    /* the worm's body and tail. Single frames each, measured directly
-       2026-08-18: Body 82x72, BodyAlt 86x82, Tail 54x54. The fight used
-       to draw the head alone because these were never registered. */
+                 w: 62,  h: 88,   frames: 1,  fw: 62,  fh: 88, fps: 0, confirmed: true,
+                 note: 'seen 2026-08-17: single beetle-like head, horns/mandibles/three eyes. SepulcherHead.cs: single-frame NPC, 62x64 hitbox, sprite is 62x88' },
     sepulBody: { src: IMG + 'calamity/SepulcherBody.png',
-                 w: 82,  h: 72,   frames: 1,  fw: 82,  fh: 72, fps: 0,  confirmed: true },
+                 w: 82,  h: 72,   frames: 1,  fw: 82,  fh: 72, fps: 0, confirmed: true },
     sepulBodyAlt: { src: IMG + 'calamity/SepulcherBodyAlt.png',
-                 w: 86,  h: 82,   frames: 1,  fw: 86,  fh: 82, fps: 0,  confirmed: true },
+                 w: 86,  h: 82,   frames: 1,  fw: 86,  fh: 82, fps: 0, confirmed: true },
     sepulTail: { src: IMG + 'calamity/SepulcherTail.png',
-                 w: 54,  h: 54,   frames: 1,  fw: 54,  fh: 54, fps: 0,  confirmed: true },
-    heart:     { src: IMG + 'calamity/BrimstoneHeart.png',
-                 w: 44,  h: 372,  frames: 6,  fw: 44,  fh: 62, fps: 10, confirmed: true,
-                 note: 'seen 2026-08-17: six beats, 62px grid. sheet re-padded 370 -> 372' },
+                 w: 54,  h: 54,   frames: 1,  fw: 54,  fh: 54, fps: 0, confirmed: true },
 
     /* the drop */
     ashes:     { src: IMG + 'calamity/AshesofAnnihilation.png',
