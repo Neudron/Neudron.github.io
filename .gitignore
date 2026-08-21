@@ -23,6 +23,13 @@
 # or duplicate every shipped file. It needs no backup: it is a clone.
 _deploy/
 
+# ── fresh sprite sources ────────────────────────────────────────
+# _sources/ holds verbatim downloads from CalamityTeam/CalamityModPublic
+# used by _scripts/verify-sprites.mjs to prove the shipped crops are
+# faithful. They are Toby Fox's / Calamity team's art — never ship them
+# and never commit them; re-fetch with _scripts/fetch-sprite-sources.ps1.
+_sources/
+
 # ── the walkthrough ─────────────────────────────────────────────
 # memory/ holds the complete design documentation and the walkthrough
 # (memory/story.md, memory/PLAN.md, etc). It must never reach the
