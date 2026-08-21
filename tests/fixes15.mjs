@@ -30,7 +30,7 @@ const SCENES = [
   ['act4/boss-polt.js','polt'],   ['act4/quiz.js',      'quiz'],
   ['act4/rhythm.js',   'rhythm'], ['act4/craft.js',     'craft'],
   ['game/bullet.js',   'bullet'], ['game/dark.js',      'dark'],
-  ['game/deck.js',     'deck']
+  ['game/deck.js',     'deck'],   ['act4/shop.js',      'shop']
 ];
 
 console.log('\n1. the assumption touch.js is built on');
@@ -90,7 +90,7 @@ for (const p of profs) {
 /* Auto-repeat belongs on menus and nowhere else. On movement it
    stutters; in the rhythm game one flick is one note and a repeat
    would spam the lane. */
-const MENUS = ['craft', 'deck'];
+const MENUS = ['craft', 'deck', 'shop'];
 for (const p of profs) {
   const rep = /repeat:\s*true/.test(p.body);
   ok(p.id + ': repeat ' + (rep ? 'on' : 'off') +

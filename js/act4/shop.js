@@ -83,6 +83,11 @@
 
   function open(step) {
     active = true;
+    /* Claim input the same way the fights do (bullet.js, boss-scal.js):
+       while the board is up the room underneath must not take a step
+       or answer Escape — engine.leave() under an open overlay is how
+       "decline" used to strand you in a closed room. */
+    NEU.activeMinigame = 'shop';
     wrap.hidden = false;
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
@@ -97,10 +102,10 @@
 
   function close() {
     active = false;
+    if (NEU.activeMinigame === 'shop') NEU.activeMinigame = null;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
-    if (NEU.engine) NEU.engine.busy(false);
   }
 
   /* keyboard */
@@ -120,5 +125,10 @@
   var quitBtn = document.getElementById('shopQuit');
   if (quitBtn) quitBtn.addEventListener('click', close);
 
-  NEU.shop = { open: open, close: close, get active() { return active; } };
+  NEU.shop = {
+    open: open, close: close,
+    get active() { return active; },
+    /* same contract as the other scenes — core/touch.js polls it */
+    get running() { return active; }
+  };
 })();

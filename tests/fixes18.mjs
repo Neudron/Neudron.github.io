@@ -361,6 +361,40 @@ console.log('\n17. game routing guard');
   ok('>>> bullet close no longer bleeds into SC <<<', /NEU\.activeMinigame !== 'bullet'\) return/.test(b2));
 }
 
+/* ═══ 17b. regression: every room-level overlay claims the input ══*/
+/* The shop, rhythm, craft, and polt overlays all open while the room
+   is still running. Without a claim, one Escape reached BOTH handlers:
+   the overlay asked "leave?" while the engine had already left the
+   room underneath — declining stranded you in a dead room, and shop's
+   close() crashed on an API that only rooms get (engine.busy). */
+console.log('\n17b. overlays claim activeMinigame');
+{
+  const S = read('act4/shop.js');
+  ok('>>> shop claims input on open <<<', /NEU\.activeMinigame = 'shop'/.test(S));
+  ok('shop releases its own claim on close',
+     /NEU\.activeMinigame === 'shop'\) NEU\.activeMinigame = null/.test(S));
+  ok('>>> shop close no longer calls the rooms-only busy() <<<', !/engine\.busy/.test(S));
+
+  const R = read('act4/rhythm.js');
+  ok('>>> rhythm claims input on open <<<', /NEU\.activeMinigame = 'rhythm'/.test(R));
+  ok('rhythm releases before re-entering the room',
+     R.indexOf("=== 'rhythm') NEU.activeMinigame = null") < R.indexOf("engine.enter('d1_street'"));
+
+  const C = read('act4/craft.js');
+  ok('>>> craft claims input on open <<<', /NEU\.activeMinigame = 'craft'/.test(C));
+  ok('craft releases its own claim on close',
+     /NEU\.activeMinigame === 'craft'\) NEU\.activeMinigame = null/.test(C));
+
+  const P = read('act4/boss-polt.js');
+  ok('>>> polt claims input on open <<<', /NEU\.activeMinigame = 'polt'/.test(P));
+  ok('polt releases its own claim on close',
+     /NEU\.activeMinigame === 'polt'\) NEU\.activeMinigame = null/.test(P));
+
+  /* the two that already did it stay honest */
+  ok('bullet still sets its claim', /NEU\.activeMinigame = 'bullet';/.test(read('game/bullet.js')));
+  ok('scal still sets its claim', /NEU\.activeMinigame = 'scal';/.test(read('act4/boss-scal.js')));
+}
+
 /* ═══ 18. regression: the five already-fixed bugs stay fixed ══════*/
 console.log('\n18. no regressions in the earlier fixes');
 {
