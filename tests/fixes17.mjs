@@ -623,6 +623,20 @@ console.log('\n10. .well-known');
   ok('the workflow uploads the repo as-is (no Jekyll build)',
      /upload-pages-artifact/.test(wf) && !/jekyll\s+(build|serve)/i.test(wf) && !/configure-jekyll/i.test(wf));
 
+  /* og.png is referenced by index.html but lives at the repo root, not
+     inside css/js/img/ — the staging step must list it explicitly or the
+     social preview image silently 404s. This actually happened for weeks
+     after the flatten-to-root deploy. */
+  ok('>>> the deploy stages og.png <<<',
+     /cp.*\bog\.png\b/.test(wf));
+
+  /* And the og:image URL must match the live domain, not the old
+     github.io host that redirects to it — scrapers follow redirects
+     but the destination must serve the file. */
+  const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  ok('>>> og:image points at the live domain <<<',
+     /og:image"\s+content="https:\/\/www\.neu\.ac\/og\.png"/.test(idx));
+
   /* And it must not be caught by any ignore rule. */
   const GI = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
   ok('no ignore rule swallows .well-known',
