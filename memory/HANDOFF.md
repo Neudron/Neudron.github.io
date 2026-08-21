@@ -1,5 +1,12 @@
 # HANDOFF — 2026-08-20 · Supreme Calamitas repair & ship
 
+> **✅ ARCHIVED 2026-08-22 — this mission is DONE.** The repair shipped, the
+> suite went green and stayed green (now 1,487 checks / 15 suites via
+> `node tests/run-all.mjs`), and the repo was flattened to root on 2026-08-21
+> — every `site/…` path below is now `…` at the repo root. Read
+> `memory/pending.md` for current state; §9's still-open list is re-checked
+> there. Kept whole as a record of how the V4 breakage was diagnosed.
+
 Fully autonomous continuation pack. Read `site/CLAUDE.md`, `memory/pending.md`,
 `memory/PLAN.md` first. Everything you need to finish the current mission is
 below; the test files are the authoritative contract.

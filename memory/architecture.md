@@ -27,12 +27,11 @@ on what.
 ```
 js/
   core/   quest save juice engine dev      things everything else needs
-          danmaku settings touch
+          danmaku settings touch music perf
   page/   main stars scene                 the scrolling website itself
   game/   sword sans bullet dark deck      acts I-III
   act4/   act4 rooms-a rooms-d rooms-g     the woods
-          boss-scal boss-polt quiz
-          rhythm craft crack
+          boss-scal boss-polt quiz rhythm craft crack shop
   data/   data sheets                      content and manifests
 ```
 
@@ -40,7 +39,7 @@ Moving a file means updating **three** places, and a stale path is a silent
 404 that only shows up later as a missing feature:
 1. the `<script src>` in `index.html`
 2. every comment in other modules that names the file
-3. the `FILES` array and every `read('...')` in `outputs/tests/fixes*.mjs`
+3. the `FILES` array and every `read('...')` in `tests/fixes*.mjs`
    — **including regex literals** like `/js\/deck\.js/`, which a
    string-replace pass will miss.
 
@@ -113,7 +112,7 @@ down anywhere.
  55     .panel      "inside"
  70     .bh .dk .eng   full-screen rooms
  74     .chips      ABOVE the rooms — you must see what you carry in them
- 76     .quiz .fnf .craft .polt   the act IV scenes
+  76     .quiz .fnf .craft .polt .shop   the act IV scenes
  78     .deck       the console home screen
  80     .dev        the dev console
  84     .fps        the frame-time meter — a readout must never cover
@@ -169,10 +168,11 @@ as a flam, not as variation.
 ## Testing
 
 Chrome/puppeteer are blocked in the sandbox. Tests run in **jsdom under node**
-against the real files: `outputs/tests/fixes*.mjs`.
+against the real files: `tests/fixes*.mjs`.
 
 ```
-cd outputs/tests && node fixes6.mjs
+node tests/run-all.mjs        # every suite, hard 60s timeout each
+node tests/fixes6.mjs         # or one at a time
 ```
 
 Required jsdom setup (see `memory/workflow.md` for the traps):

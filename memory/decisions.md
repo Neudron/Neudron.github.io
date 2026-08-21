@@ -3,6 +3,27 @@
 Why things are the way they are — including what was tried and rejected, so it
 does not get re-tried.
 
+## Decisions 2026-08-22
+
+**Every room-level overlay claims `NEU.activeMinigame` while open.**
+shop/rhythm/craft/polt join bullet/scal. The engine's keydown yields only to
+that flag, so without a claim one Escape reached both handlers and left the
+room under a still-open overlay. Claim on open, guarded release on close
+(only ever clear your own claim). Pinned by fixes18 §17b.
+
+**The engine profile is the fallback in touch.js, not the first entry.**
+Overlays open while `NEU.engine.running` is still true, so if `engine` came
+first in PROFILES it shadowed every overlay and put talk/reset buttons on a
+menu that wants arrows and Enter.
+
+**No service worker.** GitHub Pages caching makes stale-deploy risk real for
+a site with no build step to hash filenames; the manifest already gives
+installability, and the game needs the network only on first load.
+
+**Real-browser verification goes through CDP with explicit timeouts.**
+A jsdom-only boot-check once wedged a session indefinitely; every exec now
+carries an explicit timeout, and `tests/run-all.mjs` kills any suite at 60s.
+
 ## Rejected approaches
 
 **The boss fight.** Docking the console used to open an Undertale fight where

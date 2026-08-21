@@ -1,6 +1,41 @@
 ### Neu's Personal page BUG Tracker
 
-
+> **STATUS 2026-08-22** — everything above the V3 line is closed by the
+> boss-scal rebuild + suites (`fixes8` 104, `fixes18` 100, `fixes13` 79);
+> details in `memory/uat-w5.md` and `memory/pending.md` §5.2/5.4. Cluster map:
+>
+> - **Worm is a head / no hearts / follows slowly / free attack** → rebuilt:
+>   full body+tail via `sepulBody(Alt)`/`sepulTail`, six hearts ride the body,
+>   constant pursuit, charges with a 0.35s telegraph, contact damage only
+>   while dashing.
+> - **Dialog face shows sans instead of hers** → `FACE` map gained
+>   `scal`/`scalHood`; unknown speakers no longer keep the previous face.
+> - **Homing attacks don't rotate toward the player** → projectiles rotate to
+>   their travel direction continuously (superset of launch-time aim).
+> - **Flames explode on the spot** → fireblast now homes before its pause,
+>   then bursts.
+> - **Dash/melee don't work** → CYCLE drives dives (steps 5, 13) and charges
+>   (4, 9, 16, 18, 20); contact damage during telegraph/dash covers melee.
+> - **Brothers spam and are unkillable** → volley caps + enrage numbers
+>   tuned; sequence ends in phase 2.
+> - **ESC policy inconsistency** → decided: fights confirm (bullet, scal,
+>   polt, quiz, rhythm), rooms/menus stay direct (craft, dark, deck). See
+>   `memory/decisions.md`.
+> - **Enter glitch into the 20s minigame on death** → Enter guards +
+>   `activeMinigame` checks landed in bullet/scal/engine.
+> - **Sprites wrong vs the Calamity wiki** → all sheets re-measured against
+>   `SupremeCalamitas.cs` (21 rows × 2 cols, real animation bands); 18/18 PNGs
+>   match their definitions.
+> - **First pattern impossible / safe spots between bullets** → rebalanced;
+>   final judgement needs the playthrough (below).
+>
+> **Still owed — verify by playing it:** post-hearts phase start, brothers
+> killability feel, first-pattern fairness on a phone, hitbox feel generally.
+> From Iteration V3, also done: puzzle signs, wall-skip prevention, rage(Z)/
+> TP(X) bars with real game sprites, dev F8 fight entry, merchant shop UI
+> (`js/act4/shop.js`, selectable rows/prices/quips), extra SC attacks, official
+> repo sprites incl. shield states. TV-sword throw and axe→mushroom→heal chain
+> shipped as rooms/craft content — feel-check them in the same playthrough.
 
 the supreme calamitas when in the minigame form doesent have its sprite
 

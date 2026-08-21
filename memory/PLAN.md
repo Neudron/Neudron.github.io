@@ -351,11 +351,11 @@ Nineteen items. Ranked by what breaks if ignored.
 
 | # | Item | Note |
 |---|---|---|
-| 0.1 | **Deploy permission** | Acts I–IV are all local; live site is on the pre-Act-IV commit `f6acc9d` |
-| 0.2 | **Confirm 5 provisional frame counts** | `sheet fireblast/gigablast/heart/sepulcher/hook` in the dev console. Two minutes |
-| 0.3 | **Verify Catastrophe slash orientation** | `slashTop`/`slashBot` in `data/sheets.js` are flagged `verify:'orientation'`. If swapped, swap two `src` strings |
-| 0.4 | **PR #1 is still open** | `copilot/link-neuac-domain` holds an old 70-byte page; merging overwrites the site |
-| 0.5 | **Enforce HTTPS unticked** | Settings → Pages |
+| ~~0.1~~ | ~~**Deploy permission**~~ **DONE** (`pending` 1.1) | Acts I–IV live at https://www.neu.ac |
+| ~~0.2~~ | ~~**Confirm 5 provisional frame counts**~~ **DONE** (`pending` 1.2) | measured + eyeballed at 5x |
+| ~~0.3~~ | ~~**Verify Catastrophe slash orientation**~~ **DONE** (`pending` 1.3) | they WERE swapped; geometry moved with them |
+| ~~0.4~~ | ~~**PR #1 is still open**~~ **DONE** (`pending` 1.4) | closed, not merged; never reached main |
+| ~~0.5~~ | ~~**Enforce HTTPS unticked**~~ **DONE** (`pending` 1.5) | http → 301 → https verified live |
 
 ## Tier 1 — structural, gets worse with time
 
@@ -363,18 +363,18 @@ Nineteen items. Ranked by what breaks if ignored.
 |---|---|
 | ~~1.1~~ | ~~**`game/dark.js` and `game/bullet.js` are a second engine.**~~ **DONE.** `danmaku.js` extracted; `dark.js` character removed (uses `engine.drawPlayer`); `bullet.js`, `boss-scal.js`, `boss-polt.js` all refactored onto `NEU.danmaku`. Walk mode and `sweep`/`blocked`/`solidAt` in `dark.js` still separate (walk mode is not a room). |
 | ~~1.2~~ | ~~**No full-playthrough test.**~~ **DONE.** `tests/playthrough.mjs` — 45 checks, Acts I→IV, save round-trips at every boundary. |
-| 1.3 | **Accessibility partially addressed.** `craft.js` now has arrow-key grid navigation. `deck.js` traps Tab focus. `juice.js` exposes `setNoShake`/`setNoFlash` for in-game settings. `danmaku.js` dims (not blinks) the soul when reduced/noFlash. **Settings panel now built** (`js/core/settings.js` — shake/flash/larger-text switches, `Ctrl+Shift+,`, gear button, persisted as save flags). **3Hz flash audit done** (measured in fixes12 §7 — fastest loop is the 1s text cursor). **Still TODO: quiz Tab focus audit.** |
+| 1.3 | **Accessibility partially addressed.** `craft.js` now has arrow-key grid navigation. `deck.js` traps Tab focus. `juice.js` exposes `setNoShake`/`setNoFlash` for in-game settings. `danmaku.js` dims (not blinks) the soul when reduced/noFlash. **Settings panel now built** (`js/core/settings.js` — shake/flash/larger-text/thumb-controls switches, `Ctrl+Shift+,`, gear button, persisted as save flags). **3Hz flash audit done** (measured in fixes12 §7 — fastest loop is the 1s text cursor). **Still TODO: quiz Tab focus audit.** |
 
 ## Tier 2 — visible to a player
 
 | # | Item |
 |---|---|
 | 2.1 | ~~**The forest uses palette colours, not the Deltarune tree crops.**~~ **DONE (Phase 4b).** All six zones draw from `img/act4/tiles/*.png`, 2.1 KB total, tiles scored for opacity/variance/seam then re-toned to the site palette. `colours` kept as the fallback |
-| 2.2 | **Seven placeholder sprites**: `dog.svg` `hammer.svg` `clicker.svg` `hand.svg` `blanket.svg` `switch2.svg` `tv.svg` |
+| 2.2 | ~~**Seven placeholder sprites**~~ **DONE (`pending` 2.6).** All seven redrawn from ASCII grids in `_scripts/make-sprites.mjs`, each checked by rasterising at 8x and looking. `dog` was later replaced by the real Toby GIF (2026-08-20) |
 | 2.3 | ~~**Calamitas only uses her body sheet.**~~ **DONE.** Darts, hellblasts, fireblasts, gigablasts, fists, slashes, the Sepulcher, the hearts and the won-state ashes all draw from `data/sheets.js` via the `sprite(key,x,y,scale,rot,glow)` helper (rotated to travel), with the coloured-square fallback kept |
 | 2.4 | ~~**No touch input anywhere.**~~ **DONE (Phase 6).** `core/touch.js` synthesises real KeyboardEvents from a vector stick and contextual buttons; all nine scenes covered without changing any of them |
 | ~~2.5~~ | ~~**No soundtrack.**~~ **DONE (Phase 5b).** `core/music.js` — eight procedural tracks, **zero bytes of audio downloaded**. Zone tracks keyed by tileset name through a new `engine.zone()`; a 250ms poll picks the track so no scene changed; crossfade between zones and no restart within one; ducks under the dialogue box; boss layers arrive as HP falls; the rhythm game is silenced so two tempos never fight. Volume slider in settings, persisted as `opt_music` |
-| 2.6 | **The `.deck` shelf has no cover art** — five tiles are two letters on a gradient |
+| 2.6 | ~~**The `.deck` shelf has no cover art**~~ **DONE (`pending` 2.7).** Each of the six tiles carries a drawn sigil on a 48×48 grid, two colours from its own gradient, referencing something real |
 
 ## Tier 3 — quality and hygiene
 
@@ -382,9 +382,9 @@ Nineteen items. Ranked by what breaks if ignored.
 |---|---|
 | 3.1 | **`loader.js` dropped deliberately.** Boot carries ~30 KB more JS than the "+0 KB" target. Documented in `plan-act4.md` §9 |
 | 3.2 | ~~**`css/style.css` is ~1600 lines in one file.**~~ **TOC added** (top of the file, line 11). Splitting it still means a build step, so leave it |
-| 3.3 | **No performance budget enforcement.** Nothing measures frame time |
-| 3.4 | **`.well-known/discord`** parked in `_removed-from-main` if wanted back |
-| 3.5 | **Three skill repos unevaluated** (§1.10) |
+| 3.3 | ~~**No performance budget enforcement.**~~ **DONE (`pending` 3.2).** `core/perf.js` + `fps` in the dev console; 1% low scoring |
+| 3.4 | ~~**`.well-known/discord`**~~ **DONE (`pending` 3.7).** Restored at `.well-known/discord`, live; reasoning in `.well-known/README.md` |
+| 3.5 | ~~**Three skill repos unevaluated**~~ **DONE (`pending` 3.8).** Verdicts in §1.10 |
 
 ---
 
@@ -413,13 +413,22 @@ Nineteen items. Ranked by what breaks if ignored.
 > check in this project is jsdom, and nobody has heard the soundtrack out loud
 > or held the thumb pad.
 >
+> **UPDATE 2026-08-22: 1,487 checks green across 15 suites** via
+> `node tests/run-all.mjs`. The merchant shop is a real graphical UI
+> (`js/act4/shop.js`), every room-level overlay now claims
+> `NEU.activeMinigame` while open (one Escape used to leave the room under a
+> still-open overlay), the shop has thumb controls, and `.tpad`/`.eng` carry
+> safe-area/svh handling. `tests/run-all.mjs` exists because fixes5 (~28s)
+> and fixes18 (~30s) are legitimately slow jsdom boots that short shell
+> timeouts kept killing. **What is left needs a human:** item 3.5 — hear the
+> soundtrack out loud and hold the thumb pad on a real phone — plus a private
+> off-machine remote for this repo (`story.md` lives here).
+>
 > Calamitas draws everything from her sheets through a shared
 > `sprite(key,x,y,scale,rot,glow)` helper with a kept coloured-square
 > fallback, and the six `audio/act4/*.ogg` files play through the pooled
 > pattern from `sans.js`.
 >
-> **Before anything is deployed:** `_deploy\` has lost its `.git` and has to be
-> re-cloned. See `pending.md` 1.6.
 
 Seven phases. **Do them in order.** Each ends with a passing test run and a
 `pending.md` update. Estimates assume the agent has read Part One.
@@ -635,7 +644,7 @@ asserts none of them ship and fixes14 §5 asserts no shipped module names one
 `engine.tilesets()` was added as a read-only accessor so fixes14 can assert
 all six carry `src` + `rects` **at runtime** rather than only in source text.
 
-### 4c. The seven placeholders
+### 4c. The seven placeholders — DONE (`pending` 2.6)
 `dog` `hammer` `clicker` `hand` `blanket` `switch2` `tv`. Either Neu supplies
 art or draw originals in the existing pixel style. Ask before drawing.
 

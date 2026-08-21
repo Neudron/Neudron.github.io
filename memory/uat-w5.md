@@ -25,5 +25,5 @@ the lower centre pillar (the 8px hitbox straddles two rows, so a solid tile
 one row above the path freezes the slide forever) — pillar removed in
 `rooms-a.js`, room now solvable.
 
-Entry: `site/js/act4/boss-scal.js` — fight at the calami... no, the Sepulcher,
+Entry: `js/act4/boss-scal.js` — fight at the calami... no, the Sepulcher,
 end of Act IV chain.

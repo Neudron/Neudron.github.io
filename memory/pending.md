@@ -13,9 +13,9 @@ than trusting the plan document.
 | | |
 |---|---|
 | Acts | I–IV complete. 31 rooms, 3 bosses, quiz, rhythm game, crafting grid, merchant shop |
-| Tests | **1340 checks, 16 suites, all green** — re-verified 2026-08-21 by running every suite. fixes5 (53) fixes6 (48) fixes7 (73) fixes8 (104) fixes9 (70) fixes10 (97) fixes11 (75) fixes12 (63) fixes13 (79) fixes14 (70) fixes15 (106) fixes16 (185) **fixes17 (313)** fixes18 (89) playthrough (45) |
+| Tests | **1487 checks, 15 suites, all green** — re-verified 2026-08-22 via `node tests/run-all.mjs` (per-suite 60s timeout). fixes5 (53) fixes6 (48) fixes7 (73) fixes8 (104) fixes9 (70) fixes10 (97) fixes11 (75) fixes12 (63) fixes13 (79) fixes14 (70) fixes15 (112) fixes16 (185) **fixes17 (313)** fixes18 (100) playthrough (45). `reach.mjs` is a shared library, not a suite |
 | Location | repo root at `Documents\neu` (site/ flattened to root 2026-08-21); tests in `tests/` |
-| Deployed | ✅ **YES — 2026-08-21.** `70a9a71` is live at **https://www.neu.ac**. Previous deploys this session: `9158ca9` (robots.txt), `d1d0eeb` (og.png fix). Deploy workflow stages only web-facing files (`index.html css js fonts img audio CNAME .nojekyll og.png robots.txt .well-known`) to `_stage/` before uploading — `memory/`, `tests/`, `_scripts/` never reach Pages. Verified: all 30 JS files, 44 sprites, 6 tilesets, audio, og.png, robots.txt → 200; `memory/story.md` → 404 (walkthrough protected). GitHub Actions: last 5 runs all `completed/success`. |
+| Deployed | ✅ **YES — 2026-08-21.** `cb5d599` live at **https://www.neu.ac**. Since then (2026-08-22, pushed same day): `c9d380b` ledger, `62eb514` **input-ownership fix** (see below), `81f5564` phone ergonomics CSS. Deploy workflow stages only web-facing files (`index.html css js fonts img audio CNAME .nojekyll og.png robots.txt manifest.json apple-touch-icon.png .well-known`) to `_stage/` before uploading — `memory/`, `tests/`, `_scripts/` never reach Pages. Verified: all JS files, sprites, tilesets, audio, og.png, robots.txt → 200; `memory/story.md` → 404 (walkthrough protected) |
 
 **Phases 1–3 of PLAN.md are done and verified, plus 2.4, 2.5, 4a, 4b and 5:**
 
@@ -30,10 +30,14 @@ than trusting the plan document.
   map to drift; fixes16 §4 asserts every registered tileset has a track.
   Volume is a slider in settings, persisted as `opt_music`.
 
-- `core/touch.js` (2.5) gives all nine scenes thumb controls without changing
+- `core/touch.js` (2.5) gives all **ten** scenes thumb controls without changing
   one of them, by synthesising real KeyboardEvents. Writing its suite caught a
   profile sending `z` to `bullet.js`, which only listens for `Enter` — it
-  would have looked correct and done nothing on a phone.
+  would have looked correct and done nothing on a phone. The merchant shop
+  joined 2026-08-22 (stick scrolls the board, take/back buttons), and the
+  engine profile was demoted to fallback position so an open overlay can no
+  longer be shadowed by the talk/reset pad while `NEU.engine.running` is
+  still true underneath it.
 
 - All six tilesets carry `src` + `rects` (Phase 4b). `engine.tilesets()` now
   exposes the registry so this is asserted at runtime, not just in the source
@@ -60,6 +64,33 @@ than trusting the plan document.
 
 ---
 
+## 2026-08-22 — input ownership + phone ergonomics
+
+Two real bugs found by a jsdom probe that opened an overlay while the room
+was still running and pressed Escape:
+
+- **Escape bleed-through.** The engine's keydown yields only to
+  `NEU.activeMinigame`, which `bullet.js` and `boss-scal.js` set — but shop,
+  rhythm, craft and polt never did. One Escape reached both handlers: the
+  room left underneath while the overlay asked "leave?". Declining stranded
+  you in a dead room (rhythm's decline path), and craft's self-heal
+  (`engine.enter` on close) had been papering over the same hole.
+  **Fix:** all four now claim `NEU.activeMinigame` on open and release it on
+  close, guarded so they only ever clear their own claim. fixes18 §17b pins
+  all six claims.
+- **shop.close() crashed every time.** It called `NEU.engine.busy(false)`,
+  but `busy()` exists only on the rooms-only API object, not on public
+  `NEU.engine`. Uncaught TypeError on every Escape/quit — masked, because
+  `wrap.hidden = true` runs first. Line removed; nothing ever set busy(true).
+- **Phone:** shop touch profile; `.tpad` spends `env(safe-area-inset-*)`
+  (the meta viewport already asks for cover); `.eng` gains `100svh`; the
+  fight quit button meets Apple's 44px target.
+- **Runner:** `tests/run-all.mjs` — every suite with a hard 60s kill.
+  fixes5 (~28s) and fixes18 (~30s) are legitimately slow jsdom boots and
+  kept tripping short shell timeouts.
+
+---
+
 ## The table
 
 Status: 🔴 blocked on Neu · 🟠 real gap · 🟡 polish · ⚪ decided, no action
@@ -76,7 +107,7 @@ Status: 🔴 blocked on Neu · 🟠 real gap · 🟡 polish · ⚪ decided, no a
 | **2.2** | ✅ **DONE.** All six zones draw real 16×16 art — `woods castle city home prize storm`, one sheet each in `img/act4/tiles/` (2.1 KB total). Tiles were scored out of the Deltarune atlases for opacity, interior variance and seam cost, then re-mapped onto the palette colour each char already had, so the texture is theirs and the tone is ours. `colours` kept as the fallback throughout | ✅ | `act4/rooms-*.js` | done |
 | **2.3** | ✅ **DONE.** All six `audio/act4/*.ogg` play through the pooled pattern (4 copies each, volume 0.5, pools built in `open()`); each attack plays its own family, hits play the hit files | ✅ | `act4/boss-scal.js` | done |
 | **2.4** | ✅ **DONE.** `core/music.js` — eight procedural tracks, **0 bytes of audio downloaded**. Zone tracks keyed by tileset name via a new `engine.zone()`; a 250ms poll picks the track so no scene changed; crossfade on zone change and no restart within one; ducks under the dialogue box; boss layers arrive as HP falls; the rhythm game is explicitly silenced so two tempos never fight. Volume slider in settings, persisted as `opt_music`. Adding the slider exposed a real bug in the Tab trap — it collected only `button`, so focus escaped an `aria-modal` dialog; now `button, input` | ✅ | `core/music.js` | done |
-| **2.5** | ✅ **DONE.** `core/touch.js` draws a stick and buttons and synthesises real KeyboardEvents, so all nine scenes got touch without one of them changing. Vector stick with diagonals, focus (Shift) in the three bullet-hell fights, auto-repeat on the menu scenes only, and a single release path so a key can never stick. Auto-shows on a coarse pointer; `settings → thumb controls` overrides | ✅ | `core/touch.js` | done |
+| **2.5** | ✅ **DONE.** `core/touch.js` draws a stick and buttons and synthesises real KeyboardEvents, so all **ten** scenes got touch without one of them changing. Vector stick with diagonals, focus (Shift) in the three bullet-hell fights, auto-repeat on the menu scenes only, and a single release path so a key can never stick. Auto-shows on a coarse pointer; `settings → thumb controls` overrides. 2026-08-22: shop profile added; engine profile moved to fallback so overlays always win | ✅ | `core/touch.js` | done |
 | **2.6** | ✅ **DONE.** All seven redrawn from ASCII grids in `_scripts/make-sprites.mjs` and each one checked by rasterising it at 8x and looking. `dog` is Toby in profile with ear, eye, muzzle, haunch and tail, and **no expression** on purpose. `hand` **kept its original silhouette** — the redraw read as a stool and the old shape was better; only the shading stayed. One colour added to the palette: `#BFA98C`, a warm skin shadow, because the only mid-tone was a cool grey that reads as dirt on skin | ✅ | `img/`, `_scripts/` | done |
 | **2.7** | ✅ **DONE.** All seven tiles have drawn sigils on one 48×48 grid, two colours each taken from the tile's own gradient. Each references something real: the stepped torch, the glass cube, the soul and its countdown. `sigil: true` is gone — presence in `SIGILS` is the switch. The initials fallback is kept | ✅ | `game/deck.js` | done |
 | **3.1** | ✅ **DONE — this claim was wrong.** The verifier missed it: `settings.js` ships **all three** switches — `noShake`, `noFlash` and larger text (`settText` row, `opt_largeText`, `html.text-lg { zoom: 1.25 }`), tested in fixes12 §3 | ✅ | `core/settings.js` | done |

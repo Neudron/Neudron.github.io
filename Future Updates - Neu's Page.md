@@ -1,7 +1,7 @@
 ### Future Updates - Neu's Page
 
 **All six items delivered and verified 2026-08-19** — every one is covered by
-`site/tests/fixes8.mjs` (99 checks, all green; full sweep 1440 checks / 15
+`tests/fixes8.mjs` (99 checks, all green; full sweep now 1,487 checks / 15
 suites green).
 
 1. ~~**Add a healing bar that charges over-time similar to the "Rage" feature of Calamity**~~

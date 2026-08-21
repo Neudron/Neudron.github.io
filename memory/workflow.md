@@ -7,28 +7,29 @@
 push to `main` is live in under a minute — there is no staging step to catch
 a mistake.
 
-When permission is given:
+When permission is given (current flow — the workshop repo at
+`Documents\neu` **is** the deploy source; `_deploy\` is a stale vestigial
+clone kept only for `deploy.ps1` history):
 
 ```powershell
-# 1. copy changed files from the session scratch into BOTH local copies
-$src = "<session>\outputs\neu-site"
-foreach ($f in @('index.html','css\style.css','js\sans.js', ...)) {
-  Copy-Item "$src\$f" "$env:USERPROFILE\Documents\neu\site\$f" -Force
-  Copy-Item "$src\$f" "$env:USERPROFILE\Documents\neu\_deploy\$f" -Force
-}
-# 2. commit and push from _deploy
-cd "$env:USERPROFILE\Documents\neu\_deploy"
-git add -A; git commit -m "..."; git push origin main
-# 3. verify by fetching the LIVE file with a cache-buster
+git add <files> ; git commit -m "..." ; git push origin main
+# then verify by fetching the LIVE file with a cache-buster:
 Invoke-WebRequest "https://www.neu.ac/js/sans.js?cb=$(Get-Random)" -UseBasicParsing
 ```
 
-`gh` is not on PATH in the PowerShell session — verify by fetching the live
-file, not by querying the Actions API.
+The workflow `.github/workflows/deploy.yml` stages only web-facing files to
+`_stage/` before uploading, so `memory/`, `tests/`, `_scripts/` never ship.
+Watch the run: `https://api.github.com/repos/Neudron/Neudron.github.io/actions/runs?per_page=3`.
+
+`gh` is not on PATH in this session — verify by fetching the live file, not
+by CLI.
 
 The remote prints "This repository moved" — the canonical name is
 `Neudron/Neudron.github.io` (capital N). Harmless, but push with the correct
 case to silence it.
+
+**Always give shell commands an explicit timeout.** A boot-check script once
+wedged a session indefinitely; every exec now carries one.
 
 ## DNS (done, do not re-do)
 
@@ -41,10 +42,8 @@ Registrar: spaceship.com. **The site is `www.neu.ac`, not `neu.ac`.**
 ## Testing
 
 ```
-cd outputs/tests
-npm install jsdom     # once per session — the sandbox is wiped between runs
-node fixes5.mjs       # sleep timing, dock, voices, replay regression
-node fixes6.mjs       # z-order, carried console, the deck
+node tests/run-all.mjs     # every suite, hard 60s timeout each (~90s total)
+npm install jsdom --prefix tests   # once per session — the sandbox is wiped between runs
 ```
 
 ### jsdom traps that have cost real time

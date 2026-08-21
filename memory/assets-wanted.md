@@ -1,5 +1,10 @@
 # Act IV — asset shopping list
 
+> **✅ FULFILLED.** All six `.ogg` files are in `audio/act4/` and wired; the
+> Calamitas/Sepulcher sprites are in `img/act4/calamity/`, re-measured and
+> registered in `js/data/sheets.js` (18/18 PNGs match their sheet defs).
+> Kept as the record of where everything came from.
+
 **Why you and not me:** `web_fetch` reads pages, it does not save binaries —
 confirmed by fetching `Ashes_of_Annihilation.png` and getting the URL back as
 plain text. Routing around it with PowerShell or curl is off-limits to me.

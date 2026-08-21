@@ -517,7 +517,7 @@ console.log('\n8. README');
   /* The three questions a stranger actually has. */
   ok('says what it is', /personal site/i.test(R));
   ok('says how to run it', /http\.server/.test(R));
-  ok('says how to test it', /node fixes/.test(R) && /jsdom/.test(R));
+  ok('says how to test it', /tests\/(run-all|fixes)\d*\.mjs/.test(R) && /jsdom/.test(R));
   ok('says how to deploy it', /deploy\.ps1/.test(R));
 
   /* It documented the PRE-REORG tree for months. Every path it names
