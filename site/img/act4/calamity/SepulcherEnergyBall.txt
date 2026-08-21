@@ -1,4 +1,0 @@
-# Placeholder for SepulcherEnergyBall.png
-# This should be replaced with the actual 5-frame animation sprite from CalamityMod
-# Dimensions: 20x20 per frame, 100x100 total with minimal padding
-# Created as text file placeholder - will be replaced with real PNG asset

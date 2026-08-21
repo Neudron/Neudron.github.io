@@ -56,7 +56,6 @@ memory/
 # token by design.
 CLAUDE.md
 README.md
-.well-known/README.md
 
 # ── build artefacts / experiments ────────────────────────────────
 index-standalone.html
