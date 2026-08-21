@@ -7,10 +7,11 @@
 # to upload an artifact. With no workflow present, every push looked
 # like it succeeded and silently deployed nothing.
 #
-# The site is plain static files with no build step, so this only
-# uploads the repo as-is. Note that under the Actions source the
-# CNAME file is ignored entirely — the custom domain comes from the
-# repo's Pages settings, where www.neu.ac is already configured.
+# The site is plain static files with no build step. After the merge
+# that flattened site/ to root, the repo root also contains memory/
+# (the complete walkthrough — the first puzzle is finding the way in),
+# tests/, _scripts/, and .github/. These must never ship, so the
+# workflow stages only the web-facing files before uploading.
 
 name: Deploy site to Pages
 
@@ -43,10 +44,16 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload the whole repo (no build step)
+      - name: Stage only site files
+        run: |
+          mkdir _stage
+          cp -r index.html css js fonts img audio CNAME .nojekyll _stage/ 2>/dev/null || true
+          cp -r .well-known _stage/ 2>/dev/null || true
+
+      - name: Upload staged site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: './_stage'
 
       - name: Deploy
         id: deployment
