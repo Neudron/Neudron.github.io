@@ -47,7 +47,7 @@ jobs:
       - name: Stage only site files
         run: |
           mkdir _stage
-          cp -r index.html css js fonts img audio CNAME .nojekyll og.png robots.txt manifest.json apple-touch-icon.png _stage/ 2>/dev/null || true
+          cp -r index.html css js fonts img audio CNAME .nojekyll og.png robots.txt sitemap.xml manifest.json apple-touch-icon.png _stage/ 2>/dev/null || true
           cp -r .well-known _stage/ 2>/dev/null || true
 
       - name: Upload staged site
