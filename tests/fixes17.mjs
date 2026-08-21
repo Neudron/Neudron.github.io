@@ -662,6 +662,26 @@ console.log('\n10. .well-known');
   ok('>>> manifest.json is tracked <<<',
      fs.existsSync(path.join(ROOT, 'manifest.json')));
 
+  /* ── SEO surface: canonical, sitemap, JSON-LD ──────────────────── */
+  ok('>>> the deploy stages sitemap.xml <<<', /cp.*\bsitemap\.xml\b/.test(wf));
+  ok('sitemap.xml exists and lists the one page',
+     fs.existsSync(path.join(ROOT, 'sitemap.xml')) &&
+     /<loc>https:\/\/www\.neu\.ac\/<\/loc>/.test(fs.readFileSync(path.join(ROOT, 'sitemap.xml'), 'utf8')));
+  ok('robots.txt points at the sitemap',
+     /Sitemap:\s*https:\/\/www\.neu\.ac\/sitemap\.xml/.test(
+       fs.readFileSync(path.join(ROOT, 'robots.txt'), 'utf8')));
+  /* The three URL declarations must be identical — canonical == og:url
+     == JSON-LD url. A mismatch across them is what disqualifies rich
+     results. */
+  {
+    const urls = [...idx.matchAll(/(?:rel="canonical"\s+href=|property="og:url"\s+content=|"url":\s*)"?(https:\/\/www\.neu\.ac\/)"?/g)];
+    ok('canonical + og:url + JSON-LD all agree on https://www.neu.ac/',
+       /rel="canonical"/.test(idx) && urls.length >= 3);
+    ok('JSON-LD parses as WebSite',
+       (() => { try { const m = idx.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+                   return m && JSON.parse(m[1])["@type"] === "WebSite"; } catch (e) { return false; } })());
+  }
+
   /* index.html must reference both. */
   ok('>>> index.html links apple-touch-icon <<<',
      /rel="apple-touch-icon"/.test(idx));

@@ -363,7 +363,11 @@ Nineteen items. Ranked by what breaks if ignored.
 |---|---|
 | ~~1.1~~ | ~~**`game/dark.js` and `game/bullet.js` are a second engine.**~~ **DONE.** `danmaku.js` extracted; `dark.js` character removed (uses `engine.drawPlayer`); `bullet.js`, `boss-scal.js`, `boss-polt.js` all refactored onto `NEU.danmaku`. Walk mode and `sweep`/`blocked`/`solidAt` in `dark.js` still separate (walk mode is not a room). |
 | ~~1.2~~ | ~~**No full-playthrough test.**~~ **DONE.** `tests/playthrough.mjs` — 45 checks, Acts I→IV, save round-trips at every boundary. |
-| 1.3 | **Accessibility partially addressed.** `craft.js` now has arrow-key grid navigation. `deck.js` traps Tab focus. `juice.js` exposes `setNoShake`/`setNoFlash` for in-game settings. `danmaku.js` dims (not blinks) the soul when reduced/noFlash. **Settings panel now built** (`js/core/settings.js` — shake/flash/larger-text/thumb-controls switches, `Ctrl+Shift+,`, gear button, persisted as save flags). **3Hz flash audit done** (measured in fixes12 §7 — fastest loop is the 1s text cursor). **Still TODO: quiz Tab focus audit.** |
+| 1.3 | **Accessibility partially addressed.** `craft.js` now has arrow-key grid navigation. `deck.js` traps Tab focus. `juice.js` exposes `setNoShake`/`setNoFlash` for in-game settings. `danmaku.js` dims (not blinks) the soul when reduced/noFlash. **Settings panel now built** (`js/core/settings.js` — shake/flash/larger-text/thumb-controls switches, `Ctrl+Shift+,`, gear button, persisted as save flags). **3Hz flash audit done** (measured in fixes12 §7 — fastest loop is the 1s
+text cursor). ~~**Still TODO: quiz Tab focus audit.**~~ **DONE.** The quiz
+traps Tab with the same pattern as deck/settings — `focusables()` computed on
+every press (option buttons are rebuilt per question), initial focus to the
+quit button, restore on close (`quiz.js` §keyboard focus). |
 
 ## Tier 2 — visible to a player
 
