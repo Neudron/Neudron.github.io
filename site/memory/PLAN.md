@@ -565,7 +565,7 @@ back). fixes12 §5 seeds a file and asserts the whole thing comes back.
 - [x] deck traps Tab focus
 - [x] juice exposes manual shake/flash toggles
 - [x] danmaku soul dims instead of blinks when reduced
-- [ ] quiz Tab focus audit
+- [x] quiz Tab focus audit (quiz.js traps Tab with computed focusables, shift+Tab wrap, auto-focus option A)
 - [x] no animation exceeds 3Hz, measured not assumed
 - [x] settings panel UI built
 - [x] the settings persist in the save file
@@ -637,10 +637,10 @@ all six carry `src` + `rects` **at runtime** rather than only in source text.
 `dog` `hammer` `clicker` `hand` `blanket` `switch2` `tv`. Either Neu supplies
 art or draw originals in the existing pixel style. Ask before drawing.
 
-### 4d. Deck cover art
-Five tiles are two letters on a gradient. Draw six small covers (the woods
-already has a sigil). Inline SVG, like the sigil — no requests, scales with
-the tile.
+### 4d. Deck cover art — DONE
+All seven tiles have unique inline SVG sigils (brimstone star, soul+clock,
+nested squares, skeleton, candle, dog, glass cube). 48x48 viewBox,
+stroke-width 2, two colours per cover pulled from the tile's gradient.
 
 - [x] no scene draws a coloured rectangle where a sheet exists
 - [x] every `sheet` key referenced resolves to a file on disk (fixes7 + fixes13 assert)
@@ -798,10 +798,11 @@ listens for.
 **~1 session**
 
 - [x] `css/style.css` gets a table-of-contents comment block at the top
-- [ ] a frame-time meter in the dev console (`fps`), and a documented budget
-- [ ] `README.md` rewritten for a stranger — what it is, how to run it
+- [x] a frame-time meter in the dev console (`fps`), and a documented budget
+      (`core/perf.js` — p50/p95/worst ms, rAF only while on, DOM written 4x/s)
+- [x] `README.md` rewritten for a stranger — what it is, how to run it
 - [ ] full playthrough run once by hand, on desktop and on a phone
-- [x] all suites green (576 as of 2026-08-16 — fixes5–13 + playthrough)
+- [x] all suites green (1554 as of 2026-08-20 — fixes5–18 + playthrough)
 - [ ] **ask Neu, then push**
 
 ---

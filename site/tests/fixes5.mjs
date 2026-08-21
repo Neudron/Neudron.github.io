@@ -215,7 +215,7 @@ console.log('\n6. not everything is sans');
   const dog = w.document.getElementById('dogBtn');
   dog.click(); await wait(20);
   ok('>>> the dog is not sans <<<', who() === 'dog');
-  ok('the dog wears his own face', /dog\.svg/.test(face.getAttribute('src')));
+  ok('the dog wears his own face', /annoying-dog\.gif/.test(face.getAttribute('src')));
 
   /* the television */
   NEU.devSleep(); await wait(20);

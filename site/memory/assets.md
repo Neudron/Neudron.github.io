@@ -12,7 +12,8 @@ and then in pixel art matching the existing set.
 | `cat.gif` | pops out of the totem | user-supplied |
 | `sword.svg` | 12×30 pixel-art sword | made here, on request |
 | `sword-blade.svg` `sword-key.svg` | the two halves after the break | made here |
-| `dog.svg` `hammer.svg` `clicker.svg` `hand.svg` `blanket.svg` `switch2.svg` `tv.svg` | **done** | all seven redrawn 2026-08-17 from `_scripts/make-sprites.mjs`; ASCII grids are the source, the `<rect>` soup is generated |
+| `annoying-dog.gif` | the Annoying Dog (Toby) | Undertale, undertale.wiki.gg — **replaced `dog.svg` 2026-08-20**. Real 2-frame sprite, 44x38, from `spr_tobdogl`. The CSS `dogIdle` animation stays — the GIF self-animates but the `scaleY` bounce adds life on top |
+| `hammer.svg` `clicker.svg` `hand.svg` `blanket.svg` `switch2.svg` `tv.svg` | original props | redrawn 2026-08-17 from `_scripts/make-sprites.mjs`. These six are NOT from any game — they are original items in the story (the console dock, the cosmolight, the petting hand, the blanket) |
 
 **On the seven "placeholders".** All done as of 2026-08-17, and every one
 was checked by rendering it at 8x onto a checkerboard and *looking at it*

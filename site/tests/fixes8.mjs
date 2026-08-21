@@ -440,12 +440,12 @@ console.log('\n6. calamitas');
 
   const c = NEU.scal.cycle;
   const charges = c.map((k,i)=>k==='c'?i+1:0).filter(Boolean);
-  ok('charges land at 4, 9, 16, 18, 20',
-     JSON.stringify(charges) === JSON.stringify([4,9,16,18,20]));
-  ok('dives land at 5 and 13', c.filter(k=>k==='m').length === 2 &&
-     JSON.stringify(c.map((k,i)=>k==='m'?i+1:0).filter(Boolean)) === JSON.stringify([5,13]));
+  ok('charges land at 4, 8, 13, 16, 18, 20',
+     JSON.stringify(charges) === JSON.stringify([4,8,13,16,18,20]));
+  ok('no melee dive in the cycle (matches official wiki)',
+     c.filter(k=>k==='m').length === 0);
   ok('dart bursts appear 6 times', c.filter(k=>k==='d').length === 6);
-  ok('hellblast barrages appear 3 times', c.filter(k=>k==='h').length === 3);
+  ok('hellblast barrages appear 4 times', c.filter(k=>k==='h').length === 4);
   ok('two-giga appears twice', c.filter(k=>k==='g2').length === 2);
   ok('four-giga appears twice', c.filter(k=>k==='g4').length === 2);
 
@@ -652,9 +652,9 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
   ok('>>> six more call the second wall <<<',
      strike(6) && NEU.scal.mode === 'wall' && NEU.scal.hp >= 12 && NEU.scal.hp <= 15);
   pump(290);             /* wall(2) */
-  ok('>>> eighteen touches call the brothers <<<',
-     strike(6) && NEU.scal.mode === 'brothers' && NEU.scal.bros === 2 &&
-     NEU.scal.hp >= 6 && NEU.scal.hp <= 9);
+  ok('>>> twelve touches call the brothers (50pct, after wall2) <<<',
+     strike(1) && NEU.scal.mode === 'brothers' && NEU.scal.bros === 2 &&
+     NEU.scal.hp >= 11 && NEU.scal.hp <= 12);
 
   /* Brothers at the wall columns (222 and 802), bobbing ±22px in y and
      swapping sides after every volley pause — broPos is read live so

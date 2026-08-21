@@ -141,16 +141,25 @@ heart:     { src: IMG + 'calamity/BrimstoneHeart.png',
                   w: 44,  h: 372,  frames: 6,  fw: 44,  fh: 62, fps: 10, confirmed: true,
                   note: 'seen 2026-08-17: six beats, 62px grid. sheet re-padded 370 -> 372' },
 
-    /* the drop */
-    ashes:     { src: IMG + 'calamity/AshesofAnnihilation.png',
-                  w: 56,  h: 360,  frames: 6,  fw: 56,  fh: 60, fps: 8,  confirmed: true },
-
-    /* her shield (the boss is "shielded" behind it while invincible —
-       the mod summons ForcefieldTexture + the top/bottom arcs around
-       the charge telegraph, from SupremeCalamitas.cs) */
-    scalShield: { src: IMG + 'calamity/scal-forcefield.png',
-                 w: 44,  h: 372,  frames: 6,  fw: 44,  fh: 62, fps: 10, confirmed: true,
-                 note: 'seen 2026-08-17: six beats, 62px grid. sheet re-padded 370 -> 372' },
+    /* the Sepulcher — the worm she hides behind. Source:
+       SepulcherHead.cs: single-frame NPC, width=62 height=64 (the
+       sprite file is 62x88; the NPC hitbox is smaller than the art).
+       Body segments alternate Body/BodyAlt like the mod alternates
+       SepulcherBody and SepulcherBodyEnergyBall — but here both are
+       solid body sprites, since the energy balls (hearts) are drawn
+       separately. Tail is the single last segment.
+       The mod spawns 52 segments (minLength=51, maxLength=52); odd
+       indices are energy balls (hearts), even are body, index 51 is
+       the tail. Arms spawn every 4 segments starting at index 3. */
+    sepulcher: { src: IMG + 'calamity/SepulcherHead.png',
+                 w: 62,  h: 88,   frames: 1,  fw: 62,  fh: 88, fps: 0, confirmed: true,
+                 note: 'seen 2026-08-17: single beetle-like head, horns/mandibles/three eyes. SepulcherHead.cs: single-frame NPC, 62x64 hitbox, sprite is 62x88' },
+    sepulBody: { src: IMG + 'calamity/SepulcherBody.png',
+                 w: 82,  h: 72,   frames: 1,  fw: 82,  fh: 72, fps: 0, confirmed: true },
+    sepulBodyAlt: { src: IMG + 'calamity/SepulcherBodyAlt.png',
+                 w: 86,  h: 82,   frames: 1,  fw: 86,  fh: 82, fps: 0, confirmed: true },
+    sepulTail: { src: IMG + 'calamity/SepulcherTail.png',
+                 w: 54,  h: 54,   frames: 1,  fw: 54,  fh: 54, fps: 0, confirmed: true },
 
     /* the drop */
     ashes:     { src: IMG + 'calamity/AshesofAnnihilation.png',

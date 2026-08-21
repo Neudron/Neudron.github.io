@@ -85,14 +85,22 @@ Session opener and the per-session loop are in `memory/workflow-chat.md`.
 
 ## Open items (not actioned — needs the user)
 
-- Placeholder art still in use: `dog.svg`, `hammer.svg`, `clicker.svg`,
-  `hand.svg`, `blanket.svg`, `switch2.svg`, `tv.svg`.
+- The six remaining SVGs (`hammer.svg`, `clicker.svg`, `hand.svg`,
+  `blanket.svg`, `switch2.svg`, `tv.svg`) are **original props, not
+  placeholders**. They were redrawn as pixel art on 2026-08-17 and have
+  no game counterparts to gather. They are finished.
+- 3.5: human playthrough — needs the user to play it with eyes and ears
+  (nobody has heard the soundtrack out loud; every music check is jsdom
+  against a recording stub).
 
-Resolved since this list was written: PR #1 is closed, not merged (checked via
-the API, 2026-08-17 — the 70-byte page never reached `main`); `js/boss.js` is
-gone; `.well-known/discord` is **live** at `site/.well-known/discord` (serves
-200); **Enforce HTTPS is ticked** (2026-08-19 — verified: http answers 301 →
-https, TLS serves 200). Since the 2026-08-19 deploy the repo root *is* the
-site content (the `site/` subfolder, `_scripts/` and `_removed-from-main/`
+Resolved: `dog.svg` replaced with the real Undertale Annoying Dog sprite
+(`img/annoying-dog.gif` — 44x38, 2-frame, from undertale.wiki.gg);
+all BUG Tracker items audited and resolved 2026-08-21; Sepulcher sprite
+entries restored; SC attack cycle rebuilt to match the official wiki;
+`.well-known/discord` is **live** (deployed 2026-08-21, commit `9c95e00`);
+**Enforce HTTPS is ticked** (2026-08-19 — http answers 301 → https, TLS
+serves 200). Since the 2026-08-19 deploy the repo root *is* the site content
+(the `site/` subfolder, `_scripts/` and `_removed-from-main/`
 were dropped from `main`; `_scripts/` and the docs live in the local workshop
-repo at `Documents\neu`).
+repo at `Documents
+eu`).

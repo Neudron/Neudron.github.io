@@ -243,7 +243,7 @@ console.log('\n10. fireblast holds the beat');
   const B = read('act4/boss-scal.js');
   ok('>>> fireblast enters a pause state at range <<<', /b\.pauseT = 0\.55 \+ Math\.random\(\) \* 0\.25/.test(B));
   ok('>>> and stands still while paused <<<', /if \(b\.pauseT\) \{/.test(B) && /b\.vx = 0; b\.vy = 0;/.test(B));
-  ok('gigablast still bursts on proximity', /dist < 150 && b\.k === 2/.test(B));
+  ok('gigablast still bursts on proximity', /b\.k === 2/.test(B) && /dist < reach/.test(B));
 }
 
 /* ═══ 11. brothers barrage, pause, swap sides ═════════════════════*/
