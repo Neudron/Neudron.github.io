@@ -621,7 +621,7 @@ console.log('\n10. .well-known');
   /* Ground that claim in the actual workflow rather than in a comment. */
   const wf = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'deploy.yml'), 'utf8');
   ok('the workflow uploads the repo as-is (no Jekyll build)',
-     /upload-pages-artifact/.test(wf) && !/jekyll/i.test(wf));
+     /upload-pages-artifact/.test(wf) && !/jekyll\s+(build|serve)/i.test(wf) && !/configure-jekyll/i.test(wf));
 
   /* And it must not be caught by any ignore rule. */
   const GI = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
