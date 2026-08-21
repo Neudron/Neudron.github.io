@@ -907,6 +907,8 @@ body.is-playing { overflow: hidden; }
   font: 400 16px/1 var(--font);
   color: var(--dim); background: none;
   border: 2px solid var(--edge); padding: 8px 14px;
+  /* a thumb needs 44px (Apple HIG); this button quits fights */
+  min-height: 44px; min-width: 44px;
   cursor: pointer;
 }
 .bh__quit:hover { color: var(--text); border-color: var(--accent); }
@@ -1306,7 +1308,7 @@ body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) satura
 /* ── act iv rooms ─────────────────────────────────────────────────
    Same layer as the other full-screen scenes. The chip tray (74) and
    the dialogue box (96) still sit above it, which is the point. */
-.eng { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 70; background: #08080B; display: grid; place-items: center; transform-origin: center center; }
+.eng { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100svh; z-index: 70; background: #08080B; display: grid; place-items: center; transform-origin: center center; }
 .eng canvas { display: block; max-width: 100%; max-height: 100%; image-rendering: pixelated; }
 
 /* ── what's on the television ─────────────────────────────────────
@@ -1784,6 +1786,11 @@ html.text-lg .eng { zoom: 0.8; }
   height: 200px; pointer-events: none;
   display: flex; align-items: flex-end; justify-content: space-between;
   padding: 0 24px 28px;
+  /* notches and the home indicator sit exactly where thumbs land —
+     the meta viewport already asks for cover, so spend the inset here */
+  padding: 0 calc(24px + env(safe-area-inset-right))
+             calc(28px + env(safe-area-inset-bottom))
+             calc(24px + env(safe-area-inset-left));
   /* the pad must never scroll or zoom the page under it */
   touch-action: none;
   -webkit-user-select: none; user-select: none;
