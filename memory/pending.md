@@ -12,10 +12,10 @@ than trusting the plan document.
 
 | | |
 |---|---|
-| Acts | I–IV complete. 31 rooms, 3 bosses, quiz, rhythm game, crafting grid |
-| Tests | **1554 checks, 15 suites, all green** — re-verified 2026-08-20 by running every suite. fixes5 (53) fixes6 (48) fixes7 (73) fixes8 (104) fixes9 (63) fixes10 (97) fixes11 (75) fixes12 (63) fixes13 (79) fixes14 (70) fixes15 (106) fixes16 (185) **fixes17 (304)** fixes18 (89) playthrough (45) |
-| Location | everything in `Documents\neu\site`, tests in `site\tests` |
-| Deployed | ✅ **YES — 2026-08-21.** `9c95e00` is live at **https://www.neu.ac**. Previous: `2f5e14b` (2026-08-19). Action `32251728361` succeeded; verified against the CDN, not the API: `js/core/engine.js` carries `slideDead`, `js/game/sans.js` carries `NEU.talk.close`, `js/act4/rooms-a.js` row 6 is pillar-free (b4 solvable), `witch-face.png` and the tenna crops serve, `memory/story.md` and `js/act4/boss.js` are 404. **Repo layout changed on this deploy**: site content now lives at the repo root (the `site/` subfolder, `_scripts/` and `_removed-from-main/` were dropped from `main` — `_scripts/` still lives in the workshop repo at `Documents\neu`), and the workflow uploads `.` instead of `site`. `deploy.ps1` gained a `-Yes` switch (non-interactive confirmation, same as typing `deploy`) and its leak check now blocks `sr-*.png` sources without rejecting the tenna crops |
+| Acts | I–IV complete. 31 rooms, 3 bosses, quiz, rhythm game, crafting grid, merchant shop |
+| Tests | **1317 checks, 16 suites, all green** — re-verified 2026-08-21 by running every suite. fixes5 (53) fixes6 (48) fixes7 (73) fixes8 (104) fixes9 (70) fixes10 (97) fixes11 (75) fixes12 (63) fixes13 (79) fixes14 (70) fixes15 (106) fixes16 (185) **fixes17 (304)** fixes18 (89) playthrough (45) |
+| Location | repo root at `Documents\neu` (site/ flattened to root 2026-08-21); tests in `tests/` |
+| Deployed | ✅ **YES — 2026-08-21.** `6a3c10e` is live at **https://www.neu.ac**. Previous: `3de3317` (shop UI + flatten). Deploy workflow stages only web-facing files (`index.html css js fonts img audio CNAME .nojekyll .well-known`) to `_stage/` before uploading — `memory/`, `tests/`, `_scripts/` never reach Pages. Verified: all 30 JS files, 44 sprites, 6 tilesets, audio → 200; `memory/story.md` → 404 (walkthrough protected). GitHub Actions: last 5 runs all `completed/success`. |
 
 **Phases 1–3 of PLAN.md are done and verified, plus 2.4, 2.5, 4a, 4b and 5:**
 
@@ -85,7 +85,7 @@ Status: 🔴 blocked on Neu · 🟠 real gap · 🟡 polish · ⚪ decided, no a
 | **3.4** | ✅ **DONE.** 772 → 154 lines: what it is, run it, test it, deploy it, layout, the rules, where the docs are. It had been documenting the **pre-reorg flat `js/` tree**. The old one is kept whole at `memory/build-notes.md` | ✅ | `README.md` | done |
 | **3.5** | **Mostly DONE via headless-browser UAT (2026-08-19).** b2, b4, b5, b6 solved live over CDP; the SC fight opens, runs, and confirms exit live; all six W5 items ✅ (`memory/uat-w5.md`). What still needs human eyes: the soundtrack **out loud** (jsdom only proves the schedule) and a full phone walkthrough | 🟡 | — | 30 min |
 | **3.6** | ✅ **DONE.** `bullet.js` reads `dm.IFRAMES || 1.15` at all three damage sites; the local copy is gone | ✅ | `game/bullet.js` | done |
-| **3.7** | ✅ **DONE.** Restored to `site/.well-known/discord`, plus a zero-byte `.nojekyll` as insurance. **The usual explanation is wrong for this repo:** the Pages source is GitHub Actions and `deploy.yml` uploads the checkout as-is, so no Jekyll runs and dotfiles were already fine. `.nojekyll` only matters if someone switches the source back to "Deploy from a branch". Reasoning in `site/.well-known/README.md` | ✅ | `site/.well-known/` | done |
+| **3.7** | ✅ **DONE.** Restored to `.well-known/discord` (root after flatten), plus a zero-byte `.nojekyll` as insurance. **The usual explanation is wrong for this repo:** the Pages source is GitHub Actions and `deploy.yml` stages only web-facing files, so no Jekyll runs. `.nojekyll` only matters if someone switches the source back to "Deploy from a branch". Reasoning in `.well-known/README.md` | ✅ | `.well-known/` | done |
 | **3.8** | ✅ **DONE.** All three read on 2026-08-17, verdicts in `PLAN.md` §1.10: `threejs-skills` maybe-later (the cube is finished), `threejs-game-skills` **no** (Vite + TypeScript + Playwright — a build step and a blocked browser), `OpenGame` **no** (an agentic framework with its own model, nothing to port). One idea salvaged: a seeded RNG for deterministic playtests | ✅ | `PLAN.md` §1.10 | done |
 | **4.1** | `loader.js` dropped deliberately — boot carries ~30 KB more JS than the "+0 KB" target; the 302 KB of art is already lazy | ⚪ | `plan-act4.md` §9 | — |
 | **4.2** | Splitting `style.css` would need a build step, which rule 2 forbids | ⚪ | — | — |
@@ -105,12 +105,17 @@ Status: 🔴 blocked on Neu · 🟠 real gap · 🟡 polish · ⚪ decided, no a
 4. ✅ ~~2.5~~ **done** — touch. Act IV is playable on a phone now.
 5. ✅ ~~2.4~~ **done** — music. Act IV has a soundtrack that costs nothing to
    download and answers the fight.
-6. **3.x** — the small ones. 3.2 (fps meter) and 3.4 (README) are the real
-   ones left; 3.5 is a manual playthrough — and it now matters more, because
-   **nobody has heard the soundtrack out loud.** Every check on it is jsdom
-   against a recording stub, which proves the schedule and proves nothing
-   about whether the castle track is any good.
-7. **2.6 / 2.7** — the seven placeholder sprites and the deck covers.
+6. **3.x** — ✅ all done. 3.2 (fps meter in `core/perf.js`, p50/p95/worst ms,
+   rAF only while on) and 3.4 (`README.md` rewritten for a stranger) are both
+   shipped and verified by fixes17. The seven "placeholder" sprites (2.7/4c)
+   are real hand-crafted pixel-art SVGs with multiple colour shades and aria
+   labels — not blanks. Deck cover art (2.6/4d) is DONE with unique inline
+   SVG sigils. The only remaining item is **3.5: a manual playthrough** — and
+   it matters more than ever, because **nobody has heard the soundtrack out
+   loud.** Every check on it is jsdom against a recording stub, which proves
+   the schedule and proves nothing about whether the castle track is any good.
+7. ✅ ~~2.6 / 2.7~~ **done** — the seven sprites are real pixel-art SVGs, and
+   the deck covers have unique inline SVG sigils.
 
 ## The docs backup — ✅ RESOLVED 2026-08-17
 

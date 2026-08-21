@@ -34,28 +34,28 @@ that overshoots.
 
 ```
 Documents\neu\
-  site\                 ← THE PROJECT. everything lives here.
-    index.html
-    css\style.css       ~1600 lines, one file
-    js\
-      core\   quest save juice danmaku engine
-              music perf settings touch dev
-      page\   main stars scene
-      game\   sword sans bullet dark deck
-      act4\   act4 rooms-a rooms-d rooms-g boss-scal
-              boss-polt quiz rhythm craft crack
-      data\   data sheets
-    img\      + img\act4\{calamity,deltarune,terraria,undertale}
-    audio\    + audio\act4\
-    fonts\webfonts\     31 files, self-hosted Undertale kit
-    memory\   ← ALL DOCUMENTATION. read it.
-    tests\    fixes5..fixes17.mjs + playthrough.mjs
-              (node_modules is gitignored — 13 MB of jsdom)
-    .github\workflows\deploy.yml
-    CNAME     www.neu.ac
+  index.html
+  css\style.css       ~1600 lines, one file
+  js\
+    core\   quest save juice danmaku engine
+            music perf settings touch dev
+    page\   main stars scene
+    game\   sword sans bullet dark deck
+    act4\   act4 rooms-a rooms-d rooms-g boss-scal
+            boss-polt quiz rhythm craft crack
+    data\   data sheets
+  img\      + img\act4\{calamity,deltarune,terraria,undertale}
+  audio\    + audio\act4\
+  fonts\webfonts\     31 files, self-hosted Undertale kit
+  memory\   ← ALL DOCUMENTATION. read it.
+  tests\    fixes5..fixes18.mjs + playthrough.mjs
+            (node_modules is gitignored — 13 MB of jsdom)
+  .github\workflows\deploy.yml
+  CNAME     www.neu.ac
   .git\       ← THE WORKSHOP REPO (added 2026-08-17). local-only, no
-              remote. Covers site\ AND _scripts\, neither of which is
-              backed up anywhere else once memory\ left the Pages repo.
+              remote. Covers the repo root AND _scripts\, neither of
+              which is backed up anywhere else once memory\ left the
+              Pages repo.
   .gitignore  excludes _deploy\, node_modules, the sprite rips
   _deploy\    git clone of Neudron/Neudron.github.io — push from HERE
   _scripts\   sprite scrapers, deploy.ps1, backup-docs.ps1.
@@ -63,15 +63,17 @@ Documents\neu\
   _removed-from-main\
 ```
 
-`site\` and `_deploy\` must be kept identical. `site\` is where you work.
+The repo root IS the project. `site\` was flattened to root on 2026-08-21;
+the old two-folder sync is gone — a single `git push` deploys via the
+GitHub Actions workflow that stages only web-facing files to `_stage/`.
 
-**Two repos, and they do not overlap.** `_deploy` is the public Pages clone
-and holds only `site\` minus `memory\`. The workshop repo at `Documents\neu`
-holds everything including `memory\` and `_scripts\`, and has no remote.
+**One repo, one push.** The workshop repo at `Documents\neu` is the
+GitHub Pages repo itself. `memory\`, `tests\`, and `_scripts\` are tracked
+here but excluded from deploy by `deploy.yml`'s staging step.
 
-**Commit docs with `_scripts\backup-docs.ps1`, never a bare `git add -A`.**
-`site\.gitignore` excludes `memory\`, and a nested `.gitignore` outranks the
-root, so a plain add silently skips the documentation — see §1.8.
+**Commit docs with plain `git add memory\`.** After the flatten, there is
+no nested `.gitignore` outranking the root — `memory\` is tracked directly
+at the repo root.
 
 ## 1.3 The memory files
 
@@ -167,7 +169,7 @@ NEU.talk(lines, who)          // who: 'sans' | 'narr' | 'dog' | 'tv'
 ## 1.6 How to run and test
 
 ```
-cd Documents\neu\site\tests
+cd Documents\neu\tests
 node fixes5.mjs    # sleep timing, dock, voices, replay regression   (50)
 node fixes6.mjs    # z-order, carried console, the deck              (48)
 node fixes7.mjs    # save, engine, endless, sprite manifest, weight  (70)
@@ -193,7 +195,7 @@ Syntax gate first, it is instant and catches most mistakes:
 for f in js/**/*.js; do node --check "$f" || echo "FAIL $f"; done
 ```
 
-To view the site: `python -m http.server` from `site\`, then localhost:8000.
+To view the site: `python -m http.server` from the repo root, then localhost:8000.
 Dev console in-page: **Ctrl + Shift + `**
 
 ## 1.7 The jsdom harness — required setup
@@ -277,7 +279,7 @@ test bugs reporting working code as broken.** Twelve so far:
   `origin/main..HEAD` and offers to push existing commits. fixes17 §12 pins
   this; before that, nothing tested the one script that touches production.
 
-- `Copy-Item` adds files and never removes them, so syncing `site\` to
+- `Copy-Item` adds files and never removes them, so syncing the repo root to
   `_deploy\` left deleted files behind and Act IV art sat at 2,284 KB against
   a 500 KB budget. **Always mirror, never copy** — `Remove-Item -Recurse`
   then `Copy-Item -Recurse`. In `rsync` terms: `--delete` alone **protects
@@ -803,7 +805,7 @@ listens for.
 - [x] `README.md` rewritten for a stranger — what it is, how to run it
 - [ ] full playthrough run once by hand, on desktop and on a phone
 - [x] all suites green (1554 as of 2026-08-20 — fixes5–18 + playthrough)
-- [ ] **ask Neu, then push**
+- [x] **ask Neu, then push** — pushed 2026-08-21, live at https://www.neu.ac (commit `6a3c10e`)
 
 ---
 
