@@ -94,6 +94,26 @@ also a pixel face, so nothing looks broken if the files are missing.
 
 Cormorant Garamond italic + VT323 (Google) are for the boot screen only.
 
+## Act IV — `img/act4/`
+
+**Calamity sprites are verified against upstream, not assumed.** Every file
+in `img/act4/calamity/` was re-checked 2026-08-22 against verbatim downloads
+of `github.com/CalamityTeam/CalamityModPublic` @ `1.4.4`:
+
+- **37 of 40 pixel-faithful** — 36 byte-exact against their upstream texture,
+  `BrimstoneHeart.png` identical after transparent-border trim. Verifier:
+  `_scripts/verify-sprites.mjs` (own PNG decoder, trim-normalised sub-region
+  match). Re-fetch sources with `_scripts/fetch-sprite-sources.ps1`; the
+  downloads land in gitignored `_sources/calamity/`.
+- **The three TP files are not upstream.** `tp-bar.png` is a recolor of
+  upstream `RageBar.png` (identical alpha mask). `tp-bar-border.png`
+  (10 frames of 104×48) and `tp-full-anim.png` (10 frames of 172×70) are
+  Polterghast-styled originals from the wiki — no GitHub counterpart.
+- Tenna (`deltarune/`), the six zone tiles (`tiles/`, scored out of Deltarune
+  atlases), the Terraria items (`terraria/`) and the Undertale props
+  (`undertale/`) come from game wikis or were drawn here; see
+  `assets-wanted.md` for the shopping list they came from.
+
 ## Licensing note
 
 Undertale and Minecraft assets are Toby Fox's and Mojang's respectively. This
