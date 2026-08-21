@@ -637,6 +637,11 @@ console.log('\n10. .well-known');
   ok('>>> og:image points at the live domain <<<',
      /og:image"\s+content="https:\/\/www\.neu\.ac\/og\.png"/.test(idx));
 
+  /* og:url tells scrapers the canonical URL. Without it, Facebook and
+     others may use the github.io URL they were redirected from. */
+  ok('>>> og:url points at the canonical domain <<<',
+     /og:url"\s+content="https:\/\/www\.neu\.ac\/"/.test(idx));
+
   /* And it must not be caught by any ignore rule. */
   const GI = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
   ok('no ignore rule swallows .well-known',
