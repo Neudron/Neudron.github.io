@@ -105,6 +105,11 @@ body.is-lit-mode {
 
 * { box-sizing: border-box; }
 
+/* Every button is a game control. manipulation keeps scrolling working
+   but kills the 300ms tap delay and the double-tap zoom — rapid taps on
+   quiz answers or shop rows must never read as "zoom the page". */
+button { touch-action: manipulation; }
+
 /* The browser's own rule for the hidden attribute is `[hidden] {
    display: none }` in the UA stylesheet, which ANY author rule setting
    display will outrank — `.tbox { display: grid }` did exactly that,
@@ -1255,6 +1260,10 @@ body.is-blackout::before {
   display: grid; align-content: center; justify-items: center; gap: 18px;
   padding: 40px;
 }
+/* Three 104px cells plus gaps is 344px — wider than a 320-360px phone
+   once the wrapper padding is in. The cell size yields to the viewport;
+   the slot art scales with it. */
+.craft { --cell: min(104px, calc((100vw - 96px) / 3)); }
 .craft__h { margin: 0; font: 400 32px/1 var(--font-display); color: var(--bone); }
 .craft__say { margin: 0; font: 400 16px/1.4 var(--font-talk); color: #FF8ACF; min-height: 1.4em; }
 .craft__row { display: flex; align-items: center; gap: 28px; }
@@ -1265,10 +1274,10 @@ body.is-blackout::before {
    pixels and others one, which is precisely the mush `image-rendering:
    pixelated` exists to avoid. Everything here is a whole multiple of
    the source. */
-.craft__grid { display: grid; grid-template-columns: repeat(3, 104px); gap: 8px; }
+.craft__grid { display: grid; grid-template-columns: repeat(3, var(--cell)); gap: 8px; }
 .craft__cell {
-  width: 104px; height: 104px; padding: 0; border: 0;
-  background: url('../img/act4/terraria/slot.png') center / 104px 104px no-repeat;
+  width: var(--cell); height: var(--cell); padding: 0; border: 0;
+  background: url('../img/act4/terraria/slot.png') center / var(--cell) var(--cell) no-repeat;
   image-rendering: pixelated;
   cursor: pointer; display: grid; place-items: center;
   transition: filter .14s;
