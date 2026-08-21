@@ -497,7 +497,7 @@ console.log('\n7. sprites');
 
   /* The generator owns all seven now: the grid is the source, the rects
      are built. Named, then counted. */
-  const G = fs.readFileSync(path.join(ROOT, '..', '_scripts', 'make-sprites.mjs'), 'utf8');
+  const G = fs.readFileSync(path.join(ROOT, '_scripts', 'make-sprites.mjs'), 'utf8');
   ok('the generator exists', /const SPRITES = \{/.test(G));
   for (const n of SEVEN) ok('generator owns ' + n, new RegExp('\\n  ' + n + ': \\[').test(G));
   const owned = [...G.matchAll(/\n  ([a-z0-9]+): \[/g)].map(m => m[1]);
@@ -526,7 +526,7 @@ console.log('\n8. README');
     .map(m => m[1]).filter(p => !p.includes('*'));
   ok('it names some paths (' + paths.length + ')', paths.length >= 6);
   for (const p of new Set(paths)) {
-    const abs = p.startsWith('_scripts/') ? path.join(ROOT, '..', p) : path.join(ROOT, p);
+    const abs = path.join(ROOT, p);
     ok('path exists: ' + p, fs.existsSync(abs));
   }
   ok('>>> no pre-reorg flat js/ paths survive <<<',
@@ -559,11 +559,14 @@ console.log('\n8. README');
 console.log('\n9. the deploy boundary');
 {
   const GI = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
+  const DP = fs.existsSync(path.join(ROOT, "_scripts", "deploy.ps1"))
+    ? fs.readFileSync(path.join(ROOT, "_scripts", "deploy.ps1"), "utf8") : "";
 
   /* THE ONE THAT MATTERS. memory/story.md is the complete walkthrough
      of a game whose first puzzle is finding the way in. It was shipping
      because memory/ lives inside site/ and the mirror took everything. */
-  ok('>>> memory/ is excluded from the deploy <<<', /^memory\/$/m.test(GI));
+  ok(">>> memory/ is excluded from the deploy <<<",
+     /^memory\/$/m.test(GI) || /\^memory\//.test(DP));
   ok('...and the reason is written down, not just the rule',
      /walkthrough/i.test(GI) && /story\.md/.test(GI));
   ok('...and it says how to revert', /TO REVERT/.test(GI));
@@ -591,12 +594,12 @@ console.log('\n9. the deploy boundary');
   const strays = [];
   (function walk(d) {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-      if (e.name === 'node_modules') continue;
+      if (e.name === 'node_modules' || e.name === '_scripts') continue;
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p); else if (/\.orig$/.test(e.name)) strays.push(p);
     }
   })(ROOT);
-  ok('>>> no .orig backup is sitting inside site/ (' + strays.length + ') <<<', strays.length === 0);
+  ok('>>> no .orig backup is sitting inside the site root (' + strays.length + ') <<<', strays.length === 0);
 }
 
 /* ═══ 10. the discord verification is back ════════════════════════*/
@@ -642,8 +645,8 @@ console.log('\n11. the docs have a backup, and it actually reaches them');
 
      A backup that silently backs up nothing is worse than none, so
      this asserts the mechanism rather than trusting it. */
-  const S  = path.join(ROOT, '..', '_scripts', 'backup-docs.ps1');
-  const RG = path.join(ROOT, '..', '.gitignore');
+  const S  = path.join(ROOT, '_scripts', 'backup-docs.ps1');
+  const RG = path.join(ROOT, '.gitignore');
 
   ok('a backup script exists', fs.existsSync(S));
   ok('the workshop repo has its own .gitignore', fs.existsSync(RG));
@@ -651,12 +654,12 @@ console.log('\n11. the docs have a backup, and it actually reaches them');
   if (fs.existsSync(S)) {
     const B = fs.readFileSync(S, 'utf8');
     ok('>>> it force-adds memory/, or it backs up nothing <<<',
-       /git add -f\s+site\\memory/.test(B));
+       /git add -f\s+memory/.test(B));
     ok('it explains WHY the force-add is needed',
        /lower-level \.gitignore/i.test(B) && /precedence/i.test(B));
     /* the guard against the failure being silent next time */
     ok('>>> it fails loudly if the docs stop being tracked <<<',
-       /ls-files site\\memory/.test(B) && /\.Count -lt/.test(B));
+       /ls-files memory/.test(B) && /\.Count -lt/.test(B));
     ok('it warns before a remote makes the walkthrough public',
        /PRIVATE/.test(B) && /remote/i.test(B));
   }
@@ -690,7 +693,7 @@ console.log('\n12. deploy.ps1 — the only path to production');
      are source assertions. They cover the properties whose absence is
      silent — the failures you would not notice until the site was
      already wrong, or already unchanged when you needed it changed. */
-  const D = path.join(ROOT, '..', '_scripts', 'deploy.ps1');
+  const D = path.join(ROOT, '_scripts', 'deploy.ps1');
   ok('deploy.ps1 exists', fs.existsSync(D));
 
   if (fs.existsSync(D)) {

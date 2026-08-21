@@ -1,11 +1,12 @@
 # Working repo for Documents\neu — NOT the Pages repo.
 #
-# WHAT THIS IS FOR. The Pages repo (_deploy) only ever holds `site\`,
-# and `site\.gitignore` deliberately keeps `memory\` out of it because
-# memory\story.md is the complete walkthrough of the game. Removing the
-# stray root repo on 2026-08-17 was correct on its own, but together
-# those two facts left 3,600 lines of design documentation — plus every
-# script in _scripts\ — with no version history and no copy anywhere.
+# WHAT THIS IS FOR. The Pages repo (_deploy) only ever holds the site
+# files, and this .gitignore deliberately keeps `memory\` out of it
+# because memory\story.md is the complete walkthrough of the game.
+# Removing the stray root repo on 2026-08-17 was correct on its own,
+# but together those two facts left 3,600 lines of design documentation
+# — plus every script in _scripts\ — with no version history and no
+# copy anywhere.
 #
 # This repo covers that gap. It is local-only by design. Add a PRIVATE
 # remote when you want an off-machine copy:
@@ -22,16 +23,27 @@
 # or duplicate every shipped file. It needs no backup: it is a clone.
 _deploy/
 
+# ── the walkthrough ─────────────────────────────────────────────
+# memory/ holds the complete design documentation and the walkthrough
+# (memory/story.md, memory/PLAN.md, etc). It must never reach the
+# public Pages repo, because the first puzzle is finding the way in.
+#
+# It is NOT excluded here — that would make the backup script's
+# `git add -f memory/` the only thing keeping it tracked, and a
+# single forgotten -f would silently lose 3,600 lines of design docs.
+# The deploy script's leak check (`^memory/`) prevents it from shipping.
+# TO REVERT: add `memory/` to this file and the folder stops tracking.
+
 # ── dependencies and generated output ────────────────────────────
-site/tests/node_modules/
-site/tests/package-lock.json
+tests/node_modules/
+tests/package-lock.json
 _scripts/out/
 
 # ── sprite sources ───────────────────────────────────────────────
 # 2.5 MB of Deltarune/Calamity rips that exist only so tiles and frames
 # can be cropped out of them. The crops are tracked; the rips are not.
 # They are re-downloadable and they are not our work.
-site/img/act4/deltarune/sr-*.png
+img/act4/deltarune/sr-*.png
 
 # ── backups of things this repo now replaces ─────────────────────
 # _scripts\orig holds zipped copies of files before they were changed,

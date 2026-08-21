@@ -4,7 +4,7 @@
 
   WHY THIS EXISTS, AND WHY YOU CANNOT JUST RUN `git add -A`.
 
-  site\.gitignore contains `memory/`, because memory\story.md is the
+  .gitignore contains `memory/`, because memory\story.md is the
   complete walkthrough of the game and it must never reach the public
   Pages repo. Git gives a lower-level .gitignore precedence over any
   rule written in a parent directory, so that one line also hides
@@ -38,7 +38,7 @@ if (-not (Test-Path '.git')) {
 
 # The force-add. Everything else is ordinary.
 git add -A
-git add -f site\memory
+git add -f memory
 
 $staged = @(git diff --cached --name-only)
 if ($staged.Count -eq 0) {
@@ -50,9 +50,9 @@ if ($staged.Count -eq 0) {
 # The one thing that must be true, checked rather than assumed. If a
 # future edit to a .gitignore starts hiding memory\ in a way force-add
 # cannot reach, this catches it instead of silently backing up nothing.
-$docs = @(git ls-files site\memory)
+$docs = @(git ls-files memory)
 if ($docs.Count -lt 10) {
-  Bad "only $($docs.Count) files tracked under site\memory - expected the whole folder. Something is excluding it."
+  Bad "only $($docs.Count) files tracked under memory - expected the whole folder. Something is excluding it."
 }
 Good "$($docs.Count) doc file(s) tracked"
 

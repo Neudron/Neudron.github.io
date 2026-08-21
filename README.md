@@ -17,7 +17,6 @@ project is built around rather than a stage it has not reached yet.
 ## Run it
 
 ```bash
-cd site
 python3 -m http.server 8000
 # open http://localhost:8000
 ```
@@ -34,20 +33,19 @@ The suites run in **jsdom under node**, against the real files — no browser,
 no headless Chrome.
 
 ```bash
-cd site/tests
+cd tests
 npm install jsdom        # once; this is the only dependency in the project
 node fixes5.mjs          # ... through fixes17.mjs
 node playthrough.mjs     # a full scripted run of the whole game
 ```
 
-Run them one at a time; the whole set takes a few minutes. **1237 checks
-across 14 files**, all passing.
+Run them one at a time; the whole set takes a few minutes. **1400+ checks
+across 16 files**, all passing.
 
 Before anything else, the syntax gate — it is instant and catches most
 mistakes:
 
 ```bash
-cd site
 for f in js/**/*.js; do node --check "$f" || echo "FAIL $f"; done
 ```
 
@@ -57,10 +55,10 @@ for f in js/**/*.js; do node --check "$f" || echo "FAIL $f"; done
 powershell -ExecutionPolicy Bypass -File _scripts\deploy.ps1
 ```
 
-That mirrors `site/` into `_deploy/`, checks the tree is the right shape,
-refuses to ship anything that must not ship, shows you the diff, **asks**,
-then pushes and verifies against the live URL. Add `-DryRun` to do everything
-except the last three steps.
+That mirrors the repo root into `_deploy/`, checks the tree is the right
+shape, refuses to ship anything that must not ship, shows you the diff,
+**asks**, then pushes and verifies against the live URL. Add `-DryRun` to do
+everything except the last three steps.
 
 GitHub Pages deploys from an Action, so a push to `main` is live in about a
 minute and there is no staging step. Hence the prompt.
