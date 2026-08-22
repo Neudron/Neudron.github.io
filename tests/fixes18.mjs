@@ -524,6 +524,12 @@ console.log('\n20. wave-C sweep');
   ok('>>> craft: take() is one-shot per grid <<<',
      /if \(taken \|\| !matches\(\)\) return;\s*taken = true;/.test(K));
   ok('>>> craft: open() resets taken <<<', /taken = false;[\s\S]{0,900}?render\(\);/.test(K));
+
+  /* D7 — tripping=1 persists in the save but only eat() applied the
+     body class; a refresh mid-trip played the finale visually sober. */
+  const A4 = read('act4/act4.js');
+  ok('>>> act4 boot re-arms is-trip from the saved flag <<<',
+     /flagged\('tripping'\)\) \{\s*document\.body\.classList\.add\('is-trip'\);/.test(A4));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
