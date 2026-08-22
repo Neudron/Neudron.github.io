@@ -130,6 +130,13 @@
     }
   }
 
+  /* A refresh mid-trip must not quietly sober the page up: the flag
+     gates progression (rooms-g's axe answers to it), so on load the
+     visuals re-arm with the state the file already remembers. */
+  if (NEU.save && NEU.save.flagged('tripping')) {
+    document.body.classList.add('is-trip');
+  }
+
   NEU.act4 = {
     open: open, wake: wake, settle: settle, ending: ending,
     get start() { return START; },
