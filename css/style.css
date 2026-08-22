@@ -154,6 +154,26 @@ a { color: inherit; }
   border-radius: 4px;
 }
 
+/* ── accessibility extras ─────────────────────────────────────────
+   Windows High Contrast must keep every outline and kill decorative
+   backgrounds; prefers-contrast asks for the dim text to come up to
+   readable without leaving the theme. */
+@media (forced-colors: active) {
+  :focus-visible { outline-color: Highlight; }
+  a { forced-color-adjust: none; color: linktext; }
+}
+@media (prefers-contrast: more) {
+  :root { --ghost: #B9B4C4; --dim: #C6C1D0; }
+}
+
+/* Text selection speaks the palette instead of the browser default. */
+::selection { background: #B892FF; color: #08080B; }
+.is-lit-mode ::selection { background: #5E33BE; color: #EDE7DE; }
+
+/* A quiet themed scrollbar — visible, thin, never fighting the deck's
+   own hidden one (that one is a device screen, not a document). */
+html { scrollbar-color: #3A3548 #14141C; scrollbar-width: thin; }
+
 .mono { font-family: var(--font); }    /* already pixel — nothing to switch to */
 
 /* ── boot ───────────────────────────────────────────────────────── */
