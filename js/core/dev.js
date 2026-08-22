@@ -251,7 +251,11 @@
       panel.hidden ? show() : hide();
       return;
     }
-    if (!panel.hidden && e.key === 'Escape') { e.preventDefault(); hide(); }
+    if (!panel.hidden && e.key === 'Escape') {
+      e.preventDefault();
+      e.stopImmediatePropagation();          /* the console ate this key — the room must not also read it as leave */
+      hide();
+    }
   });
 
   input.addEventListener('keydown', function (e) {

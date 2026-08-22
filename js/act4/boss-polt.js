@@ -48,6 +48,8 @@
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
   var bullets = [], hooks = [], phase = 1, bossHP = 30, bossMax = 30;
   var bx = 0, by = 0, bz = 0, charging = 0, glow = 0, nextFire = 0, nextCharge = 0;
+  var chargeTimer = 0;                   /* the 900ms telegraph delay — cleared on close so a
+                                            quit+reopen inside the window can't fire it into the new fight */
   var clone = null, mode = 'fight';
   var line = '', lineT = 0;
 
@@ -193,7 +195,7 @@
     if (nextCharge <= 0 && charging <= 0) {
       glow = 0.9;
       nextCharge = [0, 5.5, 4.2, 3.4][phase];
-      setTimeout(doCharge, 900);
+      chargeTimer = setTimeout(doCharge, 900);
     }
     if (glow > 0) glow -= dt;
 
@@ -496,6 +498,7 @@
   }
   function close() {
     running = false; dying = 0;
+    if (chargeTimer) { clearTimeout(chargeTimer); chargeTimer = 0; }
     if (NEU.activeMinigame === 'polt') NEU.activeMinigame = null;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');

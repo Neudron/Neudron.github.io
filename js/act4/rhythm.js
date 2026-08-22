@@ -62,6 +62,8 @@
 
   var actx = null;
   var running = false, round = 0, notes = [], t0 = 0;
+  var phaseTimer = 0;         /* call→response switch — cleared on close/restart so a stale
+                                 timer can't concat its chart onto the next round */
   var hp = 0.5, judged = '', judgedT = 0, misses = 0;
   var phase = 'call';        // call | response
   var keys = {};
@@ -87,13 +89,15 @@
   }
 
   function startRound() {
+    if (phaseTimer) { clearTimeout(phaseTimer); phaseTimer = 0; }
     phase = 'call';
     t0 = now() + 1.4;
     notes = build(false);
     misses = 0;
     say(TAUNT[round][0] || '');
     /* His bar plays itself; yours arrives a bar later. */
-    setTimeout(function () {
+    phaseTimer = setTimeout(function () {
+      phaseTimer = 0;
       if (!running) return;
       phase = 'response';
       notes = notes.concat(build(true));
@@ -312,6 +316,7 @@
   }
   function close() {
     running = false;
+    if (phaseTimer) { clearTimeout(phaseTimer); phaseTimer = 0; }
     /* release the input claim before handing control back to the room */
     if (NEU.activeMinigame === 'rhythm') NEU.activeMinigame = null;
     wrap.hidden = true;
