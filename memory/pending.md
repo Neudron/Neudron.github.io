@@ -147,6 +147,14 @@ Later the same day, against goal "fully mobile + re-gather sprites":
   now re-summonable unless dead) + per-knock AudioContext leak, craft
   take() double-fire. fixes18 §20 (129 checks). Every js/ module has now
   been scouted at least once.
+- **Wave D — cross-session softlock killed** (804394d): follow-up
+  verification found the sleep→Switch→charge→dock chain living only in
+  module vars — ANY refresh after "let them rest" booted an empty dock
+  with no Switch while objectives said "dock it", and Act IV resumes
+  solely through that dock's deck. Boot now re-arms the chain from its
+  quest marks; an undocked console returns empty so the blaster
+  re-earns charge. Also: reload mid-trip re-arms is-trip visuals
+  (e6f6c3d). fixes18 §20 → 131 checks.
 
 ---
 
