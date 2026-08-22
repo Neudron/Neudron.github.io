@@ -214,24 +214,51 @@
   }
 
   /* ── the gesture gate ───────────────────────────────────────────
-     Browsers block audio until the user has done something, and a
-     console full of autoplay warnings is the least of it — a site
-     that makes noise at you unprompted is a site people close. The
-     context is not constructed until then either, so nothing is
-     holding an audio device open on a page that is only being read. */
+     No sound before a user gesture; a site that makes noise
+     unprompted is a site people close. The context is not built
+     until then either, so nothing holds an audio device open on a
+     page that is only being read. */
   function arm() {
-    if (armed) return;
-    armed = true;
-    build();
-    try { if (actx && actx.state === 'suspended') actx.resume(); } catch (e) {}
-    /* `play()` remembered what was asked for by setting curId, so a
-       straight replay would take its own "same track, do nothing"
-       early exit and start silence. Clear it first. */
-    if (pending) { var p = pending; pending = null; curId = null; play(p); }
+    var fresh = !armed;
+    if (fresh) {
+      armed = true;
+      build();
+      /* Web Audio sits on the ringer channel unless told otherwise;
+         'playback' moves it to media. Safari 16.4+ only, and the
+         guard is the feature check. */
+      try { if (navigator.audioSession)
+              navigator.audioSession.type = 'playback'; } catch (e) {}
+    }
+    unlock(fresh);
   }
   addEventListener('pointerdown', arm, true);
   addEventListener('keydown', arm, true);
   addEventListener('touchstart', arm, true);
+  /* pointerup/touchend are the activation triggers the spec names;
+     the down-phase ones above are Safari leniency. Both fire on
+     one tap, and a repeat costs nothing but coverage. */
+  addEventListener('pointerup', arm, true);
+  addEventListener('touchend', arm, true);
+
+  /* Every gesture gets another swing: iOS spends touchstarts on
+     scrolls without granting activation, so one failure must not
+     be permanent. */
+  function unlock(fresh) {
+    if (!actx || failed) return;
+    var parked = false;
+    try { parked = actx.state === 'suspended'; } catch (e) {}
+    if (parked) { try { actx.resume(); } catch (e2) {} }
+    if (fresh || parked) replay();
+  }
+
+  function replay() {
+    var p = pending || curId;
+    if (!p) return;
+    /* play() set curId when it parked the request, so a straight
+       replay would hit its own "same track" early exit and start
+       silence. Clear it first. */
+    pending = null; curId = null; play(p);
+  }
 
   /* ── voices ─────────────────────────────────────────────────────
      A voice is one track, playing. Two exist only during a crossfade:
@@ -522,9 +549,15 @@
 
   setInterval(sync, POLL);
   document.addEventListener('visibilitychange', function () {
-    /* Not a pause — the fade would be audible on the way back and the
+    /* Not a pause: the fade would be audible on return and the
        scheduler realigns itself anyway. Just stop burning cycles. */
-    if (document.hidden) stopTimer(); else if (voices.length) startTimer();
+    if (document.hidden) stopTimer();
+    else {
+      /* Backgrounding suspends the context; returning gets the same
+         courtesy as a gesture before the scheduler runs. */
+      unlock(false);
+      if (voices.length) startTimer();
+    }
   });
 
   NEU.music = {
