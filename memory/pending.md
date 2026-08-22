@@ -116,6 +116,29 @@ Later the same day, against goal "fully mobile + re-gather sprites":
 - **SEO surface shipped:** self-canonical + `WebSite` JSON-LD +
   `sitemap.xml` + robots `Sitemap:` line, all three URLs agreeing;
   fixes17 asserts agreement, parseability, staging, and live files.
+- **Agent team stood up** (`AGENTS.md` is the contract): five workers in
+  `.opencode/agents/` pinned to the same free model — scout/researcher
+  (read-only, dispatched through the background-agents plugin's
+  `delegate()` so results persist across compaction), builder (writes,
+  plain `edit: allow` after glob-form permissions proved broken on
+  Windows), verifier (bash allowlist), reviewer (binary SHIP/REJECT on a
+  seven-item checklist; REJECT requires executable evidence or it is
+  overruled). opencode-notify delivers Windows Toasts. Plugin sources were
+  line-reviewed before install.
+- **Pilot B shipped through the full pipeline** (builder → verifier →
+  reviewer SHIP): the audio-unlock gate no longer latches — gestures retry
+  `resume()` while suspended, `pointerup`/`touchend` join the capture pair
+  as spec-guaranteed triggers, `navigator.audioSession.type='playback'`
+  beats the iOS silent switch where supported, and backgrounding re-unlocks
+  on visibilitychange. fixes16 §2b pins all of it (TDD: written RED first).
+  A comment-only trim keeps music.js inside its 24 KB budget (24,460 B).
+- **Scout wave + six-defect sweep shipped.** Two parallel scouts audited
+  every module; 12 findings, 6 confirmed against source after
+  orchestrator verification, fixed and gated (fixes18 §19 pins them):
+  engine double-rAF on mid-room re-enter, settings is-playing strip,
+  settings/dev Escape bleed-through into live rooms, boss-scal charge
+  softlock on retry, polt stale charge timer across reopen, rhythm phase
+  timer duplicating charts. Reviewer SHIP on both waves.
 
 ---
 
