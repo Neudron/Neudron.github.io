@@ -24,7 +24,7 @@
   var el = document.getElementById('crack');
   if (!el) { NEU.crack = { arm: function () {} }; return; }
 
-  var armed = false, clicks = 0, opened = false, timer = null;
+  var armed = false, clicks = 0, opened = false, timer = null, actx = null;
 
   var NOISE = [
     'something behind the panel makes a noise. it is not a good noise.',
@@ -41,7 +41,13 @@
   }
 
   function hit() {
-    if (!armed || opened) return;
+    if (!armed) return;
+    /* The portal stays clickable: a reload between opening and fighting
+       used to leave it inert forever. He cannot be re-summoned once dead. */
+    if (opened) {
+      if (!(NEU.save && NEU.save.flagged('polt_dead')) && NEU.polt && NEU.polt.open) NEU.polt.open();
+      return;
+    }
     clicks++;
     if (NEU.save) NEU.save.flag('crack_clicks', clicks);
 
@@ -49,7 +55,8 @@
        what makes three identical clicks read as something getting
        closer rather than a button being pressed three times. */
     try {
-      var a = new (window.AudioContext || window.webkitAudioContext)();
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      var a = actx;
       var o = a.createOscillator(), g = a.createGain(), t = a.currentTime;
       o.type = 'sawtooth';
       o.frequency.setValueAtTime(160 - clicks * 38, t);

@@ -87,7 +87,7 @@
   ];
 
   var blasters = [];
-  var BL_CHARGE = 0.85, BL_FIRE = 0.42, BL_HALF = 17;
+  var BL_CHARGE = 0.85, BL_FIRE = 0.42;
 
   /* ── the electric blaster ─────────────────────────────────────────
      Its rule is INVERTED and that is the whole point: it hurts you if
@@ -530,6 +530,7 @@
 
   /* ── start / finish ───────────────────────────────────────────────*/
   function begin() {
+    dying = 0;                           /* a pending death animation is cancelled by restarting */
     layout();
     t = 0; hp = 3; inv = 0; won = false; cheat = '';
     bullets = []; resetEmitters();
@@ -565,6 +566,9 @@
   }
 
   function deathStep(now) {
+    /* A stale frame from a run the player already left must never reach
+       finish() — it would kill the fresh run behind it. */
+    if (!dying || wrap.hidden) return;
     var ms = now - dying;
     arena();
 
@@ -661,6 +665,7 @@
      emitter and the electric blaster's inverted rule. */
   var endless = false;
   function open(opts) {
+    if (running) return;                 /* already mid-run — never stack a second loop */
     endless = !!(opts && opts.endless);
     NEU.activeMinigame = 'bullet';
     wrap.hidden = false;
