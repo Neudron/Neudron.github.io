@@ -6,8 +6,8 @@ Paste-able opener, and the loop every session follows.
 
 ## Start a session with this
 
-> Working on **neu** (`Documents\neu\site`). Read `CLAUDE.md` and `memory/`
-> first. Use the `neu-site`, `neu-room` and `neu-verify` skills.
+> Working on **neu** (`Documents\neu` — repo root IS the site since the
+> 2026-08-21 flatten). Read `memory/` first, starting at `PLAN.md`.
 > Do not commit or push unless I say so in that message.
 > Current state and open items are in `memory/pending.md`.
 
@@ -62,8 +62,8 @@ is zero-build vanilla JS with Canvas 2D and one three.js scene:
 | `anthropics/skills` | already present in this environment |
 | `openai/skills`, `addyosmani/agent-skills`, `VoltAgent`, `heilcheng`, `hoodini`, `agentskills`, `eigent-ai` | general-purpose collections; nothing specific to this stack |
 
-**Not fetched, and this matters:** the three candidates above were judged from
-their names and stated scope, not from reading them. Pulling 15 repos would
-have cost more context than the work itself. If you want them properly
-evaluated, that is a session of its own — ask for it and it gets done
-per-repo with the actual SKILL.md files read.
+**Not fetched, and this mattered for a while:** the three candidates were
+judged from names and scope, not from reading them — **resolved
+2026-08-17**: all three were then read properly, verdicts in `PLAN.md`
+§1.10 (`threejs-skills` maybe-later; `threejs-game-skills` no — build step;
+`OpenGame` no). Nothing left open here.

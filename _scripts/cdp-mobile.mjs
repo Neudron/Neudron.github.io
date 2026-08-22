@@ -115,6 +115,28 @@ try {
   await sleep(400);
   console.log('craft grid fits:', await evalJs('(function(){var g=document.querySelector(".craft__grid");return g? g.scrollWidth<=innerWidth : null})()'));
   console.log('craft cell px:', await evalJs('(function(){var c=document.querySelector(".craft__cell");return c? Math.round(c.getBoundingClientRect().width):null})()'));
+  console.log('close craft:', await evalJs('(function(){try{NEU.craft.close()}catch(e){} return String(NEU.touch.scene)})()'));
+
+  /* ── every remaining scene claims its thumb profile ──────────────
+     Most open with an intro line; while #tbox is up the pad hides on
+     purpose (tap the words to advance). So: advance the box, THEN read. */
+  const sweep = ['rhythm', 'quiz', 'bullet', 'polt', 'dark', 'deck'];
+  for (const s of sweep) {
+    const opened = await evalJs(`(function(){try{NEU.${s}.open();return true}catch(e){return "THREW "+e.message}})()`);
+    await sleep(500);
+    for (let i = 0; i < 6; i++) {
+      const up = await evalJs('!!(document.getElementById("tbox") && !document.getElementById("tbox").hidden)');
+      if (!up) break;
+      await evalJs('document.getElementById("tbox").click()');
+      await evalJs('window.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter"}))');
+      await evalJs('window.dispatchEvent(new KeyboardEvent("keydown",{key:"e"}))');
+      await sleep(350);
+    }
+    const scene = await evalJs('String(NEU.touch.scene)');
+    console.log(`[${s}] open=${opened} -> touch.scene=${scene}`);
+    await evalJs(`(function(){try{NEU.${s}.close && NEU.${s}.close()}catch(e){}})()`);
+    await sleep(250);
+  }
 
   console.log('runtime errors:', JSON.stringify(
     events.filter(e => /Exception|error/i.test(e.method))

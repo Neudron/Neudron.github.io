@@ -395,33 +395,25 @@ source atlas  14 files  2574 KB   NEVER ships
 act IV total            302 KB    (budget 500 KB)
 ```
 
-**Two of the five provisional frame counts are still provisional.** The other
-three were settled by measurement on 2026-08-17 —
-`_scripts/measure-sheets.mjs` decodes the PNGs with nothing but node's `zlib`
-and finds the frame period by autocorrelating the row profile. It reproduces
-all six known-good sheets before it is allowed to claim anything, which is
-the only reason its answers are worth having: two earlier methods reproduced
-1/6 and 3/6 and would have written wrong numbers into the manifest.
+**~~Two of the five provisional frame counts are still provisional.~~ All
+five settled** (`pending` 1.2): `sepulcher` is one unbroken band — one head,
+not two frames (`frames: 1`); `heart` was cropped short of its own grid and
+was re-padded to six bands on a 62px pitch; the Catastrophe slashes WERE
+swapped and the fix moved geometry with the src. Verified by eye at 4–8x,
+twice each.
 
-- `fireblast` 5 frames, `gigablast` 6, `hook` 2 — **confirmed**
-- `sepulcher` — one unbroken band of content, no gutter to cut on
-- `heart` — six clear sprite bands at ~62px pitch, but the sheet is 370 tall
-  and 370 does not divide by 6. The sheet looks cropped short of its own
-  grid; `frames: 5, fh: 74` cuts through two sprites
-
-Those last two, and the Catastrophe slash orientation, are still one look in
-the dev console: `sheet heart`, `sheet sepulcher`, `sheet slashTop`. If a
-sprite is cut by a magenta line the count is wrong, and the fix is one line
-in `sheets.js`.
+- ~~`fireblast` 5 frames, `gigablast` 6, `hook` 2 — **confirmed**~~
+- ~~`sepulcher` — one unbroken band, no gutter → `frames: 1, fps: 0`~~
+- ~~`heart` — sheet re-padded 370→372px, `frames: 6, fh: 62`~~
 
 ---
 
 ## 8. What I need from you
 
-1. **Go/no-go on phase-by-phase.** Strongly recommended over one drop.
-2. **Two minutes with the sprite inspector** once Phase 0 lands, to confirm
-   the five provisional frame counts and the Catastrophe orientation.
-3. **Quiz answers approved** when I draft the 20 questions (Phase 3).
-4. **Deploy permission**, per push, as now.
+~~1–3~~ **all resolved:** phase-by-phase happened (Phases 1–7 done —
+`PLAN.md`); the frame counts and slash orientation are settled (`pending`
+1.2/1.3); the quiz shipped with its answers. What still needs a human:
+**item 3.5 in `pending.md`** — play it through on a real phone, headphones
+on. 4. **Deploy permission stays per-push**, as always.
 
 Nothing is built. Say go and Phase 0 starts.
