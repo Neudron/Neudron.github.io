@@ -475,5 +475,56 @@ function N2_open_close(b) {
   b.NEU.settings.close();
 }
 
+/* ═══ 20. wave-C sweep: gates, guards, and one-shot actions ════════*/
+console.log('\n20. wave-C sweep');
+{
+  /* D1 — a library-launched blackout must not be able to finish the
+     story chain: no grey door out there, so E near it does nothing. */
+  const D = read('game/dark.js');
+  ok('>>> dark: interact() gates the door on endless <<<',
+     /function interact\(\)[\s\S]{0,500}?if \(endless\) return;\s*if \(!near\(DOOR\)\) return;/.test(D));
+
+  /* D2 — a stale death rAF after Enter-restart flipped finish(false)
+     on the fresh run. */
+  const B = read('game/bullet.js');
+  ok('>>> bullet: deathStep stands down when not dying or hidden <<<',
+     /function deathStep\(now\) \{[\s\S]{0,200}?if \(!dying \|\| wrap\.hidden\) return;/.test(B));
+  ok('>>> bullet: begin() clears dying so the stale frame exits <<<',
+     /function begin\(\) \{\s*dying = 0;[\s\S]{0,160}?won = false; cheat = '';/.test(B));
+
+  /* D3 — line 90's redeclaration silently reverted the beam width. */
+  ok('>>> bullet: BL_HALF declared exactly once <<<',
+     (B.match(/BL_HALF\s*=/g) || []).length === 1);
+  ok('and it is the tuned 24', /var BL_HALF = 24;/.test(B));
+
+  /* D4 — chip-spam or double-click started two step loops. */
+  ok('>>> deck: open() re-entry guard <<<',
+     /function open\(\) \{\s*if \(open_\) return;/.test(read('game/deck.js')));
+  ok('>>> bullet: open() re-entry guard <<<',
+     /function open\(opts\) \{\s*if \(running\) return;/.test(B));
+  ok('>>> dark: open() re-entry guard <<<',
+     /function open\(opts\) \{\s*if \(running\) return;/.test(D));
+
+  /* D5 — reload with crack_clicks>=3 left an inert portal, and every
+     knock leaked an AudioContext. */
+  const C = read('act4/crack.js');
+  ok('>>> crack: clicking an opened portal re-raises Polterghast unless dead <<<',
+     /if \(!\(NEU\.save && NEU\.save\.flagged\('polt_dead'\)\) && NEU\.polt && NEU\.polt\.open\) NEU\.polt\.open\(\);/.test(C));
+  ok('crack: opened clicks return either way',
+     /if \(!armed\) return;[\s\S]{0,300}?if \(opened\) \{/.test(C));
+  ok('>>> crack: exactly one AudioContext construction site <<<',
+     (C.match(/new \(window\.AudioContext/g) || []).length === 1);
+  ok('>>> crack: the context is lazily created once and reused <<<',
+     /var [^\n]*\bactx = null/.test(C) && /if \(!actx\) actx = new \(window\.AudioContext/.test(C));
+
+  /* D6 — take() re-ran during the close delay: duplicate soup,
+     mushrooms taken twice, stacked timers. */
+  const K = read('act4/craft.js');
+  ok('>>> craft: module-level taken flag <<<', /var taken = false;/.test(K));
+  ok('>>> craft: take() is one-shot per grid <<<',
+     /if \(taken \|\| !matches\(\)\) return;\s*taken = true;/.test(K));
+  ok('>>> craft: open() resets taken <<<', /taken = false;[\s\S]{0,900}?render\(\);/.test(K));
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

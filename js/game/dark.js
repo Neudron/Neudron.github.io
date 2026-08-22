@@ -122,6 +122,9 @@
       return;
     }
 
+    /* Endless has no grey door and nothing behind it — see the
+       endless block below. */
+    if (endless) return;
     if (!near(DOOR)) return;
     if (talks < LINES.length) {
       say(LINES[talks]); talks++;
@@ -330,6 +333,7 @@
   var endless = false, torch = LIGHT;
 
   function open(opts) {
+    if (running) return;                 /* chip-spam / double-click must not stack a second loop */
     endless = !!(opts && opts.endless);
     mode = 'dark';
     torch = LIGHT;

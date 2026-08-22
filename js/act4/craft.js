@@ -89,8 +89,12 @@
     if (matches() && sayEl) sayEl.textContent = 'that is the shape the pot is.';
   }
 
+  var taken = false;                     /* the 3.2s close delay leaves the grid matching —
+                                            one shot only, or Enter re-stacks wake timers */
+
   function take() {
-    if (!matches()) return;
+    if (taken || !matches()) return;
+    taken = true;
     if (NEU.save) {
       for (var i = 1; i <= 5; i++) NEU.save.take('mush' + i);
       NEU.save.give('soup');
@@ -125,6 +129,7 @@
   var lastFocus = null;
 
   function open() {
+    taken = false;
     /* Where to put the player back when they leave. Same courtesy the
        quiz and the settings panel give. Only captured once. */
     if (!lastFocus) lastFocus = document.activeElement;
