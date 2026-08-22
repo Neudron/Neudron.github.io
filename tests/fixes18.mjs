@@ -406,5 +406,74 @@ console.log('\n18. no regressions in the earlier fixes');
      /THE ONLY RANDOMNESS/.test(B));
 }
 
+/* ═══ 19. wave-A sweep: loop, panel, and timer hygiene ════════════*/
+console.log('\n19. wave-A sweep');
+{
+  /* W1 — rhythm/craft legitimately call engine.enter() mid-room now;
+     a second unconditional rAF spawn ticks the room at double speed. */
+  const E = read('core/engine.js');
+  ok('>>> enter() spawns its loop only when not already running <<<',
+     /if \(!running\) \{\s*running = true; last = performance\.now\(\);\s*requestAnimationFrame\(step\);\s*\}/.test(E));
+  const b1 = boot();
+  let rafs = 0;
+  const origRaf = b1.w.requestAnimationFrame;
+  b1.w.requestAnimationFrame = cb => { rafs++; return origRaf(cb); };
+  b1.NEU.engine.enter('d1_street');
+  const first = rafs; rafs = 0;
+  b1.NEU.engine.enter('d1_street');
+  ok('>>> a second enter() adds no second loop <<<', first >= 1 && rafs === 0);
+
+  /* W2 — settings opens over live rooms; close() must give the room
+     its is-playing back instead of stripping it unconditionally. */
+  const S = read('core/settings.js');
+  ok('settings.open() captures the body state before claiming it',
+     /wasPlaying = document\.body\.classList\.contains\('is-playing'\);\s*document\.body\.classList\.add\('is-playing'\)/.test(S));
+  ok('>>> settings.close() only strips is-playing if it added it <<<',
+     /if \(!wasPlaying\) document\.body\.classList\.remove\('is-playing'\)/.test(S));
+  const b2 = boot();
+  N2_open_close(b2);
+  ok('settings alone leaves no is-playing behind',
+     !b2.w.document.body.classList.contains('is-playing'));
+  b2.w.document.body.classList.add('is-playing');   // a live room underneath
+  N2_open_close(b2);
+  ok('>>> closing over a live room keeps its is-playing <<<',
+     b2.w.document.body.classList.contains('is-playing'));
+
+  /* W3 — a panel that consumed Escape must not let it also reach the
+     engine's window handler and quit the room underneath. */
+  ok('>>> settings Escape claims the event <<<',
+     /e\.key === 'Escape'\) \{ e\.preventDefault\(\); e\.stopImmediatePropagation\(\); close\(\); return; \}/.test(S));
+  const D = read('core/dev.js');
+  ok('>>> dev console Escape claims the event <<<',
+     /e\.key === 'Escape'\) \{\s*e\.preventDefault\(\);\s*e\.stopImmediatePropagation\(\);[\s\S]{0,200}?hide\(\);/.test(D));
+
+  /* W4 — dying mid multi-charge then retrying hit an early-return
+     forever: open() reset everything except the charge vars. */
+  const B = read('act4/boss-scal.js');
+  ok('>>> open() zeroes every charge var alongside diveT <<<',
+     /diveT = 0;[\s\S]{0,200}?chargeT = 0; chargeTelegraph = 0; chargeBurst = 0; chargeBurstMax = 0; chargeGap = 0;/.test(B));
+
+  /* W5 — the 900ms charge telegraph outlived close(); reopening inside
+     the window fired it into the new fight untelegraphed. */
+  const P = read('act4/boss-polt.js');
+  ok('polt tracks its charge timer', /chargeTimer = setTimeout\(doCharge, 900\)/.test(P));
+  ok('>>> close() clears the pending charge <<<', /clearTimeout\(chargeTimer\)/.test(P));
+
+  /* W6 — the call→response concat timeout survived close/reopen and
+     duplicated notes onto the fresh round. */
+  const R = read('act4/rhythm.js');
+  ok('rhythm tracks its phase timer', /phaseTimer = setTimeout\(function \(\) \{/.test(R));
+  ok('>>> startRound() clears any stale phase timer <<<',
+     /function startRound\(\) \{\s*if \(phaseTimer\) \{ clearTimeout\(phaseTimer\); phaseTimer = 0; \}/.test(R));
+  ok('>>> close() clears the phase timer too <<<',
+     /function close\(\) \{\s*running = false;\s*if \(phaseTimer\) \{ clearTimeout\(phaseTimer\); phaseTimer = 0; \}/.test(R));
+}
+
+/* settings open/close over a body, for section 19's W2 checks */
+function N2_open_close(b) {
+  b.NEU.settings.open();
+  b.NEU.settings.close();
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

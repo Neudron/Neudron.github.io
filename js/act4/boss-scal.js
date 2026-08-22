@@ -1314,6 +1314,9 @@
     rage = 0; tp = 0; shieldT = 0;
     rageMode = 0; rageModeT = 0;
     diveT = 0;
+    /* charge state too — dying mid multi-charge used to carry a live
+       telegraph/dash into the retry and softlock her at the early-return */
+    chargeT = 0; chargeTelegraph = 0; chargeBurst = 0; chargeBurstMax = 0; chargeGap = 0;
     bossMax = 24; bossHP = bossMax; phase = 1; step_ = 0; stepT = 1.2;
     hearts = []; sep = null; bros = []; invuln = true; dying = 0;
     preloadSfx();

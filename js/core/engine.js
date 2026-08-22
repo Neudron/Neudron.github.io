@@ -933,8 +933,12 @@
     land(id, spawn);
     fade = 1; fadeDir = -1; fadeThen = null;
     keys = {}; busy = false;
-    running = true; last = performance.now();
-    requestAnimationFrame(step);
+    /* rhythm and craft re-enter while the room still runs — spawning a
+       second loop here would tick everything at double speed. */
+    if (!running) {
+      running = true; last = performance.now();
+      requestAnimationFrame(step);
+    }
     return true;
   }
 

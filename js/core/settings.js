@@ -68,7 +68,7 @@
   }
 
   /* ── the panel ──────────────────────────────────────────────────*/
-  var panel = null, btn = null, open_ = false;
+  var panel = null, btn = null, open_ = false, wasPlaying = false;
 
   function row(id, label, hint, lockReduced, cb) {
     var r = document.createElement('div');
@@ -270,6 +270,9 @@
     open_ = true;
     refresh();
     panel.hidden = false;
+    /* Settings opens over live rooms too — remember whether the room
+       owned is-playing so close() hands it back instead of stealing it. */
+    wasPlaying = document.body.classList.contains('is-playing');
     document.body.classList.add('is-playing');
     /* A single selector on purpose: a selector LIST comes back grouped
        by selector in jsdom, and the first match must be the first
@@ -284,7 +287,7 @@
     open_ = false;
     panel.classList.remove('is-in');
     panel.hidden = true;
-    document.body.classList.remove('is-playing');
+    if (!wasPlaying) document.body.classList.remove('is-playing');
     if (btn) btn.focus();
   }
 
@@ -301,7 +304,7 @@
       return;
     }
     if (!open_ || !panel) return;
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); return; }
     if (e.key === 'Tab') {
       /* Buttons AND inputs. The trap used to collect only buttons, so
          the moment a slider was added Tab walked straight out of a
