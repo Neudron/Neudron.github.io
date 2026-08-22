@@ -44,6 +44,13 @@ These source edits are in the working tree but need their new test sections run:
 
 ## 3. Still-pending LOW findings — implement + test
 
+> **✅ RESOLVED 2026-08-22 — nothing pending here.** Audited against source
+> and suites: LOW 15 (clearStick latch) and LOW 16 (keyup latch invalidation)
+> are implemented in `js/core/touch.js` and pinned by fixes15 §LOW-15/16;
+> LOW 17 (`goto` teleport) is implemented in `js/core/dev.js` and pinned by
+> fixes12 §9a. Every entry below is a historical record of the fix design,
+> not outstanding work.
+
 ### LOW 15 — `touch.js` releaseAll doesn't clear stick pointer latch
 
 **File:** `js/core/touch.js`  

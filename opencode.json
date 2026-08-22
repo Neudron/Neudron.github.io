@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "https://raw.githubusercontent.com/JRedeker/opencode-shell-strategy/trunk/shell_strategy.md"
+  ],
+  "permission": {
+    "bash": {
+      "*": "allow",
+      "git push*": "ask",
+      "rm *": "ask",
+      "rm -rf *": "ask",
+      "Remove-Item*": "ask",
+      "del *": "ask",
+      "rmdir *": "ask",
+      "git reset --hard*": "ask"
+    }
+  }
+}

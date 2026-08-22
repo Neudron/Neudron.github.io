@@ -75,6 +75,17 @@ npm install jsdom --prefix tests   # once per session — the sandbox is wiped b
 - `cmd && python <<EOF` — if `cmd` fails the heredoc never runs and the
   silence looks like the edit succeeded.
 
+### opencode agent permission traps
+
+- **Glob-form `edit:` rules silently hide the whole edit tool on Windows.**
+  Edit resources arrive as absolute `C:\...` paths; relative globs like
+  `js/**` never match, and a trailing `"*": deny` then wins everything —
+  the worker sees no edit tool at all and burns its steps probing bash.
+  Until upstream normalises path separators, give trusted builders plain
+  `"edit": "allow"` and enforce scope via the work order + reviewer gate.
+  Found 2026-08-22 (builder cycle 1 blocked); recorded in the builder's
+  own config comment.
+
 ## Verification habit
 
 Every change ships with a jsdom test that drives the actual state machine, and

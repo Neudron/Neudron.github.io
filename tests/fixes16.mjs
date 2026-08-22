@@ -202,6 +202,78 @@ console.log('\n2. the gesture gate  ← autoplay');
      w.__actx.notes.every(n => typeof n.t === 'number' && isFinite(n.t)));
 }
 
+/* 2b. THE SWALLOWED GESTURE. iOS can fire the event and still refuse
+   the unlock — a touchstart spent on a scroll grants no activation,
+   and the context stays parked in 'suspended' anyway. A gate that
+   latches on its first attempt and never retries is a gate that
+   stays shut for the rest of the session, silently. These checks
+   drive a context whose resume refuses once, like the real one
+   does, and demand that the next gesture gets another swing. */
+console.log('\n2b. the gate can lose a round');
+{
+  const { w, NEU } = boot();
+  let resumes = 0;
+  w.AudioContext.prototype.resume = function () {
+    resumes++;
+    if (resumes === 1) return Promise.resolve(); /* refused: still parked */
+    this.state = 'running';
+    return Promise.resolve();
+  };
+
+  ok('asked before any gesture: queued', NEU.music.play('woods') === false);
+  gesture(w);                                   /* arm + first start */
+  ok('the first gesture armed and started', NEU.music.playing === true);
+
+  /* The swallow: parked again after everything went through. Nothing
+     above changed — this is the world as iOS leaves it. */
+  w.__actx.state = 'suspended';
+  const firstVoice = NEU.music._v()[0];
+
+  gesture(w);                                   /* the retry */
+  ok('>>> a second gesture retries resume() <<<', resumes >= 1);
+  const retry = NEU.music._v().filter(v => !v.dying)[0];
+  ok('>>> and gives the track its replay <<<', !!retry && retry !== firstVoice);
+
+  gesture(w);                                   /* the one that lands */
+  ok('>>> the context comes up on retry <<<', w.__actx.state === 'running');
+  ok('still playing, not reset to silence', NEU.music.playing === true);
+}
+
+/* pointerup and touchend are the activation triggers the spec actually
+   credits; Safari's acceptance of the down-phase events is undocumented
+   leniency. Arming off both costs nothing and covers the browsers that
+   follow the letter. */
+{
+  const { w, NEU } = boot();
+  w.dispatchEvent(new w.Event('pointerup'));
+  ok('>>> a pointerup arms the gate <<<', NEU.music.armed === true);
+}
+{
+  const { w, NEU } = boot();
+  ok('queued on request', NEU.music.play('home') === false);
+  w.dispatchEvent(new w.Event('touchend'));
+  ok('>>> a touchend starts it <<<', NEU.music.playing === true);
+}
+
+/* The ringer-channel fix: without an audioSession type, Web Audio
+   answers to the silent switch and the whole soundtrack dies with it.
+   Asserted against the source because jsdom has no navigator.audioSession
+   to set before the module evaluates. */
+ok('>>> claims the playback audio session where the API exists <<<',
+   /navigator\.audioSession/.test(M) && /\.type\s*=\s*['"]playback['"]/.test(M));
+
+/* Backgrounding suspends the context; coming back must wake it, or a
+   tab switch costs the soundtrack until the next full reload. */
+{
+  const { w, NEU } = boot();
+  gesture(w);
+  NEU.music.play('woods');
+  w.__actx.state = 'suspended';                /* what backgrounding does */
+  Object.defineProperty(w.document, 'hidden', { value: false, configurable: true });
+  w.document.dispatchEvent(new w.Event('visibilitychange'));
+  ok('>>> returning to the tab wakes the context <<<', w.__actx.state === 'running');
+}
+
 /* ═══ 3. the director picks the right track ═══════════════════════*/
 console.log('\n3. the director');
 {

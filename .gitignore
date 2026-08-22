@@ -65,3 +65,7 @@ _scripts/orig/
 .DS_Store
 Thumbs.db
 *.orig
+
+# ── agent session transcripts (ephemeral) ──
+.opencode/log/
+.opencode/plans/*.txt
