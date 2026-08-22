@@ -1,4 +1,19 @@
 User-agent: *
 Allow: /
 
+# AI crawlers explicitly welcome — the site is a fan page with nothing to hide.
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+
+# Never crawl the workshop repo mirrors or staging paths (defence in depth;
+# the deploy workflow already stages only public files).
+Disallow: /_stage/
+Disallow: /_scripts/
+
 Sitemap: https://www.neu.ac/sitemap.xml

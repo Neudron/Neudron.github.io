@@ -1,0 +1,8 @@
+/* humans */
+
+neu ............ design, code, art direction, music synthesis
+toby fox ....... undertale + deltarune sprites, fonts of the soul
+calamity team .. terraria boss behaviour reference
+carter sande ... undertale webfont kit
+
+built by hand in a text editor, no build step, on purpose.
