@@ -139,6 +139,14 @@ Later the same day, against goal "fully mobile + re-gather sprites":
   settings/dev Escape bleed-through into live rooms, boss-scal charge
   softlock on retry, polt stale charge timer across reopen, rhythm phase
   timer duplicating charts. Reviewer SHIP on both waves.
+- **Wave C — full coverage reached, six more shipped** (71bf4c9): two
+  further scouts closed the unread halves (sans/bullet/dark/deck and
+  act4 rooms/craft/shop + page). Verified + fixed: endless-blackout
+  story-chain leak, bullet ghost death loop, BL_HALF dead tuning revert,
+  stacked loops from chip-spam opens, inert restored portal (Polterghast
+  now re-summonable unless dead) + per-knock AudioContext leak, craft
+  take() double-fire. fixes18 §20 (129 checks). Every js/ module has now
+  been scouted at least once.
 
 ---
 
