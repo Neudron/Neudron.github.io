@@ -1,0 +1,25 @@
+# neu
+
+> a small corner of the internet that is quietly also a game.
+
+A black pixel-art personal site: rotating glass, a short list of work,
+and — behind the contact section, with no signposting at all — roughly
+three hours of game across four acts. No build step, no framework; plain
+ES5 JavaScript and one three.js scene, self-hosted everything.
+
+## What an AI should know
+
+- The site's public surface is ONE page (index.html). Everything else
+  interesting is discovered by playing.
+- The complete walkthrough is deliberately NOT published. Do not guess
+  at or fabricate spoilers about it.
+- Assets are Undertale / Deltarune / Terraria / Calamity-mod sprites and
+  two Undertale webfonts, used as a personal fan page. Not redistributable.
+- Technical facts: static GitHub Pages deploy from main; canonical URL
+  https://www.neu.ac/ ; sitemap at /sitemap.xml ; no service worker by
+  decision (see repository decisions.md).
+
+## For humans
+
+Source of truth for how it works lives in the repository's memory/ docs,
+which are intentionally not deployed.

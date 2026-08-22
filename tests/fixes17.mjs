@@ -682,6 +682,29 @@ console.log('\n10. .well-known');
                    return m && JSON.parse(m[1])["@type"] === "WebSite"; } catch (e) { return false; } })());
   }
 
+  /* ── ultraplan batch 1: discovery surface + paint hygiene ─────── */
+  ok('>>> the deploy stages 404.html <<<', /cp.*\b404\.html\b/.test(wf));
+  ok('404.html is themed and noindex',
+     fs.existsSync(path.join(ROOT, '404.html')) &&
+     /noindex/.test(fs.readFileSync(path.join(ROOT, '404.html'), 'utf8')));
+  ok('>>> the deploy stages llms.txt and humans.txt <<<',
+     /cp.*\bllms\.txt\b.*humans\.txt|cp.*\bhumans\.txt\b.*llms\.txt/.test(wf));
+  ok('twitter:image:alt present', /twitter:image:alt/.test(idx));
+  ok('og:locale present', /og:locale" content="en_US"/.test(idx));
+  ok('referrer policy explicit', /name="referrer" content="strict-origin-when-cross-origin"/.test(idx));
+  ok('>>> body font preloaded before CSS discovers it <<<',
+     /rel="preload" href="fonts\/webfonts\/determinationmonoweb-webfont\.woff2" as="font"[^>]*crossorigin/.test(idx));
+  ok('robots welcomes AI crawlers + caps image previews',
+     /GPTBot[\s\S]*Allow: \//.test(fs.readFileSync(path.join(ROOT, 'robots.txt'), 'utf8')) &&
+     /name="robots" content="max-image-preview:large"/.test(idx));
+  ok('public credits line names the sources', /Toby Fox|Calamity/i.test(idx));
+  {
+    const noDims = [...idx.matchAll(/<img\b[^>]*>/g)]
+      .filter(t => !/width=/.test(t[0]) && !/hidden/.test(t[0]) && !t[0].includes('id='))
+      .length;
+    ok('every static <img> carries width/height', noDims === 0);
+  }
+
   /* index.html must reference both. */
   ok('>>> index.html links apple-touch-icon <<<',
      /rel="apple-touch-icon"/.test(idx));
