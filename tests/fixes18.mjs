@@ -530,6 +530,17 @@ console.log('\n20. wave-C sweep');
   const A4 = read('act4/act4.js');
   ok('>>> act4 boot re-arms is-trip from the saved flag <<<',
      /flagged\('tripping'\)\) \{\s*document\.body\.classList\.add\('is-trip'\);/.test(A4));
+
+  /* D8 — the sleep chain was page-lifetime only: any refresh after
+     "let them rest" booted an awake sans and an empty dock while the
+     persisted objectives said "dock it". Act IV resumes solely through
+     that dock's deck — a cross-session softlock for the entire back
+     half. Boot now re-arms from the marks the save already keeps. */
+  const SA = read('game/sans.js');
+  ok('>>> boot re-arms the sleep chain from its quest marks <<<',
+     /quest\.has\('sleep'\)\) \{[\s\S]{0,200}?asleep = true; switchSeen = true;/.test(SA) &&
+     /quest\.has\('docked'\)\) docked = true;/.test(SA) &&
+     /quest\.has\('console'\)\) hasConsole = true;/.test(SA));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

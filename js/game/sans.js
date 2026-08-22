@@ -1553,6 +1553,24 @@
     });
   });
 
+  /* ── boot re-arm: the sleep chain is page-lifetime state ────────
+      asleep/switchSeen/hasConsole/docked used to live only in module
+      vars, so ANY refresh after "let them rest" booted an awake sans,
+      an empty dock and no Switch — while the persisted objectives kept
+      saying "dock it". Act IV resumes solely through the docked deck,
+      so that was a cross-session softlock for the whole second half.
+      The quest marks already remember where you were; re-arm from
+      them. A console not yet docked comes back empty-handed: the blue
+      blaster re-earns the charge, which is the battery's own rule. */
+  if (NEU.quest) {
+    if (NEU.quest.has('sleep')) {
+      asleep = true; switchSeen = true;
+      if (sleepSw) sleepSw.hidden = false;
+    }
+    if (NEU.quest.has('docked')) docked = true;
+    else if (NEU.quest.has('console')) hasConsole = true;
+  }
+
   NEU.sans = {
     get state()   { return state; },
     get asleep()  { return asleep; },
