@@ -66,6 +66,7 @@ function boot() {
 const read = f => fs.readFileSync(path.join(ROOT, 'js', f), 'utf8');
 const SCAL = read('act4/boss-scal.js');
 const BULL = read('game/bullet.js');
+const WORM = read('act4/scal-worm.js');
 
 /* ═══ 1. the danmaku seam (deferred from Phase 1) ═════════════════*/
 console.log('\n1. all three fights live on NEU.danmaku');
@@ -92,7 +93,7 @@ console.log('\n2. Calamitas draws from her sheets');
 {
   const { NEU } = boot();
   const keys = ['dart', 'hellblast', 'fireblast', 'gigablast',
-                'cataclysm', 'catastrophe', 'sepulcher', 'heart', 'ashes'];
+                'cataclysm', 'catastrophe', 'heart', 'ashes'];
   keys.forEach(k => {
     ok('the sheet key "' + k + '" is referenced', SCAL.indexOf("'" + k + "'") >= 0);
   });
@@ -139,7 +140,18 @@ console.log('\n2. Calamitas draws from her sheets');
      /if \(!sprite\(key, b\.x, b\.y/.test(SCAL) &&
      /ctx\.fillRect\(\(b\.x - b\.r\) \| 0/.test(SCAL));
   ok('hearts fall back to their square', /!sprite\('heart'/.test(SCAL) && /#C2405F/.test(SCAL));
-  ok('sepulcher falls back', /!sprite\('sepulcher'/.test(SCAL));
+  /* RE-SOURCED 2026-08-24: V5 moved the Sepulcher worm body out of
+     boss-scal.js into act4/scal-worm.js — boss-scal no longer names
+     'sepulcher' or guards it with !sprite(). The art checks follow the
+     worm into its own module: its sheet keys, and its own square
+     fallback (rect() when NEU.sheetDraw is missing). */
+  ok('the worm renders from the sepulcher sheets',
+     ['sepulBody', 'sepulHeart', 'sepulBodyAlt', 'sepulArm', 'sepulTail']
+       .every(k => WORM.indexOf("'" + k + "'") >= 0));
+  ok('sepulcher falls back', /if \(!NEU\.sheetDraw \|\| !ctx\) return false;/.test(WORM) &&
+     /ctx\.fillRect\(\(x - r\) \| 0, \(y - r\) \| 0, r \* 2, r \* 2\)/.test(WORM));
+  ok("boss-scal no longer names the 'sepulcher' sprite key",
+     SCAL.indexOf("'sepulcher'") < 0);
   ok('her body falls back to MAGENTA', /#FF00A0/.test(SCAL));
   ok('the drop draws in won mode', /mode !== 'won'/.test(SCAL) &&
      /sprite\('ashes'/.test(SCAL));

@@ -115,13 +115,20 @@ console.log('\n1. sepulcher sheets + worm body');
   ok('Tail file is 54x54', tw === 54 && th === 54);
 
   const B = read('act4/boss-scal.js');
-  ok('spawn seeds a trail (initial straight body)',
-     /sep\.trail\.push\(\{ x: sep\.x, y: sep\.y - k \* 1\.5 \}\)/.test(B));
-  ok('trail records only while moving', /hypot\(sep\.vx, sep\.vy\) > 1/.test(B));
-  ok('wormSegments walks the trail at 66px spacing', /budget = 66/.test(B));
-  ok('segments computed every tick', /sep\.segs = wormSegments\(\)/.test(B));
-  ok('draw renders alternating body sprites', /sKey = s % 2 \? 'sepulBodyAlt' : 'sepulBody'/.test(B));
-  ok('tail drawn at the trail end', /sprite\('sepulTail'/.test(B));
+  const WORM = read('act4/scal-worm.js');
+  ok('spawn seeds an initial straight spine of trail',
+     /for \(var d = SEG_COUNT \* SEG_SPACING; d > 0; d -= TRAIL_STEP\)/.test(WORM));
+  ok('trail samples by distance travelled, capped at 400',
+     /dx \* dx \+ dy \* dy >= TRAIL_STEP \* TRAIL_STEP/.test(WORM) &&
+     /var TRAIL_MAX\s*=\s*400;/.test(WORM));
+  ok('beads walk the recorded arc at 34px spacing',
+     /for \(i = trail\.length - 2; i >= 0 && k < SEG_COUNT; i--\)/.test(WORM) &&
+     /var SEG_SPACING\s*=\s*34;/.test(WORM));
+  ok('beads recomputed every tick',
+     /function tick\(dt\)/.test(WORM) && /recordTrail\(\);\s+rebuildBeads\(\);/.test(WORM));
+  ok('draw renders alternating body sprites',
+     /if \(i % 4 === 3\)\s*\{[^}]*key = 'sepulBodyAlt';[\s\S]{0,120}?key = \(i % 2\) \? 'sepulHeart' : 'sepulBody';/.test(WORM));
+  ok('tail drawn at the trail end', /sprite\('sepulTail'/.test(WORM));
 }
 
 /* ═══ 2. hearts on the body, not the head ═════════════════════════*/
@@ -216,8 +223,12 @@ console.log('\n7. bh__keys says what the active game does');
 console.log('\n8. charge + contact damage');
 {
   const B = read('act4/boss-scal.js');
-  ok('sepulcher telegraphs before dashing', /sep\.telegraph = 0\.35/.test(B));
-  ok('the dash is a lunge, not a drift', /Math\.cos\(a2\) \* 340/.test(B));
+  const WORM = read('act4/scal-worm.js');
+  ok('sepulcher telegraphs before dashing',
+     WORM.indexOf("act: 'telegraph'") > -1 &&
+     WORM.indexOf("act: 'telegraph'") < WORM.indexOf("act: 'dash'"));
+  ok('the dash is a lunge, not a drift',
+     /DASH_SPEED\s*=\s*420/.test(WORM) || /dashDirX \* DASH_SPEED/.test(WORM));
   ok('>>> a shared hitPlayer exists <<<', /function hitPlayer\(\)/.test(B));
   ok('bullets route through hitPlayer', /rr \* rr && hitPlayer\(\)\) return;/.test(B));
   ok('>>> SC contact damage only while telegraph/dash <<<',

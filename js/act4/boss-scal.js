@@ -92,14 +92,25 @@
      you for doing what the fight already asked you to do. */
   var rage = 0, tp = 0, shieldT = 0;
   var rageMode = 0, rageModeT = 0;
+  /* Full-bar flourish timers: 0 starts the one-shot animation, >=1
+     means it has finished playing (or was never triggered). */
+  var rageAnimT = 9, tpAnimT = 9, rageFullPrev = 0, tpFullPrev = 0;
   var AX = 0, AY = 0, AW = 0, AH = 0;
   var bullets = [], step_ = 0, stepT = 0, phase = 1;
   var bossHP = 1, bossMax = 1, invuln = false;
   var mode = 'intro';        // intro | fight | wall | brothers | dead | won
   var wallT = 0, wallN = 0, walls = [];
   var hearts = [], sep = null, bros = [];
+  /* scal-worm.js delegation flag: true between open()'s init and
+     close()'s reset, so init runs once per fight, not once per frame. */
+  var scalWormReady = false;
+  /* The player's own homing shots (V5 phase 2). Deliberately NOT
+     `bullets` — NEU.scal.bullets feeds the test dodge AI, and mixing
+     friendly fire into it would teach the bot to dodge its own gun. */
+  var myShots = [], charging = false, chargeF = 0, shotCd = 0;
   var line = '', lineT = 0;
   var bx = 0, by = 0;        // her position
+  var orbA = Math.PI * 1.5;
   var dying = 0;
   var showHitboxes = false;  // F3 toggle
   /* Attack timers outlive the attack that scheduled them — a gigablast
@@ -164,6 +175,22 @@
     }
     px = Math.min(Math.max(px, AX + 12), AX + AW - 12);
     py = Math.min(Math.max(py, AY + 12), AY + AH - 12);
+    meterRects = meterSlots(AX, AY, AW, AH);
+    /* keep the worm's arena in step with resizes */
+    if (NEU.scalWorm && scalWormReady) NEU.scalWorm.setArena(AX, AY, AW, AH);
+  }
+
+  /* The meters live OUTSIDE the fight box: a left gutter column when
+     the viewport leaves room (AX >= 118), otherwise a horizontal row
+     under the HP line. Pure so tests can probe both branches. */
+  var meterRects = [];
+  function meterSlots(ax, ay, aw, ah) {
+    if (ax >= 118) {
+      return [{ x: ax - 100, y: ay + 20, w: 80, h: 36 },
+              { x: ax - 100, y: ay + 66, w: 80, h: 36 }];
+    }
+    return [{ x: ax, y: ay + ah + 30, w: 80, h: 36 },
+            { x: ax + 160, y: ay + ah + 30, w: 80, h: 36 }];
   }
   addEventListener('resize', function () { if (running) layout(); });
 
@@ -319,11 +346,15 @@
     bxv = Math.cos(a) * 420; byv = Math.sin(a) * 420;
     chargeT = 0.55;
     chargeTelegraph = 0.5; // telegraph time before dash
+    teleJuiced = false;
     scalAnimState = 'charge_telegraph';
     scalAnimFrame = 0;
     scalAnimTimer = 0;
   }
   var bxv = 0, byv = 0, chargeT = 0, chargeTelegraph = 0, chargeBurst = 0, chargeBurstMax = 0, chargeGap = 0;
+  /* one-shot latch so the telegraph's juice fires once per wind-up,
+     not every frame of its tail */
+  var teleJuiced = false;
   var scalAnimState = 'idle', scalAnimFrame = 0, scalAnimTimer = 0, scalAnimPrevState = 'idle';
 
   /* ── the interludes ─────────────────────────────────────────────*/
@@ -380,11 +411,12 @@
 
   function spawnSepulcher() {
     mode = 'fight'; invuln = true;
-    sep = { x: AX + AW / 2, y: AY + AH - 40, vx: 0, vy: 0, t: 0, attackCd: 0,
-            trail: [], segs: [], chargeT: 0, telegraph: 0, cd: 0.6, chaseT: 0,
-            rot: -Math.PI / 2 };
-    /* an initial straight body so the worm has segments before it moves */
-    for (var k = 0; k < 300; k++) sep.trail.push({ x: sep.x, y: sep.y - k * 1.5 });
+    /* Position marker only — movement, trail, act machine and darts
+       all live in js/act4/scal-worm.js now. Everything else reads `sep`
+       for truthiness alone (resolveTarget, moveMyShots, fightTick,
+       draw's layer gate). */
+    sep = { x: AX + AW / 2, y: AY + AH - 40 };
+    if (NEU.scalWorm && scalWormReady) NEU.scalWorm.spawn(sep.x, sep.y);
     /* Ten immobile hearts in the two upper corners — SepulcherHead.cs and
        BrimstoneHeart.cs, read directly: NPC.damage = 0 on the head (it
        hurts nothing on touch) and the mod spawns ten hearts fixed at the
@@ -427,15 +459,39 @@
     if (NEU.juice && NEU.juice.frozen()) { draw(now); return; }
     t += dt;
 
-    /* Rage: missing hearts fill the bar. A full bar is spent by z
-       (activateRage) — it no longer spends itself, because a resource
-       that fires without the player's say-so is a timer, not a choice. */
-    if (hp < MAXHP && !dying) rage = Math.min(1, rage + dt / 20);
+    /* Rage: PROXIMITY fills the bar (RipperUI's rage is earned by
+       staying in the fight, so fastest point-blank ~10s, slowest at
+       max range ~50s). A full bar is spent by z (activateRage) — it no
+       longer spends itself, because a resource that fires without the
+       player's say-so is a timer, not a choice. */
+    if (!dying && (mode === 'fight' || mode === 'wall' || mode === 'brothers')) {
+      var rd = Math.hypot(px - bx, py - by);
+      var near = 1 - Math.min(1, rd / 420);
+      rage = Math.min(1, rage + dt * (0.02 + 0.08 * near));
+    }
     if (rageModeT > 0) {
       rageModeT -= dt;
       if (rageModeT <= 0) { rageMode = 0; say('* the rage burns out. it wants to be earned again.'); }
     }
     if (shieldT > 0) shieldT -= dt;
+    /* Charging the shot: f held accumulates power over ~0.9s (capped),
+       released by keyup → tryHit(). shotCd keeps taps from machine-
+       gunning bolts. */
+    if (charging) chargeF = Math.min(1, chargeF + dt);
+    if (shotCd > 0) shotCd -= dt;
+    /* Full-bar flourish plays ONCE per fill (RipperUI.cs plays its
+       animation with a fixed frame delay and stops — it is a flourish,
+       not a screensaver). */
+    if (rage >= 1) {
+      if (rageFullPrev < 1) rageAnimT = 0;
+      if (rageAnimT < 1) rageAnimT += dt;
+    }
+    rageFullPrev = rage;
+    if (tp >= 1) {
+      if (tpFullPrev < 1) tpAnimT = 0;
+      if (tpAnimT < 1) tpAnimT += dt;
+    }
+    tpFullPrev = tp;
 
     if (mode !== 'intro' && mode !== 'won') movePlayer(dt);
     if (inv > 0) inv -= dt;
@@ -446,6 +502,7 @@
     else if (mode === 'fight') fightTick(dt);
 
     moveBullets(dt);
+    moveMyShots(dt);
     draw(now);
   }
 
@@ -456,33 +513,6 @@
     var sp = keys.focus ? FOCUS : SPEED;
     px = Math.min(Math.max(px + vx * sp * dt, AX + 7), AX + AW - 7);
     py = Math.min(Math.max(py + vy * sp * dt, AY + 7), AY + AH - 7);
-  }
-
-  /* Walk the trail placing a segment every 66px — the sepulcher body
-     sprites are 82x72 drawn at 0.8 (~65px), so 26px spacing stacked
-     them into one blob. 66px puts each bead on its own ground. */
-  /* Walks the trail placing a bead every 66px, same as before, but now
-     also keeps walking ONE more step past the 6th body segment and
-     stashes it as the tail's position (sep.tailPos). The tail used to
-     draw at `sep.trail[sep.trail.length - 1]` — the OLDEST sample in a
-     260-sample trail, while the body only consumes 6 x 66px ≈ 396px of
-     it. At chase speed the trail covers ~650px, so the tail rendered
-     ~250px past the last body segment — worse at spawn, where 300
-     points seeded 1.5px apart (line ~382) put it 450px straight above
-     the head. Continuing the SAME walk keeps the tail exactly one
-     segment-spacing beyond wherever the body actually ends. */
-  function wormSegments() {
-    if (!sep) return [];
-    var segs = [];
-    var prev = { x: sep.x, y: sep.y }, budget = 66;
-    for (var i = 0; i < sep.trail.length && segs.length < 7; i++) {
-      var p = sep.trail[i];
-      budget -= Math.hypot(p.x - prev.x, p.y - prev.y);
-      if (budget <= 0) { segs.push(p); prev = p; budget = 66; }
-    }
-    sep.tailPos = segs.length > 6 ? segs.pop()
-      : (segs.length ? segs[segs.length - 1] : { x: sep.x, y: sep.y });
-    return segs;
   }
 
   function fightTick(dt) {
@@ -508,12 +538,15 @@
     if (chargeTelegraph > 0) {
       chargeTelegraph -= dt;
       scalAnimState = 'charge_telegraph';
-      /* Telegraph: glow red, slight shake */
-      if (NEU.juice && chargeTelegraph < 0.1) NEU.juice.hit('small');
+      /* Telegraph: glow red, one small shake as the dash commits */
+      if (NEU.juice && !teleJuiced && chargeTelegraph < 0.1) {
+        teleJuiced = true;
+        NEU.juice.hit('small');
+      }
     } else if (chargeT > 0) {
       chargeT -= dt; bx += bxv * dt; by += byv * dt;
       bx = Math.min(Math.max(bx, AX), AX + AW);
-      by = Math.min(Math.max(by, AY - 30), AY + AH);
+      by = Math.min(Math.max(by, AY + 30), AY + AH - 30);
       scalAnimState = 'charging';
       /* Multi-charge burst: after dash ends, queue next if any left */
       if (chargeT <= 0 && chargeBurst < chargeBurstMax - 1) {
@@ -523,13 +556,18 @@
         bxv = Math.cos(a) * 420; byv = Math.sin(a) * 420;
         chargeT = 0.55;
         chargeTelegraph = 0.3; // shorter telegraph for subsequent dashes
+        teleJuiced = false;
       }
     } else if (chargeGap > 0) {
       chargeGap -= dt;
       scalAnimState = 'charge_recovery';
     } else {
-      bx += ((px) - bx) * Math.min(1, dt * 1.8);
-      by += ((AY - 24) - by) * Math.min(1, dt * 2.2);
+      orbA += dt * 0.8;
+      var orbR = 125 + 15 * Math.sin(t * 0.6);
+      var cxp = Math.min(Math.max(px, AX + orbR + 20), AX + AW - orbR - 20);
+      var cyp = Math.min(Math.max(py, AY + orbR + 20), AY + AH - orbR - 20);
+      bx += ((cxp + Math.cos(orbA) * orbR) - bx) * Math.min(1, dt * 4);
+      by += ((cyp + Math.sin(orbA) * orbR) - by) * Math.min(1, dt * 4);
       /* Idle or casting based on attack */
       if (stepT < 0.3) {
         scalAnimState = 'casting';
@@ -539,76 +577,21 @@
     }
 
     if (sep) {
-      sep.t += dt;
-      if (sep.attackCd > 0) sep.attackCd -= dt;
-
-      /* Trail of past positions — the body follows it. Only record while
-         actually moving, so the worm keeps its stretched-out body through
-         its cooldown instead of collapsing into the head. */
-      if (Math.hypot(sep.vx, sep.vy) > 1 || sep.chargeT > 0) {
-        sep.trail.unshift({ x: sep.x, y: sep.y });
-        if (sep.trail.length > 260) sep.trail.pop();
+      /* Delegated worm: js/act4/scal-worm.js owns movement, the trail,
+         the act machine, its darts and their drawing. This fight only
+         drives it and decides what its callbacks mean. Its body deals
+         NO contact damage (SepulcherHead.cs sets NPC.damage = 0) — the
+         darts are its only threat, and both callbacks route through the
+         SAME paths as hostile bullets: graze feeds tp under moveBullets'
+         rule (cap included), a hit calls hitPlayer so shield / i-frames
+         / death behave identically to a dart-bullet contact. */
+      if (NEU.scalWorm) {
+        NEU.scalWorm.setPlayer(px, py);
+        NEU.scalWorm.tick(dt);
+        NEU.scalWorm.tickDarts(dt, px, py,
+          function () { tp = Math.min(1, tp + dt * 0.4); },
+          function () { if (inv <= 0 && mode !== 'won') hitPlayer(); });
       }
-
-      /* Charge cycle: telegraph, dash, cooldown (real AI: sepMaxSpeed=20,
-         acceleration 0.175 — a lunge, not a drift. The old gentle chase
-         made the worm barely faster than the player.) Target is
-         CALAMITAS (bx,by), not the player — SepulcherHead.cs gives it
-         NPC.damage = 0, and the guide text is explicit that it "attempts
-         to charge at Calamitas", not at whoever is fighting her. */
-      if (sep.telegraph > 0) {
-        sep.telegraph -= dt;
-        if (sep.telegraph <= 0) {
-          var a2 = Math.atan2(by - sep.y, bx - sep.x);
-          sep.vx = Math.cos(a2) * 340; sep.vy = Math.sin(a2) * 340;
-          sep.rot = a2 + Math.PI / 2;
-          sep.chargeT = 0.55;
-          if (NEU.juice) NEU.juice.hit('small');
-        }
-      } else if (sep.chargeT > 0) {
-        sep.chargeT -= dt;
-        sep.x += sep.vx * dt; sep.y += sep.vy * dt;
-        sep.x = Math.min(Math.max(sep.x, AX + 40), AX + AW - 40);
-        sep.y = Math.min(Math.max(sep.y, AY + 40), AY + AH - 40);
-        if (sep.chargeT <= 0) {
-          sep.cd = 0.55; sep.vx = 0; sep.vy = 0;
-          /* The ring releases as the charge lands — "charges at
-             Calamitas, releasing a dense ring of accelerating
-             Brimstone Darts" (guide text) — rather than on player
-             proximity, which stopped meaning anything once the worm
-             stopped closing on the player at all. The ring still
-             accelerates outward (k:4, BrimstoneBarrage's 1.01x/frame)
-             so it remains the worm's real threat wherever the player
-             is standing. */
-          sfxPlay('giga-hit');
-          for (var q = 0; q < 16; q++) {
-            var ang = q * Math.PI * 2 / 16;
-            shot(sep.x, sep.y, Math.cos(ang) * 150, Math.sin(ang) * 150, HB.dart, COL.brim, 4);
-          }
-          if (NEU.juice) NEU.juice.burst(sep.x, sep.y, 12, COL.brimHi, 1.2);
-        }
-      } else if (sep.cd > 0) {
-        sep.cd -= dt;
-      } else {
-        /* Between lunges it keeps coming — the mod's SepulcherHead
-           chases constantly (sepMaxSpeed 20, acceleration 0.175), and
-           a worm that stands still between dashes reads as dead. It
-           drifts toward Calamitas, same as the charge target above. */
-        sep.chaseT = (sep.chaseT || 0) - dt;
-        var ca = Math.atan2(by - sep.y, bx - sep.x);
-        sep.x += Math.cos(ca) * 150 * dt;
-        sep.y += Math.sin(ca) * 150 * dt;
-        sep.rot = ca + Math.PI / 2;
-        sep.x = Math.min(Math.max(sep.x, AX + 40), AX + AW - 40);
-        sep.y = Math.min(Math.max(sep.y, AY + 40), AY + AH - 40);
-        if (sep.chaseT <= 0) { sep.chaseT = 1.3; sep.telegraph = 0.35; }
-      }
-
-      /* Body segments along the trail (drawn by draw()) */
-      sep.segs = wormSegments();
-
-      /* Hearts are fixed at spawn (spawnSepulcher) — no per-frame
-         position update. They no longer ride the body. */
 
       if (!hearts.length) {
         sep = null; invuln = false;
@@ -768,6 +751,7 @@
   function hitPlayer() {
     if (shieldT > 0) {
       shieldT = 0;
+      inv = IFRAMES;
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
       if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(px, py, 12, '#B8E6FF'); }
       return false;
@@ -903,64 +887,167 @@
   }
 
   /* ── hitting her ────────────────────────────────────────────────
-     You do not have a weapon. You have the soul, and touching her
-     while she is vulnerable is the attack — which is why the charge
-     is dangerous and also the opening. */
-  function tryHit() {
-    /* Rage doubles every strike — hearts, brothers, and her alike —
-       for the eight seconds it is up. */
-    var mult = rageMode ? 2 : 1;
-    /* The interludes are not shielded — they are the strike target
-       while she is invincible. The sepulcher's hearts shatter one at
-       a time; a brother takes eight hits. Before the fix, nothing in
-       the fight could damage either, so she stayed invincible forever
-       and the fight could not be won. */
-    if (sep) {
+     You DO have a weapon now (V5 phase 2): hold f to charge, release
+     to fire a homing shot. A tap is a weak bolt; a full ~0.9s charge
+     is an orb that bursts into eight darts on impact. The soul still
+     shatters hearts on touch? No — everything goes through the gun
+     now, which is what makes the brothers beatable and melee-vs-strike-
+     ring geometry problem moot. */
+
+  function startCharge() {
+    if (charging || dying || mode === 'intro' || mode === 'won') return;
+    charging = true; chargeF = 0;
+  }
+
+  /* Target selection mirrors the old tryHit branch order exactly:
+     hearts while the sepulcher stands, then the brothers, then her. */
+  function resolveTarget() {
+    if (sep && hearts.length) {
+      var bh = null, bd = Infinity;
       for (var i = 0; i < hearts.length; i++) {
-        if (Math.hypot(px - hearts[i].x, py - hearts[i].y) < 18) {
-          for (var hh = 0; hh < mult && hearts.length; hh++) {
-            var hx = hearts[i].x, hy = hearts[i].y;
-            hearts.splice(i, 1);
-            if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
-            if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(hx, hy, 8, COL.brimHi); }
+        var d = Math.hypot(px - hearts[i].x, py - hearts[i].y);
+        if (d < bd) { bd = d; bh = hearts[i]; }
+      }
+      if (bh) return { x: bh.x, y: bh.y };
+    }
+    if (mode === 'brothers' && bros.length) {
+      var bb = null, bdd = Infinity;
+      for (var j = 0; j < bros.length; j++) {
+        var dd = Math.hypot(px - bros[j].x, py - bros[j].y);
+        if (dd < bdd) { bdd = dd; bb = bros[j]; }
+      }
+      if (bb) return { x: bb.x, y: bb.y };
+    }
+    if (mode === 'fight' && !invuln) return { x: bx, y: by };
+    return null;
+  }
+
+  /* keyup: release the charge as a homing shot. */
+  function tryHit() {
+    if (!charging) return;
+    charging = false;
+    var power = Math.min(1, chargeF / 0.9);
+    chargeF = 0;
+    if (shotCd > 0 || dying || mode === 'intro' || mode === 'won') return;
+    shotCd = 0.3;
+    var tg = resolveTarget();
+    var ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    var iy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+    var ang = tg ? Math.atan2(tg.y - py, tg.x - px)
+                 : ((ix || iy) ? Math.atan2(iy, ix) : -Math.PI / 2);
+    var heavy = power >= 0.35;
+    var sp = heavy ? 300 : 260;
+    myShots.push({ x: px, y: py, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+                   r: heavy ? 12 : 5, k: heavy ? 'orb' : 'bolt', age: 0 });
+    if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+  }
+
+  /* An orb that lands bursts into eight darts — each one homes too,
+     so the burst total is deterministic against a stationary target. */
+  function burstShots(x, y) {
+    for (var i = 0; i < 8; i++) {
+      var a = i * Math.PI / 4;
+      myShots.push({ x: x, y: y, vx: Math.cos(a) * 220, vy: Math.sin(a) * 220,
+                     r: 4, k: 'burst', age: 0 });
+    }
+  }
+
+  function moveMyShots(dt) {
+    for (var i = myShots.length - 1; i >= 0; i--) {
+      var s = myShots[i];
+      s.age += dt;
+      var dead = s.age > (s.k === 'burst' ? 1.2 : 4);
+      /* dt-correct version of moveBullets' speed-preserving steering
+         kernel: rotate velocity toward the target without changing its
+         magnitude, so homing curves instead of snapping. */
+      if (!dead) {
+        var tg = resolveTarget();
+        if (tg) {
+          var dx = tg.x - s.x, dy = tg.y - s.y;
+          var dist = Math.hypot(dx, dy);
+          if (dist > 0.001) {
+            var sp = Math.hypot(s.vx, s.vy) || 260;
+            var k = Math.min(1, dt * 6);
+            s.vx += (dx / dist * sp - s.vx) * k;
+            s.vy += (dy / dist * sp - s.vy) * k;
           }
-          return;
+        }
+        s.x += s.vx * dt; s.y += s.vy * dt;
+        if (s.x < AX - 40 || s.x > AX + AW + 40 ||
+            s.y < AY - 80 || s.y > AY + AH + 60) dead = true;
+      }
+      /* Collisions mirror the old tryHit gating: whatever the melee
+         could touch, the shot can reach. */
+      if (!dead) {
+        if (sep) {
+          for (var q = 0; q < hearts.length; q++) {
+            if (Math.hypot(hearts[q].x - s.x, hearts[q].y - s.y) < 18 + s.r) {
+              damageTarget('heart', hearts[q], 1);
+              if (s.k === 'orb') burstShots(s.x, s.y);
+              dead = true; break;
+            }
+          }
+        } else if (mode === 'brothers') {
+          for (var w = 0; w < bros.length; w++) {
+            if (Math.hypot(bros[w].x - s.x, bros[w].y - s.y) < HB.broReach + s.r) {
+              damageTarget('bro', bros[w], 1);
+              if (s.k === 'orb') burstShots(s.x, s.y);
+              dead = true; break;
+            }
+          }
+        } else if (mode === 'fight' && !invuln &&
+                   Math.hypot(bx - s.x, by - s.y) < 40 + s.r) {
+          damageTarget('her', null, 1);
+          if (s.k === 'orb') burstShots(s.x, s.y);
+          dead = true;
         }
       }
+      if (dead) myShots.splice(i, 1);
+    }
+  }
+
+  /* One damage funnel for all three target kinds; the phase ladder
+     moved here with it. The old ladder tested 50% twice — wall(2) and
+     the brothers both hung off `pct <= 0.50`, so the second wall fired
+     and the brothers never arrived. Now: wall at 75%, wall at 50%,
+     brothers at 35%. */
+  function damageTarget(kind, ref, amount) {
+    var eff = amount * (rageMode ? 2 : 1);
+    if (kind === 'heart') {
+      var hi = hearts.indexOf(ref);
+      if (hi < 0) return;
+      var hx = ref.x, hy = ref.y;
+      hearts.splice(hi, 1);
+      if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+      if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(hx, hy, 8, COL.brimHi); }
       return;
     }
-    if (mode === 'brothers') {
-      for (var j = 0; j < bros.length; j++) {
-        if (Math.hypot(px - bros[j].x, py - bros[j].y) < HB.broReach) {
-          var b = bros[j];
-          /* 25% DR while both brothers alive */
-          var dmg = (bros.length === 2 ? 0.75 : 1) * mult;
-          b.dmgAccum = (b.dmgAccum || 0) + dmg;
-          if (b.dmgAccum >= 1) {
-            var hits = Math.floor(b.dmgAccum);
-            b.hp -= hits;
-            b.dmgAccum -= hits;
-          }
-          if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
-          if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(b.x, b.y, 8, COL.brimHi); }
-          /* Death handled in brothersTick */
-          return;
-        }
+    if (kind === 'bro') {
+      if (bros.indexOf(ref) < 0) return;
+      /* 25% DR while both brothers alive */
+      var dmg = (bros.length === 2 ? 0.75 : 1) * eff;
+      ref.dmgAccum = (ref.dmgAccum || 0) + dmg;
+      if (ref.dmgAccum >= 1) {
+        var hits = Math.floor(ref.dmgAccum);
+        ref.hp -= hits;
+        ref.dmgAccum -= hits;
       }
+      if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+      if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(ref.x, ref.y, 8, COL.brimHi); }
+      /* Death handled in brothersTick */
       return;
     }
     if (invuln || mode !== 'fight') return;
-    if (Math.hypot(px - bx, py - by) > 40) return;
-    bossHP -= mult;
+    bossHP -= eff;
     if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
     /* Landing one is SMALL — it happens often, and shaking hard on
        every strike would drown out the phase transitions. */
     if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(bx, by, 7, COL.brimHi); }
     var pct = bossHP / bossMax;
     if (pct <= 0)              { win(); }
-    else if (pct <= 0.50 && !flagged(2)) { mark(2); startWall(2); }
-    else if (pct <= 0.50 && !flagged(3)) { mark(3); startBrothers(); }
     else if (pct <= 0.75 && !flagged(1)) { mark(1); startWall(1); }
+    else if (pct <= 0.50 && !flagged(2)) { mark(2); startWall(2); }
+    else if (pct <= 0.35 && !flagged(3)) { mark(3); startBrothers(); }
   }
   var marks = {};
   function flagged(n) { return !!marks[n]; }
@@ -1130,43 +1217,30 @@
         if (b.k === 2) { ctx.fillStyle = COL.brimHi; ctx.fillRect((b.x - 3) | 0, (b.y - 3) | 0, 6, 6); }
       }
     }
-    if (sep) {
-      /* sep.rot tracks real travel (set in fightTick during telegraph-end
-         and the between-lunges chase) rather than a live atan2(vy,vx) —
-         the chase branch moves sep.x/y directly without ever writing
-         sep.vx/vy, and vx/vy are zeroed the moment a charge ends, so the
-         head, every body segment and the tail used to render at one
-         fixed angle outside of an active dash. */
-      var srot = sep.rot || 0;
-      /* body and tail follow the trail the head left behind */
-      for (var s = 0; s < sep.segs.length; s++) {
-        var sp = sep.segs[s];
-        var sKey = s % 2 ? 'sepulBodyAlt' : 'sepulBody';
-        if (!sprite(sKey, sp.x, sp.y, 0.8, srot)) {
-          ctx.fillStyle = '#3A2140';
-          ctx.fillRect((sp.x - 12) | 0, (sp.y - 12) | 0, 24, 24);
+    /* The player's homing shots (V5 phase 2). */
+    for (var ms = 0; ms < myShots.length; ms++) {
+      var s = myShots[ms];
+      var sang = Math.atan2(s.vy, s.vx);
+      if (s.k === 'orb') {
+        var osc = 1 + 0.15 * Math.sin(now / 90);
+        if (!sprite('gigablast', s.x, s.y, osc, sang, true)) {
+          ctx.fillStyle = '#B48CFF';
+          ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+        }
+      } else {
+        var ssc = s.k === 'burst' ? 0.35 : 0.5;
+        if (!sprite('dart', s.x, s.y, ssc, sang)) {
+          ctx.fillStyle = '#E4C46A';
+          ctx.fillRect((s.x - s.r) | 0, (s.y - s.r) | 0, s.r * 2, s.r * 2);
         }
       }
-      if (sep.tailPos) {
-        var tail = sep.tailPos;
-        if (!sprite('sepulTail', tail.x, tail.y, 0.9, srot)) {
-          ctx.fillStyle = '#2A1830';
-          ctx.fillRect((tail.x - 8) | 0, (tail.y - 8) | 0, 16, 16);
-        }
-      }
-      if (!sprite('sepulcher', sep.x, sep.y, 1.1, srot)) {
-        ctx.fillStyle = '#3A2140';
-        ctx.fillRect((sep.x - 18) | 0, (sep.y - 18) | 0, 36, 36);
-      }
-      /* telegraph glow — the wind-up ring before it charges */
-      if (sep.telegraph > 0) {
-        ctx.strokeStyle = 'rgba(255,74,42,0.65)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(sep.x, sep.y, 20 + (0.35 - sep.telegraph) * 26, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.lineWidth = 1;
-      }
+    }
+    if (sep && NEU.scalWorm) {
+      /* The worm draws itself — segments, arms, tail, head, the dash
+         telegraph line and ITS OWN DARTS (scal-worm.js draw() renders
+         every dart it spawns). Same layer slot as the old inline
+         renderer: in front of the bullets, behind the hearts below. */
+      NEU.scalWorm.draw(now);
     }
     /* hearts ride ON the body — drawn after it, so the six of them
        read against the worm instead of disappearing under it. */
@@ -1246,21 +1320,25 @@
     ctx.fillStyle = COL.dim;
     ctx.fillText('shift to focus  ·  f near her to strike', AX + 120, AY + AH + 12);
 
-    /* U1/U2 meters, left of the box like the mod's UI — the fill sheet
-       cropped to the filled ratio under its border, and the full
-       animation sheet playing over the bar when it is complete. Rage on
-       top, TP below it. */
-    drawMeter('rage', rage, AX + 8, AY + 10, 80, 36);
-    drawMeter('tp', tp, AX + 8, AY + 10 + 46, 80, 36);
-
     if (NEU.juice) NEU.juice.drawParts(ctx, 1 / 60);
     if (NEU.juice) NEU.juice.end(ctx, shook);
     if (NEU.juice) NEU.juice.overlay(ctx, w, h);
 
+    /* U1/U2 meters — OUTSIDE the box (gutter or row-below per
+       layout()), drawn after juice.end so screen shake never moves
+       them. Rage on top, TP below it. */
+    var mR = meterRects[0], mT = meterRects[1];
+    if (mR && mT) {
+      drawMeter('rage', rage, mR.x, mR.y, mR.w, mR.h);
+      drawMeter('tp', tp, mT.x, mT.y, mT.w, mT.h);
+    }
+
+    var dialY = AY + AH + 40;
+    if (AX < 118) dialY = AY + AH + 76;   /* clear the row-below meters */
     if (line && now - lineT < 5200) {
       ctx.fillStyle = COL.bone;
       ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
-      ctx.fillText(line, AX, AY + AH + 40);
+      ctx.fillText(line, AX, dialY);
     }
 
     /* F3 hitbox debug */
@@ -1270,6 +1348,9 @@
       ctx.beginPath(); ctx.arc(px, py, PLAYER_R, 0, Math.PI * 2); ctx.stroke();
       /* SC */
       if (mode === 'fight' && !invuln) {
+        ctx.strokeStyle = '#FF4444';
+        ctx.beginPath(); ctx.arc(bx, by, 34, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#00FF00';
         ctx.beginPath(); ctx.arc(bx, by, 40, 0, Math.PI * 2); ctx.stroke();
       }
       /* bullets */
@@ -1283,8 +1364,9 @@
         ctx.beginPath(); ctx.arc(h.x, h.y, 18, 0, Math.PI * 2); ctx.stroke();
       }
       /* sepulcher */
-      if (sep) {
-        ctx.beginPath(); ctx.arc(sep.x, sep.y, 30, 0, Math.PI * 2); ctx.stroke();
+      if (sep && NEU.scalWorm) {
+        var wh = NEU.scalWorm.head();
+        ctx.beginPath(); ctx.arc(wh.x, wh.y, 30, 0, Math.PI * 2); ctx.stroke();
       }
       /* brothers */
       for (var r = 0; r < bros.length; r++) {
@@ -1313,33 +1395,42 @@
     });
   }
 
-  /* The rage / tp meters, in the mod's own style: the fill sheet is
-     the bar and gets cropped IN WIDTH by the filled ratio (that is how
-     UI/Rippers/RipperUI.cs draws it), the border frames it, and the
-     full-animation sheet plays over it while it is full. Labels sit to
-     the right of the border. */
+  /* The rage / tp meters, in the mod's own style: an empty track under
+     everything so the level reads before the art loads, the fill sheet
+     cropped IN WIDTH by the filled ratio (that is how
+     UI/Rippers/RipperUI.cs draws it), a border whose tp strip is
+     itself a fill animation — its cell tracks the VALUE, not the
+     clock — and the full-bar flourish playing exactly once per fill.
+     Labels sit to the right of the border. */
   function drawMeter(key, ratio, x, y, w, h) {
     var fill = key === 'rage' ? 'rageBar' : 'tpBar';
     var border = key === 'rage' ? 'rageBorder' : 'tpBorder';
     var anim = key === 'rage' ? 'rageAnim' : 'tpAnim';
-    var full = ratio >= 1;
-    var fw = w * Math.min(1, Math.max(0, ratio));
+    var animT = key === 'rage' ? rageAnimT : tpAnimT;
+    ratio = Math.min(1, Math.max(0, ratio));
+    /* empty track first */
+    ctx.fillStyle = '#22222E'; ctx.fillRect(x, y, w, h);
     var sh = NEU.sheets && NEU.sheets[fill];
     var im = NEU.sheetReady ? NEU.sheetReady(sh) : null;
     if (im && sh) {
-      var fh = sh.h / (sh.frames || 1);
-      ctx.drawImage(im, 0, 0, fw, fh, x, y, fw, fh);
+      var fw = w * ratio;
+      if (fw > 0) ctx.drawImage(im, 0, 0, fw, sh.fh, x, y, fw, h);
     } else {
-      ctx.fillStyle = '#22222E'; ctx.fillRect(x, y, w, h);
       ctx.fillStyle = key === 'rage' ? '#E4C46A' : '#7BE38A';
-      ctx.fillRect(x, y, fw, h);
+      if (ratio > 0) ctx.fillRect(x, y, w * ratio, h);
     }
-    if (!sprite(border, x + w / 2 + 12, y + h / 2, 1, 0)) {
+    var bsh = NEU.sheets && NEU.sheets[border];
+    var frames = bsh ? (bsh.frames || 1) : 1;
+    var bFrame = key === 'tp' ? Math.round(ratio * (frames - 1)) : 0;
+    if (!sprite(border, x + w / 2, y + h / 2, 1, 0, false, null, bFrame)) {
       ctx.fillStyle = '#4A4560'; ctx.strokeStyle = '#22222E';
       ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
     }
-    if (full) {
-      if (!sprite(anim, x + w / 2 + 12, y + h / 2, 1, 0)) {
+    /* one-shot flourish: only while its timer is still running */
+    if (animT < 1) {
+      var ash = NEU.sheets && NEU.sheets[anim];
+      var af = Math.min(((ash && ash.frames) || 10) - 1, (animT * 10) | 0);
+      if (!sprite(anim, x + w / 2, y + h / 2, 1, 0, false, null, af)) {
         ctx.fillStyle = 'rgba(228,196,106,0.25)';
         ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
       }
@@ -1392,7 +1483,10 @@
       say('* rage. everything strikes twice.');
       return;
     }
-    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); tryHit(); return; }
+    /* f is still the strike key — but striking is now charge-and-
+       release: keydown starts the charge (guarded against OS repeat
+       autofire), keyup releases it as tryHit(). */
+    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); if (!e.repeat) startCharge(); return; }
     if (e.key === 'x' || e.key === 'X') {
       /* U2: the barrier. Full tp spends itself as one held hit. */
       e.preventDefault();
@@ -1406,8 +1500,12 @@
     var n = keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
   });
   addEventListener('keyup', function (e) {
-    if (wrap.hidden) return;
+    /* Same three-condition guard as keydown — the old one checked only
+       wrap.hidden, so a release could fire while another minigame held
+       the input lock. */
+    if (wrap.hidden || !NEU.scal.active || NEU.activeMinigame !== 'scal') return;
     var n = keyName(e); if (n) keys[n] = false;
+    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); tryHit(); return; }
   });
 
   /* ── open / close ───────────────────────────────────────────────*/
@@ -1425,17 +1523,29 @@
     var keysEl = document.querySelector('#bh .bh__keys');
     if (keysEl) {
       if (keysOrig === null) keysOrig = keysEl.innerHTML;
-      keysEl.innerHTML = 'arrows / wasd &nbsp;&middot;&nbsp; shift to focus &nbsp;&middot;&nbsp; f to strike &nbsp;&middot;&nbsp; z for rage &nbsp;&middot;&nbsp; x to shield &nbsp;&middot;&nbsp; esc to leave';
+      keysEl.innerHTML = 'arrows / wasd &nbsp;&middot;&nbsp; shift to focus &nbsp;&middot;&nbsp; f to strike &nbsp;&middot;&nbsp; hold f to charge &nbsp;&middot;&nbsp; z for rage &nbsp;&middot;&nbsp; x to shield &nbsp;&middot;&nbsp; esc to leave';
     }
     layout();
     t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; marks = {};
     rage = 0; tp = 0; shieldT = 0;
     rageMode = 0; rageModeT = 0;
+    rageAnimT = 9; tpAnimT = 9; rageFullPrev = 0; tpFullPrev = 0;
+    myShots = []; charging = false; chargeF = 0; shotCd = 0;
     /* charge state too — dying mid multi-charge used to carry a live
        telegraph/dash into the retry and softlock her at the early-return */
     chargeT = 0; chargeTelegraph = 0; chargeBurst = 0; chargeBurstMax = 0; chargeGap = 0;
+    teleJuiced = false;
+    orbA = Math.PI * 1.5;
     bossMax = 24; bossHP = bossMax; phase = 1; step_ = 0; stepT = 1.2;
     hearts = []; sep = null; bros = []; invuln = true; dying = 0;
+    /* Hand the Sepulcher module its canvas + arena once per fight;
+       close() clears the flag so a reopened fight re-inits fresh. The
+       target closure reads bx/by live — she is what the worm charges. */
+    if (NEU.scalWorm && !scalWormReady) {
+      NEU.scalWorm.init({ ctx: ctx, AX: AX, AY: AY, AW: AW, AH: AH,
+                          target: function () { return { x: bx, y: by }; } });
+      scalWormReady = true;
+    }
     preloadSfx();
     mode = 'intro';
     px = AX + AW / 2; py = AY + AH - 60;
@@ -1446,6 +1556,8 @@
   }
   function close() {
     active = false; running = false; dying = 0;
+    clearSched();
+    scalWormReady = false;
     /* Guarded, like every other minigame's close() — an unconditional
        clear here could null out a DIFFERENT minigame's lock if close()
        ever ran after something else had already claimed the input lock
@@ -1506,11 +1618,20 @@
                get bx() { return bx; },
                get by() { return by; },
                get charging() { return chargeTelegraph > 0 || chargeT > 0; },
-               get wormBusy() { return !!sep && (sep.telegraph > 0 || sep.chargeT > 0); },
-               get wormPos() { return sep ? { x: sep.x, y: sep.y } : null; },
-               get wormVel() { return sep ? { x: sep.vx, y: sep.vy } : null; },
+               get wormBusy() { return NEU.scalWorm ? NEU.scalWorm.busy() : false; },
+               get wormPos() { return sep && NEU.scalWorm ? NEU.scalWorm.head() : null; },
+               get wormVel() {
+                 var wh = sep && NEU.scalWorm ? NEU.scalWorm.head() : null;
+                 return wh ? { vx: wh.vx, vy: wh.vy } : null;
+               },
+                get wormSegs() { return NEU.scalWorm ? NEU.scalWorm.segs() : []; },
+                get wormAct() { return NEU.scalWorm ? NEU.scalWorm.act() : ''; },
+                get wormDarts() { return NEU.scalWorm ? NEU.scalWorm.darts() : []; },
                get heartPos() { return hearts.map(function (h) { return { x: h.x, y: h.y }; }); },
                get broPos() { return bros.map(function (b) { return { x: b.x, y: b.y }; }); },
-               get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy }; }); },
-               cycle: CYCLE };
+                get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy }; }); },
+                get meters() { return meterRects.map(function (m) { return { x: m.x, y: m.y, w: m.w, h: m.h }; }); },
+                get myShots() { return myShots.map(function (s) { return { x: s.x, y: s.y, vx: s.vx, vy: s.vy, k: s.k }; }); },
+                meterSlots: meterSlots,
+                cycle: CYCLE };
 })();
