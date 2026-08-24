@@ -1536,7 +1536,14 @@
     chargeT = 0; chargeTelegraph = 0; chargeBurst = 0; chargeBurstMax = 0; chargeGap = 0;
     teleJuiced = false;
     orbA = Math.PI * 1.5;
-    bossMax = 24; bossHP = bossMax; phase = 1; step_ = 0; stepT = 1.2;
+    /* x10 (2026-08-24). A charged orb deals 9 — one on impact plus eight
+       burst darts that spawn AT the impact point and all land the next
+       frame — so 24 HP was three orbs, about three seconds, and at most
+       3 of her 24 cycle steps ever played. 240 is ~27 orbs: a 70-90s
+       fight and roughly one full lap of the cycle. Every phase gate in
+       damageTarget is a FRACTION of bossMax, so they rescale for free,
+       and core/music.js takes hpMax from the first reading per fight. */
+    bossMax = 240; bossHP = bossMax; phase = 1; step_ = 0; stepT = 1.2;
     hearts = []; sep = null; bros = []; invuln = true; dying = 0;
     /* Hand the Sepulcher module its canvas + arena once per fight;
        close() clears the flag so a reopened fight re-inits fresh. The
