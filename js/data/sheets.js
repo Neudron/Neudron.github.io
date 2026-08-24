@@ -272,16 +272,19 @@
                  w: 104, h: 36,   frames: 1, fw: 104, fh: 36,  fps: 0 },
     rageAnim:  { src: IMG + 'calamity/RageFullAnimation.png',
                  from: 'UI/Rippers/RageFullAnimation.png',
-                 w: 152, h: 380,  frames: 10, fw: 152, fh: 38,  fps: 10 },
+                 w: 152, h: 380,  frames: 10, fw: 152, fh: 38,  fps: 0 },
     tpBar:     { src: IMG + 'calamity/AdrenalineBar.png',
                  from: 'UI/Rippers/AdrenalineBar.png',
                  w: 80,  h: 36,   frames: 1, fw: 80,  fh: 36,  fps: 0 },
+    /* The border strip is 12 cells of 40px (contact sheet, 2026-08-24),
+       and it is a FILL animation — the cell shown tracks the meter
+       value — so it never advances on its own clock. */
     tpBorder:  { src: IMG + 'calamity/AdrenalineBarBorder.png',
                  from: 'UI/Rippers/AdrenalineBarBorder.png',
-                 w: 104, h: 480,  frames: 10, fw: 104, fh: 48,  fps: 10 },
+                 w: 104, h: 480,  frames: 12, fw: 104, fh: 40,  fps: 0 },
     tpAnim:    { src: IMG + 'calamity/AdrenalineFullAnimation.png',
                  from: 'UI/Rippers/AdrenalineFullAnimation.png',
-                 w: 172, h: 700,  frames: 10, fw: 172, fh: 70,  fps: 10 },
+                 w: 172, h: 700,  frames: 10, fw: 172, fh: 70,  fps: 0 },
 
     /* ── Polterghast ─────────────────────────────────────────────
        Three files, identical geometry: body, glowmask, second
