@@ -1276,6 +1276,25 @@ console.log('\n6c. the shield and the meters');
   NEU.engine.leave();
 }
 
+/* ═══ 6d. the soul seeker ring ═══════════════════════════════════*/
+console.log('\n6d. the soul seeker ring');
+{
+  /* Soul Seeker ring — SoulSeekerSupreme.cs. Ten seekers on a rotating
+     ring, one synchronised dart volley every 3s. */
+  const seekSrc = fs.readFileSync(path.join(ROOT,'js','act4','scal-seekers.js'), 'utf8');
+  ok('>>> the seeker module exists and exposes the worm-shaped API <<<',
+     /NEU\.scalSeekers = \{/.test(seekSrc) &&
+     /tickDarts: tickDarts/.test(seekSrc) && /alive: alive/.test(seekSrc));
+  ok('>>> ten seekers, per the wiki <<<', /SEEKERS\s*=\s*10/.test(seekSrc));
+  ok('>>> the ring rotates at the source rate (0.5 deg per frame) <<<',
+     /RING_SPIN\s*=\s*Math\.PI \/ 6/.test(seekSrc));
+  ok('>>> one volley per 3s, per shootRate 180 <<<', /VOLLEY_EVERY\s*=\s*3/.test(seekSrc));
+  ok('the ring draws with its glow mask stacked',
+     /soulSeekerGlow/.test(seekSrc));
+  ok('the module is registered', /scal-seekers\.js/.test(
+     fs.readFileSync(path.join(ROOT,'index.html'), 'utf8')));
+}
+
 /* ═══ 7. the drop and the altar ═══════════════════════════════════*/
 console.log('\n7. ashes → altar → door');
 {
