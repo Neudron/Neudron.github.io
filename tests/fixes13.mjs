@@ -97,8 +97,11 @@ console.log('\n2. Calamitas draws from her sheets');
   keys.forEach(k => {
     ok('the sheet key "' + k + '" is referenced', SCAL.indexOf("'" + k + "'") >= 0);
   });
-  ok('the projectile mapping names all four kinds',
-     /var key = b\.k === 1 \? 'fireblast' : b\.k === 2 \? 'gigablast'\s*: b\.k === 3 \? 'hellblast' : 'dart'/.test(SCAL));
+  /* RE-SOURCED 2026-08-24: five kinds now — the fifth bullet hell adds
+     Brimstone Flame Skulls (k5), which route to the SAME hellblast
+     sheet because BrimstoneHellblast2.png IS a skull; no new art. */
+  ok('the projectile mapping names all five kinds',
+     /var key = b\.k === 1 \? 'fireblast' : b\.k === 2 \? 'gigablast'\s*: \(b\.k === 3 \|\| b\.k === 5\) \? 'hellblast' : 'dart'/.test(SCAL));
   ok('her body picks hooded in intro, body in fight',
      /var bodyKey = mode === 'intro' \? 'scalHood' : 'scal'/.test(SCAL));
   /* RE-SOURCED 2026-08-24: they draw their real NPC bodies now

@@ -462,8 +462,13 @@ console.log('\n6. calamitas');
      !/step_ = 0/.test(src.split('function open()')[1] || '') === false);
   ok('only dart bursts are randomised',
      /THE ONLY RANDOMNESS/.test(src));
-  ok('three bullet-hell interludes', /startWall\(0\)/.test(src) &&
-     /startWall\(1\)/.test(src) && /startWall\(2\)/.test(src));
+  ok('five bullet-hell interludes', /startWall\(0\)/.test(src) &&
+     /startWall\(1\)/.test(src) && /startWall\(2\)/.test(src) &&
+     /startWall\(3\)/.test(src) && /startWall\(4\)/.test(src));
+  ok('>>> each wall has its own beat pattern, not one shared by beat <<<',
+     /WALL_BEATS\[wallN\]/.test(src) && !/\]\[beat\] \|\| \['d'\];[\s\S]{0,80}dirs\[wallN\]/.test(src));
+  ok('>>> flame skulls fly a wave, not a straight line <<<',
+     /b\.k === 5/.test(src) && /Math\.cos\(b\.age/.test(src));
   ok('the brothers show up', /startBrothers/.test(src));
   /* Was a grep for the old inline 300-sample seed in boss-scal.js. The
      module seeds SEG_COUNT x SEG_SPACING (21 x 34 = 714px) of arc in
