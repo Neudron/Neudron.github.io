@@ -47,6 +47,35 @@
       FOCUS = dm.FOCUS || 108, IFRAMES = dm.IFRAMES || 1.1;
   var MAXHP = 5;
 
+  /* Fair hitboxes: every enemy projectile's collision radius, derived
+     from the REAL Terraria hitbox each `.cs` declares (sheets.js's
+     `hitRadius`), converted through the same 150/224 Terraria-to-site
+     ratio the burst-proximity trigger already uses, with a light 0.85
+     inset kept for forgiveness. These used to be hand-picked constants
+     with no tie to the drawn art at all, and drifted in both
+     directions — hellblast drew 27x22 on screen with a hit radius of 5
+     (a ratio of 2.2, meaning a dart could visibly pass through the
+     soul with no hit), gigablast the same at 1.6x. Real numbers now
+     replace every guess. Falls back to the old hand-picked constants
+     only if sheets.js failed to load. */
+  var HB = {
+    dart:      (NEU.hitRadius && NEU.hitRadius('dart', 0.85))      || 4,
+    hellblast: (NEU.hitRadius && NEU.hitRadius('hellblast', 0.85)) || 5,
+    fireblast: (NEU.hitRadius && NEU.hitRadius('fireblast', 0.85)) || 8,
+    gigablast: (NEU.hitRadius && NEU.hitRadius('gigablast', 0.85)) || 12,
+    /* the brothers' STRIKE reach (the player's own hit check against
+       them), from their real 120x120 Terraria hitbox — both
+       SupremeCataclysm.cs and SupremeCatastrophe.cs declare it. This one
+       needs to grow, not shrink: they used to draw as their own 50x22 /
+       67x20 thrown-attack sprites (see the brother body-sprite fix
+       below) with a 28px reach that was already too small for THAT art;
+       now that they draw their real ~80px body, 28px would only let a
+       strike land near their exact centre. No inset — a full-inset
+       generous reach on the PLAYER's own attack is a fairness feature,
+       matching how Calamitas's own 40px strike reach already works. */
+    broReach:  (NEU.hitRadius && NEU.hitRadius('cataclysm', 1))    || 28
+  };
+
   /* Her cycle — matches the official Calamity wiki exactly.
      c = charge, d = dart bursts, h = hellblast barrage,
      g2/g4 = two or four gigablasts. 20 steps, no melee dive
@@ -54,7 +83,7 @@
      0-indexed 3, 7, 12, 15, 17, 19 with bursts 4,2,2,4,2,2. */
   var CYCLE = ['d','h','g2','c','g2','h','d','c','d','h','g4','h','c','d','g4','c','d','c','d','c'];
 
-  var running = false, last = 0, t = 0;
+  var running = false, last = 0, t = 0, lastDt = 1 / 60;
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
   /* U1/U2: your two resources. Rage builds while you are missing
      hearts and is SPENT by z — a full bar buys eight seconds of
@@ -63,7 +92,6 @@
      you for doing what the fight already asked you to do. */
   var rage = 0, tp = 0, shieldT = 0;
   var rageMode = 0, rageModeT = 0;
-  var diveT = 0, diveDir = 1, diveY = 0;
   var AX = 0, AY = 0, AW = 0, AH = 0;
   var bullets = [], step_ = 0, stepT = 0, phase = 1;
   var bossHP = 1, bossMax = 1, invuln = false;
@@ -168,33 +196,46 @@
        A burst may be randomly replaced by a fireblast or gigablast —
        that randomness is the ONLY randomness in the cycle. The mod fires
        3-4 bursts per attack slot, ~20 frames apart. */
-    scalAnimState = 'casting';
+    /* SupremeCalamitas.cs ai[1]==0: FrameType = FasterUpwardDraft — the
+       SAME band the dash uses (confirmed in-file), not Casting. She
+       hovers 550 Terraria px above the player during this attack. */
+    scalAnimState = 'charging';
     var bursts = 3 + (Math.random() * 2 | 0);
     var span = AW * 0.7;
     for (var b = 0; b < bursts; b++) {
       later(function (k) {
         return function () {
           if (!running) return;
-          /* 8 darts in a ±20° spread aimed at the player from SCal's
-             position. Source: rotation = ToRadians(20), numProj = 8.
-             The gap walks deterministically between bursts so a player
-             who found the safe spot in burst 1 has to move for burst 2. */
-          var n = 8, rot = 0.35; /* ~20° in radians */
+          /* 8 darts, ±20° (ToRadians(20) — confirmed exact in
+             SupremeCalamitas.cs, numProj 8). The gap walks
+             deterministically between bursts so a player who found the
+             safe spot in burst 1 has to move for burst 2. */
+          var n = 8, rot = 0.35;
           var hole = Math.floor(span / n * 1.5 * k) % n;
           var baseA = Math.atan2(py - by, px - bx);
           /* Per-burst sweep: offset the aim by up to ±0.18 rad so the
-             wall does not always land on the player's current spot.
-             A stationary player gets hit; a moving one reads the
-             sweep and stays ahead of it. Without this the spread is
-             always centred on you and a still player fits between two
-             darts and never moves. */
+             wall does not always land on the player's current spot. */
           var sweep = (k % 3 - 1) * 0.18;
+          /* The source's fixed ±20° fan only stays dodgeable because SCal
+             hovers a constant 550 Terraria px away — that keeps the gap
+             between darts small no matter where the player stands. This
+             arena is smaller and she tracks the player's X, so the same
+             fixed ANGLE opens a gap that grows with distance: past ~260px
+             the darts are >26px apart, wider than a bullet-plus-soul
+             (10px), and a player who finds that gap can stand in it
+             through the whole burst. Cap the SPREAD IN PIXELS instead of
+             radians — same 8-dart fan, same hole, same sweep, but the
+             angle shrinks at range so neighbouring darts never open more
+             than a dodgeable gap. */
+          var dist = Math.max(60, Math.hypot(px - bx, py - by));
+          var maxGapPx = (4 + PLAYER_R) * 2 * 0.85;
+          var rotCapped = Math.min(rot, maxGapPx * (n - 1) / (2 * dist));
           for (var j = 0; j < n; j++) {
             if (j === hole) continue;
             var t = n === 1 ? 0 : j / (n - 1);
-            var a = baseA + sweep + (t * 2 - 1) * rot;
+            var a = baseA + sweep + (t * 2 - 1) * rotCapped;
             var sp = 150 + phase * 30;
-            shot(bx, by + 20, Math.cos(a) * sp, Math.sin(a) * sp, 4, COL.brim, 0);
+            shot(bx, by + 20, Math.cos(a) * sp, Math.sin(a) * sp, HB.dart, COL.brim, 0);
           }
         };
       }(b), b * 340);
@@ -203,10 +244,17 @@
 
   function fireblast() {
     /* Homes to player continuously, bursts into 12 darts within 150px (real: 224 Terraria px).
-       Source: inertia 100, homeSpeed 9 (13 revenge), rotation = vel + PI/2. */
+       Source: inertia 100, homeSpeed 9 (13 revenge), rotation = vel + PI/2.
+       Spawns with vx/vy both 0 (inertia 100 means velocity barely moves
+       for its first ~100 frames), so seed `rot` toward the player at
+       spawn — moveBullets only updates it once real velocity exists,
+       which used to leave atan2(0,0) picking a fixed, wrong angle for
+       the whole homing wind-up and again for the entire burst pause. */
     sfxPlay('fireblast');
     scalAnimState = 'casting';
-    var b = { x: bx, y: by + 20, vx: 0, vy: 0, r: 8, c: COL.brimHi, k: 1, age: 0, burst: false };
+    var sy = by + 20;
+    var b = { x: bx, y: sy, vx: 0, vy: 0, r: HB.fireblast, c: COL.brimHi, k: 1, age: 0, burst: false,
+              rot: Math.atan2(py - sy, px - bx) + Math.PI / 2 };
     bullets.push(b);
   }
 
@@ -216,8 +264,10 @@
     for (var i = 0; i < n; i++) {
       later(function () {
         if (!running) return;
-        bullets.push({ x: bx, y: by + 20, vx: 0, vy: 0, r: 12, c: COL.dark,
-                       k: 2, age: 0, burst: false });
+        var sy = by + 20;
+        bullets.push({ x: bx, y: sy, vx: 0, vy: 0, r: HB.gigablast, c: COL.dark,
+                       k: 2, age: 0, burst: false,
+                       rot: Math.atan2(py - sy, px - bx) + Math.PI / 2 });
       }, i * 520);
     }
   }
@@ -225,25 +275,42 @@
   function hellbarrage() {
     /* From beside the player, horizontally. Source: SupremeCalamitas.cs
        ai[1]==3: SCal moves to 600px left or right of the player at the
-       same Y, then fires a BrimstoneHellblast at the player every 20
-       frames (NPC.ai[3] >= 20). The attack lasts 480 frames (P1) or 300
-       (P2). Hellblasts accelerate gently (velocity *= 1.002/frame in
-       expert+). Here: fire 7 hellblasts over the duration, each aimed
-       at the player's current position. */
+       same Y (confirmed, line ~2399-2411), then fires a
+       BrimstoneHellblast at the player every 20 frames (NPC.ai[3] >= 20,
+       confirmed line ~2453). FrameType = OutwardHandCast (confirmed).
+       Real cadence is one shot per 20 frames (0.333s) for up to 480
+       frames (8s) — this fight compresses every cycle step into a
+       fraction of that, so the interval is kept source-accurate and the
+       COUNT is what's scaled down, to fit the step's own stepT budget
+       (see fightTick's 'h' branch) instead of an invented flat 7.
+
+       THE BUG THIS REPLACES: the loop below used to read
+         later(function () { return function () { ... }; }, i * 90)
+       — an extra `return function () {...}` with no invoking `(i)`,
+       identical in shape to dartBurst's factory EXCEPT dartBurst ends
+       `}(b)`. setTimeout called the outer wrapper, which returned the
+       real handler and threw the return value away: the wrapper's body
+       — the only place a hellblast was ever pushed — never ran. Proven
+       by direct reproduction: 7 scheduled calls, 0 bullets fired. 'h' is
+       4 of her 20 cycle steps, so this was 20% of the fight silently
+       idle the entire time, under a test (fixes13.mjs) that only
+       checked the string `sfxPlay('hellblast')` appears in the file. */
     sfxPlay('hellblast');
     scalAnimState = 'hellblast';
     var left = px < AX + AW / 2;
     var x = left ? AX - 20 : AX + AW + 20;
-    for (var i = 0; i < 7; i++) {
-      later(function () {
+    var interval = 0.333;                    /* 20 frames at 60fps, confirmed exact */
+    var count = Math.max(3, Math.round((1.5 * (phase === 2 ? 0.62 : 1)) / interval));
+    for (var i = 0; i < count; i++) {
+      later(function (k) {
         return function () {
           if (!running) return;
-          /* Aim at the player's CURRENT position — the hellblast
-             travels horizontally but the spawn Y tracks the player. */
-          var a = Math.atan2(py - (left ? AY + AH/2 : AY + AH/2), (left ? 1 : -1) * 600);
-          shot(x, py + (Math.random() - 0.5) * 40, (left ? 1 : -1) * 90, 0, 5, COL.brim, 3);
+          /* Purely horizontal, per source ("shoots the Hellblasts
+             horizontally"); the spawn Y tracks the player's position
+             at the moment each shot fires. */
+          shot(x, py + (Math.random() - 0.5) * 40, (left ? 1 : -1) * 90, 0, HB.hellblast, COL.brim, 3);
         };
-      }, i * 90);
+      }(i), i * interval * 1000);
     }
   }
 
@@ -258,14 +325,6 @@
   }
   var bxv = 0, byv = 0, chargeT = 0, chargeTelegraph = 0, chargeBurst = 0, chargeBurstMax = 0, chargeGap = 0;
   var scalAnimState = 'idle', scalAnimFrame = 0, scalAnimTimer = 0, scalAnimPrevState = 'idle';
-
-  function dive() {
-    /* the sweep: she drops to your row and crosses the arena. Ends
-       with a wake of darts so a dodged dive is still a paid pattern. */
-    diveT = 1.15; diveDir = px < bx ? 1 : -1; diveY = py;
-    scalAnimState = 'casting';
-    sfxPlay('maelstrom');
-  }
 
   /* ── the interludes ─────────────────────────────────────────────*/
   function startWall(n) {
@@ -322,12 +381,26 @@
   function spawnSepulcher() {
     mode = 'fight'; invuln = true;
     sep = { x: AX + AW / 2, y: AY + AH - 40, vx: 0, vy: 0, t: 0, attackCd: 0,
-            trail: [], segs: [], chargeT: 0, telegraph: 0, cd: 0.6, chaseT: 0 };
+            trail: [], segs: [], chargeT: 0, telegraph: 0, cd: 0.6, chaseT: 0,
+            rot: -Math.PI / 2 };
     /* an initial straight body so the worm has segments before it moves */
     for (var k = 0; k < 300; k++) sep.trail.push({ x: sep.x, y: sep.y - k * 1.5 });
+    /* Ten immobile hearts in the two upper corners — SepulcherHead.cs and
+       BrimstoneHeart.cs, read directly: NPC.damage = 0 on the head (it
+       hurts nothing on touch) and the mod spawns ten hearts fixed at the
+       arena's upper corners, not attached to the worm's body at all.
+       They used to ride the body in a chain, which meant reaching one
+       put the soul inside the head's own (invented, non-source) contact
+       zone — you had to trade a hit to break a heart. Fixed corner
+       positions make every heart reachable for free, same as the source. */
     hearts = [];
-    for (var i = 0; i < 6; i++) {
-      hearts.push({ hp: 1, offset: i });
+    for (var i = 0; i < 10; i++) {
+      var left = i < 5, idx = i % 5;
+      hearts.push({
+        hp: 1,
+        x: (left ? AX + 44 : AX + AW - 44) + (idx % 2 ? (left ? 18 : -18) : 0),
+        y: AY + 46 + idx * 28
+      });
     }
     say("* she is behind it. kill the hearts.");
   }
@@ -348,6 +421,7 @@
     if (!running) { if (dying) deathStep(now); return; }
     requestAnimationFrame(stepFn);
     var dt = Math.min(0.033, (now - last) / 1000); last = now;
+    lastDt = dt;
     /* Hit-stop: hold the frame, keep rendering. Skipping the render
        too would read as a dropped frame rather than a held one. */
     if (NEU.juice && NEU.juice.frozen()) { draw(now); return; }
@@ -387,15 +461,27 @@
   /* Walk the trail placing a segment every 66px — the sepulcher body
      sprites are 82x72 drawn at 0.8 (~65px), so 26px spacing stacked
      them into one blob. 66px puts each bead on its own ground. */
+  /* Walks the trail placing a bead every 66px, same as before, but now
+     also keeps walking ONE more step past the 6th body segment and
+     stashes it as the tail's position (sep.tailPos). The tail used to
+     draw at `sep.trail[sep.trail.length - 1]` — the OLDEST sample in a
+     260-sample trail, while the body only consumes 6 x 66px ≈ 396px of
+     it. At chase speed the trail covers ~650px, so the tail rendered
+     ~250px past the last body segment — worse at spawn, where 300
+     points seeded 1.5px apart (line ~382) put it 450px straight above
+     the head. Continuing the SAME walk keeps the tail exactly one
+     segment-spacing beyond wherever the body actually ends. */
   function wormSegments() {
     if (!sep) return [];
     var segs = [];
     var prev = { x: sep.x, y: sep.y }, budget = 66;
-    for (var i = 0; i < sep.trail.length && segs.length < 6; i++) {
+    for (var i = 0; i < sep.trail.length && segs.length < 7; i++) {
       var p = sep.trail[i];
       budget -= Math.hypot(p.x - prev.x, p.y - prev.y);
       if (budget <= 0) { segs.push(p); prev = p; budget = 66; }
     }
+    sep.tailPos = segs.length > 6 ? segs.pop()
+      : (segs.length ? segs[segs.length - 1] : { x: sep.x, y: sep.y });
     return segs;
   }
 
@@ -406,12 +492,16 @@
        its body segments never do (the mod zeroes body damage), so
        standing in the body to break a heart costs nothing. */
     if (inv <= 0) {
+      /* Sepulcher deals no contact damage — SepulcherHead.cs:45 sets
+         NPC.damage = 0 outright, confirmed directly in the source. It
+         used to hurt on touch while charging, which meant reaching a
+         heart (all of which used to ride its body) required trading a
+         hit to get there. The rewrite below moves the hearts off the
+         worm entirely, but this stays removed either way: it was never
+         source-accurate. */
       var touching = false;
       if ((chargeTelegraph > 0 || chargeT > 0) &&
           Math.hypot(px - bx, py - by) < 34) touching = true;
-      if (diveT > 0 && diveT < 0.85 && Math.hypot(px - bx, py - by) < 32) touching = true;
-      if (sep && sep.chargeT > 0 &&
-          Math.hypot(px - sep.x, py - sep.y) < 30) touching = true;
       if (touching && hitPlayer()) return;
     }
     /* she hovers above you unless charging */
@@ -437,26 +527,6 @@
     } else if (chargeGap > 0) {
       chargeGap -= dt;
       scalAnimState = 'charge_recovery';
-    } else if (diveT > 0) {
-      /* The melee sweep: she drops to your row and crosses the arena.
-         Contact while sweeping; a wake of darts when she lands, so a
-         fully-dodged dive still asks something of you. */
-      diveT -= dt;
-      if (diveT <= 0) {
-        var wa = Math.atan2(py - by, px - bx);
-        for (var wk = -1; wk <= 1; wk++)
-          shot(bx, by, Math.cos(wa + wk * 0.22) * 300,
-                         Math.sin(wa + wk * 0.22) * 300, 5, COL.brim, 3);
-        scalAnimState = 'idle';
-      } else if (diveT < 0.85) {
-        by += (diveY - by) * Math.min(1, dt * 6);
-        bx += diveDir * 500 * dt;
-        scalAnimState = 'charging';
-      } else {
-        scalAnimState = 'casting';
-      }
-      bx = Math.min(Math.max(bx, AX + 30), AX + AW - 30);
-      by = Math.min(Math.max(by, AY + 10), AY + AH - 10);
     } else {
       bx += ((px) - bx) * Math.min(1, dt * 1.8);
       by += ((AY - 24) - by) * Math.min(1, dt * 2.2);
@@ -482,12 +552,16 @@
 
       /* Charge cycle: telegraph, dash, cooldown (real AI: sepMaxSpeed=20,
          acceleration 0.175 — a lunge, not a drift. The old gentle chase
-         made the worm barely faster than the player.) */
+         made the worm barely faster than the player.) Target is
+         CALAMITAS (bx,by), not the player — SepulcherHead.cs gives it
+         NPC.damage = 0, and the guide text is explicit that it "attempts
+         to charge at Calamitas", not at whoever is fighting her. */
       if (sep.telegraph > 0) {
         sep.telegraph -= dt;
         if (sep.telegraph <= 0) {
-          var a2 = Math.atan2(py - sep.y, px - sep.x);
+          var a2 = Math.atan2(by - sep.y, bx - sep.x);
           sep.vx = Math.cos(a2) * 340; sep.vy = Math.sin(a2) * 340;
+          sep.rot = a2 + Math.PI / 2;
           sep.chargeT = 0.55;
           if (NEU.juice) NEU.juice.hit('small');
         }
@@ -496,17 +570,35 @@
         sep.x += sep.vx * dt; sep.y += sep.vy * dt;
         sep.x = Math.min(Math.max(sep.x, AX + 40), AX + AW - 40);
         sep.y = Math.min(Math.max(sep.y, AY + 40), AY + AH - 40);
-        if (sep.chargeT <= 0) { sep.cd = 0.55; sep.vx = 0; sep.vy = 0; }
+        if (sep.chargeT <= 0) {
+          sep.cd = 0.55; sep.vx = 0; sep.vy = 0;
+          /* The ring releases as the charge lands — "charges at
+             Calamitas, releasing a dense ring of accelerating
+             Brimstone Darts" (guide text) — rather than on player
+             proximity, which stopped meaning anything once the worm
+             stopped closing on the player at all. The ring still
+             accelerates outward (k:4, BrimstoneBarrage's 1.01x/frame)
+             so it remains the worm's real threat wherever the player
+             is standing. */
+          sfxPlay('giga-hit');
+          for (var q = 0; q < 16; q++) {
+            var ang = q * Math.PI * 2 / 16;
+            shot(sep.x, sep.y, Math.cos(ang) * 150, Math.sin(ang) * 150, HB.dart, COL.brim, 4);
+          }
+          if (NEU.juice) NEU.juice.burst(sep.x, sep.y, 12, COL.brimHi, 1.2);
+        }
       } else if (sep.cd > 0) {
         sep.cd -= dt;
       } else {
         /* Between lunges it keeps coming — the mod's SepulcherHead
            chases constantly (sepMaxSpeed 20, acceleration 0.175), and
-           a worm that stands still between dashes reads as dead. */
+           a worm that stands still between dashes reads as dead. It
+           drifts toward Calamitas, same as the charge target above. */
         sep.chaseT = (sep.chaseT || 0) - dt;
-        var ca = Math.atan2(py - sep.y, px - sep.x);
+        var ca = Math.atan2(by - sep.y, bx - sep.x);
         sep.x += Math.cos(ca) * 150 * dt;
         sep.y += Math.sin(ca) * 150 * dt;
+        sep.rot = ca + Math.PI / 2;
         sep.x = Math.min(Math.max(sep.x, AX + 40), AX + AW - 40);
         sep.y = Math.min(Math.max(sep.y, AY + 40), AY + AH - 40);
         if (sep.chaseT <= 0) { sep.chaseT = 1.3; sep.telegraph = 0.35; }
@@ -515,35 +607,8 @@
       /* Body segments along the trail (drawn by draw()) */
       sep.segs = wormSegments();
 
-      /* Proximity ring burst (real: within 110 Terraria px ≈ 150 game px, 30 darts, cd 150 frames = 2.5s).
-         Burst speed ~150 px/s. */
-      var dist = Math.hypot(px - sep.x, py - sep.y) || 1;
-      if (sep.attackCd <= 0 && dist < 150) {
-        sep.attackCd = 2.5;
-        sfxPlay('giga-hit');
-        /* 16 darts, not 30 — the mod fires 30 at long range in a large
-           arena; here the arena is 700x460 and 150px proximity, so 30
-           is a solid wall with no gaps a 6px soul can pass through. */
-        for (var q = 0; q < 16; q++) {
-          var ang = q * Math.PI * 2 / 16;
-          shot(sep.x, sep.y, Math.cos(ang) * 150, Math.sin(ang) * 150, 3, COL.brim, 4);
-        }
-        if (NEU.juice) NEU.juice.burst(sep.x, sep.y, 12, COL.brimHi, 1.2);
-      }
-
-      /* Hearts ride the body like the mod's energy balls: chained 34px
-         behind a segment, staggered across its flanks, so every heart
-         is reachable without touching the head's charge zone. */
-      for (var i = 0; i < hearts.length; i++) {
-        var h = hearts[i];
-        var si = Math.min(4, 2 + ((h.offset / 2) | 0));
-        var seg = sep.segs[si] || sep.segs[sep.segs.length - 1] || sep;
-        var nx = sep.segs[si - 1] || sep;
-        var dir = Math.atan2(seg.y - nx.y, seg.x - nx.x);
-        var per = dir + Math.PI / 2;
-        h.x = seg.x + Math.cos(dir) * 34 + Math.cos(per) * (i % 2 ? 18 : -18);
-        h.y = seg.y + Math.sin(dir) * 34 + Math.sin(per) * (i % 2 ? 18 : -18);
-      }
+      /* Hearts are fixed at spawn (spawnSepulcher) — no per-frame
+         position update. They no longer ride the body. */
 
       if (!hearts.length) {
         sep = null; invuln = false;
@@ -583,15 +648,24 @@
     else if (k === 'g4')  { gigablast(phase === 2 ? 3 : 4); stepT = 2.2 * fast; }
     else if (k === 'c') {
       /* Multi-charge burst: real SC does 2 or 4 consecutive dashes.
-         Cycle positions (0-indexed): 3,7,15,17,19.
-         Phase 1: 4,2,2,4,2. Phase 2: half (2,1,1,2,1). */
+         Cycle positions (0-indexed): 3,7,12,15,17,19.
+         Phase 1: 4,2,2,4,2,2. Phase 2: half (2,1,1,2,1,1).
+
+         step_ is never reset, so on lap two of the 20-step cycle it is
+         21+ while these positions are still 3/7/12/15/17/19 — comparing
+         the ABSOLUTE step_ meant nothing matched past step 20, chargeIdx
+         kept its initialiser of 0, and every charge for the rest of the
+         fight silently fired p1Bursts[0] = 4 dashes regardless of which
+         of the six charge slots it actually was. Compare the position
+         WITHIN the cycle instead, so it repeats correctly every lap. */
+      var posInCycle = (step_ - 1) % CYCLE.length;
       var chargeIdx = 0;
-      if (step_ - 1 === 3) chargeIdx = 0;       // 1st charge: 4 (p1) / 2 (p2)
-      else if (step_ - 1 === 7) chargeIdx = 1;  // 2nd: 2 / 1
-      else if (step_ - 1 === 12) chargeIdx = 2; // 3rd: 2 / 1
-      else if (step_ - 1 === 15) chargeIdx = 3; // 4th: 4 / 2
-      else if (step_ - 1 === 17) chargeIdx = 4; // 5th: 2 / 1
-      else if (step_ - 1 === 19) chargeIdx = 5; // 6th: 2 / 1
+      if (posInCycle === 3) chargeIdx = 0;       // 1st charge: 4 (p1) / 2 (p2)
+      else if (posInCycle === 7) chargeIdx = 1;  // 2nd: 2 / 1
+      else if (posInCycle === 12) chargeIdx = 2; // 3rd: 2 / 1
+      else if (posInCycle === 15) chargeIdx = 3; // 4th: 4 / 2
+      else if (posInCycle === 17) chargeIdx = 4; // 5th: 2 / 1
+      else if (posInCycle === 19) chargeIdx = 5; // 6th: 2 / 1
       var p1Bursts = [4,2,2,4,2,2];
       var p2Bursts = [2,1,1,2,1,1];
       chargeBurstMax = phase === 2 ? p2Bursts[chargeIdx] : p1Bursts[chargeIdx];
@@ -600,7 +674,9 @@
       charge();
       stepT = 0.55 + 0.5; // telegraph + first dash
     }
-    else if (k === 'm') { dive(); stepT = 1.15 + 0.5; }
+    /* CYCLE has no 'm' — the charge dash is her only melee, matching the
+       source, which has no dive attack at all. A dead 'm' branch used to
+       sit here for a swept-dive that no cycle entry could ever reach. */
   }
 
   function brothersTick(dt) {
@@ -741,7 +817,7 @@
                 sfxPlay('fireblast-hit');
                 for (var qq = 0; qq < nn; qq++) {
                   var aq = qq * Math.PI * 2 / nn;
-                  shot(b.x, b.y, Math.cos(aq) * 130, Math.sin(aq) * 130, 3, COL.brim, 4);
+                  shot(b.x, b.y, Math.cos(aq) * 130, Math.sin(aq) * 130, HB.dart, COL.brim, 4);
                 }
                 if (NEU.juice) NEU.juice.burst(b.x, b.y, 10, COL.brim, 1.2);
                 continue;
@@ -770,7 +846,7 @@
                 sfxPlay('giga-hit');
                 for (var qq = 0; qq < gn; qq++) {
                   var aq = qq * Math.PI * 2 / gn;
-                  shot(b.x, b.y, Math.cos(aq) * 140, Math.sin(aq) * 140, 3, COL.brim, 4);
+                  shot(b.x, b.y, Math.cos(aq) * 140, Math.sin(aq) * 140, HB.dart, COL.brim, 4);
                 }
                 if (NEU.juice) NEU.juice.burst(b.x, b.y, 14, COL.brimHi, 1.4);
                 continue;
@@ -797,6 +873,18 @@
          BrimstoneBarrage: velocity *= 1.01/frame → 1.01^60 ≈ 1.82x/s. */
       if (b.k === 3) { b.vx *= 1 + dt * 0.12; }   // hellblasts — gentle accel
       if (b.k === 4) { var am = 1 + dt * 0.6; b.vx *= am; b.vy *= am; } // ring darts — BrimstoneBarrage 1.01x/frame
+      /* Facing tracks REAL travel, not a per-frame recompute of
+         atan2(vy,vx) — fireblast/gigablast spawn at vx:vy:0 and are
+         re-zeroed for their burst pause (above), so atan2(0,0) locked
+         the sprite to a single fixed angle at launch and again through
+         every pause. Below the epsilon the bullet just keeps facing
+         whichever way it was already drawn. */
+      var spd2 = b.vx * b.vx + b.vy * b.vy;
+      if (spd2 > 4) {
+        b.rot = (b.k === 1 || b.k === 2 || b.k === 4)
+          ? Math.atan2(b.vy, b.vx) + Math.PI / 2
+          : Math.atan2(b.vy, b.vx);
+      }
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.x < AX - 60 || b.x > AX + AW + 60 || b.y < AY - 60 || b.y > AY + AH + 60) continue;
       keep.push(b);
@@ -843,7 +931,7 @@
     }
     if (mode === 'brothers') {
       for (var j = 0; j < bros.length; j++) {
-        if (Math.hypot(px - bros[j].x, py - bros[j].y) < 28) {
+        if (Math.hypot(px - bros[j].x, py - bros[j].y) < HB.broReach) {
           var b = bros[j];
           /* 25% DR while both brothers alive */
           var dmg = (bros.length === 2 ? 0.75 : 1) * mult;
@@ -952,7 +1040,10 @@
         scalAnimTimer = 0;
         scalAnimPrevState = scalAnimState;
       }
-      scalAnimTimer += 1/60;
+      /* Was a fixed 1/60 regardless of real frame time, so animation
+         speed silently drifted with the display's actual refresh rate
+         instead of following the simulation's own dt. */
+      scalAnimTimer += lastDt;
       var st = scalAnimState;
       if (st === 'gigablast' && phase === 2) st = 'gigablast_p2';
       if (st === 'hellblast' && phase === 2) st = 'hellblast_p2';
@@ -966,7 +1057,16 @@
     var BANDS = {
       idle:            { t: 0, fps: 4 },
       idle_fast:       { t: 1, fps: 6 },
-      charge_telegraph:{ t: 0, fps: 6 },
+      /* SupremeCalamitas.cs: the whole charging state — telegraph
+         through dash — is one continuous FrameType.FasterUpwardDraft
+         (confirmed in-file), band 1, the same band the dash itself
+         uses. The telegraph used to sit on band 0 (idle), so the
+         wind-up before every dash showed her standing still — the
+         tracker's "melee attack sprites aren't used" for the half of
+         the charge a player actually has time to read. Same band as
+         `charging`, slower fps so the wind-up still reads as distinct
+         from the dash it leads into. */
+      charge_telegraph:{ t: 1, fps: 8 },
       charging:        { t: 1, fps: 16 },
       charge_recovery: { t: 1, fps: 8, rev: true },
       casting:         { t: 2, fps: 10 },
@@ -1019,11 +1119,11 @@
               : b.k === 3 ? 'hellblast' : 'dart';
       var sc = b.k === 1 ? 0.65 : b.k === 2 ? 0.75
             : b.k === 3 ? 0.5 : 0.55;
-      /* Source: fireblast/gigablast/dart are vertical sprites → rotation = atan2(vy,vx) + PI/2.
-         hellblast is horizontal → rotation = atan2(vy,vx). */
-      var brot = (b.k === 1 || b.k === 2 || b.k === 4)
-        ? Math.atan2(b.vy, b.vx) + Math.PI / 2
-        : Math.atan2(b.vy, b.vx);
+      /* b.rot tracks real travel (set in moveBullets, seeded at spawn
+         for k1/k2) — NOT a live atan2(vy,vx) here, which used to lock
+         to a single angle for every homing blast's entire wind-up and
+         burst pause, since both spawn and pause at vx:vy:0. */
+      var brot = b.rot || 0;
       if (!sprite(key, b.x, b.y, sc, brot)) {
         ctx.fillStyle = b.c;
         ctx.fillRect((b.x - b.r) | 0, (b.y - b.r) | 0, sz, sz);
@@ -1031,7 +1131,13 @@
       }
     }
     if (sep) {
-      var srot = Math.atan2(sep.vy, sep.vx) + Math.PI / 2;
+      /* sep.rot tracks real travel (set in fightTick during telegraph-end
+         and the between-lunges chase) rather than a live atan2(vy,vx) —
+         the chase branch moves sep.x/y directly without ever writing
+         sep.vx/vy, and vx/vy are zeroed the moment a charge ends, so the
+         head, every body segment and the tail used to render at one
+         fixed angle outside of an active dash. */
+      var srot = sep.rot || 0;
       /* body and tail follow the trail the head left behind */
       for (var s = 0; s < sep.segs.length; s++) {
         var sp = sep.segs[s];
@@ -1041,8 +1147,8 @@
           ctx.fillRect((sp.x - 12) | 0, (sp.y - 12) | 0, 24, 24);
         }
       }
-      if (sep.trail.length) {
-        var tail = sep.trail[sep.trail.length - 1];
+      if (sep.tailPos) {
+        var tail = sep.tailPos;
         if (!sprite('sepulTail', tail.x, tail.y, 0.9, srot)) {
           ctx.fillStyle = '#2A1830';
           ctx.fillRect((tail.x - 8) | 0, (tail.y - 8) | 0, 16, 16);
@@ -1071,11 +1177,23 @@
         ctx.fillRect((hx - 7) | 0, (hy - 7) | 0, 14, 14);
       }
     }
+    /* Their BODIES, not their thrown attacks. This used to draw
+       'fist'/'slashTop' — SupremeCataclysmFist.png and
+       SupremeCatastropheSlashAlt.png, the projectiles each brother
+       THROWS — because SupremeCataclysm.png / SupremeCatastrophe.png
+       (their real NPC art, both confirmed 636x1872/9 rows and
+       800x1840/8 rows in the mod's own .cs) were never copied into the
+       manifest at all. Their real thrown-attack sprites stay in the
+       manifest under cataclysmFist/catastropheSlash for the projectile
+       switch below, correctly used there. Glow masks stack the same way
+       Polterghast's already do (glowKeys, additive). */
     for (var r = 0; r < bros.length; r++) {
       var br = bros[r], rot = Math.atan2(py - br.y, px - br.x);
-      var bKey = br.kind === 'fist' ? 'fist' : 'slashTop';
-      var bSc  = br.kind === 'fist' ? 0.4 : 0.35;
-      if (!sprite(bKey, br.x, br.y, bSc, rot)) {
+      var bKey = br.kind === 'fist' ? 'cataclysm' : 'catastrophe';
+      var bGlow = br.kind === 'fist' ? ['cataclysmGlow'] : ['catastropheGlow'];
+      var bSh = NEU.sheets[bKey];
+      var bSc = bSh ? 80 / bSh.fw : 0.4;
+      if (!sprite(bKey, br.x, br.y, bSc, rot, false, undefined, undefined, undefined, bGlow)) {
         ctx.fillStyle = br.kind === 'fist' ? COL.brimHi : COL.brim;
         ctx.fillRect((br.x - 14) | 0, (br.y - 14) | 0, 28, 28);
       }
@@ -1171,7 +1289,7 @@
       /* brothers */
       for (var r = 0; r < bros.length; r++) {
         var br = bros[r];
-        ctx.beginPath(); ctx.arc(br.x, br.y, 28, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(br.x, br.y, HB.broReach, 0, Math.PI * 2); ctx.stroke();
       }
     }
   }
@@ -1186,11 +1304,11 @@
   /* One blitter for the whole site, in data/sheets.js — see the note
      there. The local copy this replaces pinned source x at 0, which is
      why her two-column sheet drew as two overlapping women. */
-  function sprite(key, x, y, scale, rot, glow, col, frame, alpha) {
+  function sprite(key, x, y, scale, rot, glow, col, frame, alpha, glowKeys) {
     if (!NEU.sheetDraw) return false;
     return NEU.sheetDraw(ctx, key, x, y, {
       scale: scale, rot: rot, glow: glow, col: col, frame: frame,
-      alpha: alpha,
+      alpha: alpha, glowKeys: glowKeys,
       now: performance.now()
     });
   }
@@ -1313,7 +1431,6 @@
     t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; marks = {};
     rage = 0; tp = 0; shieldT = 0;
     rageMode = 0; rageModeT = 0;
-    diveT = 0;
     /* charge state too — dying mid multi-charge used to carry a live
        telegraph/dash into the retry and softlock her at the early-return */
     chargeT = 0; chargeTelegraph = 0; chargeBurst = 0; chargeBurstMax = 0; chargeGap = 0;
@@ -1329,7 +1446,11 @@
   }
   function close() {
     active = false; running = false; dying = 0;
-    NEU.activeMinigame = null;
+    /* Guarded, like every other minigame's close() — an unconditional
+       clear here could null out a DIFFERENT minigame's lock if close()
+       ever ran after something else had already claimed the input lock
+       (e.g. a quit racing an open elsewhere). */
+    if (NEU.activeMinigame === 'scal') NEU.activeMinigame = null;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
@@ -1385,7 +1506,6 @@
                get bx() { return bx; },
                get by() { return by; },
                get charging() { return chargeTelegraph > 0 || chargeT > 0; },
-               get diving() { return diveT > 0; },
                get wormBusy() { return !!sep && (sep.telegraph > 0 || sep.chargeT > 0); },
                get wormPos() { return sep ? { x: sep.x, y: sep.y } : null; },
                get wormVel() { return sep ? { x: sep.vx, y: sep.vy } : null; },

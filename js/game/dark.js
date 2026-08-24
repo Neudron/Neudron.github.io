@@ -340,6 +340,7 @@
     if (endless) { talks = 0; through = false; walked = 0; px = 420; py = 380; }
     wrap.classList.remove('is-walk');
     wrap.hidden = false;
+    NEU.activeMinigame = 'dark';        /* the room underneath must not move or take Escape */
     document.body.classList.add('is-playing');
     layout();
     keys = {}; moving = false; running = true; last = performance.now();
@@ -354,6 +355,7 @@
     running = false;
     endless = false;
     wrap.hidden = true;
+    if (NEU.activeMinigame === 'dark') NEU.activeMinigame = null;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
   }

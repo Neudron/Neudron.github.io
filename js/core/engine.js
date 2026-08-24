@@ -448,7 +448,20 @@
     }
     if (e.t === 'sign') {
       /* A hint the player asked for by walking up to it. Signs are
-         read, never consumed, and they always answer in narration. */
+         read, never consumed, and they always answer in narration.
+         Same guard as the npc branch below, and for the same reason:
+         `say()` here is unconditional and untracked (no dk/at resume),
+         so pressing e again while THIS sign's own box was still typing
+         restarted it from line 1 instead of leaving it alone. The four
+         V3 puzzle-hint signs were the demonstrated case. Only 'sign'
+         and the npc dialogue path get this — a RUN HOOK (mushrooms,
+         the witch, the merchant, every puzzle stone) has its own
+         state logic and must still fire even while an unrelated box is
+         open, the same way walking into a locked door still says so;
+         a blanket guard here previously blocked every run hook in the
+         game, including a stone press that was never state-tracked by
+         any dialogue at all. */
+      if (NEU.tboxOpen && NEU.tboxOpen()) return;
       say(e.lines || ['a wooden sign. nothing else.'], 'narr');
       NEU.sfx && NEU.sfx.tick && NEU.sfx.tick();
       return;
@@ -459,8 +472,10 @@
          depending on the state of the world, and a fixed `lines`
          array cannot do that. */
       if (typeof e.run === 'function') { e.run(API); return; }
-      /* E while a talk is showing is a no-op. Restarting a dialogue
-         mid-line read as the box resetting under your thumb. */
+      /* E while THIS dialogue is showing is a no-op. Restarting a
+         conversation mid-line read as the box resetting under your
+         thumb — the dk/at resume logic below exists so a finished
+         line isn't lost, but that only helps once the box has closed. */
       if (NEU.tboxOpen && NEU.tboxOpen()) return;
       var dk = 'd:' + room.id + ':' + e.x + ',' + e.y;
       var at = NEU.save ? (NEU.save.flag(dk) || 0) : 0;

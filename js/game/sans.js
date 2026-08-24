@@ -127,6 +127,10 @@
       try {
         var a = blipPool[blipI++ % blipPool.length];
         a.currentTime = 0;
+        /* Four copies of ONE file, so every blip is identical. ±5%
+           scatter on the rate is what stops a long line reading as a
+           machine gun. */
+        a.playbackRate = 1 + (Math.random() * 0.1 - 0.05);
         var p = a.play();
         if (p && p.catch) p.catch(synthBlip);
         return;
@@ -398,8 +402,10 @@
   var tfaceImg = document.getElementById('tboxFaceImg');
   var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/annoying-dog.gif', tv: 'img/tv.svg',
                witch: 'img/act4/witch-face.png',
-               scal: 'img/act4/calamity/scal-head.png',
-               scalHood: 'img/act4/calamity/scal-head-hood.png' };
+               /* real mod filenames — HoodlessHeadIcon/HoodedHeadIcon from
+                  NPCs/SupremeCalamitas/, see js/data/sheets.js scalFace* */
+               scal: 'img/act4/calamity/HoodlessHeadIcon.png',
+               scalHood: 'img/act4/calamity/HoodedHeadIcon.png' };
 
   /* Only the src is set here. Whether the portrait shows at all is a
      css question, because hiding it also has to re-do the box's grid
