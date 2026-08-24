@@ -477,12 +477,17 @@
     for (var i = 0; i < 10; i++) {
       var left = i < 5, idx = i % 5;
       hearts.push({
-        hp: 1,
+        /* Three bolts each. The heart pool IS the length of the worm
+           phase — the Sepulcher's own 6-step SCRIPT (scal-worm.js:49-56)
+           runs about 25s a lap, and one-shot hearts ended the phase
+           before a single lap finished. */
+        hp: 3,
         x: (left ? AX + 44 : AX + AW - 44) + (idx % 2 ? (left ? 18 : -18) : 0),
         y: AY + 46 + idx * 28
       });
     }
-    say("* she is behind it. kill the hearts.");
+    say(flagged(7) ? "* she goes back behind it. again."
+                   : "* she is behind it. kill the hearts.");
   }
 
   /* ── the brothers ───────────────────────────────────────────────*/
@@ -1060,10 +1065,13 @@
     if (kind === 'heart') {
       var hi = hearts.indexOf(ref);
       if (hi < 0) return;
+      ref.hp -= eff;
+      if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+      if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(ref.x, ref.y, 4, COL.brimHi); }
+      if (ref.hp > 0) return;              /* cracked, not broken */
       var hx = ref.x, hy = ref.y;
       hearts.splice(hi, 1);
-      if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
-      if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(hx, hy, 8, COL.brimHi); }
+      if (NEU.juice) NEU.juice.burst(hx, hy, 8, COL.brimHi);
       return;
     }
     if (kind === 'bro') {
@@ -1094,6 +1102,12 @@
     else if (pct <= 0.35 && !flagged(3)) { mark(3); startBrothers(); }
     else if (pct <= 0.28 && !flagged(4)) { mark(4); startWall(3); }
     else if (pct <= 0.12 && !flagged(6)) { mark(6); startWall(4); }
+    /* The wiki is explicit: below 10% she summons Sepulcher and ten
+       Brimstone Hearts again and is invulnerable until they die.
+       spawnSepulcher() already resets hearts/sep/invuln and re-spawns
+       the worm module (scal-worm.js spawn() re-seeds its whole state),
+       and fightTick's existing exit tears it down unchanged. */
+    else if (pct <= 0.08 && !flagged(7)) { mark(7); spawnSepulcher(); }
   }
   var marks = {};
   function flagged(n) { return !!marks[n]; }

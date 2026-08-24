@@ -580,27 +580,56 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
 
   NEU.scal.open();
   pump(163);   /* intro (2.6s) — the soul is frozen */
+
+  /* V5 phase 2, spawn-level: a HELD f charges past the tap threshold
+     and releases an orb — visible in myShots with k === 'orb'. Fired
+     HERE, during wall(0), it has nothing to reach: no sepulcher and no
+     hearts yet, so proving the heavy shot costs the heart pool nothing.
+     Fired below ten spawned hearts it used to chunk the nearest
+     cluster for two or three and leave the three-bolt grind short of
+     its bolt count — and under-cluster, worse. No landing wait: the
+     orb just flies, and every frame saved here belongs to the climb
+     window below. */
+  {
+    key('keydown', 'f');
+    pump(27);                     /* 0.43s held → power ~0.47 ≥ 0.35,
+                                     the same hold length strike() uses */
+    key('keyup', 'f');
+    let sawOrb = false;
+    for (let g = 0; g < 30 && !sawOrb; g++) {
+      for (const s of NEU.scal.myShots) if (s.k === 'orb') sawOrb = true;
+      pump(1);
+    }
+    ok('holding f charges a heavy orb shot', sawOrb);
+  }
+
   /* wall(0): the soul climbs to the top band in the wall's last
      moments so the worm's spawn burst cannot reach it. The climb
      crosses only horizontal dart rows whose darts have already
-     passed the soul's column. */
+     passed the soul's column. The probe above borrowed ~28 of this
+     wall's frames, so the climb arms at 190 instead of 235 to keep
+     the same absolute moment. */
   for (let i = 0; i < 900 && NEU.scal.mode === 'wall';) {
-    if (i >= 235 && NEU.scal.py > 380) { run(0, -1, 10); i += 10; }
+    if (i >= 190 && NEU.scal.py > 380) { run(0, -1, 10); i += 10; }
     else { pump(1); i++; }
   }
   ok('>>> the sepulchre descends with ten hearts <<<',
      NEU.scal.mode === 'fight' && NEU.scal.hearts === 10);
 
-  /* Park LOW before shooting: the worm's ring bursts land wherever
-     Calamitas is (top band), and a stationary gunner parked up top
-     eats one every cycle. Homing bolts do not care about distance. */
-  run(0, 1, 60);
-  pump(30);
+  /* The climb left the soul high; SLIDE LEFT along that band instead
+     of descending to the floor. Under the left cluster the nearest
+     heart is ~44px up — a bolt crosses in ~10 frames, against ~100+
+     from the floor. Bolt flight time is exposure time, and at three
+     hits per heart the old walk-in-from-centre grind stretched the
+     phase past 30s of dart rain, which bled the drive dry before
+     wall(2). The corner sits ~310px off Calamitas, clear of the ring
+     bursts that punish a stationary gunner parked beside HER. */
+  run(-1, 0, 72);
 
-  /* Heart accounting starts BEFORE the orb probe — the probe's orb
-     homes to the nearest heart and shatters it, and that kill counts
-     toward the ten like any other. */
-  let shattered = 0, before = NEU.scal.hearts, heartDamageStart = damage.length;
+  /* Heart accounting covers exactly the grind below — with the orb
+     probe moved up into wall(0), every point of heart damage from
+     here on arrives on a counted bolt. */
+  let shattered = 0, bolts = 0, before = NEU.scal.hearts, heartDamageStart = damage.length;
   const checkDrop = () => {
     if (NEU.scal.hearts < before) {
       shattered += before - NEU.scal.hearts;
@@ -610,43 +639,46 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
     return false;
   };
 
-  /* V5 phase 2, spawn-level: a HELD f charges past the tap threshold
-     and releases an orb — visible in myShots with k === 'orb'. */
-  {
-    key('keydown', 'f');
-    pump(40);                     /* 0.64s held → power ~0.71 ≥ 0.35 */
-    key('keyup', 'f');
-    let sawOrb = false;
-    for (let g = 0; g < 30 && !sawOrb; g++) {
-      checkDrop();
-      for (const s of NEU.scal.myShots) if (s.k === 'orb') sawOrb = true;
-      pump(1);
-    }
-    ok('holding f charges a heavy orb shot', sawOrb);
-    pump(120);                    /* let it fly and land before the walk */
-    checkDrop();
-  }
-
   /* RE-WORKED V5 phase 2: the attack is a HOMING BOLT now — tap f and
      a projectile seeks the nearest heart, so the walk-to-each-heart
-     choreography is gone. The bot keeps one bolt in flight, dodges
+     choreography is gone. The bot keeps bolts in flight, dodges
      ring bursts between shots, and lets the steering do the walking. */
   /* Contact-free does not mean risk-free: the worm still releases a
      ring of accelerating darts each time a charge at Calamitas lands,
      and that is real, per the guide text. Dodge it between shots. */
-  for (let g = 0; g < 900 && NEU.scal.hearts > 0 && NEU.scal.running; g++) {
+  for (let g = 0; g < 1500 && NEU.scal.hearts > 0 && NEU.scal.running; g++) {
     if (dodge()) { checkDrop(); continue; }
     if (!NEU.scal.heartPos.length) break;
-    if (NEU.scal.myShots.length === 0) f();   /* one bolt in flight */
+    /* TWO bolts in flight, not one: flight time dwarfs the 0.3s shot
+       cooldown out here, so a single-bolt bot spends most of the phase
+       watching paint dry. The cap tightens on the last heart: never
+       more bolts airborne than there are hearts left, so the teardown
+       finds an empty sky — a stray bolt outlives the sepulcher, homes
+       to CALAMITAS, and chips the 180-milestone the next section
+       asserts exactly. bolts counts SHOTS, not key presses: inside the
+       cooldown f() is a no-op and must not inflate the count. */
+    const airborne = NEU.scal.myShots.length;
+    if (airborne < 2 && (NEU.scal.hearts > 1 || airborne === 0)) {
+      const shotsBefore = NEU.scal.myShots.length;
+      f();
+      if (NEU.scal.myShots.length > shotsBefore) bolts++;
+    }
     pump(4);
     checkDrop();
   }
   if (shattered !== 10) console.log('       heart diagnostic:', JSON.stringify({ shattered, hearts: NEU.scal.hearts, soulHP: NEU.scal.soulHP, tp: NEU.scal.tp, shieldT: NEU.scal.shieldT, mode: NEU.scal.mode, damage: damage.slice(heartDamageStart) }));
-  ok('>>> a homing bolt shatters a heart, one per bolt <<<', shattered === 10);
+  ok('>>> a heart takes three bolts, not one <<<', shattered === 10 && bolts >= 28);
   ok('>>> all ten hearts die <<<', NEU.scal.hearts === 0);
   ok('>>> the gunner survives collecting every heart <<<', NEU.scal.soulHP > 0);
   pump(2);
   ok('>>> she steps out of her invincibility <<<', NEU.scal.mode === 'fight');
+
+  /* Down to the floor before the strike gauntlet: strike() stations at
+     centre-floor, and the walk down THROUGH her resumed crossfire —
+     orb hold included — spends a soul point the wall milestones
+     downstream do not have. The grind above fought from the top band
+     because the hearts are there; the walls are fought from below. */
+  run(0, 1, 72);
 
   /* Strikes are homing bolts too — no more walking into her strike
      ring (which shared a wall with her damage ring; that geometry bug
@@ -739,7 +771,14 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
   ok('>>> six more call the second wall <<<',
      strike(60) && NEU.scal.mode === 'wall' && NEU.scal.hp >= 120 && NEU.scal.hp <= 150);
   waitOut(290);          /* wall(2) */
-  const broArrive = strike(40);
+  /* strike(28), not strike(40): the old call walked her onto the 84
+     ladder ITSELF, and its parting orb volley — airborne when the mode
+     flip froze its fire loop — retargeted to the freshly arrived
+     brothers, whose 8 HP lose to one orb's contact-plus-burst of 9.
+     The brother was dead before his own checkpoint. Stop high instead;
+     the drip below finishes the approach with weapons that cannot
+     kill what they are about to meet. */
+  const broArrive = strike(28);
   /* Rapid fire settles ON its target, so the 35% ladder (84) can sit
      below the hp the call stopped at with the magazine already dry —
      the old tap trickle used to overshoot into the gate via in-flight
@@ -747,33 +786,44 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
      one damage, so the settle point stays inside the window. */
   {
     const cxN = 162 + 700 / 2, BOTYN = 178 + 460 - 60;
-    let holdN = false, heldN = 0;
     let dirN = NEU.scal.px > cxN ? -1 : 1;
-    for (let gn = 0; gn < 400 && NEU.scal.mode === 'fight' &&
-         NEU.scal.hp > 84 && NEU.scal.soulHP > 0; gn++) {
+    for (let gn = 0; gn < 1400 && NEU.scal.mode === 'fight' &&
+         NEU.scal.hp > 86 && NEU.scal.soulHP > 0; gn++) {
       if (sidestepLow(BOTYN)) continue;
-      /* Shuttle ALWAYS — orb holds included: a 27f hold is an eternity
-         to a volley cadence measured in seconds, and the last volley
-         proved it by landing on a stationary orb phase. Taps and orbs
-         alike fly from wherever the soul is when f releases. */
+      /* Shuttle ALWAYS — taps included: a volley cadence measured in
+         seconds punishes a stationary gunner. Taps fly from wherever
+         the soul is when f fires. */
       if (gn % 15 === 0) dirN = -dirN;
       if ((dirN < 0 && NEU.scal.px < 268) ||
           (dirN > 0 && NEU.scal.px > 756)) dirN = -dirN;
-      if (holdN) {
-        heldN += 3;
-        if (heldN >= 27) { key('keyup', 'f'); holdN = false; }
-      } else if (NEU.scal.myShots.length === 0) {
-        if (NEU.scal.hp > 92) { key('keydown', 'f'); holdN = true; heldN = 0; }
-        else f();
-      }
+      /* PURE TAPS, three airborne at most: this leg walks her down
+         onto the 84 ladder, and ANY orb still flying at the crossing
+         retargets to the freshly arrived brothers — nine points of
+         contact-plus-burst against 8 HP murders one before his leg
+         begins (measured: bros 1 by drip-exit, magazine empty). Taps
+         carry exactly one damage each, so even a full airborne set
+         cannot kill what it lands on; the last three points arrive
+         after the loop, still inside the arrival window. */
+      if (NEU.scal.myShots.length < 3) f();
       run(dirN, 0, 3);
     }
-    if (holdN) key('keyup', 'f');
+  }
+  /* Settle the magazine before the arrival is judged: whatever is in
+     flight when the ladder trips should have landed and been seen, so
+     the state below is settled and not mid-delivery. Brothers volley
+     while we wait; sidestep. */
+  {
+    const BOTYD = 178 + 460 - 60;
+    for (let gd = 0; gd < 300 && NEU.scal.myShots.length > 0 &&
+         NEU.scal.running && NEU.scal.soulHP > 0; gd++) {
+      if (!sidestepLow(BOTYD)) pump(2);
+    }
   }
   if (!broArrive || NEU.scal.mode !== 'brothers' ||
       !(NEU.scal.hp >= 80 && NEU.scal.hp <= 90)) {
     console.log('       bros-arrival diagnostic:', JSON.stringify({
-      broArrive, mode: NEU.scal.mode, hp: NEU.scal.hp, soul: NEU.scal.soulHP,
+      broArrive, mode: NEU.scal.mode, hp: NEU.scal.hp, bros: NEU.scal.bros,
+      hearts: NEU.scal.hearts, soul: NEU.scal.soulHP,
       tp: NEU.scal.tp, shieldT: NEU.scal.shieldT, myShots: NEU.scal.myShots.length,
       damageTail: damage.slice(-8) }));
   }
