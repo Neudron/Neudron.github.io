@@ -415,7 +415,7 @@ console.log('\n18. no regressions in the earlier fixes');
   ok('no-sprite: the blitter honours cols', /var col = \(\(o\.col \|\| 0\) % cols \+ cols\) % cols/.test(read('data/sheets.js')));
   ok('homing+rotation: fireblast still homes before its pause', /sp = 140/.test(B));
   ok('multi-charge burst still queues dashes', /chargeBurstMax > 0/.test(B));
-  ok('>>> her cycle stays fixed, not randomised <<<', /CYCLE\[step_ % CYCLE\.length\]/.test(B) &&
+  ok('>>> her cycle stays fixed, not randomised <<<', /var k = CYCLE\[posInCycle\];/.test(B) &&
      /THE ONLY RANDOMNESS/.test(B));
 }
 

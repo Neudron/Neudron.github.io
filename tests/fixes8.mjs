@@ -436,18 +436,21 @@ console.log('\n6. calamitas');
 {
   const { NEU } = boot();
   ok('boss loaded', !!NEU.scal);
-  ok('>>> her cycle is 20 steps <<<', NEU.scal.cycle.length === 20);
+  ok('>>> her cycle is 24 steps <<<', NEU.scal.cycle.length === 24);
 
   const c = NEU.scal.cycle;
-  const charges = c.map((k,i)=>k==='c'?i+1:0).filter(Boolean);
-  ok('charges land at 4, 8, 13, 16, 18, 20',
-     JSON.stringify(charges) === JSON.stringify([4,8,13,16,18,20]));
+  /* SupremeCalamitas.cs:2093-2175 — phase 1 (charge) at these indices. */
+  const charges = c.map((k,i)=>k==='c'?i:0-1).filter(i=>i>=0);
+  ok('charges land where the source switch puts them',
+     JSON.stringify(charges) === JSON.stringify([3,4,8,14,18,19,21,23]));
   ok('no melee dive in the cycle (matches official wiki)',
      c.filter(k=>k==='m').length === 0);
   ok('dart bursts appear 6 times', c.filter(k=>k==='d').length === 6);
   ok('hellblast barrages appear 4 times', c.filter(k=>k==='h').length === 4);
-  ok('two-giga appears twice', c.filter(k=>k==='g2').length === 2);
-  ok('four-giga appears twice', c.filter(k=>k==='g4').length === 2);
+  ok('>>> fireblast is a first-class step, 6 times <<<',
+     c.filter(k=>k==='f').length === 6);
+  ok('the old 20-step giga codes are gone',
+     c.filter(k=>k==='g2'||k==='g4').length === 0);
 
   const src = fs.readFileSync(path.join(ROOT,'js','act4','boss-scal.js'), 'utf8');
   /* RE-SOURCED 2026-08-24: the Sepulcher is its own module now

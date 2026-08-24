@@ -76,12 +76,23 @@
     broReach:  (NEU.hitRadius && NEU.hitRadius('cataclysm', 1))    || 28
   };
 
-  /* Her cycle — matches the official Calamity wiki exactly.
-     c = charge, d = dart bursts, h = hellblast barrage,
-     g2/g4 = two or four gigablasts. 20 steps, no melee dive
-     (that was a custom addition not in the source). Charges at
-     0-indexed 3, 7, 12, 15, 17, 19 with bursts 4,2,2,4,2,2. */
-  var CYCLE = ['d','h','g2','c','g2','h','d','c','d','h','g4','h','c','d','g4','c','d','c','d','c'];
+  /* Her cycle — SupremeCalamitas.cs:2093-2175, all TWENTY-FOUR cases,
+     not the 20 this file used to carry. Its `phase` values map straight
+     onto these step codes:
+       0 shots above -> 'd'   1 charge      -> 'c'
+       3 hellblasts  -> 'h'   4 fireblasts  -> 'f'
+     Fireblast gets six slots of its own here. It used to exist only as
+     an 18% random substitution inside 'd', which made the rarest thing
+     in the fight out of one of its six scheduled attacks.
+     WILL_CHARGE is the source's willCharge flag (:582): the step BEFORE
+     each charge, during which she raises her forcefield. True at 2, 7,
+     13, 17 — and 3, 8, 14, 18 are all 'c'. */
+  var CYCLE = ['d','h','f','c','c','f','h','d','c','d','h','f',
+               'f','h','c','d','f','f','c','c','d','c','d','c'];
+  var WILL_CHARGE = { 2: 1, 7: 1, 13: 1, 17: 1 };
+  /* The wiki names gigablast volleys of 4 and 2 among the fireblast
+     slots; the rest fire a homing fireblast. */
+  var GIGA_AT = { 11: 4, 12: 4, 16: 2, 17: 2 };
 
   var running = false, last = 0, t = 0, lastDt = 1 / 60;
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
@@ -352,6 +363,9 @@
     scalAnimTimer = 0;
   }
   var bxv = 0, byv = 0, chargeT = 0, chargeTelegraph = 0, chargeBurst = 0, chargeBurstMax = 0, chargeGap = 0;
+  /* SupremeCalamitas.cs:582 — true during the attack BEFORE a charge, so
+     her forcefield goes up as a telegraph. Set from WILL_CHARGE. */
+  var willCharge = false;
   /* one-shot latch so the telegraph's juice fires once per wind-up,
      not every frame of its tail */
   var teleJuiced = false;
@@ -616,8 +630,10 @@
 
     stepT -= dt;
     if (stepT > 0) return;
-    var k = CYCLE[step_ % CYCLE.length];
+    var posInCycle = step_ % CYCLE.length;
+    var k = CYCLE[posInCycle];
     step_++;
+    willCharge = !!WILL_CHARGE[posInCycle];
     var fast = phase === 2 ? 0.62 : 1;
     if (k === 'd') {
       /* Some bursts randomly become a blast. THE ONLY RANDOMNESS. */
@@ -627,31 +643,21 @@
       else dartBurst();
       stepT = 0.72 * fast;
     } else if (k === 'h') { hellbarrage(); stepT = 1.5 * fast; }
-    else if (k === 'g2')  { gigablast(2); stepT = 1.5 * fast; }
-    else if (k === 'g4')  { gigablast(phase === 2 ? 3 : 4); stepT = 2.2 * fast; }
+    else if (k === 'f') {
+      /* Source phase 4: she crosses to 750 Terraria px beside the player
+         and lobs blasts. The wiki names gigablast volleys of 4 and 2 at
+         four of these six slots; the other two are homing fireblasts. */
+      var g = GIGA_AT[posInCycle];
+      if (g) { gigablast(phase === 2 ? g - 1 : g); stepT = (g > 2 ? 2.2 : 1.5) * fast; }
+      else   { fireblast(); stepT = 1.5 * fast; }
+    }
     else if (k === 'c') {
-      /* Multi-charge burst: real SC does 2 or 4 consecutive dashes.
-         Cycle positions (0-indexed): 3,7,12,15,17,19.
-         Phase 1: 4,2,2,4,2,2. Phase 2: half (2,1,1,2,1,1).
-
-         step_ is never reset, so on lap two of the 20-step cycle it is
-         21+ while these positions are still 3/7/12/15/17/19 — comparing
-         the ABSOLUTE step_ meant nothing matched past step 20, chargeIdx
-         kept its initialiser of 0, and every charge for the rest of the
-         fight silently fired p1Bursts[0] = 4 dashes regardless of which
-         of the six charge slots it actually was. Compare the position
-         WITHIN the cycle instead, so it repeats correctly every lap. */
-      var posInCycle = (step_ - 1) % CYCLE.length;
-      var chargeIdx = 0;
-      if (posInCycle === 3) chargeIdx = 0;       // 1st charge: 4 (p1) / 2 (p2)
-      else if (posInCycle === 7) chargeIdx = 1;  // 2nd: 2 / 1
-      else if (posInCycle === 12) chargeIdx = 2; // 3rd: 2 / 1
-      else if (posInCycle === 15) chargeIdx = 3; // 4th: 4 / 2
-      else if (posInCycle === 17) chargeIdx = 4; // 5th: 2 / 1
-      else if (posInCycle === 19) chargeIdx = 5; // 6th: 2 / 1
-      var p1Bursts = [4,2,2,4,2,2];
-      var p2Bursts = [2,1,1,2,1,1];
-      chargeBurstMax = phase === 2 ? p2Bursts[chargeIdx] : p1Bursts[chargeIdx];
+      /* SupremeCalamitas.cs:2373 — willChargeAgain = ai[3] + 1 < 2, i.e.
+         EXACTLY two dashes per charge entry. The wiki's "4 charges" are
+         two ADJACENT 'c' entries (indices 3+4 and 18+19), not a per-slot
+         table. This replaces a posInCycle -> p1Bursts lookup that matched
+         six hardcoded positions of the old 20-step cycle. */
+      chargeBurstMax = phase === 2 ? 1 : 2;
       chargeBurst = 0;
       chargeGap = 0;
       charge();
@@ -1192,7 +1198,7 @@
     /* her shield. The mod summons the forcefield bubble and the two
        arcs around the charge telegraph; here it also marks the whole
        "she cannot be touched" state — walls, brothers, the worm. */
-    if ((invuln || chargeTelegraph > 0 || chargeT > 0) && mode !== 'intro') {
+    if ((invuln || willCharge || chargeTelegraph > 0 || chargeT > 0) && mode !== 'intro') {
       var shk = Math.sin(now / 160) * 3;
       sprite('scalShield', bx, by, 1.35, 0, false, 0, 0, 0.55);
       sprite('scalShieldTop', bx, by - 6 + shk, 1.15, 0);
@@ -1534,6 +1540,7 @@
     /* charge state too — dying mid multi-charge used to carry a live
        telegraph/dash into the retry and softlock her at the early-return */
     chargeT = 0; chargeTelegraph = 0; chargeBurst = 0; chargeBurstMax = 0; chargeGap = 0;
+    willCharge = false;
     teleJuiced = false;
     orbA = Math.PI * 1.5;
     /* x10 (2026-08-24). A charged orb deals 9 — one on impact plus eight
