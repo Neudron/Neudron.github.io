@@ -372,6 +372,19 @@
   var scalAnimState = 'idle', scalAnimFrame = 0, scalAnimTimer = 0, scalAnimPrevState = 'idle';
 
   /* ── the interludes ─────────────────────────────────────────────*/
+  /* The five bullet hells, each with its OWN direction sequence
+     (official wiki). wallTick used to index this by BEAT alone —
+     `[['d','r','l'], ['u','r'], ['d','l','r']][beat]` — so every wall
+     fired the identical three beats and the interludes read as one
+     repeated attack. */
+  var WALL_BEATS = [
+    [['d','r','l'], ['l','r'],   ['d','l','r']],   /* 0 — spawn */
+    [['u'],         ['r'],       ['l','r']],       /* 1 — 75% */
+    [['d'],         ['l'],       ['l','r']],       /* 2 — 50% */
+    [['u'],         ['r'],       ['l','r']],       /* 3 — 28% */
+    [['d'],         ['l','r'],   ['d','l','r']]    /* 4 — 12%, + skulls */
+  ];
+
   function startWall(n) {
     mode = 'wall'; wallT = 0; wallN = n; walls = []; bullets = [];
     clearSched();
@@ -379,7 +392,9 @@
     sfxPlay('maelstrom');
     say(n === 0 ? "* the room fills up."
       : n === 1 ? "* it fills up faster."
-                : "* and again, with something heavier.");
+      : n === 2 ? "* and again, with something heavier."
+      : n === 3 ? "* she is not slowing down."
+                : "* the last one. it is all of them at once.");
   }
 
   function wallTick(dt) {
@@ -389,15 +404,19 @@
       walls.push(beat);
       /* down / right / left, then left+right, then down+left+right —
          the order the game uses, so anyone who knows it is rewarded.
-         Was dirs[wallN]: every beat fired the first wall's triple.
          Beats 0 and 2 fire two horizontal walls at once; their holes
          share ONE y so the two walls leave a single passable strip.
          Independent random holes made the first attack a coin flip:
          the walls reach you at the same instant, and surviving needed
          both holes to overlap. */
-      var dirs = [['d','r','l'], ['u','r'], ['d','l','r']][beat] || ['d'];
+      var dirs = (WALL_BEATS[wallN] || WALL_BEATS[0])[beat] || ['d'];
       var holeY = (beat === 0 || beat === 2) ? (AY + 70 + Math.random() * (AH - 140)) : null;
       dirs.forEach(function (d, i) { later(function () { wallLine(d, holeY); }, i * 240); });
+      /* Wall 4 is the fifth bullet hell: it adds Brimstone Flame Skulls
+         on top of the dart rows (wiki). */
+      if (wallN === 4) later(function (bt) {
+        return function () { if (running) skullWave(bt % 2 === 0); };
+      }(beat), 500);
     }
     if (wallT > 4.6) {
       bullets = []; invuln = false;
@@ -420,6 +439,21 @@
         if (Math.abs(y - gy) < 48) continue;
         shot(d === 'r' ? AX - 20 : AX + AW + 20, y, (d === 'r' ? 1 : -1) * 210, 0, 6, COL.brim);
       }
+    }
+  }
+
+  /* Brimstone Flame Skulls — the fifth bullet hell's addition (wiki):
+     skulls that cross the arena in a horizontal wave. No new art:
+     BrimstoneHellblast2.png IS a skull, so this is a motion change and
+     the draw switch below routes k5 to the same sheet as k3. */
+  function skullWave(fromLeft) {
+    if (!running) return;
+    for (var i = 0; i < 5; i++) {
+      var y = AY + 60 + i * (AH - 120) / 4;
+      bullets.push({ x: fromLeft ? AX - 20 : AX + AW + 20, y: y,
+                     vx: (fromLeft ? 1 : -1) * 150, vy: 0,
+                     r: HB.hellblast, c: COL.brim, k: 5, age: 0,
+                     baseY: y, phase_: i * 0.6 });
     }
   }
 
@@ -863,6 +897,10 @@
          BrimstoneBarrage: velocity *= 1.01/frame → 1.01^60 ≈ 1.82x/s. */
       if (b.k === 3) { b.vx *= 1 + dt * 0.12; }   // hellblasts — gentle accel
       if (b.k === 4) { var am = 1 + dt * 0.6; b.vx *= am; b.vy *= am; } // ring darts — BrimstoneBarrage 1.01x/frame
+      /* k5 flame skull: constant horizontal travel, sinusoidal vy. Set
+         the VELOCITY rather than y directly, so the graze/hit checks and
+         the facing rotation below all see real motion. */
+      if (b.k === 5) b.vy = Math.cos(b.age * 3.2 + b.phase_) * 90;
       /* Facing tracks REAL travel, not a per-frame recompute of
          atan2(vy,vx) — fireblast/gigablast spawn at vx:vy:0 and are
          re-zeroed for their burst pause (above), so atan2(0,0) locked
@@ -1054,6 +1092,8 @@
     else if (pct <= 0.75 && !flagged(1)) { mark(1); startWall(1); }
     else if (pct <= 0.50 && !flagged(2)) { mark(2); startWall(2); }
     else if (pct <= 0.35 && !flagged(3)) { mark(3); startBrothers(); }
+    else if (pct <= 0.28 && !flagged(4)) { mark(4); startWall(3); }
+    else if (pct <= 0.12 && !flagged(6)) { mark(6); startWall(4); }
   }
   var marks = {};
   function flagged(n) { return !!marks[n]; }
@@ -1209,9 +1249,9 @@
       var b = bullets[i], sz = (b.r * 2) | 0;
       /* k picks the sheet; everything else is a brimstone dart. */
       var key = b.k === 1 ? 'fireblast' : b.k === 2 ? 'gigablast'
-              : b.k === 3 ? 'hellblast' : 'dart';
+              : (b.k === 3 || b.k === 5) ? 'hellblast' : 'dart';
       var sc = b.k === 1 ? 0.65 : b.k === 2 ? 0.75
-            : b.k === 3 ? 0.5 : 0.55;
+            : (b.k === 3 || b.k === 5) ? 0.5 : 0.55;
       /* b.rot tracks real travel (set in moveBullets, seeded at spawn
          for k1/k2) — NOT a live atan2(vy,vx) here, which used to lock
          to a single angle for every homing blast's entire wind-up and
