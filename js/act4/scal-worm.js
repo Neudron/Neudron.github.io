@@ -45,6 +45,14 @@
                              third-second keeps the spray dodgeable */
   var GRAZE_R = 28, HIT_PAD = 8, CULL = 48;
 
+  /* SepulcherBodyEnergyBall.cs — the body's own slow orbs, released from
+     the heart beads toward the player. Art is already in sheets.js as
+     `sepulHeart` (SepulcherBodyEnergyBall.png), used until now only as a
+     body-bead sprite. Slow and few: this adds threat DENSITY to a phase
+     that got longer, not another dart wall. */
+  var ORB_EVERY = 2.6, ORB_SPEED = 90, ORB_R = 7;
+  var orbCd = 0;
+
   /* the repeating routine. dash carries no t — it ends on arrival. */
   var SCRIPT = [
     { act: 'chase',     t: 6   },
@@ -186,6 +194,23 @@
         vy: Math.sin(ang) * DART_SPEED,
         r: DART_R
       });
+    }
+  }
+
+  function emitOrbs(dt) {
+    orbCd -= dt;
+    if (orbCd > 0) return;
+    orbCd = ORB_EVERY;
+    /* Pushed into the SAME `darts` array so tickDarts' graze / hit /
+       cull routing is untouched; only draw() and the accelerator branch
+       on the kind tag. */
+    for (var i = 1; i < SEG_COUNT - 1; i += 8) {
+      var b = beads[i];
+      if (!b) continue;
+      var a = Math.atan2(plY - b.y, plX - b.x);
+      darts.push({ x: b.x, y: b.y,
+                   vx: Math.cos(a) * ORB_SPEED, vy: Math.sin(a) * ORB_SPEED,
+                   r: ORB_R, kind: 'orb' });
     }
   }
 
@@ -331,6 +356,7 @@
 
     recordTrail();
     rebuildBeads();
+    emitOrbs(dt);          /* needs the rebuilt beads to fire from */
   }
 
   /* ── darts ─────────────────────────────────────────────────────── */
@@ -339,7 +365,10 @@
     for (var i = darts.length - 1; i >= 0; i--) {
       var d = darts[i];
       var sp = Math.sqrt(d.vx * d.vx + d.vy * d.vy);
-      if (sp > 0 && sp < DART_CAP) {
+      /* Orbs hold their speed — the dart accelerator (DART_ACC to a
+         DART_CAP of 300) would turn a slow telegraphed body orb into a
+         second, faster dart. */
+      if (d.kind !== 'orb' && sp > 0 && sp < DART_CAP) {
         var ns = Math.min(DART_CAP, sp + DART_ACC * dt) / sp;
         d.vx *= ns;
         d.vy *= ns;
@@ -432,7 +461,11 @@
 
     for (i = 0; i < darts.length; i++) {
       d = darts[i];
-      if (!sprite('dart', d.x, d.y, 0.5, Math.atan2(d.vy, d.vx), 0, now))
+      if (d.kind === 'orb') {
+        if (!sprite('sepulHeart', d.x, d.y, 0.8, 0,
+                    (((now * 0.008) | 0) % 5 + 5) % 5, now))
+          rect(d.x, d.y, d.r, '#C2405F');
+      } else if (!sprite('dart', d.x, d.y, 0.5, Math.atan2(d.vy, d.vx), 0, now))
         rect(d.x, d.y, d.r, '#E4C46A');
     }
 
@@ -454,6 +487,7 @@
     dashNear = false;
     dashFired = false;
     dartCd = 0;
+    orbCd = 0;
     enterStep(0);
     rebuildBeads();
     spawned = true;
@@ -480,6 +514,7 @@
       trail = [];
       beads = [];
       darts = [];
+      orbCd = 0;
       stepIdx = 0;
       stepT = SCRIPT[0].t || 0;
       actName = '';
@@ -511,7 +546,8 @@
     darts: function () {
       var out = [], i;
       for (i = 0; i < darts.length; i++)
-        out.push({ x: darts[i].x, y: darts[i].y, vx: darts[i].vx, vy: darts[i].vy, r: darts[i].r });
+        out.push({ x: darts[i].x, y: darts[i].y, vx: darts[i].vx,
+                   vy: darts[i].vy, r: darts[i].r, kind: darts[i].kind || '' });
       return out;
     },
     /* busy = mid-set-piece. coil counts: she is unmistakably occupied */

@@ -484,6 +484,12 @@ console.log('\n6. calamitas');
      /dx \* dx \+ dy \* dy >= TRAIL_STEP \* TRAIL_STEP/.test(wormSrc) &&
      /for \(i = trail\.length - 2; i >= 0 && k < SEG_COUNT; i--\)/.test(wormSrc) &&
      /Math\.atan2\(prev\.y - beads\[i\]\.y,\s*\n\s*prev\.x - beads\[i\]\.x\) \+ HALF_PI/.test(wormSrc));
+   /* SepulcherBodyEnergyBall.cs: the body's own slow orbs ride the same
+      `darts` array but must NOT feed the dart accelerator — a slow,
+      telegraphed orb accelerated to DART_CAP would just be a second,
+      faster dart. */
+   ok('>>> the body releases energy balls, and they do not accelerate <<<',
+      /kind: 'orb'/.test(wormSrc) && /d\.kind !== 'orb'/.test(wormSrc));
   /* RE-SOURCED 2026-08-24: the hearts no longer ride the worm's body at
      all. SepulcherHead.cs:45 sets NPC.damage = 0 (confirmed directly in
      the mod source) and the guide text is explicit that ten hearts sit
@@ -646,9 +652,83 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
   /* Contact-free does not mean risk-free: the worm still releases a
      ring of accelerating darts each time a charge at Calamitas lands,
      and that is real, per the guide text. Dodge it between shots. */
-  for (let g = 0; g < 1500 && NEU.scal.hearts > 0 && NEU.scal.running; g++) {
-    if (dodge()) { checkDrop(); continue; }
+  /* The weave: a large ellipse around the arena centre, traced
+     constantly. Orbs fly straight at WHERE THE SOUL STOOD when they
+     spawned, so a gunner that never holds a heading faces aims that
+     are stale on arrival; a parked one is a firing solution (measured:
+     four orb contacts bled MAXHP=5 to 1 before the first wall). The
+     ellipse spans 250x165, keeping every arc ≥90px off every wall —
+     small rings failed because one evasion hop left the soul half a
+     ring behind and the field then fought the return path. */
+  const cxG = 512, cyG = 398, RXG = 250, RYG = 165;
+  let thG = Math.atan2(NEU.scal.py - cyG, Math.max(1, NEU.scal.px - cxG));
+  /* The orb cloud needs VECTOR evasion, not first-match hops. She
+     orbits THE SOUL (her orbit centre clamps the player position), so
+     the bead chain follows the gunner and every 2.6s three fresh orbs
+     spawn aimed at where it stood. Chained single-threat hops random-
+     walk the soul straight through the crossfire (measured: it
+     tumbled from the top band to the floor and still ate four orbs).
+     Every closing projectile — hers AND the worm's — sums into a
+     repulsion field weighted by proximity and speed, with a tangential
+     swirl so the soul slides ALONG threats instead of fleeing down
+     their bearing; the bot walks the resultant until the sky clears. */
+  const evadeCloud = () => {
+    const R = 230;
+    let fx = 0, fy = 0, any = false;
+    const scan = bs => {
+      for (const b of bs) {
+        const dx = b.x - NEU.scal.px, dy = b.y - NEU.scal.py;
+        const d = Math.hypot(dx, dy);
+        if (d > R || d < 0.001) continue;
+        if (dx * b.vx + dy * b.vy >= 0) continue;   /* not closing */
+        const sp = Math.hypot(b.vx, b.vy);
+        const wgt = (R - d) / R * (0.55 + sp / 260);
+        fx -= dx / d * wgt;
+        fy -= dy / d * wgt;
+        fx += -dy / d * wgt * 0.7;   /* swirl component */
+        fy += dx / d * wgt * 0.7;
+        any = true;
+      }
+    };
+    scan(NEU.scal.bullets);
+    scan(NEU.scal.wormDarts || []);
+    /* Walls are part of the threat model: chained dodges herd the soul
+       into a corner, and a cornered gunner eats whole volleys (measured:
+       five consecutive orb contacts at the bottom-left corner tile,
+       soul pinned 7px off the wall). Edge terms bias any ACTIVE
+       evasion inward and fade to nothing mid-floor. */
+    if (any) {
+      const M = 110;
+      if (NEU.scal.px - 162 < M) fx += 2.2 * (M - (NEU.scal.px - 162)) / M;
+      if (862 - NEU.scal.px < M) fx -= 2.2 * (M - (862 - NEU.scal.px)) / M;
+      if (NEU.scal.py - 178 < M) fy += 2.2 * (M - (NEU.scal.py - 178)) / M;
+      if (638 - NEU.scal.py < M) fy -= 2.2 * (M - (638 - NEU.scal.py)) / M;
+    }
+    if (!any) return false;
+    const ex = Math.abs(fx) > 0.25 ? Math.sign(fx) : 0;
+    const ey = Math.abs(fy) > 0.25 ? Math.sign(fy) : 0;
+    if (!ex && !ey) return false;
+    run(ex, ey, 2);
+    return true;
+  };
+  for (let g = 0; g < 4500 && NEU.scal.hearts > 0 && NEU.scal.running; g++) {
+    if (evadeCloud()) { checkDrop(); continue; }
     if (!NEU.scal.heartPos.length) break;
+    /* Weave step — advance the ellipse angle and chase its point.
+       Bolts home, so shooting on the move costs nothing accurate (the
+       same reason killBro below fires mid-sway). */
+    thG += 0.045;
+    {
+      const wpx = cxG + Math.cos(thG) * RXG, wpy = cyG + Math.sin(thG) * RYG;
+      const dxw = wpx - NEU.scal.px, dyw = wpy - NEU.scal.py;
+      if (dxw || dyw) run(Math.sign(dxw), Math.sign(dyw), 1);
+    }
+    /* Shield discipline: cash a full tp bar whenever the soul is
+       below max — a shielded hit costs nothing, an unspent bar is a
+       wasted graze. */
+    if (NEU.scal.tp >= 1 && NEU.scal.shieldT === 0 && NEU.scal.soulHP < 5) {
+      key('keydown', 'x'); key('keyup', 'x');
+    }
     /* TWO bolts in flight, not one: flight time dwarfs the 0.3s shot
        cooldown out here, so a single-bolt bot spends most of the phase
        watching paint dry. The cap tightens on the last heart: never
@@ -663,7 +743,6 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
       f();
       if (NEU.scal.myShots.length > shotsBefore) bolts++;
     }
-    pump(4);
     checkDrop();
   }
   if (shattered !== 10) console.log('       heart diagnostic:', JSON.stringify({ shattered, hearts: NEU.scal.hearts, soulHP: NEU.scal.soulHP, tp: NEU.scal.tp, shieldT: NEU.scal.shieldT, mode: NEU.scal.mode, damage: damage.slice(heartDamageStart) }));
@@ -688,12 +767,44 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
      bot, so a generic perpendicular escape yanks us UP into worse
      crossfire. Sidestep along the floor away from the heading. */
   const sidestepLow = BOTY => {
+    /* Her BODY is a hostile while a charge is live: contact is
+       hypot<34 (boss-scal touch rule) and each dash leg runs 420px/s
+       at the soul's fire-time position — the pools below only see
+       projectiles, so a holding gunner ate the charge itself (measured:
+       every gauntlet death was chg:true with her 20-32px away). Hop
+       PERPENDICULAR to her bearing from 170px out: the hop itself is
+       cheap because a held f keeps charging through it (chargeF grows
+       with real key-down time, and power past the heavy gate wastes
+       nothing), while radial flight would lose to the faster dash.
+       Take the side with open floor. */
+    if (NEU.scal.charging) {
+      const dxh = NEU.scal.px - NEU.scal.bx, dyh = NEU.scal.py - NEU.scal.by;
+      const dh = Math.hypot(dxh, dyh);
+      if (dh > 0.001 && dh < 170) {
+        let mx = -dyh / dh, my = dxh / dh;   /* perpendicular */
+        if ((mx < 0 && NEU.scal.px - 162 < 90) ||
+            (mx > 0 && 862 - NEU.scal.px < 90)) { mx = -mx; my = -my; }
+        if ((my < 0 && NEU.scal.py - 178 < 90) ||
+            (my > 0 && 638 - NEU.scal.py < 90)) { my = -my; }
+        run(Math.round(mx), Math.round(my), 6);
+        return true;
+      }
+    }
     /* worm darts ride their own accessor and close faster (accel to
        ~300px/s) — give them a wider reaction radius than bullets.
        (Bullet tier measured best at 110: widening to 150 made the bot
-       sidestep constantly and starve its orb cycle.) */
+       sidestep constantly and starve its orb cycle.)
+       Only while the body is OUT, though: when the last heart dies,
+       boss-scal stops ticking the worm, and whatever was airborne
+       FREEZES mid-arena until the 8% re-summon clears it (draw is
+       gated the same way, so players never see them; measured: five
+       orbs airborne at sep exit). A frozen orb still points where the
+       soul stood, so the approaching-dot test below never goes false
+       and the bot starves its fire cycle dodging a painting. hearts>0
+       is exactly when tickDarts is live. */
     const pools = NEU.scal.bullets.map(b => ({ b: b, R: 110 }))
-      .concat((NEU.scal.wormDarts || []).map(b => ({ b: b, R: 160 })));
+      .concat(NEU.scal.hearts > 0 ?
+        (NEU.scal.wormDarts || []).map(b => ({ b: b, R: 160 })) : []);
     const th = pools.find(p => {
       const dx = p.b.x - NEU.scal.px, dy = p.b.y - NEU.scal.py;
       return Math.hypot(dx, dy) <= p.R && dx * p.b.vx + dy * p.b.vy < 0;
@@ -719,7 +830,7 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
        it has to live through. */
     let holding = false, heldFrames = 0;
     const release = () => { if (holding) { key('keyup', 'f'); holding = false; } };
-    for (let g = 0; g < 1400 && NEU.scal.hp > target && NEU.scal.mode === 'fight'; g++) {
+    for (let g = 0; g < 2600 && NEU.scal.hp > target && NEU.scal.mode === 'fight'; g++) {
       /* Proximity fills rage over the standoff — cash it the moment the
          bar is full, exactly as killBro does: eight seconds of doubled
          orbs roughly halves the real time parked in fight mode. */
@@ -736,7 +847,11 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
       if (holding) {
         heldFrames += 3;
         if (heldFrames >= 27) release();     /* ~0.43s -> power ~0.47 */
-      } else if (NEU.scal.hp - target > 12) {
+      } else if (NEU.scal.hp - target > 20) {
+        /* taps from 20 out, not 12: phase ladders sit at fixed hp
+           (180/120/84), and when upstream chip lowered the entry hp a
+           9-point heavy could STRADDLE the ladder (measured: 128 -> 119
+           put hp under the wall(2) window). One-point taps cannot. */
         key('keydown', 'f'); holding = true; heldFrames = 0;
       } else if (NEU.scal.myShots.length === 0) {
         f();
@@ -763,6 +878,10 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
      bleed the HP pool the brothers phase needs. */
   const waitOut = n => {
     for (let g = 0; g < n && NEU.scal.mode === 'wall'; g++) {
+      /* cash a full tp bar — wall rows graze heavily while dodged */
+      if (NEU.scal.tp >= 1 && NEU.scal.shieldT === 0 && NEU.scal.soulHP < 5) {
+        key('keydown', 'x'); key('keyup', 'x');
+      }
       if (dodge()) continue;
       pump(2);
     }
@@ -783,12 +902,20 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
      below the hp the call stopped at with the magazine already dry —
      the old tap trickle used to overshoot into the gate via in-flight
      drain. Drip single taps until the ladder trips: each is exactly
-     one damage, so the settle point stays inside the window. */
+     one damage, so the settle point stays inside the window.
+     Gate at 85, not 86: strike(28) can settle EXACTLY on 86 (measured
+     once the orb weave shifted the dart-burst RNG), and a strict->86
+     gate then refuses to fire the two taps the ladder still needs —
+     the drive idles at 86 forever and the arrival check reads fight
+     mode. Taps past 86 are safe by the same argument below. */
   {
     const cxN = 162 + 700 / 2, BOTYN = 178 + 460 - 60;
     let dirN = NEU.scal.px > cxN ? -1 : 1;
-    for (let gn = 0; gn < 1400 && NEU.scal.mode === 'fight' &&
-         NEU.scal.hp > 86 && NEU.scal.soulHP > 0; gn++) {
+    for (let gn = 0; gn < 2600 && NEU.scal.mode === 'fight' &&
+         NEU.scal.hp > 84 && NEU.scal.soulHP > 0; gn++) {
+      if (NEU.scal.tp >= 1 && NEU.scal.shieldT === 0 && NEU.scal.soulHP < 5) {
+        key('keydown', 'x'); key('keyup', 'x');
+      }
       if (sidestepLow(BOTYN)) continue;
       /* Shuttle ALWAYS — taps included: a volley cadence measured in
          seconds punishes a stationary gunner. Taps fly from wherever
