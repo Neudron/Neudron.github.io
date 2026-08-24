@@ -69,3 +69,4 @@ Thumbs.db
 # ── agent session transcripts (ephemeral) ──
 .opencode/log/
 .opencode/plans/*.txt
+.worktrees/
