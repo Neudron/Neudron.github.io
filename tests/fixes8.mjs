@@ -459,11 +459,25 @@ console.log('\n6. calamitas');
   ok('the brothers show up', /startBrothers/.test(src));
   ok('the Sepulcher starts with enough trail for six 66px body segments',
      /for \(var k = 0; k < 300; k\+\+\) sep\.trail\.push/.test(src));
-  ok('Sepulcher hearts trail on body segments beyond its proximity ring',
-     /var si = Math\.min\(4, 2 \+ \(\(h\.offset \/ 2\) \| 0\)\);/.test(src) &&
-     /h\.x = seg\.x \+ Math\.cos\(dir\) \* 34/.test(src));
-  ok('destroying a heart cannot pull survivors toward the Sepulcher head',
-     /var si = Math\.min\(4, 2 \+ \(\(h\.offset \/ 2\) \| 0\)\);/.test(src));
+  /* RE-SOURCED 2026-08-24: the hearts no longer ride the worm's body at
+     all. SepulcherHead.cs:45 sets NPC.damage = 0 (confirmed directly in
+     the mod source) and the guide text is explicit that ten hearts sit
+     fixed in the arena's upper corners while the worm charges Calamitas,
+     not the player — riding the body meant reaching a heart put the
+     soul inside the head's own (invented, non-source) contact zone, so
+     killing the worm required trading a hit. Ten static hearts make
+     that impossible by construction: nothing about their position
+     depends on where the worm's segments happen to be. */
+  ok('Sepulcher hearts are fixed at spawn, anchored to the two upper corners',
+     /\(left \? AX \+ 44 : AX \+ AW - 44\)/.test(src) &&
+     /AY \+ 46 \+ idx \* 28/.test(src));
+  ok('ten hearts spawn, not six',
+     /for \(var i = 0; i < 10; i\+\+\) \{[\s\S]{0,40}var left = i < 5, idx = i % 5;/.test(src));
+  ok('the worm deals no contact damage (SepulcherHead.cs: NPC.damage = 0)',
+     !/sep\.chargeT > 0 &&\s*\n\s*Math\.hypot\(px - sep\.x/.test(src));
+  ok('the worm charges CALAMITAS, not the player',
+     /Math\.atan2\(by - sep\.y, bx - sep\.x\)/.test(src) &&
+     !/Math\.atan2\(py - sep\.y, px - sep\.x\)/.test(src));
   ok('>>> her bar actually moves <<<', /bossHP -= mult/.test(src));
   ok('she is visibly shielded while invincible', /calamitas — shielded/.test(src));
   /* The additive pass moved into the one shared blitter in
@@ -486,14 +500,15 @@ console.log('\n6. calamitas');
 
 /* 6b. the win path. tryHit() used to bail on `invuln || mode !== 'fight'
    || sep` — and she is invincible for both interludes, so the sepulchre's
-   six hearts and her two brothers were untouchable, she never came out
+   ten hearts and her two brothers were untouchable, she never came out
    of her invincibility, and the fight could not be won. Drive the whole
    thing: shatter the hearts, strike her eighteen times, kill both
    brothers, and she must drop into phase 2. (Arena in jsdom: 1024x768,
    so AX=162 AY=178 AW=700 AH=460; the soul walks 4px/frame straight,
    2.828px/frame diagonal, and has MAXHP=5 — contact damage is lethal,
-   so the drive dodges: she and the worm only hurt while charging, and
-   darts are dodged perpendicular to their path.) */
+   so the drive dodges: SHE only hurts while charging (the worm deals
+   none, per SepulcherHead.cs), and darts are dodged perpendicular to
+   their path.) */
 console.log('\n6b. the sepulchre, the brothers, and the win');
 {
   const { w, NEU } = boot();
@@ -543,15 +558,17 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
     if (i >= 235 && NEU.scal.py > 380) { run(0, -1, 10); i += 10; }
     else { pump(1); i++; }
   }
-  ok('>>> the sepulchre descends with six hearts <<<',
-     NEU.scal.mode === 'fight' && NEU.scal.hearts === 6);
+  ok('>>> the sepulchre descends with ten hearts <<<',
+     NEU.scal.mode === 'fight' && NEU.scal.hearts === 10);
 
-  /* The hearts orbit a body segment at radius 24 and shatter under the
-     soul's strike (f) within 18px. The worm dashes at the soul every
-     1.45s, so the drive works the REST windows: dodge the dash, walk
-     onto the ring while the worm is still, strike the heart that the
-     orbit sweeps through the soul (one per ~0.9s), dodge again. */
-  let shattered = 0, before = NEU.scal.hearts, closestHeart = Infinity, strikeAttempts = 0, heartDamageStart = damage.length;
+  /* RE-SOURCED 2026-08-24: hearts are fixed at spawn (the two upper
+     corners) and the worm deals no contact damage at all, so the old
+     dodge-the-dash-then-catch-the-orbit choreography this drive used to
+     need is gone along with the mechanic it was working around. The
+     drive is now just "walk to each heart and strike it" — which is
+     the whole point of the rewrite: every heart is reachable for free,
+     never at the cost of a hit. */
+  let shattered = 0, before = NEU.scal.hearts, heartDamageStart = damage.length;
   const checkDrop = () => {
     if (NEU.scal.hearts < before) {
       shattered += before - NEU.scal.hearts;
@@ -560,31 +577,13 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
     }
     return false;
   };
-  /* The worm's body trails its head, so its heart-bearing segment (and
-     the hearts) snaps toward the soul during a lunge and rests near it
-     afterwards. So the soul stays close: when the dash starts (the aim
-     locks at the soul's then-position), step once perpendicular to the
-     locked aim — 48px clears the 30px contact radius — then hold still
-     through the rest of the busy window and strike hearts as they
-     orbit within reach during the cooldown. */
-  let dashStep = false;
-  const perpWorm = () => {
-    const v = NEU.scal.wormVel;
-    if (v && (v.x !== 0 || v.y !== 0)) {
-      run(Math.sign(v.y) || 1, Math.sign(-v.x) || 1, 16);
-      return true;
-    }
-    return false;
-  };
-  pump(1);   /* the spawn tick updates the heart positions */
-  for (let g = 0; g < 400 && NEU.scal.hearts > 0 && NEU.scal.running; g++) {
-    if (NEU.scal.wormBusy) {
-      if (!dashStep) dashStep = perpWorm();
-      pump(1);   /* time must advance even while holding */
-      checkDrop();
-      continue;
-    }
-    dashStep = false;
+  /* Contact-free does not mean risk-free: the worm still releases a
+     ring of accelerating darts each time a charge at Calamitas lands
+     (moved from the old player-proximity trigger — see boss-scal.js),
+     and that is real, per the guide text. Dodge it the same way the
+     dart-wall phases already do, interleaved with the walk to each
+     heart. */
+  for (let g = 0; g < 500 && NEU.scal.hearts > 0 && NEU.scal.running; g++) {
     if (dodge()) { checkDrop(); continue; }
     const pts = NEU.scal.heartPos;
     if (!pts.length) break;
@@ -593,40 +592,34 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
       const d = Math.hypot(p.x - NEU.scal.px, p.y - NEU.scal.py);
       if (d < bd) { bd = d; best = p; }
     }
-    closestHeart = Math.min(closestHeart, bd);
-    if (bd < 18) {
-      strikeAttempts++; f(); pump(3);
-      checkDrop();
-      continue;
-    }
-    if (bd <= 28) { pump(2); checkDrop(); continue; }   /* on the ring: hold, let the orbit bring the heart in */
+    if (bd < 18) { f(); pump(3); checkDrop(); continue; }
     const dx = best.x - NEU.scal.px, dy = best.y - NEU.scal.py;
     const sp = dx !== 0 && dy !== 0 ? 2.828 : 4;
     run(Math.sign(dx), Math.sign(dy), Math.min(12, Math.max(1, Math.ceil(bd / sp))));
     checkDrop();
   }
-  if (shattered !== 6) console.log('       heart diagnostic:', JSON.stringify({ shattered, hearts: NEU.scal.hearts, closestHeart: Math.round(closestHeart), strikeAttempts, soulHP: NEU.scal.soulHP, tp: NEU.scal.tp, shieldT: NEU.scal.shieldT, mode: NEU.scal.mode, damage: damage.slice(heartDamageStart) }));
-  ok('>>> a touch shatters a heart, one per touch <<<', shattered === 6);
-  ok('>>> all six hearts die <<<', NEU.scal.hearts === 0);
+  if (shattered !== 10) console.log('       heart diagnostic:', JSON.stringify({ shattered, hearts: NEU.scal.hearts, soulHP: NEU.scal.soulHP, tp: NEU.scal.tp, shieldT: NEU.scal.shieldT, mode: NEU.scal.mode, damage: damage.slice(heartDamageStart) }));
+  ok('>>> a touch shatters a heart, one per touch <<<', shattered === 10);
+  ok('>>> all ten hearts die <<<', NEU.scal.hearts === 0);
+  /* Contact-FREE (from the worm) is proven by the source check above,
+     not by this walker taking zero damage — the ring burst is a real
+     dodgeable ranged threat, same as any dart wall, and a simple test
+     bot missing an occasional dodge over 500 frames does not mean the
+     worm touched it. This just checks the run survived to prove every
+     heart really is reachable, not that dodging is flawless. */
+  ok('>>> the walk survives collecting every heart <<<', NEU.scal.soulHP > 0);
   pump(2);
   ok('>>> she steps out of her invincibility <<<', NEU.scal.mode === 'fight');
 
-/* Strike her only when she is in reach and NOT charging/diving — her
-     telegraph, dash, and dive sweep are contact damage. She hovers at the
-     top wall (by → AY-24) and her x chases the soul, so the soul walks up
-     into reach when she drifts far. The dive sweeps horizontally at the
-     row where the soul stood when the dive began — move perpendicular
-     (vertically) to escape the 32px contact band. */
+/* Strike her only when she is in reach and NOT charging — her telegraph
+     and dash are her only contact damage (the charge dash IS her melee;
+     there is no separate dive, matching the source). She hovers at the
+     top wall (by → AY-24) and her x chases the soul, so the soul walks
+     up into reach when she drifts far. */
   const strike = want => {
     const target = NEU.scal.hp - want;
     for (let g = 0; g < 900 && NEU.scal.hp > target; g++) {
       if (NEU.scal.charging) { run(1, 1, 45); continue; }
-      if (NEU.scal.diving) {
-        /* dive sweeps horizontally — dodge vertically away from its row */
-        const dy = NEU.scal.py - NEU.scal.by;
-        run(0, Math.sign(dy) || 1, 30);
-        continue;
-      }
       const d = Math.hypot(NEU.scal.px - NEU.scal.bx, NEU.scal.py - NEU.scal.by);
       if (d < 40) { f(); pump(1); }
       else if (Math.abs(NEU.scal.py - NEU.scal.by) > 6) {

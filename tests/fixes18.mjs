@@ -128,9 +128,10 @@ console.log('\n1. sepulcher sheets + worm body');
 console.log('\n2. hearts orbit a body segment');
 {
   const B = read('act4/boss-scal.js');
-  ok('hearts anchor to body segments 1..3, not the head', /si = Math\.min\(4, 2 \+ \(\(h\.offset \/ 2\) \| 0\)\)/.test(B));
-  ok('>>> hearts never referenced the head position <<<',
-     !/h\.x = sep\.x \+ Math\.cos\(hang\) \* hrad/.test(B));
+  ok('hearts anchor to the arena\'s upper corners, not the worm',
+     /\(left \? AX \+ 44 : AX \+ AW - 44\)/.test(B) && /AY \+ 46 \+ idx \* 28/.test(B));
+  ok('>>> hearts never referenced the head or body position <<<',
+     !/h\.x = sep\.x \+ Math\.cos\(hang\) \* hrad/.test(B) && !/si = Math\.min\(4, 2 \+/.test(B));
 }
 
 /* ═══ 3. the wall fires per-beat, not per-wall ════════════════════*/
@@ -149,8 +150,8 @@ console.log('\n4. SC fight flow: intro -> wall -> sepulcher');
   NEU.scal.open();
   ok('starts in intro', NEU.scal.mode === 'intro');
   ok('>>> intro ends and the wall starts <<<', await until(() => NEU.scal.mode === 'wall'));
-  ok('>>> the wall ends and the sepulcher spawns with 6 hearts <<<',
-     await until(() => NEU.scal.mode === 'fight' && NEU.scal.hearts === 6));
+  ok('>>> the wall ends and the sepulcher spawns with 10 hearts <<<',
+     await until(() => NEU.scal.mode === 'fight' && NEU.scal.hearts === 10));
   NEU.scal.close();
 }
 
@@ -160,7 +161,7 @@ console.log('\n5. ESC works mid-fight, with a confirm');
   const { w, NEU } = boot();
   const doc = w.document;
   NEU.scal.open();
-  await until(() => NEU.scal.mode === 'fight' && NEU.scal.hearts === 6);
+  await until(() => NEU.scal.mode === 'fight' && NEU.scal.hearts === 10);
   key(w, 'Escape');
   ok('>>> ESC mid-fight raises the confirm overlay <<<', !!doc.getElementById('confirmExit'));
   key(w, 'Enter');
@@ -179,7 +180,7 @@ console.log('\n6. bhQuit belongs to whoever is playing');
   /* SC up: the bullet minigame's handler must stand down and SC's must
      confirm, not close straight out. */
   NEU.scal.open();
-  await until(() => NEU.scal.mode === 'fight' && NEU.scal.hearts === 6);
+  await until(() => NEU.scal.mode === 'fight' && NEU.scal.hearts === 10);
   quit.click();
   ok('>>> SC fight: bhQuit raises the confirm overlay <<<', !!doc.getElementById('confirmExit'));
   ok('and does NOT close the fight behind it', NEU.scal.active === true);
@@ -204,14 +205,14 @@ console.log('\n7. bh__keys says what the active game does');
   const doc = w.document;
   const hint = doc.querySelector('#bh .bh__keys');
   NEU.scal.open();
-  await until(() => NEU.scal.mode === 'fight' && NEU.scal.hearts === 6);
+  await until(() => NEU.scal.mode === 'fight' && NEU.scal.hearts === 10);
   ok('>>> SC fight: no "survive 20s" on her wrapper <<<', !/survive 20s/.test(hint.textContent));
   ok('and her controls are listed', /f to strike/.test(hint.textContent) && /z for rage/.test(hint.textContent) && /x to shield/.test(hint.textContent) && /esc to leave/.test(hint.textContent));
   NEU.scal.close();
   ok('>>> the bullet hint comes back <<<', /survive 20s/.test(hint.textContent));
 }
 
-/* ═══ 8. the sepulcher charges, and contact damage exists ═════════*/
+/* ═══ 8. Calamitas charges with contact damage; the worm never does ═*/
 console.log('\n8. charge + contact damage');
 {
   const B = read('act4/boss-scal.js');
@@ -221,7 +222,8 @@ console.log('\n8. charge + contact damage');
   ok('bullets route through hitPlayer', /rr \* rr && hitPlayer\(\)\) return;/.test(B));
   ok('>>> SC contact damage only while telegraph/dash <<<',
      /\(chargeTelegraph > 0 \|\| chargeT > 0\)/.test(B) && /Math\.hypot\(px - bx, py - by\) < 34/.test(B));
-  ok('sepulcher contact only while dashing', /sep && sep\.chargeT > 0/.test(B));
+  ok('>>> the sepulcher itself deals no contact damage at all <<<',
+     /Sepulcher deals no contact damage/.test(B) && !/hypot\(px - sep\.x, py - sep\.y\)/.test(B));
   ok('>>> no contact damage while idle: the touch radius check is guarded <<<',
      !/&& \|\| true/.test(B));
 }
@@ -450,8 +452,9 @@ console.log('\n19. wave-A sweep');
   /* W4 — dying mid multi-charge then retrying hit an early-return
      forever: open() reset everything except the charge vars. */
   const B = read('act4/boss-scal.js');
-  ok('>>> open() zeroes every charge var alongside diveT <<<',
-     /diveT = 0;[\s\S]{0,200}?chargeT = 0; chargeTelegraph = 0; chargeBurst = 0; chargeBurstMax = 0; chargeGap = 0;/.test(B));
+  ok('>>> open() zeroes every remaining charge var (diveT is gone with dive()) <<<',
+     /chargeT = 0; chargeTelegraph = 0; chargeBurst = 0; chargeBurstMax = 0; chargeGap = 0;/.test(B) &&
+     !/diveT/.test(B));
 
   /* W5 — the 900ms charge telegraph outlived close(); reopening inside
      the window fired it into the new fight untelegraphed. */

@@ -156,6 +156,7 @@
        button it is sitting on. */
     if (!lastFocus) lastFocus = document.activeElement;
     wrap.hidden = false;
+    NEU.activeMinigame = 'quiz';        /* the room underneath must not move or take Escape */
     document.body.classList.add('is-playing');
     if (NEU.quest) { NEU.quest.lock(true); NEU.quest.mark('a4_tenna'); }
     i = 0; score = 0; locked = false;
@@ -179,6 +180,7 @@
     clearTimeout(askTimer);
     askTimer = null;
     wrap.hidden = true;
+    if (NEU.activeMinigame === 'quiz') NEU.activeMinigame = null;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
     if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) {} }

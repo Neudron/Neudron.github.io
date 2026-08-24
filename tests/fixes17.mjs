@@ -232,62 +232,76 @@ console.log('\n3. settings trap, driven');
 console.log('\n4. manifest honesty');
 {
   const { NEU } = boot();
-  const S = read('data/sheets.js');
   const keys = Object.keys(NEU.sheets);
   ok('the manifest is non-empty (' + keys.length + ')', keys.length > 10);
 
-  /* A sheet cannot be both measured and guessed. The pair drifted
-     apart once already: two entries carried `confirmed: true` AND a
-     `verify:` flag, which reads as "we checked it" and means "we did
-     not". */
-  for (const k of keys) {
-    const s = NEU.sheets[k];
-    if (s.provisional) ok(k + ': provisional, so not also confirmed', !s.confirmed);
-  }
+  /* RE-SOURCED 2026-08-24: the measured/provisional/confirmed/verify
+     apparatus this section used to check is gone entirely — it existed
+     because the only art on hand was a rip with no frame counts
+     attached, so every dimension had to be guessed at and flagged for
+     a human to eyeball. Every Calamity file is now copied byte-for-byte
+     from CalamityModPublic under its own filename, and every frame
+     count is read from the `.cs` that ships beside it. What "honesty"
+     means for this manifest now: every Calamity entry names the exact
+     source it came from, and none of them names the wrong Calamitas —
+     NPCs/CalClone/ is a different, earlier boss; NPCs/TownNPCs/ is the
+     witch who moves in after this fight, used ONLY for her own
+     pre-fight portrait. */
+  const calamityKeys = keys.filter(k => /calamity\//.test(NEU.sheets[k].src));
+  const noProvenance = calamityKeys.filter(k => !NEU.sheets[k].from);
+  ok('>>> every Calamity sheet cites its source <<<', noProvenance.length === 0);
+  if (noProvenance.length) console.log('       missing from: ' + noProvenance.join(', '));
+  const wrongEntity = calamityKeys.filter(k => /CalClone|TownNPCs/.test(NEU.sheets[k].from || ''));
+  ok('>>> no Calamity sheet cites CalClone or TownNPCs <<<', wrongEntity.length === 0);
 
-  /* NOTHING is provisional any more. The last two, sepulcher and heart,
-     were settled by rendering them at 5x with the candidate cell rules
-     drawn on and looking: sepulcher is one head, not two frames, and
-     heart is six beats on a 62px grid, not five on 74. */
-  const prov = keys.filter(k => NEU.sheets[k].provisional);
-  ok('>>> nothing is provisional (' + (prov.join(', ') || 'none') + ') <<<', prov.length === 0);
-
-  for (const want of ['fireblast', 'gigablast', 'hook', 'sepulcher', 'heart']) {
-    const s = NEU.sheets[want];
-    ok(want + ': confirmed', s.confirmed === true && !s.provisional);
-    ok(want + ': records how it was settled', /measured|seen/.test(s.note || ''));
-  }
   ok('sepulcher is one frame, not two', NEU.sheets.sepulcher.frames === 1);
   ok('...and fps 0, because there is nothing to animate', NEU.sheets.sepulcher.fps === 0);
-  ok('heart is six frames on a 62px grid',
-     NEU.sheets.heart.frames === 6 && NEU.sheets.heart.fh === 62);
-  ok('...and its sheet was re-padded so the grid is exact',
-     NEU.sheets.heart.h === 372 && 6 * 62 === 372);
+  /* heart is SepulcherHead.cs's sibling BrimstoneHeart.cs: frameCount 6
+     over a 370px-tall file. Terraria's FindFrame does ordinary integer
+     division (`texture.Height / npcFrameCount`, truncated) rather than
+     requiring an exact split — 370/6 = 61 with 4px simply left unused
+     at the bottom. The previous manifest treated 370 as a corrupted rip
+     and padded the file to 372 so 6*62 would divide evenly; that file
+     and that step are both gone. This IS what the mod ships. */
+  ok('heart is six frames on the source\'s own 370px file',
+     NEU.sheets.heart.frames === 6 && NEU.sheets.heart.h === 370 && NEU.sheets.heart.fh === 61);
+  ok('...matching Terraria\'s own truncating frame division, not exact division',
+     NEU.sheets.heart.fh === Math.floor(NEU.sheets.heart.h / NEU.sheets.heart.frames) &&
+     NEU.sheets.heart.frames * NEU.sheets.heart.fh !== NEU.sheets.heart.h);
 
-  /* Geometry must be self-consistent whatever the provenance. */
+  /* Geometry must be self-consistent whatever the provenance — every
+     grid still has to fit inside its own file (truncation only ever
+     loses a few trailing pixels, never overflows it). */
   for (const k of keys) {
     const s = NEU.sheets[k];
     if (!s.h || !s.frames || !s.fh) continue;
-    ok(k + ': frames x fh accounts for the sheet (' + s.frames + 'x' + s.fh + '=' +
+    ok(k + ': frames x fh fits the sheet (' + s.frames + 'x' + s.fh + '=' +
        (s.frames * s.fh) + ' of ' + s.h + ')', s.frames * s.fh <= s.h);
   }
 
-  /* The slash pair was mislabelled and has been swapped, so nothing is
-     waiting on a human any more. */
-  const orient = keys.filter(k => NEU.sheets[k].verify);
-  ok('>>> no sheet is still flagged for a human (' + (orient.join(', ') || 'none') + ') <<<',
-     orient.length === 0);
-  ok('slashTop is the top arc (the Alt file)', /SlashAlt\.png$/.test(NEU.sheets.slashTop.src));
-  ok('slashBot is the bottom arc (the plain file)',
-     /CatastropheSlash\.png$/.test(NEU.sheets.slashBot.src));
-  /* The geometry had to travel with the src — the files are different
-     sizes, so an entry left holding the other one's dimensions would
-     slice the arc off-grid. This is the check for that mistake. */
+  /* The slash pair's pose reading (2026-08-17: rendered onto a
+     checkerboard with the cell grid drawn over both files) survives
+     the rename from pose-guess keys to the mod's own filenames. */
+  ok('catastropheSlashAlt is the top arc (the Alt file)',
+     /SlashAlt\.png$/.test(NEU.sheets.catastropheSlashAlt.src));
+  ok('catastropheSlash is the bottom arc (the plain file)',
+     /^(?!.*Alt).*CatastropheSlash\.png$/.test(NEU.sheets.catastropheSlash.src));
+  /* The geometry has to travel WITH the src — the two files are
+     different sizes, so an entry holding the other one's dimensions
+     would slice the arc off-grid. */
   ok('>>> geometry moved with the src, not just the string <<<',
-     NEU.sheets.slashTop.w === 192 && NEU.sheets.slashTop.fh === 58 &&
-     NEU.sheets.slashBot.w === 168 && NEU.sheets.slashBot.fh === 60);
-  ok('and sheets.js records that swapping only the strings was wrong',
-     /describe the FILE, not the role/.test(S));
+     NEU.sheets.catastropheSlashAlt.w === 192 && NEU.sheets.catastropheSlashAlt.fh === 58 &&
+     NEU.sheets.catastropheSlash.w === 168 && NEU.sheets.catastropheSlash.fh === 60);
+
+  /* The brothers' real NPC bodies exist now — CurrentFrame/col math
+     read straight from SupremeCataclysm.cs / SupremeCatastrophe.cs
+     (9 rows x 3 cols, 8 rows x 2 cols respectively). */
+  ok('cataclysm body: 9 rows, 3 cols, matching the .cs frame math',
+     NEU.sheets.cataclysm.frames === 9 && NEU.sheets.cataclysm.cols === 3 &&
+     NEU.sheets.cataclysm.fw * 3 === NEU.sheets.cataclysm.w);
+  ok('catastrophe body: 8 rows, 2 cols, matching the .cs frame math',
+     NEU.sheets.catastrophe.frames === 8 && NEU.sheets.catastrophe.cols === 2 &&
+     NEU.sheets.catastrophe.fw * 2 === NEU.sheets.catastrophe.w);
 }
 
 /* ═══ 5. the frame-time meter ═════════════════════════════════════*/

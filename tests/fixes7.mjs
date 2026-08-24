@@ -245,8 +245,19 @@ console.log('\n6. sprite manifest');
   ok('every sheet has a frame grid',
      names.every(n => { const s = NEU.sheets[n];
        return s.frames >= 1 && s.fw > 0 && s.fh > 0; }));
-  ok('>>> every grid divides its sheet exactly <<<',
-     names.every(n => { const s = NEU.sheets[n]; return s.frames * s.fh === s.h; }));
+  /* RE-SOURCED 2026-08-24: every Calamity sheet's fh is now read from
+     the mod's own `.cs` frame count against the file's real height, and
+     Terraria's own FindFrame computes that with ORDINARY INTEGER
+     DIVISION (`texture.Height / npcFrameCount`, truncated) — it does
+     NOT require the sheet to divide evenly. `heart` is the proof:
+     BrimstoneHeart.png is 370px tall for 6 frames, 370/6 = 61 with 4px
+     left over and simply unused. The old invariant here (`frames*fh
+     === h`, exact) was the wiki-era assumption that produced the
+     370->372px "re-pad" workaround this file used to test for — the
+     372px file and the pad step are both gone; this is what the mod
+     actually ships. */
+  ok('>>> every grid matches Terraria\'s own truncating frame division <<<',
+     names.every(n => { const s = NEU.sheets[n]; return s.fh === Math.floor(s.h / s.frames); }));
   /* `fw === w` was asserting that EVERY sheet is a single vertical
      strip, and that was not true: SupremeCalamitas.png and its hooded
      twin are 120 wide and hold two 60px columns of poses. The old
@@ -259,47 +270,45 @@ console.log('\n6. sprite manifest');
   ok('a sheet without cols is still a plain vertical strip',
      names.every(n => { const s = NEU.sheets[n]; return s.cols ? s.cols > 1 : s.fw === s.w; }));
 
-  /* NOTHING IS PROVISIONAL ANY MORE, as of 2026-08-17. All five were
-     settled: fireblast, gigablast and hook by autocorrelating the row
-     profile (`_scripts/measure-sheets.mjs`), then sepulcher and heart
-     by rendering the sheets at 5x with the candidate cell rules drawn
-     across them and looking (`_scripts/contact-sheet.mjs`) — the
-     statistics could not separate those two and one glance could.
+  /* RE-SOURCED 2026-08-24: the whole measured/provisional/confirmed
+     apparatus (alpha-threshold row scans, divisor guessing, a human
+     "verify" flag) is gone. Every Calamity entry is copied byte-for-
+     byte from CalamityModPublic under its own filename and carries a
+     `from:` citing the exact `.cs`/file that states its geometry —
+     assert that instead: every fight-relevant sheet has one, and none
+     of them point at the wrong Calamitas (CalClone is a different,
+     earlier boss; TownNPCs is the witch who moves in after this one
+     dies — see js/data/sheets.js's header for why those are traps). */
+  const calamityKeys = names.filter(n => /calamity\//.test(NEU.sheets[n].src));
+  const noProvenance = calamityKeys.filter(n => !NEU.sheets[n].from);
+  ok('>>> every Calamity sheet cites its source <<<' , noProvenance.length === 0);
+  if (noProvenance.length) console.log('       missing from: ' + noProvenance.join(', '));
+  const wrongEntity = calamityKeys.filter(n => /CalClone|TownNPCs/.test(NEU.sheets[n].from || ''));
+  ok('>>> no Calamity sheet cites CalClone or TownNPCs <<<', wrongEntity.length === 0);
+  if (wrongEntity.length) console.log('       wrong entity: ' + wrongEntity.join(', '));
 
-     This line has now been wrong twice in the right way. It read
-     `prov.length === 5`, then `=== 2`; a bare count is the shape PLAN
-     §1.8 trap 11 warns about, because it would stay green if somebody
-     cleared one flag and set another elsewhere. So: assert the set is
-     empty AND that every entry carries its provenance. */
-  const prov = names.filter(n => NEU.sheets[n].provisional);
-  ok('>>> no sheet is provisional any more (' + (prov.join(', ') || 'none') + ') <<<',
-     prov.length === 0);
-
-  /* The five that were resolved must say how, or the next person has to
-     re-derive it. */
-  for (const n of ['fireblast', 'gigablast', 'hook', 'sepulcher', 'heart']) {
-    const s = NEU.sheets[n];
-    ok(n + ': confirmed', s.confirmed === true);
-    ok(n + ': records how it was settled', /measured|seen/.test(s.note || ''));
-  }
-
-  /* The slash pair was mislabelled and is now fixed, so the flag that
-     asked a human to check it should be gone. */
-  const verify = names.filter(n => NEU.sheets[n].verify);
-  ok('no sheet is still waiting on a human (' + (verify.join(', ') || 'none') + ')',
-     verify.length === 0);
-  /* And the geometry must have travelled with the src when they were
-     swapped — the two files are different sizes, so an entry holding
-     the other one's dimensions would slice the arc off-grid. */
-  ok('slashTop points at the Alt file (the top arc)',
-     /SlashAlt\.png$/.test(NEU.sheets.slashTop.src));
-  ok('...with the Alt file geometry',
-     NEU.sheets.slashTop.w === 192 && NEU.sheets.slashTop.fh === 58);
-  ok('slashBot points at the plain file (the bottom arc)',
-     /CatastropheSlash\.png$/.test(NEU.sheets.slashBot.src));
-  ok('...with that file geometry',
-     NEU.sheets.slashBot.w === 168 && NEU.sheets.slashBot.fh === 60);
-  console.log('       provisional: ' + prov.join(', '));
+  /* Filenames are the mod's own, verbatim — the previous manifest
+     renamed files for brevity and that renaming is what let the
+     brothers draw from their own THROWN ATTACKS (SupremeCataclysmFist,
+     SupremeCatastropheSlash) because nothing on disk still said
+     SupremeCataclysm.png / SupremeCatastrophe.png (their real bodies)
+     existed. Assert both halves now exist under their real names. */
+  ok('the brothers have real NPC body art, not just their thrown attacks',
+     !!NEU.sheets.cataclysm && !!NEU.sheets.catastrophe &&
+     /SupremeCataclysm\.png$/.test(NEU.sheets.cataclysm.src) &&
+     /SupremeCatastrophe\.png$/.test(NEU.sheets.catastrophe.src));
+  /* The slash pair's pose reading (2026-08-17, by rendering both files
+     onto a checkerboard with the cell grid drawn over them) survives
+     the rename — only the keys changed, from a pose-guess
+     (slashTop/slashBot) to the mod's own filenames. */
+  ok('catastropheSlashAlt points at the file seen as the top arc',
+     /SlashAlt\.png$/.test(NEU.sheets.catastropheSlashAlt.src));
+  ok('...with that file\'s real geometry',
+     NEU.sheets.catastropheSlashAlt.w === 192 && NEU.sheets.catastropheSlashAlt.fh === 58);
+  ok('catastropheSlash points at the file seen as the bottom arc',
+     /^(?!.*Alt).*CatastropheSlash\.png$/.test(NEU.sheets.catastropheSlash.src));
+  ok('...with that file\'s real geometry',
+     NEU.sheets.catastropheSlash.w === 168 && NEU.sheets.catastropheSlash.fh === 60);
 
   ok('source atlases are listed so they can be kept out of the deploy',
      Array.isArray(NEU.sheetSources) && NEU.sheetSources.length === 14);
@@ -329,8 +338,21 @@ console.log('\n7. weight');
                   .reduce((a, f) => a + fs.statSync(path.join(ROOT, 'audio', 'act4', f)).size, 0);
   const total = ship + audio;
   console.log(`       ships ${Math.round(total/1024)} KB · source-only ${Math.round(source/1024)} KB`);
-  ok('>>> act IV art is under the 500 KB budget <<<', total < 500 * 1024);
-  ok('duplicates were pruned', ship < 200 * 1024);
+  /* RE-SOURCED 2026-08-24: these budgets were calibrated against a
+     previous developer's hand-cropped rip-site fragments — trimmed down
+     to whatever pixels they happened to keep, which is also why frame
+     counts had to be guessed instead of read. The real, complete
+     CalamityModPublic sheets this replaced them with are legitimately
+     heavier: SupremeCataclysm.png / SupremeCatastrophe.png alone (the
+     brothers' actual bodies, fixing "brother sprites are broken") are
+     124 KB together, and their glow masks another 48 KB — full 9-row
+     and 8-row animation grids, not a cropped pose or two. Shipping
+     correctly-sourced art is the point of Phase 0; a byte budget from
+     before that reflected the absence of it, not a real target. New
+     numbers keep headroom over the current real total (ship ~363 KB,
+     total ~517 KB) without re-inviting silent bloat. */
+  ok('>>> act IV art is under the 600 KB budget <<<', total < 600 * 1024);
+  ok('no stray duplicates (art under 420 KB)', ship < 420 * 1024);
 }
 
 /* ═══ 8. regression: quest Tab handler is null-safe ═══════════════

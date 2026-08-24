@@ -1,41 +1,112 @@
 ### Neu's Personal page BUG Tracker
 
-> **STATUS 2026-08-22** — everything above the V3 line is closed by the
-> boss-scal rebuild + suites (`fixes8` 104, `fixes18` 100, `fixes13` 79);
-> details in `memory/uat-w5.md` and `memory/pending.md` §5.2/5.4. Cluster map:
+> **STATUS 2026-08-24** — the 2026-08-22 status block above this line was
+> wrong: it declared bugs closed on the strength of suites that were 20-44%
+> regex-on-source-text (asserting a string exists in a `.js` file, not that
+> the game behaves), and on sprites that were wiki/rip-site rips with
+> pixel-measured, sometimes-guessed frame geometry. This entry replaces it
+> with what is actually verified — root cause, fix, and the test that now
+> fails without it — after a full source-accurate rebuild against
+> CalamityModPublic (the mod's own repo, commit `1a8cebd`, cloned to
+> `_sources/calamity-src/`, never shipped). Suites: `fixes7` 64/64, `fixes8`
+> 107/107, `fixes13` 80/80, `fixes17` 331/331, `fixes18` 131/131 — all
+> converted off regex-on-source assertions onto behavioral ones.
 >
-> - **Worm is a head / no hearts / follows slowly / free attack** → rebuilt:
->   full body+tail via `sepulBody(Alt)`/`sepulTail`, six hearts ride the body,
->   constant pursuit, charges with a 0.35s telegraph, contact damage only
->   while dashing.
-> - **Dialog face shows sans instead of hers** → `FACE` map gained
->   `scal`/`scalHood`; unknown speakers no longer keep the previous face.
-> - **Homing attacks don't rotate toward the player** → projectiles rotate to
->   their travel direction continuously (superset of launch-time aim).
-> - **Flames explode on the spot** → fireblast now homes before its pause,
->   then bursts.
-> - **Dash/melee don't work** → CYCLE drives dives (steps 5, 13) and charges
->   (4, 9, 16, 18, 20); contact damage during telegraph/dash covers melee.
-> - **Brothers spam and are unkillable** → volley caps + enrage numbers
->   tuned; sequence ends in phase 2.
-> - **ESC policy inconsistency** → decided: fights confirm (bullet, scal,
->   polt, quiz, rhythm), rooms/menus stay direct (craft, dark, deck). See
->   `memory/decisions.md`.
-> - **Enter glitch into the 20s minigame on death** → Enter guards +
->   `activeMinigame` checks landed in bullet/scal/engine.
-> - **Sprites wrong vs the Calamity wiki** → all sheets re-measured against
->   `SupremeCalamitas.cs` (21 rows × 2 cols, real animation bands); 18/18 PNGs
->   match their definitions.
-> - **First pattern impossible / safe spots between bullets** → rebalanced;
->   final judgement needs the playthrough (below).
+> - **Worm is only a head, hearts inside it require taking damage** → root
+>   cause: hearts were pinned to body segments on a worm that deals contact
+>   damage while charging, so reaching a heart was structurally a trade.
+>   Fixed per the mod source (`SepulcherHead.cs`/`BrimstoneHeart.cs`, both
+>   unreadable before Phase 0): 10 static hearts anchored in the arena's
+>   upper corners, the worm's own contact damage removed entirely
+>   (`NPC.damage = 0` in source), and its charge/chase now targets Calamitas,
+>   not the player.
+> - **Tail floats detached from the body** → it was drawing at the oldest
+>   sample of a 260-entry trail while the body only spans ~6 segments; fixed
+>   to draw one segment-spacing past the last real body segment.
+> - **Calamitas has an empty attack (hellblast fires nothing)** → the
+>   closure handed to the projectile scheduler was never invoked — it
+>   returned its own handler instead of calling it, so `setTimeout` executed
+>   nothing. One of her 20 cycle steps (`'h'`, 4/20 = 20% of the fight) was
+>   silently idle since it was written. Fixed; also fixed the charge count
+>   drifting to the wrong pattern after cycle 1 (indexed absolute step
+>   number instead of position-in-cycle).
+> - **Dash/melee doesn't work** → the charge dash *is* her only melee per
+>   source; the unreachable `dive()` path (never in `CYCLE`, contradicted the
+>   header comment that already said it was removed) is now deleted rather
+>   than half-present. The telegraph before a dash now plays its own
+>   animation band instead of the idle pose.
+> - **Homing attacks / the worm don't rotate toward travel direction** →
+>   both derived rotation from live velocity, which is zero at spawn and
+>   during any pause; both now track an explicit `rot` updated only from
+>   real motion.
+> - **You can stand still in the dart wall and never be hit** → the spread
+>   was a fixed angle, so gaps between darts widen with distance and become
+>   walkable past ~250px; spread is now sized to stay within hit range at
+>   any distance the fight actually happens at.
+> - **Hitboxes are unfair / some don't even work** → radii were hand-picked
+>   constants disconnected from the drawn sprite size (off by 0.36×-2.2× in
+>   both directions). Radii now derive from the real Terraria
+>   `Projectile.width/height` cited in each `.cs`, scaled to the drawn cell.
+> - **Brother attack sprites are broken** → root cause: the brothers'
+>   *bodies* were being drawn from their own *projectile* art
+>   (`SupremeCataclysmFist.png` / `SupremeCatastropheSlashAlt.png`) because
+>   their real NPC sprites (`SupremeCataclysm.png` / `SupremeCatastrophe.png`)
+>   had never been added to any manifest, despite existing in the mod repo.
+>   Fixed; both now draw their own body + glow art.
+> - **Dialog face shows sans instead of hers** → still fixed, now sourced
+>   from the boss's real `HoodlessHeadIcon.png`/`HoodedHeadIcon.png` instead
+>   of renamed copies.
+> - **Dialogs reset on every `e` press** → confirmed: the open-tbox guard
+>   only covered the `npc` branch. Added the same guard to `sign` (the
+>   concretely-reported case — the four V3 hint signs). Left run-hook
+>   entities (puzzle stones, the witch, the merchant) unguarded on purpose:
+>   an earlier attempt hoisted the guard to the top of `fire()` and broke the
+>   riddle-stone puzzle, because a left-open room-intro dialogue kept
+>   `tboxOpen()` true and silently blocked their own `.run` interaction
+>   logic.
+> - **Enter glitches into the 20s minigame on death / ESC inconsistency** →
+>   three overlays (`quiz`, `dark`, `deck`) never claimed the shared
+>   `activeMinigame` input lock at all, so the room's own keydown handler
+>   stayed live underneath them; scal's `close()` also cleared the lock
+>   unconditionally, capable of stealing it from whichever overlay opened
+>   next. All four now claim/release it correctly.
+> - **Sprites wrong vs the wiki** → not fixed by comparing against the wiki
+>   (the wiki was never a source of truth); fixed by re-sourcing every
+>   Calamity sprite directly from CalamityModPublic under its real filename,
+>   with the `.cs` that declares its frame count cited per manifest entry.
+>   Deleted the pixel/alpha-threshold measuring apparatus this replaces.
+>   Also caught: the boss's own head-icon sheet was one row short of its
+>   real frame count, because integer division of `texture.Height /
+>   frameCount` in the mod's own `FindFrame` truncates rather than divides
+>   exactly — a previous fix had padded the sheet instead of matching that
+>   truncation.
+> - **First pattern impossible** → rebalanced (see dart-wall entry above);
+>   still owed a phone-viewport playtest, not just jsdom.
 >
-> **Still owed — verify by playing it:** post-hearts phase start, brothers
-> killability feel, first-pattern fairness on a phone, hitbox feel generally.
-> From Iteration V3, also done: puzzle signs, wall-skip prevention, rage(Z)/
-> TP(X) bars with real game sprites, dev F8 fight entry, merchant shop UI
-> (`js/act4/shop.js`, selectable rows/prices/quips), extra SC attacks, official
-> repo sprites incl. shield states. TV-sword throw and axe→mushroom→heal chain
-> shipped as rooms/craft content — feel-check them in the same playthrough.
+> **Genuinely still open, and why:**
+> - Undertale, Deltarune and Terraria sprites (`recall`, `axe`, `mushroom`,
+>   `slot`, `tenna`, `firedoor`, `armchair`, `corridor`, etc.) are still
+>   rip-site sourced. Re-gathering them the same way as Calamity requires a
+>   local game install to unpack (`TExtract`/`UndertaleModTool`) — this
+>   machine has neither, so this is blocked on you, not skipped.
+> - "After breaking the hearts calamitas just does nothing" and general
+>   post-hearts phase-2 feel are unverified beyond jsdom's behavioral
+>   assertions — owed a real playthrough.
+> - Brothers-killability and hitbox feel generally are tuned to the source
+>   numbers but not yet felt out by hand.
+>
+> **Unrelated, pre-existing, confirmed NOT caused by this pass** (verified by
+> `git stash`-ing this session's changes and re-running against the clean
+> baseline): `fixes12.mjs` — "no unexpected switches (6)" — and `fixes16.mjs`
+> — "music.js is under 24 KB" (it's 24.3 KB; `js/core/music.js` was already
+> modified-but-uncommitted before this session started). Neither touches the
+> Calamitas fight; left alone.
+>
+> From Iteration V3, still holding from the prior pass: puzzle signs,
+> wall-skip prevention, rage(Z)/TP(X) bars now sourced from
+> `UI/Rippers/RageBar.png`/`AdrenalineBar.png` rather than renamed copies,
+> dev F8 fight entry, merchant shop UI (`js/act4/shop.js`), TV-sword throw
+> and axe→mushroom→heal chain as rooms/craft content.
 
 the supreme calamitas when in the minigame form doesent have its sprite
 

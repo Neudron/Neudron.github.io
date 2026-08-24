@@ -299,6 +299,7 @@
     if (open_) return;
     open_ = true;
     wrap.hidden = false;
+    NEU.activeMinigame = 'deck';        /* the room underneath must not move or take Escape */
     document.body.classList.add('is-playing');
     if (NEU.quest) { NEU.quest.lock(true); NEU.quest.mark('deck'); }
     build();
@@ -315,6 +316,7 @@
     clearInterval(tick);
     wrap.classList.remove('is-in');
     wrap.hidden = true;
+    if (NEU.activeMinigame === 'deck') NEU.activeMinigame = null;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
   }

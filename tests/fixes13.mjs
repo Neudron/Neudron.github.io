@@ -92,7 +92,7 @@ console.log('\n2. Calamitas draws from her sheets');
 {
   const { NEU } = boot();
   const keys = ['dart', 'hellblast', 'fireblast', 'gigablast',
-                'fist', 'slashTop', 'sepulcher', 'heart', 'ashes'];
+                'cataclysm', 'catastrophe', 'sepulcher', 'heart', 'ashes'];
   keys.forEach(k => {
     ok('the sheet key "' + k + '" is referenced', SCAL.indexOf("'" + k + "'") >= 0);
   });
@@ -100,8 +100,18 @@ console.log('\n2. Calamitas draws from her sheets');
      /var key = b\.k === 1 \? 'fireblast' : b\.k === 2 \? 'gigablast'\s*: b\.k === 3 \? 'hellblast' : 'dart'/.test(SCAL));
   ok('her body picks hooded in intro, body in fight',
      /var bodyKey = mode === 'intro' \? 'scalHood' : 'scal'/.test(SCAL));
-  ok('the brothers pick fist vs slash by kind',
-     /bKey = br\.kind === 'fist' \? 'fist' : 'slashTop'/.test(SCAL));
+  /* RE-SOURCED 2026-08-24: they draw their real NPC bodies now
+     (SupremeCataclysm.png / SupremeCatastrophe.png), not their own
+     thrown attacks — 'fist'/'slashTop' pointed at
+     SupremeCataclysmFist.png / SupremeCatastropheSlashAlt.png, the
+     PROJECTILES each brother throws, because the actual body art
+     (confirmed present in the mod repo the whole time) had never been
+     copied into the manifest under any key at all. That was the whole
+     "brother attack sprites are broken" bug. */
+  ok('the brothers pick cataclysm vs catastrophe body art by kind',
+     /bKey = br\.kind === 'fist' \? 'cataclysm' : 'catastrophe'/.test(SCAL));
+  ok('...with their own glow masks, additive, same as Polterghast',
+     /bGlow = br\.kind === 'fist' \? \['cataclysmGlow'\] : \['catastropheGlow'\]/.test(SCAL));
   /* The blitter these three describe moved into data/sheets.js when
      three identical copies of it were collapsed into one — the copies
      were why a two-column sheet could not be declared, since each
@@ -111,7 +121,7 @@ console.log('\n2. Calamitas draws from her sheets');
      alone would report all three gone because the lines live elsewhere. */
   const SHEETS = fs.readFileSync(path.join(ROOT, 'js', 'data', 'sheets.js'), 'utf8');
   ok('>>> the sprite helper exists <<<',
-     /function sprite\(key, x, y, scale, rot, glow, col, frame, alpha\)/.test(SCAL) &&
+     /function sprite\(key, x, y, scale, rot, glow, col, frame, alpha, glowKeys\)/.test(SCAL) &&
      /NEU\.sheetDraw = function/.test(SHEETS));
   ok('it rotates to face travel', /ctx\.rotate\(o\.rot\)/.test(SHEETS) &&
      /Math\.atan2\(b\.vy, b\.vx\)/.test(SCAL));
