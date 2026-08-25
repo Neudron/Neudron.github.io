@@ -498,7 +498,9 @@
      20% health: ten Supreme Soul Seekers on a rotating ring, and she is
      invulnerable until the last one dies (official wiki; the module in
      scal-seekers.js holds the source cites). She parks at arena centre
-     for it — the source has her immobile here anyway, and her resting
+     for it — fightTick returns above her hover/orbit chain while ringOn,
+     so nothing moves bx/by until the last seeker dies — which is what
+     the source does anyway (she is immobile here), and her resting
      position (by = AY - 24) is ABOVE the frame, where a ring would not
      fit. */
   var ringOn = false;
@@ -609,6 +611,31 @@
           Math.hypot(px - bx, py - by) < 34) touching = true;
       if (touching && hitPlayer()) return;
     }
+
+    if (ringOn && NEU.scalSeekers) {
+      /* She holds still; the ring is the attack. This block sits ABOVE
+         the hover/charge chain on purpose: her idle branch orbits the
+         player, so letting that run first would drag her (and the ring,
+         which re-centres on her every tick) around the arena instead of
+         holding the park point startSeekers chose. Both callbacks are
+         the SAME ones the worm uses (the sep block below), so graze
+         feeds tp under moveBullets' rule and a hit routes through
+         hitPlayer with the shield and i-frames behaving identically. */
+      NEU.scalSeekers.setPlayer(px, py);
+      NEU.scalSeekers.tick(dt);
+      NEU.scalSeekers.tickDarts(dt, px, py,
+        function () { tp = Math.min(1, tp + dt * 0.4); },
+        function () { if (inv <= 0 && mode !== 'won') hitPlayer(); });
+      if (!NEU.scalSeekers.alive()) {
+        ringOn = false; invuln = false;
+        say("* the eyes go out. she is exposed again.");
+        /* pause before she resumes the cycle — same interlude beat the
+           worm exit uses */
+        stepT = 1.2;
+      }
+      return;
+    }
+
     /* she hovers above you unless charging */
     if (chargeTelegraph > 0) {
       chargeTelegraph -= dt;
@@ -649,26 +676,6 @@
       } else {
         scalAnimState = phase === 2 ? 'idle_fast' : 'idle';
       }
-    }
-
-    if (ringOn && NEU.scalSeekers) {
-      /* She holds still; the ring is the attack. Both callbacks are the
-         SAME ones the worm uses (the sep block below), so graze feeds
-         tp under moveBullets' rule and a hit routes through hitPlayer
-         with the shield and i-frames behaving identically. */
-      NEU.scalSeekers.setPlayer(px, py);
-      NEU.scalSeekers.tick(dt);
-      NEU.scalSeekers.tickDarts(dt, px, py,
-        function () { tp = Math.min(1, tp + dt * 0.4); },
-        function () { if (inv <= 0 && mode !== 'won') hitPlayer(); });
-      if (!NEU.scalSeekers.alive()) {
-        ringOn = false; invuln = false;
-        say("* the eyes go out. she is exposed again.");
-        /* pause before she resumes the cycle — same interlude beat the
-           worm exit uses */
-        stepT = 1.2;
-      }
-      return;
     }
 
     if (sep) {

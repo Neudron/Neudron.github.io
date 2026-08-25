@@ -1201,6 +1201,9 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
       if (NEU.scal.myShots.length === 0) { f(); sent++; }
       pump(3);
     }
+    /* invuln alone would satisfy this check — shot ROUTING (bolts aim
+       at the ring via resolveTarget and die in the moveMyShots ring
+       branch) is proven by the shred test below when phase 2 executes. */
     ok('>>> shooting her does nothing while a seeker stands <<<',
        sent > 0 && NEU.scal.seekers >= 1 && NEU.scal.hp === hpAtRing);
 
