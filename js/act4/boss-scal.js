@@ -106,6 +106,14 @@
   /* Full-bar flourish timers: 0 starts the one-shot animation, >=1
      means it has finished playing (or was never triggered). */
   var rageAnimT = 9, tpAnimT = 9, rageFullPrev = 0, tpFullPrev = 0;
+  /* What the meters DRAW. A bar that snaps to its value reads as a
+     counter; one that sweeps toward it reads as charging, which is the
+     whole point of RipperUI's presentation. */
+  var rageShown = 0, tpShown = 0, grazeT = 0;
+  /* RipperUI.cs:24-27 — rage is 10 frames at a 6-frame delay, adrenaline
+     10 at a 5-frame delay. This file used to run both off one 1.0s
+     window, so tp's flourish was 20% too slow. */
+  var RAGE_ANIM_S = 10 * 6 / 60, TP_ANIM_S = 10 * 5 / 60;
   var AX = 0, AY = 0, AW = 0, AH = 0;
   var bullets = [], step_ = 0, stepT = 0, phase = 1;
   var bossHP = 1, bossMax = 1, invuln = false;
@@ -544,7 +552,11 @@
     if (!dying && (mode === 'fight' || mode === 'wall' || mode === 'brothers')) {
       var rd = Math.hypot(px - bx, py - by);
       var near = 1 - Math.min(1, rd / 420);
-      rage = Math.min(1, rage + dt * (0.02 + 0.08 * near));
+      /* Calamity wiki: the Rage Meter fills by proximity, bosses triple
+         the rate, and a full bar takes 30s. 0.0333/s base x3 at
+         point-blank = 10s close, 30s far. It does NOT drain here — a
+         ratchet, by design decision, unlike the mod's 3.33%/s bleed. */
+      rage = Math.min(1, rage + dt * 0.0333 * (1 + 2 * near));
     }
     if (rageModeT > 0) {
       rageModeT -= dt;
@@ -561,14 +573,19 @@
        not a screensaver). */
     if (rage >= 1) {
       if (rageFullPrev < 1) rageAnimT = 0;
-      if (rageAnimT < 1) rageAnimT += dt;
+      if (rageAnimT < RAGE_ANIM_S) rageAnimT += dt;
     }
     rageFullPrev = rage;
     if (tp >= 1) {
       if (tpFullPrev < 1) tpAnimT = 0;
-      if (tpAnimT < 1) tpAnimT += dt;
+      if (tpAnimT < TP_ANIM_S) tpAnimT += dt;
     }
     tpFullPrev = tp;
+    /* The sweep. Six per second converges in about half a second —
+       fast enough to feel responsive, slow enough to read as charging. */
+    var ease = Math.min(1, dt * 6);
+    rageShown += (rage - rageShown) * ease;
+    tpShown   += (tp   - tpShown)   * ease;
 
     if (mode !== 'intro' && mode !== 'won') movePlayer(dt);
     if (inv > 0) inv -= dt;
@@ -624,7 +641,7 @@
       NEU.scalSeekers.setPlayer(px, py);
       NEU.scalSeekers.tick(dt);
       NEU.scalSeekers.tickDarts(dt, px, py,
-        function () { tp = Math.min(1, tp + dt * 0.4); },
+        function () { feedGraze(dt, true); },
         function () { if (inv <= 0 && mode !== 'won') hitPlayer(); });
       if (!NEU.scalSeekers.alive()) {
         ringOn = false; invuln = false;
@@ -691,7 +708,7 @@
         NEU.scalWorm.setPlayer(px, py);
         NEU.scalWorm.tick(dt);
         NEU.scalWorm.tickDarts(dt, px, py,
-          function () { tp = Math.min(1, tp + dt * 0.4); },
+          function () { feedGraze(dt, true); },
           function () { if (inv <= 0 && mode !== 'won') hitPlayer(); });
       }
 
@@ -859,8 +876,20 @@
     return false;
   }
 
+  /* Deltarune's rule, from the wiki: "More TP is earned as the SOUL
+     continues to graze bullets for longer." This used to be a flat
+     `tp += dt * 0.4` written out TWICE — once in moveBullets and once in
+     the worm's graze callback — which is two copies of a rule free to
+     drift apart. One funnel; every hostile body calls it. */
+  function feedGraze(dt, grazing) {
+    if (!grazing) { grazeT = 0; return; }
+    grazeT += dt;
+    tp = Math.min(1, tp + dt * (0.25 + 0.35 * Math.min(1, grazeT / 1.5)));
+  }
+
   function moveBullets(dt) {
     var keep = [];
+    var grazedThisFrame = false;
     for (var i = 0; i < bullets.length; i++) {
       var b = bullets[i];
       b.age += dt;
@@ -976,11 +1005,11 @@
            it hits or not. Same rule as the hit check — a near miss is
            still contact with the pattern, and the pattern pays for
            that. */
-        if (dx * dx + dy * dy < (b.r + 26) * (b.r + 26))
-          tp = Math.min(1, tp + dt * 0.4);
+        if (dx * dx + dy * dy < (b.r + 26) * (b.r + 26)) grazedThisFrame = true;
         if (dx * dx + dy * dy < rr * rr && hitPlayer()) return;
       }
     }
+    feedGraze(dt, grazedThisFrame);
     bullets = keep;
   }
 
@@ -1467,8 +1496,8 @@
        them. Rage on top, TP below it. */
     var mR = meterRects[0], mT = meterRects[1];
     if (mR && mT) {
-      drawMeter('rage', rage, mR.x, mR.y, mR.w, mR.h);
-      drawMeter('tp', tp, mT.x, mT.y, mT.w, mT.h);
+      drawMeter('rage', rageShown, mR.x, mR.y, mR.w, mR.h, rageMode > 0);
+      drawMeter('tp',   tpShown,   mT.x, mT.y, mT.w, mT.h, shieldT > 0);
     }
 
     var dialY = AY + AH + 40;
@@ -1540,11 +1569,21 @@
      itself a fill animation — its cell tracks the VALUE, not the
      clock — and the full-bar flourish playing exactly once per fill.
      Labels sit to the right of the border. */
-  function drawMeter(key, ratio, x, y, w, h) {
+  function drawMeter(key, ratio, x, y, w, h, active) {
     var fill = key === 'rage' ? 'rageBar' : 'tpBar';
     var border = key === 'rage' ? 'rageBorder' : 'tpBorder';
     var anim = key === 'rage' ? 'rageAnim' : 'tpAnim';
     var animT = key === 'rage' ? rageAnimT : tpAnimT;
+    var animS = key === 'rage' ? RAGE_ANIM_S : TP_ANIM_S;
+    /* RipperUI.GetShakeOffset() — the meter shakes while its mode is
+       active. This is the METER's own shake: these are drawn after
+       juice.end precisely so screen shake never moves them, and this
+       must not leak back into that. */
+    var meterShake = active ? 1 : 0;
+    if (meterShake) {
+      x += (Math.random() * 2 - 1) * meterShake;
+      y += (Math.random() * 2 - 1) * meterShake;
+    }
     ratio = Math.min(1, Math.max(0, ratio));
     /* empty track first */
     ctx.fillStyle = '#22222E'; ctx.fillRect(x, y, w, h);
@@ -1565,9 +1604,10 @@
       ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
     }
     /* one-shot flourish: only while its timer is still running */
-    if (animT < 1) {
+    if (animT < animS) {
       var ash = NEU.sheets && NEU.sheets[anim];
-      var af = Math.min(((ash && ash.frames) || 10) - 1, (animT * 10) | 0);
+      var frames = (ash && ash.frames) || 10;
+      var af = Math.min(frames - 1, (animT / animS * frames) | 0);
       if (!sprite(anim, x + w / 2, y + h / 2, 1, 0, false, null, af)) {
         ctx.fillStyle = 'rgba(228,196,106,0.25)';
         ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
@@ -1668,6 +1708,7 @@
     rage = 0; tp = 0; shieldT = 0;
     rageMode = 0; rageModeT = 0;
     rageAnimT = 9; tpAnimT = 9; rageFullPrev = 0; tpFullPrev = 0;
+    rageShown = 0; tpShown = 0; grazeT = 0;
     myShots = []; charging = false; chargeF = 0; shotCd = 0;
     /* charge state too — dying mid multi-charge used to carry a live
        telegraph/dash into the retry and softlock her at the early-return */
@@ -1775,6 +1816,8 @@
                   so its ladder taps stay exactly one point */
                get rageMode() { return rageMode; },
                get tp() { return tp; },
+               get rageShown() { return rageShown; },
+               get tpShown() { return tpShown; },
                get shieldT() { return shieldT; },
                get bx() { return bx; },
                get by() { return by; },
