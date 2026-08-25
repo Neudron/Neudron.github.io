@@ -115,6 +115,9 @@
   /* scal-worm.js delegation flag: true between open()'s init and
      close()'s reset, so init runs once per fight, not once per frame. */
   var scalWormReady = false;
+  /* scal-seekers.js delegation flag — same once-per-fight contract as
+     scalWormReady: init in open(), reset here-in-close(). */
+  var seekersReady = false;
   /* The player's own homing shots (V5 phase 2). Deliberately NOT
      `bullets` — NEU.scal.bullets feeds the test dodge AI, and mixing
      friendly fire into it would teach the bot to dodge its own gun. */
@@ -189,6 +192,7 @@
     meterRects = meterSlots(AX, AY, AW, AH);
     /* keep the worm's arena in step with resizes */
     if (NEU.scalWorm && scalWormReady) NEU.scalWorm.setArena(AX, AY, AW, AH);
+    if (NEU.scalSeekers && seekersReady) NEU.scalSeekers.setArena(AX, AY, AW, AH);
   }
 
   /* The meters live OUTSIDE the fight box: a left gutter column when
@@ -490,6 +494,24 @@
                    : "* she is behind it. kill the hearts.");
   }
 
+  /* ── the ring ───────────────────────────────────────────────────
+     20% health: ten Supreme Soul Seekers on a rotating ring, and she is
+     invulnerable until the last one dies (official wiki; the module in
+     scal-seekers.js holds the source cites). She parks at arena centre
+     for it — the source has her immobile here anyway, and her resting
+     position (by = AY - 24) is ABOVE the frame, where a ring would not
+     fit. */
+  var ringOn = false;
+  function startSeekers() {
+    if (!NEU.scalSeekers) return;         /* module absent: skip the phase */
+    ringOn = true; invuln = true; bullets = [];
+    clearSched();
+    bx = AX + AW / 2; by = AY + AH * 0.34;
+    NEU.scalSeekers.spawn();
+    sfxPlay('maelstrom');
+    say("* she puts ten eyes between you and her.");
+  }
+
   /* ── the brothers ───────────────────────────────────────────────*/
   function startBrothers() {
     mode = 'brothers'; invuln = true; bullets = [];
@@ -627,6 +649,26 @@
       } else {
         scalAnimState = phase === 2 ? 'idle_fast' : 'idle';
       }
+    }
+
+    if (ringOn && NEU.scalSeekers) {
+      /* She holds still; the ring is the attack. Both callbacks are the
+         SAME ones the worm uses (the sep block below), so graze feeds
+         tp under moveBullets' rule and a hit routes through hitPlayer
+         with the shield and i-frames behaving identically. */
+      NEU.scalSeekers.setPlayer(px, py);
+      NEU.scalSeekers.tick(dt);
+      NEU.scalSeekers.tickDarts(dt, px, py,
+        function () { tp = Math.min(1, tp + dt * 0.4); },
+        function () { if (inv <= 0 && mode !== 'won') hitPlayer(); });
+      if (!NEU.scalSeekers.alive()) {
+        ringOn = false; invuln = false;
+        say("* the eyes go out. she is exposed again.");
+        /* pause before she resumes the cycle — same interlude beat the
+           worm exit uses */
+        stepT = 1.2;
+      }
+      return;
     }
 
     if (sep) {
@@ -949,8 +991,17 @@
   }
 
   /* Target selection mirrors the old tryHit branch order exactly:
-     hearts while the sepulcher stands, then the brothers, then her. */
+     the ring while it stands, hearts while the sepulcher stands, then
+     the brothers, then her. */
   function resolveTarget() {
+    if (ringOn && NEU.scalSeekers && NEU.scalSeekers.alive()) {
+      var ss = NEU.scalSeekers.seekers(), bs = null, bsd = Infinity;
+      for (var s = 0; s < ss.length; s++) {
+        var sd = Math.hypot(px - ss[s].x, py - ss[s].y);
+        if (sd < bsd) { bsd = sd; bs = ss[s]; }
+      }
+      if (bs) return { x: bs.x, y: bs.y };
+    }
     if (sep && hearts.length) {
       var bh = null, bd = Infinity;
       for (var i = 0; i < hearts.length; i++) {
@@ -1026,9 +1077,17 @@
             s.y < AY - 80 || s.y > AY + AH + 60) dead = true;
       }
       /* Collisions mirror the old tryHit gating: whatever the melee
-         could touch, the shot can reach. */
+         could touch, the shot can reach. The ring branch comes first:
+         while she is invulnerable behind the seekers, every shot that
+         touches one kills it (orbs burst into their eight darts right
+         there — how the phase is played through). */
       if (!dead) {
-        if (sep) {
+        if (ringOn && NEU.scalSeekers) {
+          if (NEU.scalSeekers.hit(s.x, s.y, s.r)) {
+            if (s.k === 'orb') burstShots(s.x, s.y);
+            dead = true;
+          }
+        } else if (sep) {
           for (var q = 0; q < hearts.length; q++) {
             if (Math.hypot(hearts[q].x - s.x, hearts[q].y - s.y) < 18 + s.r) {
               damageTarget('heart', hearts[q], 1);
@@ -1101,6 +1160,10 @@
     else if (pct <= 0.50 && !flagged(2)) { mark(2); startWall(2); }
     else if (pct <= 0.35 && !flagged(3)) { mark(3); startBrothers(); }
     else if (pct <= 0.28 && !flagged(4)) { mark(4); startWall(3); }
+    /* 20%: the Supreme Soul Seeker ring (official wiki; scal-seekers.js
+       holds the source cites for spawn and AI). She is invulnerable
+       behind it until the last seeker dies. */
+    else if (pct <= 0.20 && !flagged(5)) { mark(5); startSeekers(); }
     else if (pct <= 0.12 && !flagged(6)) { mark(6); startWall(4); }
     /* The wiki is explicit: below 10% she summons Sepulcher and ten
        Brimstone Hearts again and is invulnerable until they die.
@@ -1115,6 +1178,10 @@
 
   function win() {
     mode = 'won'; running = false; bullets = [];
+    /* the ring cannot outlive her: drop it so nothing ticks or draws
+       into the victory lap */
+    if (NEU.scalSeekers) NEU.scalSeekers.clear();
+    ringOn = false;
     clearSched();
     if (NEU.juice) { NEU.juice.hit('huge', { colour: '#FF6B4A' });
                      NEU.juice.burst(bx, by, 60, COL.brim, 260); }
@@ -1302,6 +1369,10 @@
          renderer: in front of the bullets, behind the hearts below. */
       NEU.scalWorm.draw(now);
     }
+    /* the ring draws itself — darts, then seekers with their glow
+       stacked, same layer slot as the worm: in front of bullets,
+       behind the hearts below */
+    if (ringOn && NEU.scalSeekers) NEU.scalSeekers.draw(now);
     /* hearts ride ON the body — drawn after it, so the six of them
        read against the worm instead of disappearing under it. */
     for (var q = 0; q < hearts.length; q++) {
@@ -1606,6 +1677,7 @@
        and core/music.js takes hpMax from the first reading per fight. */
     bossMax = 240; bossHP = bossMax; phase = 1; step_ = 0; stepT = 1.2;
     hearts = []; sep = null; bros = []; invuln = true; dying = 0;
+    ringOn = false;
     /* Hand the Sepulcher module its canvas + arena once per fight;
        close() clears the flag so a reopened fight re-inits fresh. The
        target closure reads bx/by live — she is what the worm charges. */
@@ -1613,6 +1685,15 @@
       NEU.scalWorm.init({ ctx: ctx, AX: AX, AY: AY, AW: AW, AH: AH,
                           target: function () { return { x: bx, y: by }; } });
       scalWormReady = true;
+    }
+    /* Same once-per-fight handoff for the ring module; close() clears
+       the flag so a reopened fight re-inits fresh. The target closure
+       reads bx/by live — startSeekers parks her at arena centre and
+       the ring spins around THAT. */
+    if (NEU.scalSeekers && !seekersReady) {
+      NEU.scalSeekers.init({ ctx: ctx, AX: AX, AY: AY, AW: AW, AH: AH,
+                             target: function () { return { x: bx, y: by }; } });
+      seekersReady = true;
     }
     preloadSfx();
     mode = 'intro';
@@ -1626,6 +1707,7 @@
     active = false; running = false; dying = 0;
     clearSched();
     scalWormReady = false;
+    seekersReady = false;
     /* Guarded, like every other minigame's close() — an unconditional
        clear here could null out a DIFFERENT minigame's lock if close()
        ever ran after something else had already claimed the input lock
@@ -1681,6 +1763,10 @@
                get py() { return py; },
                get soulHP() { return hp; },
                get rage() { return rage; },
+               /* test-only read (same class as wormSegs/wormAct): the
+                  fixes8 drive refuses to fire during a doubling window
+                  so its ladder taps stay exactly one point */
+               get rageMode() { return rageMode; },
                get tp() { return tp; },
                get shieldT() { return shieldT; },
                get bx() { return bx; },
@@ -1696,6 +1782,9 @@
                 get wormAct() { return NEU.scalWorm ? NEU.scalWorm.act() : ''; },
                 get wormDarts() { return NEU.scalWorm ? NEU.scalWorm.darts() : []; },
                get heartPos() { return hearts.map(function (h) { return { x: h.x, y: h.y }; }); },
+               get seekers() { return NEU.scalSeekers ? NEU.scalSeekers.alive() : 0; },
+               get seekerPos() { return NEU.scalSeekers ? NEU.scalSeekers.seekers() : []; },
+               get seekerDarts() { return NEU.scalSeekers ? NEU.scalSeekers.darts() : []; },
                get broPos() { return bros.map(function (b) { return { x: b.x, y: b.y }; }); },
                 get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy }; }); },
                 get meters() { return meterRects.map(function (m) { return { x: m.x, y: m.y, w: m.w, h: m.h }; }); },

@@ -570,8 +570,12 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
   const dodge = rad => {
     const R = rad || 170;   /* wide net: the gunner must survive */
     /* worm darts are hostile projectiles too — the module keeps them
-       out of NEU.scal.bullets, so merge them into the scan. */
-    const bs = NEU.scal.bullets.concat(NEU.scal.wormDarts || []);
+       out of NEU.scal.bullets, so merge them into the scan. Seeker
+       darts ride their own accessor the same way; before Task 7's
+       ring spawns (and on every pre-ring run) it is an empty array,
+       so merging it changes nothing upstream of 20pct. */
+    const bs = NEU.scal.bullets.concat(NEU.scal.wormDarts || [])
+      .concat(NEU.scal.seekerDarts || []);
     for (const b of bs) {
       const dx = b.x - NEU.scal.px, dy = b.y - NEU.scal.py;
       const d = Math.hypot(dx, dy);
@@ -766,7 +770,7 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
   /* Sidestep, never climb: incoming darts travel DOWNWARD at a low
      bot, so a generic perpendicular escape yanks us UP into worse
      crossfire. Sidestep along the floor away from the heading. */
-  const sidestepLow = BOTY => {
+  const sidestepLow = (BOTY, bulletR) => {
     /* Her BODY is a hostile while a charge is live: contact is
        hypot<34 (boss-scal touch rule) and each dash leg runs 420px/s
        at the soul's fire-time position — the pools below only see
@@ -802,7 +806,11 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
        soul stood, so the approaching-dot test below never goes false
        and the bot starves its fire cycle dodging a painting. hearts>0
        is exactly when tickDarts is live. */
-    const pools = NEU.scal.bullets.map(b => ({ b: b, R: 110 }))
+    /* Bullet tier is parameterisable: the enraged survivor's volleys
+       come in denser than the phase-1 crossfire, so killBro's legs
+       pass a wider reaction radius while the strike descent keeps the
+       measured 110 default. */
+    const pools = NEU.scal.bullets.map(b => ({ b: b, R: bulletR || 110 }))
       .concat(NEU.scal.hearts > 0 ?
         (NEU.scal.wormDarts || []).map(b => ({ b: b, R: 160 })) : []);
     const th = pools.find(p => {
@@ -870,8 +878,13 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
     return NEU.scal.hp <= target;
   };
 
-  ok('>>> six touches open the first mid-fight wall <<<',
-     strike(60) && NEU.scal.mode === 'wall' && NEU.scal.hp === 180);
+   /* The two ladder windows carry 2 points of slack: strike() cashes
+      rage whenever the bar is full, and a doubled (2-dmg) tap from
+      odd hp skips an even ladder value — measured at HEAD as a ~half
+      of all runs failing on strict equality. Crossing, not the exact
+      digit, is what these checks are about. */
+   ok('>>> six touches open the first mid-fight wall <<<',
+      strike(60) && NEU.scal.mode === 'wall' && NEU.scal.hp >= 178 && NEU.scal.hp <= 180);
   /* tp still feeds from grazing near bullets (U2 unchanged). */
   ok('>>> grazing bullets fills tp <<<', NEU.scal.tp > 0 && NEU.scal.tp <= 1);
   /* Wall interludes spray dart rows — waiting them out BLIND used to
@@ -887,8 +900,8 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
     }
   };
   waitOut(290);          /* wall(1) lasts 4.6s */
-  ok('>>> six more call the second wall <<<',
-     strike(60) && NEU.scal.mode === 'wall' && NEU.scal.hp >= 120 && NEU.scal.hp <= 150);
+   ok('>>> six more call the second wall <<<',
+      strike(60) && NEU.scal.mode === 'wall' && NEU.scal.hp >= 118 && NEU.scal.hp <= 150);
   waitOut(290);          /* wall(2) */
   /* strike(28), not strike(40): the old call walked her onto the 84
      ladder ITSELF, and its parting orb volley — airborne when the mode
@@ -938,11 +951,17 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
   /* Settle the magazine before the arrival is judged: whatever is in
      flight when the ladder trips should have landed and been seen, so
      the state below is settled and not mid-delivery. Brothers volley
-     while we wait; sidestep. */
+     while we wait; sidestep. Cast here too — probe data showed the
+     lethal window opens the INSTANT brothers mode begins, and tp is
+     usually topped from drip grazing, so the opening volley should
+     meet an already-standing barrier. */
   {
     const BOTYD = 178 + 460 - 60;
     for (let gd = 0; gd < 300 && NEU.scal.myShots.length > 0 &&
          NEU.scal.running && NEU.scal.soulHP > 0; gd++) {
+      if (NEU.scal.tp >= 1 && NEU.scal.shieldT === 0) {
+        key('keydown', 'x'); key('keyup', 'x');
+      }
       if (!sidestepLow(BOTYD)) pump(2);
     }
   }
@@ -967,7 +986,11 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
   /* They spawn at mid-height and immediately aim at fire-time
      positions. Get to the bottom-centre pocket THROUGH the first
      volleys — i-frames from any hit buy free frames, and dodging here
-     just starves the descent while keeping us in the envelope. */
+     just starves the descent while keeping us in the envelope. Probe
+     data showed the lethal window is the FIRST ~2.5s of brothers mode
+     (opening volley plus her leftover crossfire), so the shield must
+     be up BEFORE the descent starts — the breather below tops tp off
+     and casts the moment it can. */
   const cxT = 162 + 700 / 2, BOTY = 178 + 460 - 26;
   for (let g = 0; g < 120 && NEU.scal.py < BOTY && NEU.scal.soulHP > 0; g++) {
     if (NEU.scal.tp >= 1 && NEU.scal.shieldT === 0) { key('keydown', 'x'); key('keyup', 'x'); }
@@ -989,6 +1012,18 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
   run(NEU.scal.px > (162 + 700 / 2) ? -1 : 1, 0, 30);
   console.log('       bros-entry:', JSON.stringify({ soul: NEU.scal.soulHP,
     px: NEU.scal.px | 0, py: NEU.scal.py | 0 }));
+  /* Breather before leg 1 too: the arrival crossfire leaves tp spent
+     half the time; a short stand-off lets the first barrier come up
+     before the volleys start landing. Mode-guarded like its leg-2
+     twin. */
+  {
+    const BOTYB1 = 178 + 460 - 60;
+    for (let gb = 0; gb < 120 && NEU.scal.running &&
+         NEU.scal.mode === 'brothers' && NEU.scal.bros === 2; gb++) {
+      if (sidestepLow(BOTYB1, 130)) continue;
+      pump(2);
+    }
+  }
 
   /* V5 phase 2: brothers die to homing bolts from across the arena —
      the old walk-to-touch-radius choreography (and the 25% DR both
@@ -1005,20 +1040,24 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
       bullets: NEU.scal.bullets.length });
     for (let h = 0; h < 3000 && NEU.scal.bros > target && NEU.scal.running; h++) {
       if (!NEU.scal.broPos.length) return true;
-      /* Proximity fills rage over the long standoff — cash it the
-         moment the bar is full (rejected harmlessly otherwise): a
-         doubled orb takes a brother apart in one release. */
-      if (NEU.scal.rage >= 1 && h % 30 === 0) {
+      /* Proximity fills rage over the long standoff — spend it the
+         frame it completes (no cadence gate: baseline probes caught
+         legs dying with a FULL bar idle because h%30 skipped the
+         window). Doubled orbs halve the leg's exposure time. */
+      if (NEU.scal.rage >= 1) {
         key('keydown', 'z'); key('keyup', 'z');
       }
-      /* Barrier whenever it is up for grabs. */
+      /* Barrier whenever a cast is actually possible — the fight only
+         accepts a FULL tp bar ('the barrier wants full tp'), so any
+         lower threshold is a no-op press. Probe data showed legs dying
+         with 0.4-0.9 in the tank and the shield never once up. */
       if (NEU.scal.tp >= 1 && NEU.scal.shieldT === 0) {
         key('keydown', 'x'); key('keyup', 'x');
       }
       /* Sidestep, never climb: brother darts come DOWNWARD at a low
          bot, so the generic dodge's vertical escape yanks us UP into
          the crossfire (measured: py drifted 618 -> 426 -> death). */
-      if (sidestepLow(BOTY)) continue;
+      if (sidestepLow(BOTY, 130)) continue;
       /* Orb cycle: hold f ~30 frames (power ≈ 0.53 ≥ 0.35 → heavy),
          release into the volley gap, wait for the shot array to drain
          before charging again. Contact 1 + burst 8 lands through the
@@ -1083,7 +1122,27 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
                 'phase-2/orb-win deferred to browser-uat');
     NEU.scal.close();
   } else {
-    const bothBrothersFall = killBro(0);
+    /* Breather before the enraged leg: tp and rage rebuild off
+       proximity and passing fire, so the leg opens with a barrier
+       available instead of spending its first seconds naked. Capped
+       and mode-guarded — it must never wait out a state change. */
+    {
+      const BOTYB = 178 + 460 - 60;
+      for (let gb = 0; gb < 150 && NEU.scal.running &&
+           NEU.scal.mode === 'brothers' && NEU.scal.bros === 1; gb++) {
+        if (sidestepLow(BOTYB, 130)) continue;
+        pump(2);
+      }
+    }
+    let bothBrothersFall = killBro(0);
+    /* Same ruling as leg 1: a survived-but-slow enraged leg gets one
+       retry while the state still allows it. A death (soul 0) is not
+       retryable and falls through to the coverage note. */
+    for (let att = 0; !bothBrothersFall && NEU.scal.soulHP > 0 &&
+         NEU.scal.bros === 1 && att < 1; att++) {
+      console.log('       leg-2 timeout, retrying once');
+      bothBrothersFall = killBro(0);
+    }
     if (!bothBrothersFall || NEU.scal.bros !== 0 || NEU.scal.phase !== 2)
       console.log('       brothers diagnostic:', JSON.stringify({ bothBrothersFall, bros: NEU.scal.bros, phase: NEU.scal.phase, mode: NEU.scal.mode, soulHP: NEU.scal.soulHP, bullets: NEU.scal.bullets.length }));
     if (!(bothBrothersFall && NEU.scal.bros === 0 && NEU.scal.phase === 2 && NEU.scal.mode === 'fight')) {
@@ -1094,30 +1153,83 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
       ok('>>> both brothers fall: phase 2 begins <<<',
          bothBrothersFall && NEU.scal.bros === 0 && NEU.scal.phase === 2 && NEU.scal.mode === 'fight');
 
-    /* The charged release: holding f past 0.35 power releases an ORB
-       that homes, hits for 1, then bursts into 8 homing darts — with
-       the brothers gone she sits at her last 8 HP, so one full orb
-       (contact + burst = 9) ends the fight outright. Only meaningful
-       once BOTH brothers are down: in 'brothers' mode orbs home to a
-       surviving brother and her HP never moves. */
-    if (NEU.scal.phase === 2 && NEU.scal.mode === 'fight') {
-      const hpBeforeOrb = NEU.scal.hp;
-      key('keydown', 'f');
-      pump(40);                     /* 0.64s held → power ~0.71 */
-      key('keyup', 'f');
-      let orbSeen = false;
-      for (let g = 0; g < 300 && NEU.scal.mode !== 'won'; g++) {
-        if (!orbSeen) for (const s of NEU.scal.myShots) if (s.k === 'orb') orbSeen = true;
+    /* The ring at 20pct (Task 7). The descent from the post-brothers
+       ~84 is a PURE-TAP dripper: orbs are banned outright because a
+       rage-doubled volley can leapfrog BOTH the 28pct wall and the
+       20pct ladder in one salvo — measured: hp 70 -> ~34 with wall3
+       tripped and the gate never reached, or worse, shots still
+       airborne when the ring spawned, which then killed seekers off
+       before the assertion ran. One tap = one point = the trip happens
+       on an empty magazine and all ten seekers survive it. The loop
+       rides out wall(3) itself and breaks the instant the ring stands. */
+    {
+      const cxD = 162 + 700 / 2, BOTYD = 178 + 460 - 60;
+      for (let gd = 0; gd < 4500 && NEU.scal.running &&
+           NEU.scal.soulHP > 0; gd++) {
+        if (NEU.scal.seekers >= 1) break;        /* the ring stands */
+        if (NEU.scal.hp <= 48) break;            /* pre-wiring parity */
+        const mD = NEU.scal.mode;
+        if (mD === 'wall') { if (dodge()) continue; pump(2); continue; }
+        if (mD !== 'fight') { pump(2); continue; }
+        /* taps only, and never during a doubling window: rageMode
+           turns a 1-point tap into 2 and skips even ladder values */
+        if (sidestepLow(BOTYD)) continue;
+        const sxD = Math.abs(NEU.scal.px - cxD) > 24 ? Math.sign(cxD - NEU.scal.px) : 0;
+        const syD = NEU.scal.py < BOTYD ? 1 : 0;
+        if (sxD || syD) { run(sxD, syD, 1); continue; }
+        if (!NEU.scal.rageMode && NEU.scal.myShots.length === 0) f();
+        pump(3);
+      }
+    }
+    ok('>>> the ring arrives at 20pct and she cannot be touched <<<',
+       NEU.scal.seekers === 10 && NEU.scal.mode === 'fight');
+    /* While more than one seeker stands, every bolt we send dies on
+       the ring: resolveTarget aims at the nearest seeker and the ring
+       branch eats the shot. The loop GUARD is the assertion's partner
+       — past the last seeker the ring exits, she is exposed again,
+       and bolts landing on her SHOULD move her bar. The guard keeps
+       this test inside the invariant it names. sent proves the loop
+       actually fired (pre-wiring, seekers is undefined and it would
+       otherwise pass vacuously). */
+    const hpAtRing = NEU.scal.hp;
+    let sent = 0;
+    for (let g = 0; g < 200 && NEU.scal.seekers > 1; g++) {
+      if (NEU.scal.soulHP <= 3 && NEU.scal.tp >= 1 && NEU.scal.shieldT === 0) {
+        key('keydown', 'x'); key('keyup', 'x');
+      }
+      if (dodge()) continue;
+      if (NEU.scal.myShots.length === 0) { f(); sent++; }
+      pump(3);
+    }
+    ok('>>> shooting her does nothing while a seeker stands <<<',
+       sent > 0 && NEU.scal.seekers >= 1 && NEU.scal.hp === hpAtRing);
+
+    /* The old one-orb win died with the x10 HP change (one orb = 9 of
+       240) and the ring buries what was left: at 48 she is invulnerable
+       until the LAST seeker falls. Its successor proof: a charged orb
+       into the ring shreds it — contact kills one seeker and bursts
+       eight homing darts across the rest, which is exactly how the
+       phase is meant to be played through. */
+    {
+      const BOTY_R = 178 + 460 - 60;   /* jsdom arena floor, as strike() */
+      let hF = -1;
+      for (let gs = 0; gs < 900 && NEU.scal.seekers > 0 &&
+           NEU.scal.running && NEU.scal.soulHP > 0; gs++) {
+        if (NEU.scal.soulHP <= 3 && NEU.scal.tp >= 1 && NEU.scal.shieldT === 0) {
+          key('keydown', 'x'); key('keyup', 'x');
+        }
+        if (sidestepLow(BOTY_R)) continue;
+        if (hF < 0) {
+          if (NEU.scal.myShots.length === 0) { key('keydown', 'f'); hF = 0; }
+        } else {
+          hF++;
+          if (hF >= 30) { key('keyup', 'f'); hF = -1; }
+        }
         pump(1);
       }
-      const drop = hpBeforeOrb - NEU.scal.hp;
-      ok('>>> a held f orbs her out: contact + burst = lethal <<<',
-         orbSeen && NEU.scal.mode === 'won' && drop >= 8 && drop <= 9);
-      if (!(orbSeen && NEU.scal.mode === 'won' && drop >= 8))
-        console.log('       orb diagnostic:', JSON.stringify({ orbSeen, hpBeforeOrb, drop, mode: NEU.scal.mode }));
-    } else {
-      console.log('       coverage note: phase 2 not reached by the drive — ' +
-                  'orb-win deferred to browser-uat');
+      if (hF >= 0) key('keyup', 'f');
+      ok('>>> a held orb shreds what is left of the ring <<<',
+         NEU.scal.seekers === 0 && NEU.scal.mode === 'fight');
     }
 
     NEU.scal.close();
