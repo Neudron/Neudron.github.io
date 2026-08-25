@@ -1387,7 +1387,19 @@ console.log('\n6c. the shield and the meters');
      /Math\.round\(ratio \* \(frames - 1\)\)/.test(src));
   ok('meter art no longer runs on the wall clock',
      !/fps: 10/.test(sheetsSrc.slice(sheetsSrc.indexOf('rageAnim'), sheetsSrc.indexOf('sepulHeart'))) &&
-     /\(animT \* 10\) \| 0/.test(src));
+     /\(animT \/ animS \* frames\) \| 0/.test(src));
+  ok('>>> the meter sweeps toward its value instead of stepping <<<', (() => {
+    const before = NEU.scal.rageShown;
+    return before < NEU.scal.rage && NEU.scal.rageShown >= 0;
+  })());
+  ok('>>> graze accrual accelerates the longer it is held <<<',
+     /grazeT/.test(src) && /function feedGraze/.test(src));
+  ok('>>> exactly one graze funnel, not two drifting copies <<<',
+     (src.match(/tp = Math\.min\(1, tp \+ dt \*/g) || []).length === 1);
+  ok('>>> the two meters use the source frame delays, not a shared 1s <<<',
+     /RAGE_ANIM_S/.test(src) && /TP_ANIM_S/.test(src) && /10 \* 5 \/ 60/.test(src));
+  ok('the meter shakes on its own, not with the screen',
+     /meterShake/.test(src));
   NEU.engine.leave();
 }
 
