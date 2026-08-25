@@ -974,7 +974,7 @@ console.log('\n6b. the sepulchre, the brothers, and the win');
       damageTail: damage.slice(-8) }));
   }
   /* broArrive's strict return can miss an arrival that happened:
-     worm chip during wall(2) may cross the ladder before strike(40)
+     worm chip during wall(2) may cross the ladder before strike(28)
      opens fire (its targets retarget to the brothers and her hp
      freezes), so the call returns false while the state below —
      brothers up, ladder tripped, inside the window — is the actual
@@ -1281,7 +1281,7 @@ console.log('\n6b2. rage climbs faster near Calamitas');
   pump(163);
   /* FAR window, before the climb: wall(0), she static at the top-centre
      (~(512,154) in jsdom), soul parked on the floor — max range, so the
-     slope sits at the ~0.02/s floor. */
+     slope sits at the ~0.0333/s base (retuned in 99c69af). */
   run(0, 1, 60);                       /* bottom of the arena */
   const rFarA = NEU.scal.rage;
   /* Fix round 1: bound the far window by the CLOSEST the soul actually
@@ -1415,6 +1415,61 @@ console.log('\n6c. the shield and the meters');
   ok('the meter shakes on its own, not with the screen',
      /meterShake/.test(src));
   NEU.engine.leave();
+}
+
+/* ═══ 6c2. body-only grazing keeps its ramp ══════════════════════*/
+console.log('\n6c2. body-only grazing keeps its ramp');
+{
+  const { w, NEU } = boot();
+  let frames = [];
+  w.requestAnimationFrame = cb => { frames.push(cb); return frames.length; };
+  let t = w.performance.now();
+  w.performance.now = () => t;
+  const pump = n => { for (let i = 0; i < n; i++) { const q = frames; frames = []; t += 16; for (const cb of q) cb(t); } };
+  const key = (ty, k) => w.dispatchEvent(new w.KeyboardEvent(ty, { key: k, bubbles: true }));
+  const run = (dx, dy, n) => {
+    if (dx < 0) key('keydown', 'ArrowLeft'); else if (dx > 0) key('keydown', 'ArrowRight');
+    if (dy < 0) key('keydown', 'ArrowUp'); else if (dy > 0) key('keydown', 'ArrowDown');
+    pump(n);
+    key('keyup', 'ArrowLeft'); key('keyup', 'ArrowRight'); key('keyup', 'ArrowUp'); key('keyup', 'ArrowDown');
+  };
+
+  NEU.scal.open();
+  pump(163);
+  for (let i = 0; i < 900 && NEU.scal.mode === 'wall';) {
+    if (i >= 190 && NEU.scal.py > 380) { run(0, -1, 10); i += 10; }
+    else { pump(1); i++; }
+  }
+  ok('the sepulchre phase is live for the body-graze window',
+     NEU.scal.mode === 'fight' && NEU.scal.hearts === 10);
+
+  /* Parked high, clear of her; drain whatever wall(0) left in flight so
+     the measured window is provably body-only. */
+  for (let g = 0; g < 600 && NEU.scal.bullets.length; g++) pump(1);
+  ok('the window is genuinely body-only: no bullets in flight',
+     NEU.scal.bullets.length === 0);
+
+  /* The controlled continuous-latching window. Real darts pass inside
+     graze range only in bursts, so the stub replaces tickDarts with one
+     that fires the fight's OWN graze callback EVERY frame — a hostile
+     body permanently in range while the bullet array stays empty, the
+     exact shape the ring and sepulchre phases present between volleys. */
+  NEU.scalWorm.tickDarts = function (dt, sx, sy, grazeCb) { grazeCb(); };
+
+  /* 95 latched frames (~1.52s): ramped accrual earns ~0.65 tp (0.25/s
+     climbing to 0.6/s past the 1.5s knee); the defect — moveBullets'
+     empty-frame feed resetting grazeT to 0 after every latched frame —
+     earns a flat 0.25/s = 0.38. The bound sits between them and well
+     under the 1.0 cap, so the measurement cannot clip. */
+  const tp0 = NEU.scal.tp;
+  pump(95);
+  const gain = NEU.scal.tp - tp0;
+  ok('>>> a body graze held through moveBullets keeps its ramp <<<',
+     gain > 0.5 && NEU.scal.bullets.length === 0);
+  if (!(gain > 0.5)) console.log('       graze diagnostic:',
+     JSON.stringify({ gain: +gain.toFixed(3), tp: +NEU.scal.tp.toFixed(3),
+                      soul: NEU.scal.soulHP }));
+  NEU.scal.close();
 }
 
 /* ═══ 6d. the soul seeker ring ═══════════════════════════════════*/

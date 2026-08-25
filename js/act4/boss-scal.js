@@ -110,6 +110,12 @@
      counter; one that sweeps toward it reads as charging, which is the
      whole point of RipperUI's presentation. */
   var rageShown = 0, tpShown = 0, grazeT = 0;
+  /* Body grazes cannot feed the funnel directly: fightTick runs BEFORE
+     moveBullets every frame, so a direct feed is erased by that same
+     frame's no-bullet-in-range reset before it accumulates anything.
+     They latch here; moveBullets' single end-of-frame call is the only
+     place grazeT advances or resets. */
+  var grazedByBody = false;
   /* RipperUI.cs:24-27 — rage is 10 frames at a 6-frame delay, adrenaline
      10 at a 5-frame delay. This file used to run both off one 1.0s
      window, so tp's flourish was 20% too slow. */
@@ -635,13 +641,14 @@
          player, so letting that run first would drag her (and the ring,
          which re-centres on her every tick) around the arena instead of
          holding the park point startSeekers chose. Both callbacks are
-         the SAME ones the worm uses (the sep block below), so graze
-         feeds tp under moveBullets' rule and a hit routes through
-         hitPlayer with the shield and i-frames behaving identically. */
+         the SAME ones the worm uses (the sep block below), so a graze
+         latches grazedByBody for moveBullets' one end-of-frame funnel
+         and a hit routes through hitPlayer with the shield and
+         i-frames behaving identically. */
       NEU.scalSeekers.setPlayer(px, py);
       NEU.scalSeekers.tick(dt);
       NEU.scalSeekers.tickDarts(dt, px, py,
-        function () { feedGraze(dt, true); },
+        function () { grazedByBody = true; },
         function () { if (inv <= 0 && mode !== 'won') hitPlayer(); });
       if (!NEU.scalSeekers.alive()) {
         ringOn = false; invuln = false;
@@ -701,14 +708,15 @@
          drives it and decides what its callbacks mean. Its body deals
          NO contact damage (SepulcherHead.cs sets NPC.damage = 0) — the
          darts are its only threat, and both callbacks route through the
-         SAME paths as hostile bullets: graze feeds tp under moveBullets'
-         rule (cap included), a hit calls hitPlayer so shield / i-frames
-         / death behave identically to a dart-bullet contact. */
+         SAME paths as hostile bullets: a graze latches grazedByBody for
+         moveBullets' one end-of-frame funnel (cap included), a hit
+         calls hitPlayer so shield / i-frames / death behave identically
+         to a dart-bullet contact. */
       if (NEU.scalWorm) {
         NEU.scalWorm.setPlayer(px, py);
         NEU.scalWorm.tick(dt);
         NEU.scalWorm.tickDarts(dt, px, py,
-          function () { feedGraze(dt, true); },
+          function () { grazedByBody = true; },
           function () { if (inv <= 0 && mode !== 'won') hitPlayer(); });
       }
 
@@ -1009,7 +1017,13 @@
         if (dx * dx + dy * dy < rr * rr && hitPlayer()) return;
       }
     }
-    feedGraze(dt, grazedThisFrame);
+    /* Body grazes latched during fightTick count as grazing here —
+       without them, every frame with no bullet in range would reset
+       the clock a ring/worm graze was building. This is still the ONLY
+       place grazeT advances or resets: bullet and body grazing share
+       one clock and one cap. */
+    feedGraze(dt, grazedThisFrame || grazedByBody);
+    grazedByBody = false;
     bullets = keep;
   }
 
