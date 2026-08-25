@@ -1284,8 +1284,20 @@ console.log('\n6b2. rage climbs faster near Calamitas');
      slope sits at the ~0.02/s floor. */
   run(0, 1, 60);                       /* bottom of the arena */
   const rFarA = NEU.scal.rage;
-  for (let i = 0; i < 125; i++) { dodge(); pump(1); }   /* 2s far */
+  /* Fix round 1: bound the far window by the CLOSEST the soul actually
+     gets during it, sampled every frame — dodges can walk the soul up
+     the arena mid-window. A constant ceiling (0.035 over the retuned
+     0.0333/s base) left ~5% headroom and would flip red on layout
+     drift alone. The bound mirrors boss-scal.js's own slope,
+     0.0333 * (1 + 2*near), plus 15% for between-sample approach; with
+     zero approach it degrades to a flat ~0.038 ceiling. */
+  let dFar = Infinity;
+  for (let i = 0; i < 125; i++) {
+    dFar = Math.min(dFar, Math.hypot(NEU.scal.px - NEU.scal.bx, NEU.scal.py - NEU.scal.by));
+    dodge(); pump(1);
+  }
   const farRate = (NEU.scal.rage - rFarA) / 2;
+  const farBound = 0.0333 * (1 + 2 * Math.max(0, 1 - dFar / 420)) * 1.15;
 
   /* The climb, unchanged — except idle waits dodge, because the wall
      rows do not care that we are busy measuring. */
@@ -1311,17 +1323,19 @@ console.log('\n6b2. rage climbs faster near Calamitas');
   const rNearA = NEU.scal.rage;
   for (let i = 0; i < 125; i++) { dodge(); pump(1); }   /* same 2s, close */
   const nearRate = (NEU.scal.rage - rNearA) / 2;
-  const diag = JSON.stringify({ farRate, nearRate, dist: Math.round(dist),
+  const diag = JSON.stringify({ farRate, farBound: +farBound.toFixed(4),
+    farDist: Math.round(dFar), nearRate, dist: Math.round(dist),
     soulHP: NEU.scal.soulHP,
     px: NEU.scal.px | 0, py: NEU.scal.py | 0, bx: NEU.scal.bx | 0, by: NEU.scal.by | 0 });
   /* Absolute floors, not just a ratio: the old hp<MAXHP gate yields a
      FLAT 0.05/s whenever any heart is missing (and 0 when none is), so
-     either way one of these bounds catches it. Proximity rule: ~0.02/s
-     at max range, ~0.07+/s inside 150px. */
+     either way one of these bounds catches it. Proximity rule: ~0.0333/s
+     at max range, ~0.07+/s inside 150px; farRate is capped by the
+     derived farBound above instead of a constant. */
   ok('>>> rage climbs faster near Calamitas than far <<<',
-     farRate < 0.035 && nearRate > 0.055 && nearRate > farRate * 2 &&
+     farRate < farBound && nearRate > 0.055 && nearRate > farRate * 2 &&
      NEU.scal.rage <= 1);
-  if (!(farRate < 0.035 && nearRate > 0.055 && nearRate > farRate * 2)) console.log('       rage diagnostic:', diag);
+  if (!(farRate < farBound && nearRate > 0.055 && nearRate > farRate * 2)) console.log('       rage diagnostic:', diag);
   if (NEU.scal.soulHP <= 0) console.log('       the probe died measuring:', diag);
   ok('the probe stayed alive through both windows', NEU.scal.soulHP > 0);
   NEU.scal.close();
