@@ -203,7 +203,9 @@ console.log('\n6. what he tells you');
 
   const S = fs.readFileSync(path.join(ROOT,'js','game/sans.js'), 'utf8');
   ok('the television reads that flag', /flagged\('tv_breakable'\)/.test(S));
-  ok('>>> the sword has to be in your hand <<<', /state === 'held'/.test(S));
+  ok('>>> clicking it cannot break it <<<', !/tvBreakable\(\) && state === 'held'/.test(S));
+  ok('>>> the television is a throw target <<<',
+     /function tvScreenPos/.test(S) && /if \(landBlow\(\)\) NEU\.breakTV\(\)/.test(S));
   ok('breaking it opens the show', /NEU\.quiz\.open\(\)/.test(S));
 
   const { NEU } = boot();

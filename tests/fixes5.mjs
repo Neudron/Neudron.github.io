@@ -282,18 +282,47 @@ console.log('\n7. regression — the hammer loop still runs twice');
   ok('>>> second run: the light can be fixed again <<<', b.fixed === true);
 }
 
-/* ═══ 8. regression: CARRY-mode stray tap drops the sword home ═══
-   In CARRY (coarse pointer) mode the pointerup handler used to do
-   nothing when the tap missed sans — leaving state='held' forever
-   (re-grab requires 'stuck'). The fix adds `else flyHome()` plus a
-   pointercancel handler in the CARRY branch. */
+/* ═══ 8. regression: the touch carry contract ════════════════════
+   Two bugs live here, and the second was caused by the fix for the
+   first. Originally a tap that missed sans did nothing, stranding
+   state='held' forever (re-grab requires 'stuck'), so `else
+   flyHome()` was added. But nothing told a MISSED tap apart from the
+   PICKUP tap — and the pickup tap's own pointerup arrives one event
+   later — so from then on the sword went home the instant you lifted
+   your finger and could never be carried at all.
+   Both rules have to hold at once: the pickup tap is consumed by
+   pointerId, and any LATER stray tap still drops it home. */
 {
   const src = fs.readFileSync(path.join(ROOT, 'js', 'game/sans.js'), 'utf8');
-  const i = src.indexOf('if (CARRY) {');
-  const j = src.indexOf('} else {', i);
-  const branch = src.slice(i, j);
-  ok('CARRY branch has a stray-tap drop path', /else\s+flyHome\(\)/.test(branch));
-  ok('CARRY branch also handles pointercancel', /pointercancel/.test(branch));
+  ok('the carry contract follows the gesture, not a load-time query',
+     /function tapCarry\s*\(/.test(src));
+  ok('>>> the pickup tap does not also drop the sword <<<',
+     /grabTap && grabId !== null && e\.pointerId === grabId/.test(src));
+  ok('a later stray tap still sends it home',
+     /attempt\(e\.clientX, e\.clientY\);/.test(src) && /function attempt/.test(src));
+  ok('pointercancel is still handled', /addEventListener\('pointercancel'/.test(src));
+}
+
+/* ═══ 9. regression: attribute heights must not survive a CSS width ═══
+   <img width>/<height> are presentational hints, not just metadata. The
+   paint-hygiene pass added them to these sprites for CLS, and every rule
+   that set only `width` then left the height pinned to the raw attribute
+   number — the blanket rendered 250x5 instead of 250x69, the television
+   96x9 instead of 96x62. Any rule that overrides the width of an image
+   carrying a height attribute MUST also say height:auto. */
+{
+  const CSS = fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8');
+  /* Anchored to a line start: 'CSS.indexOf(".tv img")' would otherwise
+     match the phrase inside a comment. */
+  const rule = sel => {
+    const i = CSS.indexOf('\n' + sel + ' {');
+    return i < 0 ? '' : CSS.slice(i, CSS.indexOf('}', i));
+  };
+  for (const sel of ['.sleep > img', '.sleep__sw img', '.tv img']) {
+    const body = rule(sel);
+    ok('rule exists: ' + sel, body !== '');
+    ok('>>> ' + sel + ' pins height:auto <<<', /height:\s*auto/.test(body));
+  }
 }
 
 console.log('\n' + (fail ? `${fail} FAILED, ${pass} passed` : `ALL PASS (${pass})`));
