@@ -300,21 +300,21 @@
     ["the witch, the ash, the door, the potion. that's a day.", 'sans'],
     ["listen. the television. the one in the corner of the actual page.", 'sans'],
     ["it's been playing something this whole time and nobody's watching it.", 'sans'],
-    ["you've still got that sword up at the top of the page.", 'sans'],
-    ["hit the television with it. i'm not going to explain that one.", 'sans'],
+    ["you've still got that broken key up at the top of the page.", 'sans'],
+    ["the hilt was always the sword. put it through the television.", 'sans'],
     ["go on. i'll be here. i'm always here, that's the whole bit.", 'sans']
   ];
 
   function lastTalk(c) {
     var n = (NEU.save && NEU.save.flag('last_talks')) || 0;
     if (n >= LAST.length) {
-      c.say(["go and hit the television.", "with the sword. yes. that one."], 'sans');
+      c.say(["go and hit the television.", "with that key. throw it. yes, really."], 'sans');
       return;
     }
     c.say([LAST[n][0]], 'sans');
     if (NEU.save) NEU.save.flag('last_talks', n + 1);
     if (n + 1 >= LAST.length) {
-      /* THE flag. From here the sword can break the TV on the main
+      /* THE flag. From here a thrown key can break the TV on the main
          page — an object two acts old gains a new verb. */
       c.flag('tv_breakable', 1);
       if (NEU.quest) NEU.quest.mark('a4_told');

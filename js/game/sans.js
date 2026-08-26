@@ -40,6 +40,26 @@
   var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   var CARRY   = matchMedia('(pointer: coarse)').matches;   // tap-to-carry
 
+  /* The contract follows the pointer that made THIS gesture, not a
+     fact frozen at page load. A phone with a bluetooth mouse and an
+     iPad with a trackpad both get press-and-hold on the mouse and
+     tap-to-carry on the finger, in the same session. CARRY survives
+     only as the fallback for engines that do not fill pointerType. */
+  function tapCarry(e) {
+    var t = e && e.pointerType;
+    if (t === 'touch' || t === 'pen') return true;
+    if (t === 'mouse') return false;
+    return CARRY;
+  }
+
+  /* Where a carried thing rides when there is no finger on it.
+     Bottom-centre: clear of sans (bottom right), the #chips stack
+     (bottom left), and touch.js's stick and buttons. Re-derived every
+     frame by its callers rather than set once, so a scroll, a rotation
+     or the URL bar collapsing can never strand it off screen. */
+  function handX() { return innerWidth / 2; }
+  function handY() { return innerHeight - 76; }
+
   /* ── what he says ───────────────────────────────────────────────
      Written for this page rather than quoted, so nothing here is
      lifted dialogue. Index 0 is the greeting; 1 onward are swings.
@@ -535,6 +555,7 @@
   var px = 0, py = 0;              // current screen position
   var fx = 0, fy = 0, ft = 0;      // flight: target + start time
   var FLY_MS = 620;
+  var grabId = null, grabTap = false;
 
   function homeDoc() {
     return { x: innerWidth * 0.78, y: innerHeight * 0.30 };
@@ -633,6 +654,11 @@
       if (k >= 1) { state = 'stuck'; NEU.sword && NEU.sword.setPose('stuck'); }
     } else if (state === 'stuck') {
       var s = homeScreen(); px = s.x; py = s.y;
+    } else if (state === 'held') {
+      /* Tap-carry with no finger down: it rides in the hand. Re-derived
+         every frame, which is what makes it survive a scroll and a
+         rotation without a resize or scroll listener. */
+      if (grabTap && grabId === null) { px = handX(); py = handY(); }
     }
 
     /* Spatial continuity. Once it is above the fold you have no idea
@@ -650,7 +676,14 @@
   }
   requestAnimationFrame(loop);
 
+  /* The sword's half of the carried tell. The key has this built into
+     carryKey/uncarryKey; the sword's carry is a state in loop(), so it
+     needs its own pair. */
+  function carrySword()   { if (sword) sword.classList.add('is-carried'); }
+  function uncarrySword() { if (sword) sword.classList.remove('is-carried'); }
+
   function flyHome() {
+    uncarrySword();
     fx = px; fy = py; ft = performance.now();
     state = 'fly';
     NEU.sword && NEU.sword.setPose('fly');
@@ -740,11 +773,14 @@
     state = 'held';
     NEU.sword && NEU.sword.setPose('held');
     px = e.clientX; py = e.clientY;
-    if (!CARRY) sword.setPointerCapture && sword.setPointerCapture(e.pointerId);
+    grabId = e.pointerId; grabTap = tapCarry(e);
+    if (!grabTap) sword.setPointerCapture && sword.setPointerCapture(e.pointerId);
+    tellCarry('sword');
   });
 
   addEventListener('pointermove', function (e) {
     if (state !== 'held') return;
+    if (grabTap && grabId === null) return;
     px = e.clientX; py = e.clientY;
   }, { passive: true });
 
@@ -780,13 +816,15 @@
   var chip = document.getElementById('keyChip');
   var kel  = document.getElementById('keyObj');
 
-  var kstate = 'off';                    // off | fall | rest | held | thrown
+  var kstate = 'off';                    // off | fall | rest | held | carry | thrown
   /* kx is a screen x (there is no horizontal scroll) but ky is a
      DOCUMENT y — the key falls to the bottom of the PAGE, not the
      bottom of the viewport, so it keeps falling past the fold and
      comes to rest on the last pixel of the document. Screen position
      is ky - scrollY, applied only at draw time. */
   var kx = 0, ky = 0, kvx = 0, kvy = 0, krot = 0, kRest = 90, klast = 0;
+  var kGrabId = null, kGrabTap = false, kGrabX = 0, kGrabY = 0, kFromCarry = false;
+  var TAP_SLOP = 10;                    // px of travel before a tap is a flick
   function docH() {
     var b = document.body, e = document.documentElement;
     return Math.max(b.scrollHeight, e.scrollHeight, e.offsetHeight);
@@ -800,6 +838,16 @@
 
     if (kstate === 'held') {
       krot += (0 - krot) * 0.2;          // held upright, ready to throw
+    } else if (kstate === 'carry') {
+      /* ky stays a DOCUMENT coordinate but is rebuilt from scrollY every
+         frame, so the key holds still ON SCREEN while the page moves under
+         it. That is the whole fix: a carried key used to keep its document
+         y and slide away the moment you scrolled. The draw below already
+         subtracts scrollY, so nothing else changes. */
+      kx = handX();
+      ky = scrollY + handY();
+      krot += (0 - krot) * 0.2;
+      kvx = 0; kvy = 0;
     } else if (kstate === 'rest') {
       krot += (kRest - krot) * 0.14;     // settles onto its side
     } else {
@@ -866,26 +914,44 @@
     return Math.hypot(cx - (ax + t * dx), cy - (ay + t * dy));
   }
 
-  function keyHit(fromX, fromY) {
-    var d = NEU.doorScreenPos && NEU.doorScreenPos();
-    if (!d) return;
-    /* SWEPT, not point-in-circle. A hard throw covers more ground in a
-       single frame than the door is wide — 6000px/s at 60fps is 100px
-       per step against a ~70px target — so testing only where the key
-       ENDED UP lets a good throw tunnel clean through. Testing the
-       segment it crossed is the difference between the mechanic
-       working and it silently failing on exactly the hardest throws,
-       which are the ones the player is most sure they got right. */
-    if (segDist(fromX, fromY, kx, ky, d.x, d.y + scrollY) > d.r + 20) return;
+  /* Where the television is ON SCREEN, so a thrown key can be tested
+     against it — the same contract as NEU.doorScreenPos. Returns null
+     when there is nothing to hit: it is hidden, it has no box yet, or
+     it is not breakable, which means the throw only counts once he has
+     actually told you to make it. */
+  function tvScreenPos() {
+    if (!tvEl || tvEl.hidden) return null;
+    if (!NEU.tvBreakable()) return null;
+    var r = tvEl.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2,
+             r: Math.max(30, r.height * 0.5) };
+  }
 
+  /* SWEPT, not point-in-circle. A hard throw covers more ground in a
+     single frame than the target is wide — 6000px/s at 60fps is 100px
+     per step against a ~70px target — so testing only where the key
+     ENDED UP lets a good throw tunnel clean through. Testing the
+     segment it crossed is the difference between the mechanic
+     working and it silently failing on exactly the hardest throws,
+     which are the ones the player is most sure they got right.
+     Targets report SCREEN positions while the key lives in document
+     space, hence t.y + scrollY. */
+  function sweptInto(fromX, fromY, t) {
+    return segDist(fromX, fromY, kx, ky, t.x, t.y + scrollY) <= t.r + 20;
+  }
+
+  /* Everything a landed blow shares across targets: the speed gate,
+     the once-only nag, the cooldown and the bounce. */
+  function landBlow() {
     if (Math.hypot(kvx, kvy) < THROW_MIN) {
       if (!keyHit.nagged) { keyHit.nagged = true; say(["put some shoulder into it."]); }
-      return;
+      return false;
     }
 
     /* A short cooldown, because a hit reflects the key rather than
        removing it — without this the next frame is still inside the
-       door's radius and the panel reopens every frame.
+       target's radius and the effect refires every frame.
 
        The `keyHit.at &&` guard is load-bearing. Defaulting the
        timestamp to 0 and comparing against it means the cooldown is
@@ -895,7 +961,7 @@
        key one second after load, it fails every time. Only apply a
        cooldown once there has actually been a hit to cool down from. */
     var nowMs = performance.now();
-    if (keyHit.at && nowMs - keyHit.at < 900) return;
+    if (keyHit.at && nowMs - keyHit.at < 900) return false;
     keyHit.at = nowMs;
 
     /* The key BOUNCES OFF. It used to be consumed here, and that was
@@ -909,14 +975,39 @@
     kstate = 'thrown';
 
     NEU.sfx && NEU.sfx.snap && NEU.sfx.snap();
-    unlockDoor();
-    openPanel();
+    return true;
+  }
+
+  function keyHit(fromX, fromY) {
+    /* The television is tested FIRST: by now the cube door is long
+       open, and its target circle sits right in the flight path of any
+       throw aimed at the screen — door-first would eat every blow
+       meant for the TV. */
+    var tv = tvScreenPos();
+    if (tv && sweptInto(fromX, fromY, tv)) {
+      if (landBlow()) NEU.breakTV();
+      return;
+    }
+    var d = NEU.doorScreenPos && NEU.doorScreenPos();
+    if (!d) return;
+    /* A hit only counts against a door you can actually see —
+       doorScreenPos returns null when the hero has scrolled away or
+       the door is facing into the page. So you have to carry it up AND
+       turn the cube. */
+    if (!sweptInto(fromX, fromY, d)) return;
+    if (landBlow()) {
+      unlockDoor();
+      openPanel();
+    }
   }
 
   if (kel) {
     kel.addEventListener('pointerdown', function (e) {
       if (kstate === 'off' || kstate === 'held') return;
       e.preventDefault();
+      kGrabId = e.pointerId; kGrabTap = tapCarry(e);
+      kGrabX = e.clientX; kGrabY = e.clientY;
+      kFromCarry = (kstate === 'carry');
       kstate = 'held'; trk.length = 0;
       kx = e.clientX; ky = e.clientY + scrollY;
       kel.classList.add('is-held');
@@ -932,7 +1023,9 @@
 
     addEventListener('pointerup', function (e) {
       if (kstate !== 'held') return;
+      if (kGrabId !== null && e.pointerId !== kGrabId) return;
       kel.classList.remove('is-held');
+      kGrabId = null;
       var now = performance.now(), a = null;
       for (var i = trk.length - 1; i >= 0; i--) {
         if (now - trk[i].t > 90) break;
@@ -944,10 +1037,56 @@
         kvy = (e.clientY + scrollY - a.y) / dt;
       } else { kvx = 0; kvy = 0; }
       kx = e.clientX; ky = e.clientY + scrollY;
+
+      /* On a finger, a stationary tap is not a throw — it is picking the
+         thing up or putting it down. Anything that actually travelled is a
+         throw, even a weak one: a slow drag still earns "put some shoulder
+         into it" from keyHit, which is the correct answer to a bad throw. */
+      if (kGrabTap) {
+        var moved = Math.hypot(e.clientX - kGrabX, e.clientY - kGrabY);
+        if (moved < TAP_SLOP && Math.hypot(kvx, kvy) < THROW_MIN) {
+          kvx = 0; kvy = 0;
+          if (kFromCarry) { dropKey(); } else { carryKey(); }
+          return;
+        }
+      }
+      uncarryKey();
       kstate = 'thrown'; keyHit.nagged = false;
       if (Math.hypot(kvx, kvy) > 420 && NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
     });
   }
+
+  function carryKey() {
+    kstate = 'carry';
+    if (kel) kel.classList.add('is-carried');
+    showChip(chip, true);       /* the chip is the standing "in hand" tell */
+    tellCarry('key');
+  }
+  function dropKey() {
+    uncarryKey();
+    kstate = 'thrown';          /* zero velocity: gravity takes it from here */
+  }
+  function uncarryKey() {
+    if (kel) kel.classList.remove('is-carried');
+    /* kstate is 'held' at every call site — the gesture that ends a
+       carry runs through 'held' on its way — so whether this WAS a
+       carry has to be read off the flag pointerdown recorded, not off
+       the live state. Reading kstate here lit the chip permanently the
+       first time the key was picked up. */
+    if (kFromCarry || kstate === 'carry') showChip(chip, false);
+  }
+
+  /* Said once, on a finger, the first time you pick each thing up. The
+     phone contract is not guessable from a desktop-shaped page, and he
+     is the only voice on it. */
+  var told = {};
+  function tellCarry(what) {
+    if (!grabTapFor(what) || told[what]) return;
+    told[what] = true;
+    if (what === 'sword') say(["tap me to swing it. tap anywhere else and it goes home."]);
+    else                  say(["tap it to pick it up. flick it to throw."]);
+  }
+  function grabTapFor(what) { return what === 'sword' ? grabTap : kGrabTap; }
 
   function gainKey() {
     NEU.sword && NEU.sword.hide();
@@ -978,6 +1117,7 @@
 
   function attempt(x, y) {
     if (state !== 'held') return;
+    uncarrySword();
     if (!overSans(x, y)) { flyHome(); return; }
 
     state = 'swing';
@@ -1056,22 +1196,31 @@
     });
   }
 
-  if (CARRY) {
-    /* Touch: you cannot hold a finger down and scroll with it, so the
-       press-and-hold contract is impossible here. Tap to pick up, tap
-       sans to swing. A tap that lands on neither drops the sword back
-       home — otherwise the blade is stranded mid-scroll with no way to
-       re-grab it (grabbing requires the 'stuck' state). */
-    addEventListener('pointerup', function (e) {
-      if (state !== 'held') return;
-      if (overSans(e.clientX, e.clientY)) attempt(e.clientX, e.clientY);
-      else flyHome();
-    });
-    addEventListener('pointercancel', function () { if (state === 'held') flyHome(); });
-  } else {
-    addEventListener('pointerup', function (e) { attempt(e.clientX, e.clientY); });
-    addEventListener('pointercancel', function () { if (state === 'held') flyHome(); });
-  }
+  /* Touch: you cannot hold a finger down and scroll with it, so the
+     press-and-hold contract is impossible. Tap to pick up, tap sans to
+     swing, tap anywhere else to send it home. The ONLY new rule is that
+     the pointerup which closes the pickup tap does not count as a drop —
+     without that guard the sword goes home the instant you lift, and
+     tap-to-carry never engages at all. */
+  addEventListener('pointerup', function (e) {
+    if (grabTap && grabId !== null && e.pointerId === grabId) { grabId = null; carrySword(); return; }
+    if (grabTap && state !== 'held') return;
+    /* The dialogue box is modal and sits over the page; tapping it means
+       "advance the text", never "drop what you are holding". Without this
+       the hint that explains tap-to-carry is itself what drops the sword,
+       on the player's very first pickup. Touch only: on a mouse, letting
+       go IS letting go, wherever the cursor happens to be. */
+    if (grabTap && tbox && !tbox.hidden && e.target && tbox.contains(e.target)) return;
+    attempt(e.clientX, e.clientY);
+  });
+  addEventListener('pointercancel', function (e) {
+    if (state !== 'held') return;
+    /* A cancelled PICKUP still leaves it in your hand — that is the
+       recoverable state, and a tap elsewhere still drops it. A cancelled
+       mouse drag goes home, as before. */
+    if (grabTap && grabId !== null && e.pointerId === grabId) { grabId = null; return; }
+    flyHome();
+  });
 
   /* Clicking the box advances it, the way it should. */
   tbox.addEventListener('click', next);
@@ -1496,8 +1645,8 @@
   /* ── breaking it ────────────────────────────────────────────────
      He tells you to do this at the end of the last corridor, and the
      flag is what makes an object two acts old gain a new verb. Before
-     the flag it is a television. After it, it is a television you can
-     hit with a sword. Nothing about the television changes. */
+     the      flag it is a television. After it, it is a television you can
+     put a thrown key through. Nothing about the television changes. */
   NEU.tvBreakable = function () {
     return !!(NEU.save && NEU.save.flagged('tv_breakable')) && !tvBroken;
   };
@@ -1509,16 +1658,16 @@
     if (tvEl) { tvEl.classList.add('is-broke'); tvEl.classList.remove('is-live'); }
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     if (NEU.quest) NEU.quest.mark('a4_smash');
-    say(["you put the sword through the television.",
+    say(["you put the hilt of a broken sword through the television.",
          "something climbs out of it."], 'narr');
     setTimeout(function () { if (NEU.quiz) NEU.quiz.open(); }, 2600);
     return true;
   };
 
   if (tvEl) tvEl.addEventListener('click', function () {
-    /* Carrying the sword and allowed to swing it beats every other
-       meaning the television has. */
-    if (NEU.tvBreakable() && state === 'held') { NEU.breakTV(); return; }
+    /* Breaking is not a click any more: keyHit owns that moment — you
+       put a thrown key through the screen — so a tap here only means
+       the television's ordinary meanings. */
     if (docked || docking) {
       /* Once it is in, the television is just a way back to the menu. */
       if (docked && NEU.deck) { NEU.deck.open(); return; }
@@ -1577,6 +1726,15 @@
     else if (NEU.quest.has('console')) hasConsole = true;
   }
 
+  /* The smash is page-lifetime state like the sleep chain above. The
+     flag was already being written and never read back, so a reload
+     made a television you had already put a key through breakable
+     again — and re-opened the show that climbs out of it. */
+  if (NEU.save && NEU.save.flagged('tv_broken')) {
+    tvBroken = true;
+    if (tvEl) { tvEl.classList.add('is-broke'); tvEl.classList.remove('is-live'); }
+  }
+
   NEU.sans = {
     get state()   { return state; },
     get asleep()  { return asleep; },
@@ -1594,6 +1752,10 @@
     get hasKey()  { return hasKey; },
     get hasFood() { return hasFood; },
     get dogOut()  { return dogOut; },
+    get keyState()   { return kstate; },
+    get keyScreenY() { return ky - scrollY; },
+    get carried()    { return kstate === 'carry'; },
+    get tvBroken()   { return tvBroken; },
     get lines()   { return LINES.length; }
   };
 })();

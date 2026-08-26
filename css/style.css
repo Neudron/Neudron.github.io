@@ -891,6 +891,23 @@ body.is-scrolled .cue { opacity: 0; pointer-events: none; }
 }
 .keyobj.is-held { cursor: grabbing; }
 
+/* ── a thing in your hand ─────────────────────────────────────────
+   On a phone, carrying is a STATE you tap into, not a finger you keep
+   down — so a carried object and a dropped one are otherwise pixel
+   identical. This is the difference. Filter, never transform: js
+   rewrites the transform on both of these every frame and would wipe
+   a keyframed one out entirely. */
+.sword.is-carried, .keyobj.is-carried { animation: carried 1.7s ease-in-out infinite; }
+
+@keyframes carried {
+  0%, 100% { filter: drop-shadow(0 6px 18px rgba(0,0,0,.5)); }
+  50%      { filter: drop-shadow(0 6px 22px rgba(255,236,160,.55)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sword.is-carried, .keyobj.is-carried { animation: none; }
+}
+
 
 /* ── a plain button, matching the switch's language ───────────────*/
 .btn {
@@ -1015,7 +1032,12 @@ body.is-playing { overflow: hidden; }
 /* Direct children only. The console is a <button> now, and a blanket
    rule on `.sleep img` would absolutely-position the sprite inside it
    and tear it out of its own button. */
-.sleep > img { position: absolute; image-rendering: pixelated; }
+/* height:auto is load-bearing. These <img> tags carry width/height
+   attributes for paint hygiene, and those attributes are
+   presentational hints — so setting only `width` here leaves the
+   height pinned to the raw attribute. That is what rendered the
+   blanket as a 250x5 sliver and stretched the sleepers. */
+.sleep > img { position: absolute; height: auto; image-rendering: pixelated; }
 .sleep__blanket { left: 0; bottom: 0; width: 250px; }
 .sleep__sans    { left: 26px;  bottom: 16px; width: 54px;  transform: rotate(-90deg); }
 .sleep__dog     { left: 108px; bottom: 20px; width: 92px; }
@@ -1031,7 +1053,7 @@ body.is-playing { overflow: hidden; }
   animation: swBob 2.4s ease-in-out infinite;
   filter: drop-shadow(0 0 6px rgba(184,146,255,.45));
 }
-.sleep__sw img { display: block; width: 46px; image-rendering: pixelated; }
+.sleep__sw img { display: block; width: 46px; height: auto; image-rendering: pixelated; }
 .sleep__sw:hover { filter: drop-shadow(0 0 12px rgba(184,146,255,.9)); }
 .sleep__sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sleep__sw.is-taken {
@@ -1077,7 +1099,7 @@ body.is-playing { overflow: hidden; }
   opacity: 0; transition: opacity .7s ease;
 }
 .tv.is-in { opacity: 1; }
-.tv img { display: block; width: 96px; image-rendering: pixelated; }
+.tv img { display: block; width: 96px; height: auto; image-rendering: pixelated; }
 .tv__lbl { font: 400 16px/1 var(--font); color: var(--dim); }
 /* after the sword */
 .tv.is-broke img { filter: grayscale(1) brightness(.5); transform: rotate(-4deg); }
