@@ -119,11 +119,42 @@
   var fast = false;
   function pace(ms) { return fast ? 0 : (reduced ? Math.min(ms, 400) : ms); }
 
-  var HOST = [
-    "WELCOME! yes! to the SHOW!",
-    "twenty questions. four buttons. one of you.",
-    "the board is right there. i am not hiding it. i would NEVER."
-  ];
+  /* Tenna is a character, not a text box. Every line he says is
+     keyed to a moment in the show. His voice, from the wiki:
+     desperate, needy, takes the ranking personally, insults
+     Spamton (BAD CAR! SMALL NOSE!), and talks to the audience.
+     COWABUNGA-DERO is his catchphrase. */
+  var TENNA = {
+    intro: [
+      "WELCOME! YES! TO THE SHOW! i am TENNA and this is TV TIME!",
+      "twenty questions. four buttons. one of you. COWABUNGA-DERO!",
+      "the board is right there. i am not hiding it. i would NEVER."
+    ],
+    right: [
+      "CORRECT! the audience loves you.",
+      "YES! that is the smooth taste of TV TIME!",
+      "obviously. obviously correct.",
+      "you knew that one. i saw you know it."
+    ],
+    wrong: [
+      "NO! it was ",
+      "WRONG! the answer was "
+    ],
+    slow: "TOO SLOW! the answer was ",
+    finish: "AND THAT IS THE SHOW! COWABUNGA-DERO!",
+    /* His reaction to the final rank. Takes it personally. */
+    rank: {
+      'T': 'T! ULTIMATE! i... i have nothing bad to say.',
+      'S': 'S! PERFECT! okay. okay. that is fine.',
+      'A': 'A! AWESOME! ...for now.',
+      'A\u2013': 'A! well. almost awesome.',
+      'B': 'B! NOT BAD! which is the worst thing you can be.',
+      'B\u2013': 'B! not bad. not good either. just... there.',
+      'C': 'C! KINDA SLOW! like a certain salesman i know.',
+      'C\u2013': 'C! you are testing my patience. and my show.',
+      'Z': 'Z! VERY SLOW! BAD CAR! SMALL NOSE! ...SALESMAN.'
+    }
+  };
 
   /* ── keyboard focus ─────────────────────────────────────────────
      The quiz was the last scene in the game with no focus management
@@ -162,7 +193,7 @@
     i = 0; score = 0; locked = false;
     if (elEnd) elEnd.hidden = true;
     board();
-    host(HOST.join('  '));
+    host(TENNA.intro.join('  '));
     /* No options exist yet, so the quit button is the way in. */
     var q0 = document.getElementById('quizQuit');
     if (q0 && q0.focus) q0.focus();
@@ -243,11 +274,12 @@
     }
     if (n === right) {
       score++;
-      host(['CORRECT!', 'YES!', 'obviously.', 'you knew that one.'][(Math.random() * 4) | 0]);
+      host(TENNA.right[(Math.random() * TENNA.right.length) | 0]);
       if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
     } else {
-      host(n < 0 ? "TOO SLOW! the answer was " + 'ABCD'[right] + "."
-                 : "NO! it was " + 'ABCD'[right] + ".");
+      host(n < 0
+        ? TENNA.slow + 'ABCD'[right] + "."
+        : TENNA.wrong[(Math.random() * TENNA.wrong.length) | 0] + 'ABCD'[right] + ".");
       if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     }
     i++;
@@ -280,7 +312,10 @@
         '<p class="quiz__small">the highest one you have ever scored is the one that counts.<br>' +
         'enter to go and see &middot; esc to try again</p>';
     }
-    host("AND THAT IS THE SHOW!");
+    host(TENNA.finish);
+    /* His reaction to the rank itself, shown after the end screen. */
+    var react = TENNA.rank[rank];
+    if (react) setTimeout(function () { if (open_) host(react); }, pace(1800));
     /* Off the dead option buttons. The global Enter handler below
        preventDefaults, so Enter here retries the show rather than
        activating whatever the caret was left sitting on. */
