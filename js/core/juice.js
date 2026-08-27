@@ -49,6 +49,7 @@
 
   var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   var customNoShake = false, customNoFlash = false;
+  var customNoHitstop = false, customNoParticles = false;
 
   /* ── trauma ─────────────────────────────────────────────────────*/
   var trauma = 0, DECAY = 1.5;
@@ -96,7 +97,7 @@
        not move anything, and removing it entirely takes the weight out
        of every impact for people who only asked for less motion. */
     var stop = t.stop * (reduced ? 0.33 : 1);
-    if (stop > 0) freezeUntil = Math.max(freezeUntil, performance.now() + stop * 1000);
+    if (stop > 0 && !customNoHitstop) freezeUntil = Math.max(freezeUntil, performance.now() + stop * 1000);
     return t;
   }
 
@@ -180,7 +181,7 @@
   for (var i = 0; i < POOL; i++) parts.push({ life: 0 });
 
   function burst(x, y, n, col, spd) {
-    if (reduced) return;
+    if (reduced || customNoParticles) return;
     n = n || 8; spd = spd || 130;
     for (var k = 0; k < n; k++) {
       var p = parts[pi++ % POOL];
@@ -230,8 +231,12 @@
     shakeEl: shakeEl,
     setNoShake: function (on) { customNoShake = !!on; },
     setNoFlash: function (on) { customNoFlash = !!on; },
+    setNoHitstop: function (on) { customNoHitstop = !!on; },
+    setNoParticles: function (on) { customNoParticles = !!on; },
     get noShake() { return customNoShake; },
     get noFlash() { return customNoFlash; },
+    get noHitstop() { return customNoHitstop; },
+    get noParticles() { return customNoParticles; },
     get trauma() { return trauma; },
     get reduced() { return reduced; },
     tiers: TIER,
