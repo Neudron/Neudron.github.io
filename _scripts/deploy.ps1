@@ -1,4 +1,16 @@
 <#
+  RETIRED - 2026-08-24. Do not use this to deploy.
+
+  The current deploy is a single repo: commit and push to main from the
+  repo root, and .github/workflows/deploy.yml stages the web-facing files
+  into _stage/ and uploads them to Pages. See .claude/skills/deploy/.
+
+  This script predates that. It mirrors the site into _deploy\ and pushes
+  from there; _deploy\ is now a vestigial clone (memory/workflow.md, and
+  AGENTS.md lists it hands-off). Kept for its history and for the leak
+  regex and tree-shape assertions in steps 3-4, which are still the best
+  written record of what must never ship.
+
   deploy.ps1 - the whole deploy, in one command.
 
       powershell -ExecutionPolicy Bypass -File _scripts\deploy.ps1
@@ -126,98 +138,6 @@ $staged = @(git diff --cached --name-only)
 # them; a bare `deltarune` alternative also blocked the legitimately
 # shipped crops that live beside the sources (tenna-idle/tenna-point).
 $leak = $staged | Select-String 'node_modules|deltarune|sr-.*\.png|\.env|\.pem$|\.key$|^memory/|\.orig$'
-if ($leak) { git reset --quiet; Pop-Location; Bad ("these must not ship: " + ($leak -join ', ')) }
-Good "$($staged.Count) file(s) staged, no leaks"
-
-# -- 5. what is actually changing -------------------------------------
-# A clean working tree does NOT mean there is nothing to deploy. Work
-# can already be committed here and simply not pushed - that is exactly
-# the state a session leaves behind when it is told to commit but not
-# push. An earlier version of this script exited with "already in sync"
-# in that case, which is the worst possible answer: the one moment you
-# most need it to act, it politely does nothing and the site stays on
-# the old commit.
-Step 5 'what would go live'
-git fetch --quiet origin main 2>$null
-$ahead = @(git rev-list origin/main..HEAD)
-$hasStaged = $staged.Count -gt 0
-
-if (-not $hasStaged -and $ahead.Count -eq 0) {
-  git reset --quiet; Pop-Location
-  Write-Host "   nothing to deploy - already in sync" -ForegroundColor Yellow
-  exit 0
-}
-
-if ($hasStaged) {
-  Write-Host "   uncommitted changes:" -ForegroundColor Cyan
-  git diff --cached --stat | Select-Object -Last 30
-}
-if ($ahead.Count -gt 0) {
-  Write-Host "   already committed, waiting to be pushed:" -ForegroundColor Cyan
-  git --no-pager log --oneline origin/main..HEAD | ForEach-Object { Write-Host "     $_" }
-}
-
-if ($DryRun) {
-  git reset --quiet; Pop-Location
-  Write-Host ""
-  Write-Host "-- dry run: nothing committed, nothing pushed --" -ForegroundColor Yellow
-  exit 0
-}
-
-# -- 6. ASK. Pages has no staging step --------------------------------
-Step 6 'confirm'
-if (-not $Yes) {
-  Write-Host "   This goes LIVE at https://www.neu.ac in about a minute." -ForegroundColor Yellow
-  Write-Host "   Close PR #1 first if it is still open - merged after this," -ForegroundColor Yellow
-  Write-Host "   it overwrites the site with a 70-byte page." -ForegroundColor Yellow
-  $a = Read-Host "   Type  deploy  to continue"
-  # Normalise before comparing. PowerShell writes a UTF-8 BOM at the head
-  # of a redirected pipeline, so `'deploy' | powershell -File deploy.ps1`
-  # arrives as "<BOM>deploy" and a plain -ne comparison rejects it. The
-  # failure looks like a refusal to deploy rather than an encoding bug,
-  # which is a confusing place to lose ten minutes.
-  $a = ($a -replace "^﻿", '').Trim()
-  if ($a -ne 'deploy') {
-    git reset --quiet; Pop-Location
-    Write-Host "   cancelled, nothing committed"
-    exit 0
-  }
-} else {
-  Write-Host "   -Yes: proceeding (the confirmation was given when the command ran)" -ForegroundColor Cyan
-}
-
-if ($hasStaged) {
-  if (-not $Message) { $Message = Read-Host "   commit message" }
-  if (-not $Message) { $Message = 'Update the site' }
-  git commit -q -m $Message
-  Good "committed $(git rev-parse --short HEAD)"
-} else {
-  git reset --quiet          # nothing to commit; drop the staging from step 4
-  Good "pushing $($ahead.Count) existing commit(s)"
-}
-
-git push origin main
-if ($LASTEXITCODE -ne 0) { Pop-Location; Bad "push failed" }
-Good "pushed"
-Pop-Location
-
-# -- 7. verify against the LIVE file, not the Actions API -------------
-# gh is not on PATH here, and the API is not the point anyway: what
-# matters is what the CDN serves. Cache-buster on every attempt.
-Step 7 'verifying live'
-Start-Sleep -Seconds 45
-foreach ($try in 1..6) {
-  try {
-    $cb = Get-Random
-    $r = Invoke-WebRequest "https://www.neu.ac/js/core/music.js?cb=$cb" -UseBasicParsing -TimeoutSec 20
-    if ($r.StatusCode -eq 200 -and $r.Content -match 'NEU\.music') { Good "live (attempt $try)"; exit 0 }
-  } catch { }
-  Write-Host "   not up yet, retrying ($try/6)"
-  Start-Sleep -Seconds 20
-}
-Write-Host "   still not visible after about 3 min; the Action may still be running." -ForegroundColor Yellow
-Write-Host "   Check https://github.com/Neudron/Neudron.github.io/actions" -ForegroundColor Yellow
-
 if ($leak) { git reset --quiet; Pop-Location; Bad ("these must not ship: " + ($leak -join ', ')) }
 Good "$($staged.Count) file(s) staged, no leaks"
 

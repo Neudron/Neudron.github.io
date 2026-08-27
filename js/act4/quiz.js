@@ -278,7 +278,7 @@
         '<p>' + opens(rank).length + ' door' + (opens(rank).length === 1 ? '' : 's') +
         ' just unlocked. all of them are yours.</p>' +
         '<p class="quiz__small">the highest one you have ever scored is the one that counts.<br>' +
-        'enter to try again &middot; esc to go and look</p>';
+        'enter to go and see &middot; esc to try again</p>';
     }
     host("AND THAT IS THE SHOW!");
     /* Off the dead option buttons. The global Enter handler below
@@ -292,6 +292,7 @@
     if (!open_) return;
     if (e.key === 'Escape') {
       e.preventDefault();
+      if (i >= Q.length) { open_ = false; open(); return; }
       if (NEU.engine && NEU.engine.confirmExit) {
         NEU.engine.confirmExit('Quiz', close);
       } else { close(); }
@@ -308,7 +309,15 @@
       }
       return;
     }
-    if (i >= Q.length && e.key === 'Enter') { e.preventDefault(); open_ = false; open(); return; }
+    if (i >= Q.length && e.key === 'Enter') {
+      e.preventDefault();
+      /* The show is finished and the score is saved; Enter is the
+         reward door, not an exit to confirm. Close and walk into the
+         prize corridor the show was always meant to open. */
+      close();
+      if (NEU.engine && NEU.engine.enter) NEU.engine.enter('g0_hall');
+      return;
+    }
     var k = 'abcd'.indexOf(String(e.key).toLowerCase());
     if (k >= 0 && i < Q.length) { e.preventDefault(); answer(k); return; }
     var n = '1234'.indexOf(e.key);

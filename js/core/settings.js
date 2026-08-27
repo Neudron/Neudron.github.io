@@ -4,11 +4,13 @@
    danmaku.js dims instead of blinking, and nothing let a player
    reach any of it. This is the panel.
 
-   THREE SWITCHES, PERSISTED IN THE SAVE FILE:
+   FIVE SWITCHES, PERSISTED IN THE SAVE FILE:
 
      reduce screen shake — juice.js stops adding trauma
      reduce flashing    — juice.js stops the white overlay
      larger text        — zooms the whole page 1.25x
+     reduce hit-stop    — juice.js skips the frozen frame on impacts
+     reduce particles   — juice.js stops spawning impact debris
 
    Larger text is a zoom, not a font-size, and that is deliberate:
    the Undertale faces are drawn on a 16px grid, so resampling a
@@ -31,6 +33,8 @@
   var K_SHAKE = 'opt_noShake';
   var K_FLASH = 'opt_noFlash';
   var K_TEXT  = 'opt_largeText';
+  var K_STOP  = 'opt_hitstop';      /* on = juice skips the held frame   */
+  var K_PART  = 'opt_particles';    /* on = juice spawns no debris       */
   var K_MUSIC = 'opt_music';        /* owned by music.js; read here    */
 
   var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -58,7 +62,12 @@
   function apply() {
     var shake = reduced || state(K_SHAKE);
     var flash = reduced || state(K_FLASH);
-    if (NEU.juice) { NEU.juice.setNoShake(shake); NEU.juice.setNoFlash(flash); }
+    if (NEU.juice) {
+      NEU.juice.setNoShake(shake);
+      NEU.juice.setNoFlash(flash);
+      NEU.juice.setNoHitstop(state(K_STOP));
+      NEU.juice.setNoParticles(state(K_PART));
+    }
     document.documentElement.classList.toggle('text-lg', !!state(K_TEXT));
   }
 
@@ -180,6 +189,14 @@
         'zooms the whole page 1.25x', false, function (on) {
       set(K_TEXT, on);
     }));
+    box.appendChild(row('settHitstop', 'reduce hit-stop',
+        'impacts land without the held frame', false, function (on) {
+      set(K_STOP, on);
+    }));
+    box.appendChild(row('settParticles', 'reduce particles',
+        'hits leave no debris behind', false, function (on) {
+      set(K_PART, on);
+    }));
     /* Thumb controls appear on their own on a touch screen. This is
        the override for the two cases auto-detection gets wrong: a
        laptop with a touchscreen that does not want them, and a tablet
@@ -238,6 +255,8 @@
       ['settShake', reduced || state(K_SHAKE)],
       ['settFlash', reduced || state(K_FLASH)],
       ['settText',  state(K_TEXT)],
+      ['settHitstop',   state(K_STOP)],
+      ['settParticles', state(K_PART)],
       ['settTouch', NEU.touch ? NEU.touch.visible || NEU.touch.mode === 'on' : false]
     ];
     for (var i = 0; i < rows.length; i++) {
@@ -337,6 +356,8 @@
     get shake() { return reduced || state(K_SHAKE); },
     get flash() { return reduced || state(K_FLASH); },
     get text() { return state(K_TEXT); },
+    get hitstop() { return state(K_STOP); },
+    get particles() { return state(K_PART); },
     get music() { return NEU.music ? NEU.music.volume : num(K_MUSIC, 55); }
   };
 })();

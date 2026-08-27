@@ -78,9 +78,10 @@ console.log('\n1. the settings module');
      deletes another, and it tells you nothing about which one broke. */
   {
     const ids = [...w.document.querySelectorAll('.sett [role="switch"]')].map(e => e.id);
-    for (const want of ['settShake', 'settFlash', 'settText', 'settTouch'])
+    for (const want of ['settShake', 'settFlash', 'settText', 'settTouch',
+                        'settHitstop', 'settParticles'])
       ok('switch: ' + want, ids.includes(want));
-    ok('no unexpected switches (' + ids.length + ')', ids.length === 4);
+    ok('no unexpected switches (' + ids.length + ')', ids.length === 6);
   }
   ok('close button exists', !!w.document.querySelector('.sett__x'));
   ok('dialog role + label', w.document.querySelector('.sett').getAttribute('role') === 'dialog');

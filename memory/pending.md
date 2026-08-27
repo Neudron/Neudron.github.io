@@ -158,6 +158,22 @@ Later the same day, against goal "fully mobile + re-gather sprites":
 
 ---
 
+## 2026-08-23 — plugin/MCP cycle applied globally
+
+Global config (`~/.config/opencode/opencode.jsonc`) now carries 4 npm plugins
+(dynamic-context-pruning, autotitle, sessions, envsitter-guard) + 2 remote MCPs
+(gh_grep, context7). Full record: `.opencode/log/2026-08-23.md`.
+
+**Open item:** ~~watch first start for plugin-load errors~~ **RESOLVED
+2026-08-23** — headless boot verified: zero plugin errors, all four packages in
+`~/.cache/opencode/packages/` (DCP's correct npm name is
+`@tarquinen/opencode-dcp`, not the ecosystem-page name). Remaining if context
+budget allows later: `strip-skills-catalog` (manual copy, qike-ms repo) trims
+the `<available_skills>` block; `opencode-worktree` via ocx registry. `skillful`
+was skipped — archived upstream, superseded by native skills.
+
+---
+
 ## The table
 
 Status: 🔴 blocked on Neu · 🟠 real gap · 🟡 polish · ⚪ decided, no action
@@ -299,3 +315,29 @@ See `memory/decisions.md`. Briefly: the TV boss fight is gone, two text-blip
 samples was wrong, the torch is stepped not smooth, walk cycles advance on
 distance, rooms are data, the deck is DOM, Polterghast plays flat, and
 Calamitas's 20-step cycle is fixed and does not reset between phases.
+
+## 2026-08-24 — V5: Supreme Calamitas fight repair
+
+- **tpBorder resolved.** Sheet corrected to 12×40 fps:0, border frame indexed
+  by value, full-bar flourish plays once. Supersedes the old open question
+  about TP art ownership (the three TP files stay as provenance-noted wiki
+  originals; see the sprite re-gather note above).
+- **Browser-uat debt** (blocked: chrome-devtools MCP not registered in
+  session): meters outside box at wide + narrow viewport · orbit ≥90px
+  separation · worm dash continuity · charge-flourish play-once · tp border
+  value-tracking.
+- **Intentionally red:** fixes12 (no unexpected switches), fixes16
+  (music.js size). Full record: `.opencode/log/2026-08-24.md`.
+
+## 2026-08-24 - V6: Supreme Calamitas longer fight
+Merged v6-scal-longer-fight @ b6f4697 into main (fast-forward ea48c4c..b6f4697, 11 commits). All 8 tasks SDD-reviewed; final whole-branch review + 1 fix wave (graze-ramp latch).
+Browser-uat debt (jsdom cannot prove):
+- Ring playthrough proof (~1-2% of jsdom drives reach phase 2); ring/park/drift visuals.
+- Telegraph-glow freeze if the 20% gate trips mid-dash (scalAnimState persists through ring phase).
+- Second-summon sub-12% arc has no automated coverage.
+- Meter-local +-1px shake isolation (drawn after juice.end).
+Follow-ups:
+- Seed Math.random in fixes8 harness and re-fit drive legs once (~8% residual flake).
+- Name wiki pages in GIGA_AT / skull-constant comments (sourcing pass).
+- Rename drawMeter inner `frames` to aFrames (shadowing trap; text is brief-mandated today).
+Known-red on MAIN checkout only: fixes12/fixes16 (artifacts of unrelated dirty files juice/music/settings); clean checkouts run 15/15.

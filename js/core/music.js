@@ -301,6 +301,7 @@
 
   function drum(dest, kind, t, gain) {
     try {
+      /*jitter noise pitch so hits don't stack.*/
       if (kind === 'k') {
         var o = actx.createOscillator(), g = actx.createGain();
         o.type = 'sine';
@@ -313,6 +314,7 @@
         return;
       }
       var s = actx.createBufferSource(); s.buffer = noise;
+      s.playbackRate.value = 1 + (Math.random() * 0.1 - 0.05);
       var f = actx.createBiquadFilter();
       var ng = actx.createGain();
       var len = kind === 's' ? 0.13 : 0.045;
