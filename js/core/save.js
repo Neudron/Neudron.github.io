@@ -34,7 +34,7 @@
 
   var KEY = 'neu.save.v1';
   var BAD = 'neu.save.bad';
-  var VERSION = 1;
+  var VERSION = 2;
 
   /* The in-memory copy is the truth while playing. localStorage is a
      mirror of it, not the other way round — so a storage failure
@@ -67,7 +67,31 @@
      Runs oldest-first so a v1 file can climb to v4 through every step
      rather than needing an N×N table of direct conversions. */
   var STEPS = {
-    /* 1: function (s) { s.newField = default; s.v = 2; return s; } */
+    /* 1: remap old rank names (S+..D-) to Deltarune ranks (T..Z). */
+    1: function (s) {
+      var MAP = {
+        'S+': 'T', 'S': 'S', 'A+': 'A', 'A': 'A\u2013',
+        'B+': 'B', 'B': 'B\u2013', 'C': 'C', 'D': 'C\u2013', 'D-': 'Z'
+      };
+      if (s.flags) {
+        var old = {};
+        for (var k in s.flags) {
+          if (k.slice(0, 5) === 'rank:') {
+            var name = k.slice(5);
+            old[k] = MAP[name] ? 'rank:' + MAP[name] : k;
+          }
+        }
+        for (var ok in old) {
+          s.flags[old[ok]] = s.flags[ok];
+          if (old[ok] !== ok) delete s.flags[ok];
+        }
+      }
+      if (s.quiz && s.quiz.rank && MAP[s.quiz.rank]) s.quiz.rank = MAP[s.quiz.rank];
+      if (s.flags && s.flags.quiz_rank && MAP[s.flags.quiz_rank])
+        s.flags.quiz_rank = MAP[s.flags.quiz_rank];
+      s.v = 2;
+      return s;
+    }
   };
 
   function migrate(s) {

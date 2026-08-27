@@ -69,7 +69,7 @@
 
   function say(c, l, w) { c.say(l, w || 'narr'); }
 
-  var RANKS = ['D-', 'D', 'C', 'B', 'B+', 'A', 'A+', 'S', 'S+'];
+  var RANKS = ['Z', 'C\u2013', 'C', 'B\u2013', 'B', 'A\u2013', 'A', 'S', 'T'];
 
   /* ══ G0 — the corridor of doors ══════════════════════════════════*/
   E.register('g0_hall', {
@@ -98,7 +98,7 @@
     onEnter: function (c) {
       if (c.flagged('g0_seen')) return;
       c.flag('g0_seen', 1);
-      var rank = (NEU.save && NEU.save.flag('quiz_rank')) || 'D-';
+      var rank = (NEU.save && NEU.save.flag('quiz_rank')) || 'Z';
       var n = NEU.quiz ? NEU.quiz.opens(rank).length : 1;
       say(c, ['nine doors, each with a letter on it.',
               'you scored ' + rank + '. ' + n + ' of them will open for you.',
@@ -110,23 +110,23 @@
      a small reward delivered instantly beats a big one you have to
      work for after already working for it. */
   var PRIZES = [
-    ['D-', 'a participation certificate, unsigned',
+    ['Z',  'a participation certificate, unsigned',
      'somebody started writing your name and gave up after the first letter.'],
-    ['D',  'a chair, facing a wall',
+    ['C\u2013', 'a chair, facing a wall',
      'the chair is comfortable. the wall is not interesting. these facts are unrelated.'],
     ['C',  'a vending machine with one button and no slot',
      'pressing it makes a noise like a filing cabinet agreeing with you.'],
-    ['B',  'a fish tank with no water',
+    ['B\u2013', 'a fish tank with no water',
      'the fish appear to be fine. you decide not to look directly at them.'],
-    ['B+', 'a poster of a much better room',
+    ['B',  'a poster of a much better room',
      'the room in the poster has a chandelier. this room has a poster.'],
-    ['A',  'a piano with three keys',
+    ['A\u2013', 'a piano with three keys',
      'all three are middle c. it is the most decisive instrument you have ever met.'],
-    ['A+', 'a shelf of books, all the same book',
+    ['A',  'a shelf of books, all the same book',
      'the book is called THE BOOK. you do not open it. that felt correct.'],
     ['S',  'a very small door you cannot fit through',
      'through the keyhole: another, smaller door.'],
-    ['S+', 'nothing at all, and a staircase down',
+    ['T',  'nothing at all, and a staircase down',
      'the best room is empty. that is either a joke or the point.']
   ];
 

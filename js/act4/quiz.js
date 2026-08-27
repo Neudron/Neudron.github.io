@@ -93,12 +93,12 @@
 
   /* ── the board ──────────────────────────────────────────────────*/
   var RANKS = [
-    ['S+', 20], ['S', 18], ['A+', 16], ['A', 14], ['B+', 12],
-    ['B', 10], ['C', 7], ['D', 4], ['D-', 0]
+    ['T', 20], ['S', 18], ['A', 16], ['A\u2013', 14], ['B', 12],
+    ['B\u2013', 10], ['C', 7], ['C\u2013', 4], ['Z', 0]
   ];
   function rankFor(score) {
     for (var i = 0; i < RANKS.length; i++) if (score >= RANKS[i][1]) return RANKS[i][0];
-    return 'D-';
+    return 'Z';
   }
   /* Ranks are cumulative: holding A opens A and everything under it. */
   function opens(rank) {

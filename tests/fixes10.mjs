@@ -124,16 +124,16 @@ console.log('\n2. nine doors');
      (G.match(/locked: 'rank:' \+ r/g) || []).length === 1);
   ok('the corridor names the doors you did not earn',
      /you did not score high enough for this one\. yet\./.test(G));
-  ok('nine distinct prizes', (G.match(/^\s+\['[SABCD]/gm) || []).length === 9);
+  ok('nine distinct prizes', (G.match(/^\s+\['[ZCASTB]/gm) || []).length === 9);
 
-  /* a D- run opens exactly one door; S+ opens all nine */
-  NEU.save.flag('rank:D-', 1);
-  ok('D- opens one', NEU.save.flagged('rank:D-') && !NEU.save.flagged('rank:S+'));
-  NEU.quiz.opens('S+').forEach(r => NEU.save.flag('rank:' + r, 1));
-  ok('>>> S+ opens all nine <<<',
+  /* a Z run opens exactly one door; T opens all nine */
+  NEU.save.flag('rank:Z', 1);
+  ok('Z opens one', NEU.save.flagged('rank:Z') && !NEU.save.flagged('rank:T'));
+  NEU.quiz.opens('T').forEach(r => NEU.save.flag('rank:' + r, 1));
+  ok('>>> T opens all nine <<<',
      NEU.quiz.ranks.every(r => NEU.save.flagged('rank:' + r[0])));
 
-  ok('only the S+ room leads onward', /to: 'h1_storm'/.test(G));
+  ok('only the T room leads onward', /to: 'h1_storm'/.test(G));
 }
 
 /* ═══ 3. the vending machine ══════════════════════════════════════*/

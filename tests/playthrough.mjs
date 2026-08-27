@@ -191,10 +191,10 @@ console.log('\n--- FULL PLAYTHROUGH SUITE ---');
   ok('Act IV step 25: television broken', NEU.quest.has('a4_smash'));
 
   if (NEU.quiz && NEU.quiz.fast) NEU.quiz.fast(true);
-  NEU.save.flag('quiz_rank', 'S+');
+  NEU.save.flag('quiz_rank', 'T');
   NEU.quest.mark('a4_tenna');
   NEU.quest.mark('a4_rank');
-  ok('Act IV steps 26-27: Tenna quiz passed with S+', NEU.quest.has('a4_tenna') && NEU.quest.has('a4_rank'));
+  ok('Act IV steps 26-27: Tenna quiz passed with T', NEU.quest.has('a4_tenna') && NEU.quest.has('a4_rank'));
 
   for (let i = 1; i <= 9; i++) NEU.quest.bump('a4_prizes', i);
   ok('Act IV step 28: opened all 9 prize rooms', NEU.quest.has('a4_prizes'));

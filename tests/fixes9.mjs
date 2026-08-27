@@ -241,17 +241,17 @@ console.log('\n7. tenna');
   ok('>>> categories never repeat back to back <<<', runs === 0);
 
   ok('nine ranks', NEU.quiz.ranks.length === 9);
-  ok('D- is reachable with zero', NEU.quiz.rankFor(0) === 'D-');
-  ok('S+ needs all twenty', NEU.quiz.rankFor(20) === 'S+' && NEU.quiz.rankFor(19) !== 'S+');
+  ok('Z is reachable with zero', NEU.quiz.rankFor(0) === 'Z');
+  ok('T needs all twenty', NEU.quiz.rankFor(20) === 'T' && NEU.quiz.rankFor(19) !== 'T');
   ok('the scale is monotonic', (() => {
     let last = 99;
     for (const [, min] of NEU.quiz.ranks) { if (min > last) return false; last = min; }
     return true;
   })());
 
-  ok('>>> ranks are cumulative <<<', NEU.quiz.opens('S+').length === 9);
-  ok('a middling rank opens fewer', NEU.quiz.opens('B').length === 4);
-  ok('the worst rank still opens one', NEU.quiz.opens('D-').length === 1);
+  ok('>>> ranks are cumulative <<<', NEU.quiz.opens('T').length === 9);
+  ok('a middling rank opens fewer', NEU.quiz.opens('B\u2013').length === 4);
+  ok('the worst rank still opens one', NEU.quiz.opens('Z').length === 1);
 
   const src = fs.readFileSync(path.join(ROOT,'js','act4','quiz.js'), 'utf8');
   ok('thresholds are shown before you start', /function board\(\)/.test(src));
@@ -283,7 +283,7 @@ console.log('\n8. playing it');
   }
   await wait(200);
   ok('>>> a perfect run scores twenty <<<', NEU.quiz.score === 20);
-  ok('and lands S+', NEU.save.flag('quiz_rank') === 'S+');
+  ok('and lands T', NEU.save.flag('quiz_rank') === 'T');
   ok('>>> which opens all nine rooms <<<',
      NEU.quiz.ranks.every(r => NEU.save.flagged('rank:' + r[0])));
   ok('the objective ticked', NEU.quest.has('a4_rank') === true);

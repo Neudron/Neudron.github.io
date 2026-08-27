@@ -70,7 +70,7 @@ console.log('\n1. save');
 {
   const { NEU } = boot();
   ok('save.js loaded', !!NEU.save);
-  ok('versioned from v1', NEU.save.VERSION === 1);
+  ok('versioned from v1, now v2', NEU.save.VERSION === 2);
   ok('starts blank', NEU.save.data.items.length === 0);
 
   NEU.save.flag('witch_met', 1);
