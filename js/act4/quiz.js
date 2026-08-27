@@ -21,7 +21,7 @@
    4. FOUR CATEGORIES ROTATE. Five in a row about Terraria makes the
       whole thing feel like one long question.
 
-   5. NOTHING IS UNWINNABLE AND NOTHING IS FREE. D- still opens a room.
+   5. NOTHING IS UNWINNABLE AND NOTHING IS FREE. Z still opens a room.
       Every rank opens its own room and all the ones below it, so a bad
       run is a smaller reward rather than no reward — which is what
       makes a second attempt appealing instead of obligatory.        */
@@ -193,6 +193,7 @@
     i = 0; score = 0; locked = false;
     if (elEnd) elEnd.hidden = true;
     board();
+    roundBanner('ROUND 1: THE LEGEND OF TENNA');
     host(TENNA.intro.join('  '));
     /* No options exist yet, so the quit button is the way in. */
     var q0 = document.getElementById('quizQuit');
@@ -205,7 +206,7 @@
     clearInterval(tick);
     /* A pending "next question" timer must die with the overlay. If
        it survived, ask() would keep rebuilding the board on a hidden
-       wrapper, the timer would run the whole show into a phantom "D-"
+       wrapper, the timer would run the whole show into a phantom "Z"
        finish, and the rank door would mark itself a4_rank behind the
        player's back. */
     clearTimeout(askTimer);
@@ -228,15 +229,24 @@
     }).join('');
   }
 
+  function roundBanner(text) {
+    var el = document.getElementById('quizRound');
+    if (el) { el.textContent = text; el.hidden = !text; }
+  }
+
   function ask() {
     /* The guard every timer fires into: if the show was closed while
        this call was queued, rebuild nothing and touch nothing. */
     if (!open_) return;
+    /* Round break: after question 10, the DODGE FIRE phase runs
+       before the second half. In fast mode the dodge is a no-op
+       (pace is 0, dodgeStart calls dodgeDone immediately). */
+    if (i === 10 && !dodgeLoop && !fast) { dodgeStart(8); return; }
     if (i >= Q.length) { finish(); return; }
     locked = false;
     var q = Q[i];
     if (elCat) elCat.textContent = q[0];
-    if (elNum) elNum.textContent = (i + 1) + ' / ' + Q.length + '   ·   ' + score + ' right';
+    if (elNum) elNum.textContent = (i + 1) + ' / ' + Q.length + '   \u00b7   ' + score + ' right';
     if (elQ)   elQ.textContent = q[1];
     if (elOpts) {
       elOpts.innerHTML = '';
@@ -288,6 +298,7 @@
 
   function finish() {
     if (!open_) return;
+    roundBanner('');
     var rank = rankFor(score);
     if (NEU.save) {
       /* Only ever improves. A worse re-run must not close a door that
@@ -323,8 +334,74 @@
     if (qq && qq.focus) qq.focus();
   }
 
+  /* ── the physical challenge: DODGE FIRE ───────────────────────────────────────
+     Round 1 Phase B and the bonus layer. Fire rains; the SOUL (a
+     red dot) dodges left and right for a fixed duration. Each hit
+     subtracts from the round score. This is the DODGE FIRE minigame
+     from the Tenna boss battle, adapted to the quiz canvas.
+
+     The phase is gated behind `fast`: tests drive the show with
+     fast(true) which collapses pacing to zero, so the dodge timer
+     fires instantly and the phase is a no-op. Real players get the
+     full dodge. */
+  var cv = document.getElementById('quizCanvas');
+  var cx = cv ? cv.getContext('2d') : null;
+  var soul = { x: 240, y: 210 }, dodgeTime = 0, dodgeHits = 0, dodgeLoop = null;
+  var fires = [];
+
+  function dodgeStart(duration) {
+    if (!cv || !cx || fast) { dodgeDone(); return; }
+    soul = { x: 240, y: 210 }; dodgeTime = duration; dodgeHits = 0; fires = [];
+    cv.hidden = false;
+    if (elOpts) elOpts.innerHTML = '';
+    if (elQ) elQ.textContent = '';
+    host("DODGE FIRE! don't get hit!");
+    dodgeLoop = setInterval(dodgeTick, 33);
+  }
+
+  function dodgeTick() {
+    if (!open_ || fast) { clearInterval(dodgeLoop); cv.hidden = true; dodgeDone(); return; }
+    dodgeTime -= 0.033;
+    if (Math.random() < 0.4)
+      fires.push({ x: Math.random() * 480, y: 0, vy: 80 + Math.random() * 80 });
+    cx.fillStyle = '#0E0820'; cx.fillRect(0, 0, 480, 240);
+    cx.fillStyle = '#FF6B2A';
+    for (var f = fires.length - 1; f >= 0; f--) {
+      fires[f].y += fires[f].vy * 0.033;
+      if (fires[f].y > 240) { fires.splice(f, 1); continue; }
+      cx.fillRect(fires[f].x, fires[f].y, 8, 12);
+      if (Math.abs(fires[f].x - soul.x) < 10 && Math.abs(fires[f].y - soul.y) < 10) {
+        dodgeHits++; fires.splice(f, 1);
+      }
+    }
+    cx.fillStyle = '#FF2030'; cx.fillRect(soul.x - 4, soul.y - 4, 8, 8);
+    if (dodgeTime <= 0) { clearInterval(dodgeLoop); cv.hidden = true; dodgeDone(); }
+  }
+
+  function dodgeDone() {
+    if (elQ) elQ.textContent = '';
+    cv.hidden = true;
+    roundBanner('ROUND 2: THE ONE I SAID WAS LAST');
+    host('ROUND TWO! the one i said was last! i lied!');
+    askTimer = setTimeout(ask, pace(800));
+  }
+
+  /* Arrow keys move the SOUL during the dodge phase. The global
+     keydown handler below calls this; it returns true if it
+     consumed the key, so the trivia handler can skip it. */
+  function dodgeKey(e) {
+    if (!dodgeLoop || fast) return false;
+    var s = 24;
+    if (e.key === 'ArrowLeft')  { soul.x = Math.max(8, soul.x - s); return true; }
+    if (e.key === 'ArrowRight') { soul.x = Math.min(472, soul.x + s); return true; }
+    if (e.key === 'ArrowUp')    { soul.y = Math.max(8, soul.y - s); return true; }
+    if (e.key === 'ArrowDown')  { soul.y = Math.min(232, soul.y + s); return true; }
+    return false;
+  }
+
   addEventListener('keydown', function (e) {
     if (!open_) return;
+    if (dodgeKey(e)) { e.preventDefault(); return; }
     if (e.key === 'Escape') {
       e.preventDefault();
       if (i >= Q.length) { open_ = false; open(); return; }

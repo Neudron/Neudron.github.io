@@ -1204,6 +1204,14 @@ body.is-blackout::before {
 .quiz__end em { font: 400 96px/1 var(--font-display); color: #FFD34E; font-style: normal; }
 .quiz__end p { margin: 0; font: 400 16px/1.5 var(--font); color: var(--ghost); }
 .quiz__small { color: #6E6880 !important; }
+.quiz__round {
+  font: 400 22px/1.2 var(--font-display); color: #FFD34E;
+  letter-spacing: 2px; text-transform: uppercase; margin: 4px 0;
+}
+.quiz__canvas {
+  display: block; width: 100%; max-width: 480px; height: auto;
+  background: #0E0820; border: 3px solid #4A2C74; margin: 4px 0;
+}
 
 /* ── through the crack ────────────────────────────────────────────*/
 .polt { position: fixed; inset: 0; z-index: 76; background: #04060A; }
