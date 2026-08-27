@@ -1769,11 +1769,11 @@ body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) satura
 }
 .sett__rng::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 14px; height: 22px; margin-top: -10px;
+  width: 28px; height: 28px; margin-top: -13px;
   background: var(--accent); border: 0; border-radius: 0;
 }
 .sett__rng::-moz-range-thumb {
-  width: 14px; height: 22px;
+  width: 28px; height: 28px;
   background: var(--accent); border: 0; border-radius: 0;
 }
 .sett__rng:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
