@@ -242,6 +242,8 @@
        before the second half. In fast mode the dodge is a no-op
        (pace is 0, dodgeStart calls dodgeDone immediately). */
     if (i === 10 && !dodgeLoop && !fast) { dodgeStart(8); return; }
+    /* Round 2 Phase B: after the last question, SHOOT THE TARGETS. */
+    if (i >= Q.length && !shootLoop && !fast) { shootStart(8); return; }
     if (i >= Q.length) { finish(); return; }
     locked = false;
     var q = Q[i];
@@ -386,6 +388,85 @@
     askTimer = setTimeout(ask, pace(800));
   }
 
+  /* ── the physical challenge: SHOOT THE TARGETS ──
+     Round 2 Phase B. Tenna faces appear in windows; the player shoots
+     them before they shoot back. Redder = about to shoot. This is the
+     Cowboy minigame from the Tenna battle, adapted. Click or press
+     Space to shoot at the crosshair (moved by arrow keys).
+
+     Like dodge, gated behind `fast`: in test mode it's a no-op. */
+  var shootLoop = null, shootTime = 0, shootHits = 0, shootMisses = 0;
+  var targets = [], crosshair = { x: 240, y: 120 };
+
+  function shootStart(duration) {
+    if (!cv || !cx || fast) { shootDone(); return; }
+    shootTime = duration; shootHits = 0; shootMisses = 0; targets = [];
+    crosshair = { x: 240, y: 120 };
+    cv.hidden = false;
+    if (elOpts) elOpts.innerHTML = '';
+    if (elQ) elQ.textContent = '';
+    host("SHOOT THE TARGETS! don't let them shoot you!");
+    shootLoop = setInterval(shootTick, 33);
+  }
+
+  function shootTick() {
+    if (!open_ || fast) { clearInterval(shootLoop); cv.hidden = true; shootDone(); return; }
+    shootTime -= 0.033;
+    /* spawn targets */
+    if (Math.random() < 0.3)
+      targets.push({ x: 20 + Math.random() * 440, y: 20 + Math.random() * 180, timer: 2 + Math.random() * 2 });
+    cx.fillStyle = '#0E0820'; cx.fillRect(0, 0, 480, 240);
+    cx.fillStyle = '#FFD34E';
+    for (var t = targets.length - 1; t >= 0; t--) {
+      targets[t].timer -= 0.033;
+      if (targets[t].timer <= 0) { shootMisses++; targets.splice(t, 1); continue; }
+      var red = targets[t].timer < 1;
+      cx.fillStyle = red ? '#FF2030' : '#FFD34E';
+      cx.fillRect(targets[t].x - 8, targets[t].y - 8, 16, 16);
+      cx.fillStyle = '#FFFFFF';
+      cx.fillText('T', targets[t].x - 4, targets[t].y + 4);
+    }
+    /* crosshair */
+    cx.strokeStyle = '#7BE38A'; cx.lineWidth = 2;
+    cx.strokeRect(crosshair.x - 12, crosshair.y - 12, 24, 24);
+    cx.strokeStyle = '#7BE38A'; cx.beginPath();
+    cx.moveTo(crosshair.x - 16, crosshair.y); cx.lineTo(crosshair.x + 16, crosshair.y);
+    cx.moveTo(crosshair.x, crosshair.y - 16); cx.lineTo(crosshair.x, crosshair.y + 16);
+    cx.stroke();
+    if (shootTime <= 0) { clearInterval(shootLoop); cv.hidden = true; shootDone(); }
+  }
+
+  function shootFire() {
+    if (!shootLoop || fast) return false;
+    for (var t = targets.length - 1; t >= 0; t--) {
+      if (Math.abs(targets[t].x - crosshair.x) < 16 && Math.abs(targets[t].y - crosshair.y) < 16) {
+        shootHits++; targets.splice(t, 1); return true;
+      }
+    }
+    shootMisses++; return true;
+  }
+
+  function shootDone() {
+    if (elQ) elQ.textContent = '';
+    cv.hidden = true;
+    roundBanner('');
+    /* Faux Round 3: Tenna tries to start a third round, the act breaks. */
+    host('ROUND THREE! TV CITY! collect the\u2014 wait. wait. the show is over. it is OVER.');
+    askTimer = setTimeout(finish, pace(2400));
+  }
+
+  /* Arrow keys move the crosshair; Space fires. */
+  function shootKey(e) {
+    if (!shootLoop || fast) return false;
+    var s = 24;
+    if (e.key === 'ArrowLeft')  { crosshair.x = Math.max(12, crosshair.x - s); return true; }
+    if (e.key === 'ArrowRight') { crosshair.x = Math.min(468, crosshair.x + s); return true; }
+    if (e.key === 'ArrowUp')    { crosshair.y = Math.max(12, crosshair.y - s); return true; }
+    if (e.key === 'ArrowDown')  { crosshair.y = Math.min(228, crosshair.y + s); return true; }
+    if (e.key === ' ' || e.key === 'Enter') { shootFire(); return true; }
+    return false;
+  }
+
   /* Arrow keys move the SOUL during the dodge phase. The global
      keydown handler below calls this; it returns true if it
      consumed the key, so the trivia handler can skip it. */
@@ -402,6 +483,7 @@
   addEventListener('keydown', function (e) {
     if (!open_) return;
     if (dodgeKey(e)) { e.preventDefault(); return; }
+    if (shootKey(e)) { e.preventDefault(); return; }
     if (e.key === 'Escape') {
       e.preventDefault();
       if (i >= Q.length) { open_ = false; open(); return; }
