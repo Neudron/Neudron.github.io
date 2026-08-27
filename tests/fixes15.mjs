@@ -82,7 +82,9 @@ for (const [f, name] of SCENES) {
 /* focus mode only belongs where there are bullets to dodge */
 for (const p of profs) {
   const wantsShift = /x:\s*'Shift'/.test(p.body);
-  const isDanmaku = ['scal', 'polt', 'bullet'].includes(p.id);
+  /* scal dropped Shift for a hold-to-charge phone layout (2026-08-27);
+     polt + bullet still dodge with focus. */
+  const isDanmaku = ['polt', 'bullet'].includes(p.id);
   ok(p.id + (wantsShift ? ': has focus mode' : ': no focus mode') +
      (isDanmaku ? ' (bullet hell)' : ''), wantsShift === isDanmaku);
 }
@@ -90,7 +92,8 @@ for (const p of profs) {
 /* Auto-repeat belongs on menus and nowhere else. On movement it
    stutters; in the rhythm game one flick is one note and a repeat
    would spam the lane. */
-const MENUS = ['craft', 'deck', 'shop'];
+/* deck's Play/Quit are click buttons — no stick repeat needed. */
+const MENUS = ['craft', 'shop'];
 for (const p of profs) {
   const rep = /repeat:\s*true/.test(p.body);
   ok(p.id + ': repeat ' + (rep ? 'on' : 'off') +

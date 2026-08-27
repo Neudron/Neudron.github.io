@@ -44,6 +44,14 @@
      `xHold` on an extra means it is a modifier you keep pressed (focus
      mode) rather than a press you release immediately.
 
+     `aHold` on the primary means A stays down while the thumb is down
+     (charge-and-release: the fight reads keyup as the strike release).
+
+     `xLong` on an extra means a quick tap fires `x`, but holding past a
+     short threshold fires `xLong` instead (released immediately, as a
+     single press-release pair). The Calamitas fight uses it: tap = rage,
+     hold = barrier.
+
      `repeat` means the stick auto-repeats while held, the way a
      keyboard does. Menus need it — without it, holding left in the
      crafting grid moves one cell and then stalls until you re-centre
@@ -61,8 +69,8 @@
       a: 'Enter', aLabel: 'take',   b: 'Escape', stick: true, repeat: true },
 
     { id: 'scal',   on: function () { return NEU.scal && NEU.scal.running; },
-      a: 'Enter', aLabel: 'ok',     b: 'Escape',
-      x: 'Shift', xLabel: 'focus',  xHold: true, stick: true },
+      a: 'f',     aLabel: 'strike', aHold: true, b: 'Escape',
+      x: 'z',     xLabel: 'rage',   xLong: 'x', stick: true },
 
     { id: 'polt',   on: function () { return NEU.polt && NEU.polt.running; },
       a: 'Enter', aLabel: 'ok',     b: 'Escape',
@@ -85,8 +93,7 @@
       a: 'Enter', aLabel: 'pick',   b: 'Escape', stick: true },
 
     { id: 'deck',   on: function () { return NEU.deck && NEU.deck.running; },
-      a: 'Enter', aLabel: 'open',   b: 'Escape',
-      x: 'Tab',   xLabel: 'next',   stick: true, repeat: true },
+      a: 'Enter', aLabel: 'play',  b: 'Escape', stick: true },
 
     /* the fallback world — see the note at the top of the list */
     { id: 'engine', on: function () { return NEU.engine && NEU.engine.running; },
@@ -147,9 +154,11 @@
   var killRepeat = function () {};
   var clearStick = function () {};
 
+  var killLong = function () {};
   function releaseAll() {
     killRepeat();
     clearStick();
+    killLong();
     for (var k in held) if (held[k]) send(k, false);
   }
 
@@ -188,7 +197,7 @@
 
     document.body.appendChild(pad);
     wireStick();
-    wireButton(btnA, function () { return cur && cur.a; }, true);
+    wireButton(btnA, function () { return cur && cur.a; }, false);
     wireButton(btnB, function () { return cur && cur.b; }, true);
     wireButton(btnX, function () { return cur && cur.x; }, false);
   }
@@ -199,28 +208,54 @@
      is what focus mode needs. */
   function wireButton(el, keyOf, tap) {
     var id = null;
+    /* long-press (xLong): tap fires x, a held press past LONG_MS
+       fires xLong instead. The swap is mid-press: release x first,
+       then send xLong as a clean down/up pair. */
+    var longTimer = null, longFired = false;
+    var LONG_MS = 480;
+    function clearLong() { if (longTimer) { clearTimeout(longTimer); longTimer = null; } }
     el.addEventListener('pointerdown', function (e) {
       var k = keyOf(); if (!k) return;
       e.preventDefault();
       id = e.pointerId;
       if (el.setPointerCapture) { try { el.setPointerCapture(id); } catch (x) {} }
       el.classList.add('is-down');
+      longFired = false;
+      /* If this button has an xLong alternate, arm the timer. If it
+         fires while still held, swap x -> xLong in place. */
+      if (cur && cur.xLong) {
+        longTimer = setTimeout(function () {
+          longTimer = null; longFired = true;
+          send(k, false);
+          var L = cur.xLong;
+          send(L, true);
+          requestAnimationFrame(function () { send(L, false); });
+        }, LONG_MS);
+      }
       send(k, true);
       /* A confirm is a press, not a hold. Release on the next frame so
          the keydown lands first and anything watching keyup still sees
-         a real pair. */
-      if (tap || !cur.xHold) requestAnimationFrame(function () { send(k, false); });
+         a real pair. A held action (xHold or aHold) stays down until
+         the thumb lifts — that is the charge-and-release path. */
+      if (tap || (!cur.xHold && !cur.aHold)) requestAnimationFrame(function () { send(k, false); });
       if (NEU.juice) NEU.juice.hit('tick');
     });
     function up(e) {
       if (id !== null && e && e.pointerId !== id) return;
       id = null;
       el.classList.remove('is-down');
+      clearLong();
+      /* If the long-press already swapped to xLong, x is already up
+         and xLong fired as a self-contained pair — do not re-send x. */
+      if (longFired) { longFired = false; return; }
       var k = keyOf(); if (k) send(k, false);
     }
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);
     el.addEventListener('pointerleave', up);
+    /* releaseAll() must cancel a pending long-press so a backgrounded
+       tab cannot leave the timer latched. */
+    if (el === btnX) killLong = clearLong;
   }
 
   /* ── the stick ─────────────────────────────────────────────────── */
