@@ -82,7 +82,7 @@
       a: 'Enter', aLabel: 'place',  b: 'Escape', stick: true, repeat: true },
 
     { id: 'quiz',   on: function () { return NEU.quiz && NEU.quiz.running; },
-      a: 'Enter', aLabel: 'pick',   b: 'Escape', stick: false },
+      a: 'Enter', aLabel: 'pick',   b: 'Escape', stick: true },
 
     { id: 'deck',   on: function () { return NEU.deck && NEU.deck.running; },
       a: 'Enter', aLabel: 'open',   b: 'Escape',

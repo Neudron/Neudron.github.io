@@ -1668,6 +1668,14 @@
     /* Breaking is not a click any more: keyHit owns that moment — you
        put a thrown key through the screen — so a tap here only means
        the television's ordinary meanings. */
+    /* After the show has run at least once, the broken TV re-opens
+       it. The 'only ever improves' save rule means a worse run
+       can't close doors, so replay is safe. */
+    if (tvBroken && NEU.save && NEU.save.flagged('quiz_rank') && NEU.quiz) {
+      say(['the screen is cracked but the show is still on inside it.',
+            'you can hear him. press e to go again.'], 'narr');
+      NEU.quiz.open(); return;
+    }
     if (docked || docking) {
       /* Once it is in, the television is just a way back to the menu. */
       if (docked && NEU.deck) { NEU.deck.open(); return; }
