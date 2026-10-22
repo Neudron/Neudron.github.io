@@ -964,24 +964,43 @@
     overlay.id = 'confirmExit';
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:95;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = '<div style="background:#1A1016;padding:32px 48px;border:2px solid #E23B55;border-radius:4px;text-align:center;">' +
-      '<p style="font:24px \"Determination Mono\",monospace;color:#EDE7DE;margin:0 0 16px;">Leave ' + minigameName + '?</p>' +
-      '<p style="font:16px \"Undertale Sans\",cursive;color:#8A8598;margin:0 0 24px;">Enter = Yes &nbsp;·&nbsp; Escape = No</p>' +
+      '<p style="font:24px \'Determination Mono\',monospace;color:#EDE7DE;margin:0 0 16px;">Leave ' + minigameName + '?</p>' +
+      '<p style="font:16px \'Undertale Sans\',cursive;color:#8A8598;margin:0 0 24px;">Enter = Yes &nbsp;·&nbsp; Escape = No</p>' +
+      '<div style="display:flex;gap:16px;justify-content:center;margin:0 0 20px;">' +
+        '<button type="button" data-ans="yes" style="font:20px \'Determination Mono\',monospace;color:#EDE7DE;background:#331419;border:2px solid #E23B55;padding:10px 28px;cursor:pointer;">yes</button>' +
+        '<button type="button" data-ans="no" style="font:20px \'Determination Mono\',monospace;color:#EDE7DE;background:#14111A;border:2px solid #8A8598;padding:10px 28px;cursor:pointer;">no</button>' +
+      '</div>' +
       '<div style="font:14px monospace;color:#555;">Progress will be lost.</div></div>';
     document.body.appendChild(overlay);
+    var done = false;
     function cleanup() {
-      document.body.removeChild(overlay);
-      document.removeEventListener('keydown', onKey);
+      if (done) return;
+      done = true;
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      removeEventListener('keydown', onKey, true);
     }
+    /* Window, capture phase, and stopImmediatePropagation. The touch
+       pad dispatches its synthetic Enter/Escape on window, which a
+       document listener never hears — so on a phone this prompt could
+       not be answered at all and every confirmed exit was a soft-lock.
+       Capturing on window runs before the minigames' own window
+       listeners, and stopping immediate propagation keeps them from
+       seeing the same press: without it Escape-to-decline would clean
+       the overlay up and the minigame would build a new one. */
     function onKey(e) {
-      /* The overlay listens on document and the minigames on window —
-         without stopping the bubble, Escape to decline would clean the
-         overlay up, the window handler would see the keypress and
-         immediately build a new one. The decline became a re-ask. */
-      e.stopPropagation();
+      e.stopImmediatePropagation();
+      if (e.key !== 'Enter' && e.key !== 'Escape' && e.key !== 'Tab') return;
+      e.preventDefault();
       if (e.key === 'Enter') { cleanup(); onConfirm(); }
       else if (e.key === 'Escape') { cleanup(); }
     }
-    document.addEventListener('keydown', onKey);
+    addEventListener('keydown', onKey, true);
+    /* And something to tap, for a phone with the pad switched off. */
+    overlay.addEventListener('click', function (e) {
+      var ans = e.target && e.target.getAttribute && e.target.getAttribute('data-ans');
+      if (ans === 'yes') { cleanup(); onConfirm(); }
+      else if (ans === 'no') { cleanup(); }
+    });
   }
 
   /* The room's quit button is the same exit as its ESC: rooms cost

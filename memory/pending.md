@@ -341,3 +341,36 @@ Follow-ups:
 - Name wiki pages in GIGA_AT / skull-constant comments (sourcing pass).
 - Rename drawMeter inner `frames` to aFrames (shadowing trap; text is brief-mandated today).
 Known-red on MAIN checkout only: fixes12/fixes16 (artifacts of unrelated dirty files juice/music/settings); clean checkouts run 15/15.
+
+## 2026-10-22 — Tenna soft-lock: the show now hands you to the corridor
+
+**Bug (reported):** the game got stuck at Tenna and could not move on.
+**Root cause:** `quiz.js` cleared the DODGE FIRE / SHOOT THE TARGETS
+intervals but never nulled their handles, and the handles doubled as "is
+this phase live". After the shoot phase, `shootKey()` stayed armed for the
+rest of the session and ate every Enter, so "enter to go and see" on the end
+screen did nothing. Esc there restarted a show that then skipped both phases,
+and Esc during the shoot phase restarted the show under a live loop. No suite
+caught it because every quiz test ran `fast(true)`, which skips both phases.
+**Fix:** one `phase`/`phaseLoop` pair that `stopPhase()` nulls, plus per-run
+`dodged`/`shot` flags reset by `begin()`. The end screen is now an `ended`
+state with a 7s countdown that opens `g0_hall` on its own (Enter goes now,
+Esc replays). Held-arrow movement in both phases. Arrows/Enter pick answers,
+so the touch stick and A button can play the show.
+**Also fixed (phone):** `engine.confirmExit` listened on `document`, but
+`touch.js` dispatches on `window`, and the prompt covers the pad (z 95 > 92).
+On a phone "Leave X?" could not be answered at all, which soft-locked every
+confirmed exit. It now captures on window, has tappable yes/no buttons, and
+its font quoting no longer breaks the inline style.
+**Proof:** `tests/fixes21.mjs` (48) runs the REAL pacing with time-warped
+timers, so both phases run. Human-paced playtests: Obscura MCP v0.2.5
+(`obscura mcp --allow-private-network`, desktop, 2 runs) and Chromium
+(desktop + 390x844 touch-only). All green; the corridor opened unprompted
+about 7s after the end screen, and the first door was walked into.
+**Harness drift fixed:** jsdom 30.1.3 applies `<noscript>` styles under
+`runScripts:'outside-only'` and refuses focus inside `display:none`. That
+broke the focus checks in fixes10/17/20 on a clean checkout, and fixes15's
+profile regex tripped on a comment in touch.js. All 18 suites green.
+**Open (cosmetic, not blocking):** the end-screen quit button still says
+"Progress will be lost" although the score is already saved. On a 390px
+phone the top-right `esc` button overlaps the "20 / 20 · N right" counter.

@@ -37,6 +37,11 @@ function boot() {
   const dom = new JSDOM(HTML, { pretendToBeVisual: true, url: 'https://www.neu.ac/',
                                 runScripts: 'outside-only' });
   const w = dom.window;
+  /* jsdom 30 parses <noscript> as live markup under runScripts:
+     'outside-only', so its fallback style hides every overlay and
+     focus() into one silently does nothing. A browser running the
+     page never applies that block. */
+  w.document.querySelectorAll('noscript').forEach(n => n.remove());
   w.IntersectionObserver = class { constructor(cb) { this.cb = cb; } observe() {} disconnect() {} };
   w.matchMedia = () => ({ matches: false, addListener() {}, addEventListener() {} });
   w.AudioContext = class {
