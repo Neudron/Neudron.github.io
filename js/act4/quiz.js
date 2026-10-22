@@ -112,6 +112,15 @@
 
   var TIME = 12;
   var i = 0, score = 0, t = 0, tick = null, askTimer = null, locked = false, open_ = false;
+  /* The end screen is a state of its own, not "i ran past the last
+     question": the shoot phase and Tenna's faux Round 3 both run with
+     i at 20, and Escape there used to restart the show underneath a
+     live phase loop. */
+  var ended = false, goTimer = null, goLeft = 0, reactTimer = null;
+  /* Seconds the end screen stays up before the show hands you to the
+     prize corridor on its own. Long enough to read the rank and his
+     reaction to it; Enter goes sooner, Escape stays for a replay. */
+  var AUTO = 7;
   /* Dev/test only. The pacing between questions is most of what makes
      this feel like a game show, so it cannot be tuned down for real
      players — but a test that has to sit through twenty 1.5-second
@@ -190,8 +199,20 @@
     NEU.activeMinigame = 'quiz';        /* the room underneath must not move or take Escape */
     document.body.classList.add('is-playing');
     if (NEU.quest) { NEU.quest.lock(true); NEU.quest.mark('a4_tenna'); }
-    i = 0; score = 0; locked = false;
+    begin();
+  }
+
+  /* A fresh show, from the top. open() calls it, and so does Escape on
+     the end screen — which is why it owns all the per-run state,
+     including whether each physical phase has run yet. */
+  function begin() {
+    stopTimers();
+    stopPhase();
+    i = 0; score = 0; locked = false; ended = false;
+    dodged = false; shot = false;
     if (elEnd) elEnd.hidden = true;
+    if (elOpts) elOpts.innerHTML = '';
+    if (elQ) elQ.textContent = '';
     board();
     roundBanner('ROUND 1: THE LEGEND OF TENNA');
     host(TENNA.intro.join('  '));
@@ -201,16 +222,28 @@
     askTimer = setTimeout(ask, pace(2400));
   }
 
-  function close() {
-    open_ = false;
+  /* A pending "next question" timer must die with the overlay. If
+     it survived, ask() would keep rebuilding the board on a hidden
+     wrapper, the timer would run the whole show into a phantom "Z"
+     finish, and the rank door would mark itself a4_rank behind the
+     player's back. The same goes for the end screen's countdown: a
+     replay or a deliberate leave must not be followed by a door. */
+  function stopTimers() {
     clearInterval(tick);
-    /* A pending "next question" timer must die with the overlay. If
-       it survived, ask() would keep rebuilding the board on a hidden
-       wrapper, the timer would run the whole show into a phantom "Z"
-       finish, and the rank door would mark itself a4_rank behind the
-       player's back. */
-    clearTimeout(askTimer);
-    askTimer = null;
+    clearTimeout(askTimer); askTimer = null;
+    clearInterval(goTimer); goTimer = null;
+    clearTimeout(reactTimer); reactTimer = null;
+  }
+
+  function close() {
+    /* Idempotent. The confirm prompt can still be up when the end
+       screen's countdown takes you to the corridor, and its "yes"
+       must not unlock the objectives panel over a running room. */
+    if (!open_) return;
+    open_ = false;
+    ended = false;
+    stopTimers();
+    stopPhase();
     wrap.hidden = true;
     if (NEU.activeMinigame === 'quiz') NEU.activeMinigame = null;
     document.body.classList.remove('is-playing');
@@ -240,10 +273,13 @@
     if (!open_) return;
     /* Round break: after question 10, the DODGE FIRE phase runs
        before the second half. In fast mode the dodge is a no-op
-       (pace is 0, dodgeStart calls dodgeDone immediately). */
-    if (i === 10 && !dodgeLoop && !fast) { dodgeStart(8); return; }
+       (dodgeStart calls dodgeDone immediately). Whether a phase has
+       run is its own flag, reset by begin() — it used to be read off
+       the interval handle, which was never nulled, so a replay
+       skipped both phases. */
+    if (i === 10 && !dodged) { dodged = true; dodgeStart(8); return; }
     /* Round 2 Phase B: after the last question, SHOOT THE TARGETS. */
-    if (i >= Q.length && !shootLoop && !fast) { shootStart(8); return; }
+    if (i >= Q.length && !shot) { shot = true; shootStart(8); return; }
     if (i >= Q.length) { finish(); return; }
     locked = false;
     var q = Q[i];
@@ -300,6 +336,8 @@
 
   function finish() {
     if (!open_) return;
+    stopPhase();
+    ended = true;
     roundBanner('');
     var rank = rankFor(score);
     if (NEU.save) {
@@ -323,33 +361,89 @@
         '<p>' + opens(rank).length + ' door' + (opens(rank).length === 1 ? '' : 's') +
         ' just unlocked. all of them are yours.</p>' +
         '<p class="quiz__small">the highest one you have ever scored is the one that counts.<br>' +
-        'enter to go and see &middot; esc to try again</p>';
+        '<span id="quizGo"></span><br>' +
+        'enter to go now &middot; esc to try again</p>';
     }
     host(TENNA.finish);
     /* His reaction to the rank itself, shown after the end screen. */
     var react = TENNA.rank[rank];
-    if (react) setTimeout(function () { if (open_) host(react); }, pace(1800));
+    if (react) reactTimer = setTimeout(function () { if (open_ && ended) host(react); }, pace(1800));
     /* Off the dead option buttons. The global Enter handler below
-       preventDefaults, so Enter here retries the show rather than
+       preventDefaults, so Enter here goes to the corridor rather than
        activating whatever the caret was left sitting on. */
     var qq = document.getElementById('quizQuit');
     if (qq && qq.focus) qq.focus();
+
+    /* The show is over and the doors are open, so the show takes you
+       to them. Waiting on a keypress here was a dead end for anyone
+       who did not read the small print — and on a phone, for anyone
+       at all whenever that keypress went missing. */
+    goLeft = AUTO;
+    countdown();
+    if (fast) { goTimer = setTimeout(go, 0); return; }
+    goTimer = setInterval(function () {
+      /* Hold the count while "Leave Quiz?" is on screen; the player
+         is answering a question, not watching a clock. */
+      if (document.getElementById('confirmExit')) return;
+      goLeft--;
+      countdown();
+      if (goLeft <= 0) go();
+    }, 1000);
+  }
+
+  function countdown() {
+    var el = document.getElementById('quizGo');
+    if (el) el.textContent = 'taking you to the doors in ' + Math.max(0, goLeft) + '\u2026';
+  }
+
+  /* Off the stage and into the prize corridor the show was always
+     meant to open. */
+  function go() {
+    if (!open_ || !ended) return;
+    close();
+    if (NEU.engine && NEU.engine.enter) NEU.engine.enter('g0_hall');
   }
 
   /* ── the physical challenge: DODGE FIRE ───────────────────────────────────────
      Round 1 Phase B and the bonus layer. Fire rains; the SOUL (a
-     red dot) dodges left and right for a fixed duration. Each hit
-     subtracts from the round score. This is the DODGE FIRE minigame
-     from the Tenna boss battle, adapted to the quiz canvas.
+     red dot) dodges for a fixed duration. Each hit subtracts from
+     the round score. This is the DODGE FIRE minigame from the Tenna
+     boss battle, adapted to the quiz canvas.
 
      The phase is gated behind `fast`: tests drive the show with
-     fast(true) which collapses pacing to zero, so the dodge timer
-     fires instantly and the phase is a no-op. Real players get the
-     full dodge. */
+     fast(true) which collapses pacing to zero, so dodgeStart hands
+     straight to dodgeDone and the phase is a no-op. Real players get
+     the full dodge.
+
+     BOTH PHASES SHARE ONE LOOP HANDLE AND ONE `phase` NAME, AND
+     stopPhase() NULLS THEM. The first version cleared each interval
+     but kept its handle, and the handle doubled as "is this phase
+     live" — so once the shoot phase had run, its key handler stayed
+     armed for the rest of the session and ate every Enter on the end
+     screen. That was the soft-lock at the end of the show. */
   var cv = document.getElementById('quizCanvas');
   var cx = cv ? cv.getContext('2d') : null;
-  var soul = { x: 240, y: 210 }, dodgeTime = 0, dodgeHits = 0, dodgeLoop = null;
+  var soul = { x: 240, y: 210 }, dodgeTime = 0, dodgeHits = 0;
   var fires = [];
+  var phase = null, phaseLoop = null, dodged = false, shot = false;
+  var DT = 0.033;
+
+  /* Held arrows, not keydown counts. A step per keydown meant the soul
+     moved once, waited out the keyboard's repeat delay, then lurched —
+     and on a phone it moved once and stopped, because the touch stick
+     sends one keydown per push and a keyup on release. */
+  var held = {};
+  var SOUL_SPEED = 240, AIM_SPEED = 300;
+  function axis(neg, pos) { return (held[pos] ? 1 : 0) - (held[neg] ? 1 : 0); }
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+  function stopPhase() {
+    clearInterval(phaseLoop);
+    phaseLoop = null;
+    phase = null;
+    held = {};
+    if (cv) cv.hidden = true;
+  }
 
   function dodgeStart(duration) {
     if (!cv || !cx || fast) { dodgeDone(); return; }
@@ -358,18 +452,21 @@
     if (elOpts) elOpts.innerHTML = '';
     if (elQ) elQ.textContent = '';
     host("DODGE FIRE! don't get hit!");
-    dodgeLoop = setInterval(dodgeTick, 33);
+    phase = 'dodge';
+    phaseLoop = setInterval(dodgeTick, 33);
   }
 
   function dodgeTick() {
-    if (!open_ || fast) { clearInterval(dodgeLoop); cv.hidden = true; dodgeDone(); return; }
-    dodgeTime -= 0.033;
+    if (!open_ || phase !== 'dodge') { stopPhase(); return; }
+    dodgeTime -= DT;
+    soul.x = clamp(soul.x + axis('ArrowLeft', 'ArrowRight') * SOUL_SPEED * DT, 8, 472);
+    soul.y = clamp(soul.y + axis('ArrowUp', 'ArrowDown') * SOUL_SPEED * DT, 8, 232);
     if (Math.random() < 0.4)
       fires.push({ x: Math.random() * 480, y: 0, vy: 80 + Math.random() * 80 });
     cx.fillStyle = '#0E0820'; cx.fillRect(0, 0, 480, 240);
     cx.fillStyle = '#FF6B2A';
     for (var f = fires.length - 1; f >= 0; f--) {
-      fires[f].y += fires[f].vy * 0.033;
+      fires[f].y += fires[f].vy * DT;
       if (fires[f].y > 240) { fires.splice(f, 1); continue; }
       cx.fillRect(fires[f].x, fires[f].y, 8, 12);
       if (Math.abs(fires[f].x - soul.x) < 10 && Math.abs(fires[f].y - soul.y) < 10) {
@@ -377,12 +474,13 @@
       }
     }
     cx.fillStyle = '#FF2030'; cx.fillRect(soul.x - 4, soul.y - 4, 8, 8);
-    if (dodgeTime <= 0) { clearInterval(dodgeLoop); cv.hidden = true; dodgeDone(); }
+    if (dodgeTime <= 0) dodgeDone();
   }
 
   function dodgeDone() {
+    stopPhase();
+    if (!open_) return;
     if (elQ) elQ.textContent = '';
-    cv.hidden = true;
     roundBanner('ROUND 2: THE ONE I SAID WAS LAST');
     host('ROUND TWO! the one i said was last! i lied!');
     askTimer = setTimeout(ask, pace(800));
@@ -391,11 +489,11 @@
   /* ── the physical challenge: SHOOT THE TARGETS ──
      Round 2 Phase B. Tenna faces appear in windows; the player shoots
      them before they shoot back. Redder = about to shoot. This is the
-     Cowboy minigame from the Tenna battle, adapted. Click or press
-     Space to shoot at the crosshair (moved by arrow keys).
+     Cowboy minigame from the Tenna battle, adapted. Arrow keys (or
+     the stick) move the crosshair; Space or Enter (or A) fires.
 
      Like dodge, gated behind `fast`: in test mode it's a no-op. */
-  var shootLoop = null, shootTime = 0, shootHits = 0, shootMisses = 0;
+  var shootTime = 0, shootHits = 0, shootMisses = 0;
   var targets = [], crosshair = { x: 240, y: 120 };
 
   function shootStart(duration) {
@@ -406,19 +504,22 @@
     if (elOpts) elOpts.innerHTML = '';
     if (elQ) elQ.textContent = '';
     host("SHOOT THE TARGETS! don't let them shoot you!");
-    shootLoop = setInterval(shootTick, 33);
+    phase = 'shoot';
+    phaseLoop = setInterval(shootTick, 33);
   }
 
   function shootTick() {
-    if (!open_ || fast) { clearInterval(shootLoop); cv.hidden = true; shootDone(); return; }
-    shootTime -= 0.033;
+    if (!open_ || phase !== 'shoot') { stopPhase(); return; }
+    shootTime -= DT;
+    crosshair.x = clamp(crosshair.x + axis('ArrowLeft', 'ArrowRight') * AIM_SPEED * DT, 12, 468);
+    crosshair.y = clamp(crosshair.y + axis('ArrowUp', 'ArrowDown') * AIM_SPEED * DT, 12, 228);
     /* spawn targets */
     if (Math.random() < 0.3)
       targets.push({ x: 20 + Math.random() * 440, y: 20 + Math.random() * 180, timer: 2 + Math.random() * 2 });
     cx.fillStyle = '#0E0820'; cx.fillRect(0, 0, 480, 240);
     cx.fillStyle = '#FFD34E';
     for (var t = targets.length - 1; t >= 0; t--) {
-      targets[t].timer -= 0.033;
+      targets[t].timer -= DT;
       if (targets[t].timer <= 0) { shootMisses++; targets.splice(t, 1); continue; }
       var red = targets[t].timer < 1;
       cx.fillStyle = red ? '#FF2030' : '#FFD34E';
@@ -433,60 +534,77 @@
     cx.moveTo(crosshair.x - 16, crosshair.y); cx.lineTo(crosshair.x + 16, crosshair.y);
     cx.moveTo(crosshair.x, crosshair.y - 16); cx.lineTo(crosshair.x, crosshair.y + 16);
     cx.stroke();
-    if (shootTime <= 0) { clearInterval(shootLoop); cv.hidden = true; shootDone(); }
+    if (shootTime <= 0) shootDone();
   }
 
   function shootFire() {
-    if (!shootLoop || fast) return false;
+    if (phase !== 'shoot') return;
     for (var t = targets.length - 1; t >= 0; t--) {
       if (Math.abs(targets[t].x - crosshair.x) < 16 && Math.abs(targets[t].y - crosshair.y) < 16) {
-        shootHits++; targets.splice(t, 1); return true;
+        shootHits++; targets.splice(t, 1); return;
       }
     }
-    shootMisses++; return true;
+    shootMisses++;
   }
 
   function shootDone() {
+    stopPhase();
+    if (!open_) return;
     if (elQ) elQ.textContent = '';
-    cv.hidden = true;
     roundBanner('');
     /* Faux Round 3: Tenna tries to start a third round, the act breaks. */
     host('ROUND THREE! TV CITY! collect the\u2014 wait. wait. the show is over. it is OVER.');
     askTimer = setTimeout(finish, pace(2400));
   }
 
-  /* Arrow keys move the crosshair; Space fires. */
-  function shootKey(e) {
-    if (!shootLoop || fast) return false;
-    var s = 24;
-    if (e.key === 'ArrowLeft')  { crosshair.x = Math.max(12, crosshair.x - s); return true; }
-    if (e.key === 'ArrowRight') { crosshair.x = Math.min(468, crosshair.x + s); return true; }
-    if (e.key === 'ArrowUp')    { crosshair.y = Math.max(12, crosshair.y - s); return true; }
-    if (e.key === 'ArrowDown')  { crosshair.y = Math.min(228, crosshair.y + s); return true; }
-    if (e.key === ' ' || e.key === 'Enter') { shootFire(); return true; }
+  /* During a phase the arrows are held state and, in the shoot phase,
+     Space/Enter fire. Returns true if it consumed the key, so the
+     trivia handler below skips it. Only while a phase is LIVE. */
+  var ARROWS = { ArrowLeft: 1, ArrowRight: 1, ArrowUp: 1, ArrowDown: 1 };
+  function phaseKey(e) {
+    if (!phase) return false;
+    if (ARROWS[e.key]) { held[e.key] = true; return true; }
+    if (phase === 'shoot' && (e.key === ' ' || e.key === 'Enter')) {
+      if (!e.repeat) shootFire();
+      return true;
+    }
     return false;
   }
+  addEventListener('keyup', function (e) { if (held[e.key]) held[e.key] = false; });
+  /* A key released while the tab was in the background never sends
+     its keyup; without this the soul keeps walking into the wall. */
+  addEventListener('blur', function () { held = {}; });
 
-  /* Arrow keys move the SOUL during the dodge phase. The global
-     keydown handler below calls this; it returns true if it
-     consumed the key, so the trivia handler can skip it. */
-  function dodgeKey(e) {
-    if (!dodgeLoop || fast) return false;
-    var s = 24;
-    if (e.key === 'ArrowLeft')  { soul.x = Math.max(8, soul.x - s); return true; }
-    if (e.key === 'ArrowRight') { soul.x = Math.min(472, soul.x + s); return true; }
-    if (e.key === 'ArrowUp')    { soul.y = Math.max(8, soul.y - s); return true; }
-    if (e.key === 'ArrowDown')  { soul.y = Math.min(232, soul.y + s); return true; }
+  /* Arrows walk the caret between the four answers and Enter picks the
+     one it is on. The touch stick and A button arrive as synthetic
+     key events, which never activate a focused button by themselves —
+     so without this, a phone could see the answers and not pick one
+     with the pad. */
+  function options() {
+    return elOpts ? Array.prototype.slice.call(elOpts.querySelectorAll('.quiz__o')) : [];
+  }
+  function optionKey(e) {
+    var os = options();
+    if (!os.length || locked) return false;
+    var at = os.indexOf(document.activeElement);
+    if (ARROWS[e.key]) {
+      var step = (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 1;
+      var to = at < 0 ? 0 : (at + step + os.length) % os.length;
+      os[to].focus();
+      return true;
+    }
+    if (e.key === 'Enter' && at >= 0) { answer(at); return true; }
     return false;
   }
 
   addEventListener('keydown', function (e) {
     if (!open_) return;
-    if (dodgeKey(e)) { e.preventDefault(); return; }
-    if (shootKey(e)) { e.preventDefault(); return; }
+    /* "Leave Quiz?" owns the keyboard while it is up. */
+    if (document.getElementById('confirmExit')) return;
+    if (phaseKey(e)) { e.preventDefault(); return; }
     if (e.key === 'Escape') {
       e.preventDefault();
-      if (i >= Q.length) { open_ = false; open(); return; }
+      if (ended) { begin(); return; }
       if (NEU.engine && NEU.engine.confirmExit) {
         NEU.engine.confirmExit('Quiz', close);
       } else { close(); }
@@ -503,19 +621,18 @@
       }
       return;
     }
-    if (i >= Q.length && e.key === 'Enter') {
-      e.preventDefault();
+    if (ended) {
       /* The show is finished and the score is saved; Enter is the
-         reward door, not an exit to confirm. Close and walk into the
-         prize corridor the show was always meant to open. */
-      close();
-      if (NEU.engine && NEU.engine.enter) NEU.engine.enter('g0_hall');
+         reward door, not an exit to confirm. */
+      if (e.key === 'Enter') { e.preventDefault(); go(); }
       return;
     }
+    if (phase || i >= Q.length) return;
+    if (optionKey(e)) { e.preventDefault(); return; }
     var k = 'abcd'.indexOf(String(e.key).toLowerCase());
-    if (k >= 0 && i < Q.length) { e.preventDefault(); answer(k); return; }
+    if (k >= 0) { e.preventDefault(); answer(k); return; }
     var n = '1234'.indexOf(e.key);
-    if (n >= 0 && i < Q.length) { e.preventDefault(); answer(n); }
+    if (n >= 0) { e.preventDefault(); answer(n); }
   });
 
   var q = document.getElementById('quizQuit');
@@ -530,6 +647,9 @@
                get running() { return open_; },
                get score() { return score; },
                get index() { return i; },
+               get phase() { return phase; },
+               get ended() { return ended; },
+               get soul() { return { x: soul.x, y: soul.y }; },
                questions: Q, ranks: RANKS,
                rankFor: rankFor, opens: opens };
 })();
