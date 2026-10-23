@@ -39,6 +39,13 @@
   var hud  = document.getElementById('bhHud');
   var msg  = document.getElementById('bhMsg');
 
+  /* The HP is painted on the canvas, which a screen reader cannot read,
+     so the same number goes to a visually hidden polite line (#bhLive in
+     index.html) every time it changes. The line is written from here and
+     nowhere else, so the canvas and the spoken number cannot disagree. */
+  var live = document.getElementById('bhLive');
+  function announce(s) { if (live) live.textContent = s; }
+
   var dm = NEU.danmaku || {};
   var SURVIVE   = 20;          // seconds
   var PLAYER_R  = (dm.soul && dm.soul.R) || 6; // TRUE hitbox (matches scale 2 soul sprite ~60px visual, 6px radius)
@@ -300,7 +307,7 @@
       if (inv <= 0) {
         var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
         if (dx * dx + dy * dy < rr * rr) {
-          hp--; inv = dm.IFRAMES || 1.15;
+          hp--; inv = dm.IFRAMES || 1.15; hpLine();
           /* MEDIUM: felt, but never enough to make the pattern
              unreadable on the frame you most need to read it. */
           if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
@@ -348,7 +355,7 @@
               emptyFx = performance.now();
             } else if (inv <= 0) {
               bl.took = true;
-              hp--; inv = dm.IFRAMES || 1.15;
+              hp--; inv = dm.IFRAMES || 1.15; hpLine();
               /* MEDIUM: felt, but never enough to make the pattern
                  unreadable on the frame you most need to read it. */
               if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
@@ -357,7 +364,7 @@
             }
           }
         } else if (inv <= 0 && inBeam) {
-          hp--; inv = dm.IFRAMES || 1.15;
+          hp--; inv = dm.IFRAMES || 1.15; hpLine();
           /* MEDIUM: felt, but never enough to make the pattern
              unreadable on the frame you most need to read it. */
           if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
@@ -538,8 +545,15 @@
     keys = {};
     running = true; last = performance.now();
     if (msg) msg.hidden = true;
+    hpLine();
     requestAnimationFrame(step);
   }
+
+  /* Called right after each hit takes its point. The spoken line is set
+     from the same hp the canvas paints, so the two cannot disagree. A
+     death is announced by startDeath() on top of this, so the last line
+     a player hears after the final hit is the death line. */
+  function hpLine() { announce('HP ' + Math.max(0, hp) + '/3'); }
 
   /* ── death ────────────────────────────────────────────────────────
      Undertale holds the cracked soul for a beat before it goes, and
@@ -548,6 +562,7 @@
      split down the middle and it reads as a death. */
   function startDeath() {
     running = false;                 // stops the main loop's next frame
+    announce('ouch. the soul broke.');
     dying = performance.now();
     if (dm.resetDeath) dm.resetDeath();
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
@@ -595,16 +610,19 @@
           (pb ? 'a new best.' : 'best ' + prev.toFixed(1) + 's') +
           '<br><small>enter to go again &middot; esc to leave</small>';
       }
+      announce(secs.toFixed(1) + ' seconds. ' +
+               (pb ? 'a new best.' : 'best ' + prev.toFixed(1) + ' seconds.'));
       return;
     }
 
     if (msg) {
       msg.hidden = false;
       msg.innerHTML = good
-        ? '<b>you made it.</b><br>twenty seconds. take the dog food.<br><small>esc to leave</small>'
+        ? '<b>you made it.</b><br>twenty seconds. take the dog food?<br><small>esc to leave</small>'
         : '<b>ouch.</b><br>enter to try again &middot; esc to leave';
     }
     if (good) {
+      announce('you made it. twenty seconds. take the dog food?');
       if (NEU.quest) NEU.quest.mark('survive');
       if (NEU.grantDogFood) NEU.grantDogFood();
     }

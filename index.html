@@ -40,6 +40,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <!-- The real Undertale faces — Carter Sande's kit, now SELF-HOSTED in
      fonts/webfonts/ exactly as its author asks. The remote hotlink that
      used to sit above this line is gone; nothing here depends on
@@ -145,7 +146,7 @@
   <button class="crack" id="crack" hidden aria-label="a crack in the panel"></button>
 
   <p class="panel__carry" id="panelCarry" hidden>
-    <img src="img/switch2.svg" alt="" width="34" height="23">
+    <img src="img/switch2.svg" alt="" width="34" height="23" loading="lazy" decoding="async">
     <span id="panelCarryTxt">a console, flat</span>
   </p>
 </aside>
@@ -160,6 +161,11 @@
   <button class="bh__quit" id="bhQuit">esc</button>
   <p class="bh__keys">arrows / wasd &nbsp;&middot;&nbsp; shift to focus &nbsp;&middot;&nbsp; survive 20s</p>
 </div>
+<!-- The HP is drawn on the canvas, which a screen reader cannot read.
+     This line carries the same number as text, and only the bullet-hell
+     script writes it. Visually hidden, polite, and outside #bh so it
+     exists before the room is ever opened. -->
+<p class="sr-only" id="bhLive" aria-live="polite"></p>
 
 <!-- ═══ what you're carrying ═══════════════════════════════════════
      One stack, column-reverse from the bottom-left, so adding an item
@@ -320,11 +326,15 @@
   </div>
 </div>
 
-<div class="tbox" id="tbox" hidden role="status" aria-live="polite">
-  <span class="tbox__face" id="tboxFace"><img id="tboxFaceImg" src="img/Sans_sprite.webp" alt="" width="42" height="63"></span>
+<div class="tbox" id="tbox" hidden>
+  <span class="tbox__face" id="tboxFace"><img id="tboxFaceImg" src="img/Sans_sprite.webp" alt="" width="42" height="63" loading="lazy" decoding="async"></span>
   <p class="tbox__txt" id="tboxTxt"></p>
   <span class="tbox__more" id="tboxMore" hidden aria-hidden="true">&#9660;</span>
 </div>
+<!-- The box itself is not a live region: its text is rewritten letter by
+     letter, and a screen reader would read every letter. This sibling
+     gets each whole line once, from sans.js, and is emptied on close. -->
+<p class="sr-only" id="tboxSR" aria-live="polite"></p>
 
 <!-- deepest layer: the pixel sky. Always on, behind everything. -->
 <canvas class="stars" id="starCanvas" aria-hidden="true"></canvas>
@@ -388,27 +398,27 @@
        scrolling when the starfield tried it. -->
   <div class="dog" id="dog" hidden>
     <button class="dog__btn" id="dogBtn" aria-label="the dog">
-      <img src="img/annoying-dog.gif" alt="" width="104" height="90">
+      <img src="img/annoying-dog.gif" alt="" width="104" height="90" loading="lazy" decoding="async">
     </button>
   </div>
 
   <!-- Everyone asleep once the light is back. The switch turns up
        beside them on a later visit; the tv is to their right. -->
   <div class="sleep" id="sleep" hidden>
-    <img class="sleep__blanket" src="img/blanket.svg" alt="" width="18" height="5" decoding="async">
-    <img class="sleep__sans" src="img/Sans_sprite.webp" alt="" width="60" height="90" decoding="async">
-    <img class="sleep__dog" src="img/annoying-dog.gif" alt="" width="104" height="90" decoding="async">
+    <img class="sleep__blanket" src="img/blanket.svg" alt="" width="18" height="5" decoding="async" loading="lazy">
+    <img class="sleep__sans" src="img/Sans_sprite.webp" alt="" width="60" height="90" decoding="async" loading="lazy">
+    <img class="sleep__dog" src="img/annoying-dog.gif" alt="" width="104" height="90" decoding="async" loading="lazy">
     <span class="zzz zzz--1" aria-hidden="true">Z</span>
     <span class="zzz zzz--2" aria-hidden="true">Z</span>
     <span class="zzz zzz--3" aria-hidden="true">Z</span>
-    <img class="sleep__chair" id="armchair" src="img/act4/undertale/armchair.png" alt="" width="45" height="83" decoding="async" hidden>
+    <img class="sleep__chair" id="armchair" src="img/act4/undertale/armchair.png" alt="" width="45" height="83" decoding="async" loading="lazy" hidden>
     <button class="sleep__sw" id="sleepSwitch" aria-label="take the console" hidden>
-      <img src="img/switch2.svg" alt="" width="16" height="7" decoding="async">
+      <img src="img/switch2.svg" alt="" width="16" height="7" decoding="async" loading="lazy">
     </button>
   </div>
 
   <button class="tv" id="tv" hidden aria-label="the television">
-    <img src="img/tv.svg" alt="" width="14" height="9" decoding="async">
+    <img src="img/tv.svg" alt="" width="14" height="9" decoding="async" loading="lazy">
     <span class="tv__lbl" id="tvLbl">dock</span>
   </button>
   <div class="stage">
@@ -426,6 +436,9 @@
       Undertale &amp; Deltarune are Toby Fox's. Boss behaviour references the
       Calamity mod. Fonts by Carter Sande's kit and Pixelify Sans. A personal
       fan page — nothing here is official or for sale.
+    </p>
+    <p class="colophon lay lay--colophon">
+      no analytics, no cookies. your save stays in this browser.
     </p>
   </div>
 </section>

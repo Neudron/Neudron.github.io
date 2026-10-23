@@ -420,6 +420,13 @@
   var curIdx = 0, curTotal = 0, watch = null;
   var tface = document.getElementById('tboxFace');
   var tfaceImg = document.getElementById('tboxFaceImg');
+  /* The box is not a live region itself. The typewriter rewrites its
+     text every 42ms, and a screen reader on a live region announces
+     each rewrite, so a line was read out one letter at a time. The
+     whole line goes to this sibling once, when it starts, and the
+     region is emptied when the box closes. */
+  var tboxSR = document.getElementById('tboxSR');
+  function srSay(s) { if (tboxSR) tboxSR.textContent = s; }
   var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/annoying-dog.gif', tv: 'img/tv.svg',
                witch: 'img/act4/witch-face.png',
                /* real mod filenames — HoodlessHeadIcon/HoodedHeadIcon from
@@ -453,11 +460,13 @@
     clearInterval(typing); clearTimeout(next.hold);
     if (!queue.length) {
       tbox.hidden = true;
+      srSay('');
       /* the talk ended or was cut short — the watcher wants to know */
       if (watch) watch(-1, -1);
       return;
     }
     var line = queue.shift(), i = 0;
+    srSay(line);
     curV = queueV.shift() || 'sans';
     curIdx++;
     if (watch) watch(curIdx, curTotal);
@@ -499,6 +508,7 @@
     clearInterval(typing); clearTimeout(next.hold);
     queue = [];
     if (tbox) tbox.hidden = true;
+    srSay('');
     if (watch) watch(-1, -1);
   };
   NEU.hush = function () { shutUp(); };
@@ -515,6 +525,7 @@
   function shutUp() {
     clearInterval(typing); clearTimeout(next.hold);
     queue = []; queueV = []; ttxt.textContent = ''; tbox.hidden = true;
+    srSay('');
     if (watch) watch(-1, -1);
   }
 
