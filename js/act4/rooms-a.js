@@ -682,7 +682,7 @@
          the fire door, every zone after the castle — was unreachable
          because of one entity two cells too far in. It is the door
          itself now, which is also what the room has been calling it. */
-      { t: 'npc', x: 5, y: 4, colour: '#C2405F', run: function (c) { enterArena(c); } },
+      { t: 'npc', x: 5, y: 4, colour: '#C2405F', look: 'gate', run: function (c) { enterArena(c); } },
       { t: 'exit', x: 0, y: 4, to: 'b7_altar', spawn: 'north' }
     ],
     onEnter: function (c) {

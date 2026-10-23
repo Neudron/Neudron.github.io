@@ -30,7 +30,7 @@ const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const FIXTURE = [
   'js/data/data.js', 'js/page/main.js', 'js/page/stars.js',
   'js/core/quest.js', 'js/core/save.js', 'js/core/juice.js', 'js/core/danmaku.js',
-  'js/data/sheets.js', 'js/core/engine.js',
+  'js/data/sheets.js', 'js/core/engine-look.js', 'js/core/engine-kinds.js', 'js/core/engine.js',
   'js/game/sword.js', 'js/game/sans.js', 'js/game/bullet.js', 'js/game/dark.js',
   'js/act4/act4.js', 'js/act4/rooms-a.js', 'js/act4/rooms-d.js', 'js/act4/shop.js',
   'js/act4/boss-scal.js', 'js/act4/scal-worm.js', 'js/act4/scal-seekers.js',
@@ -109,6 +109,10 @@ console.log('\n1. what index.html loads, in order');
   if (saveLate.length) console.log('       too early: ' + saveLate.join(', '));
 
   ok('data/sheets.js loads before core/engine.js', at(SH) >= 0 && at(SH) < at(E));
+  /* engine v2: the look kit and the kinds registry load before the sim */
+  ok('core/engine-look.js and core/engine-kinds.js load before core/engine.js',
+     at('js/core/engine-look.js') >= 0 && at('js/core/engine-kinds.js') >= 0 &&
+     at('js/core/engine-look.js') < at(E) && at('js/core/engine-kinds.js') < at(E));
 
   const roomsEarly = rooms.filter(f => !(at(E) < at(f)));
   ok(`core/engine.js loads before all ${rooms.length} act4/rooms-*.js`,

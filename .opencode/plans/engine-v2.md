@@ -1,7 +1,7 @@
 # Engine v2 — review and rebuild plan
 
-Owner: orchestrator (Opus). Status: **planned 2026-10-23**, implementation
-follows the ultraplan batches. Work order per AGENTS.md: objective,
+Owner: orchestrator (Opus). Status: **P0–P5 shipped 2026-10-23** (P6 optional,
+open). Implementation ran alongside the ultraplan batches. Work order per AGENTS.md: objective,
 acceptance, touched paths, budget, phases. Progress is tracked here with
 `[ ]` → `[x]` so it survives compaction.
 
@@ -190,7 +190,7 @@ keeps working exactly as today.
 
 ## 5. Phases (each ends green + screenshots + commit)
 
-- [ ] **P0 characterisation.** `tests/fixes22.mjs` pins today's
+- [x] **P0 characterisation.** `tests/fixes22.mjs` pins today's
   observable behaviour before anything moves:
   - the API surface and the `c.*` hook surface;
   - every entity kind in shipped rooms has a handler;
@@ -199,28 +199,28 @@ keeps working exactly as today.
   - transitions landing on spawns;
   - `NEU.engine.SCALE` and `TILE` semantics;
   - no ES6 in the three engine files.
-- [ ] **P1 structure, no visual change.**
+- [x] **P1 structure, no visual change.**
   - Extract `engine-kinds.js` (verbatim branches).
   - Add the fixed-step loop and the camera module.
   - Add the two new files to index.html and every suite's MODULES (by
     script).
   - Gate: 18 suites + fixes22 green, and screenshots identical in layout.
-- [ ] **P2 renderer.**
+- [x] **P2 renderer.**
   - Viewport scale.
   - Static-layer bake, autotiler, floor texture, contact shadows.
   - Entity sprites, shadows, player v2.
   - Screenshot review on desktop + phone for every zone.
-- [ ] **P3 light + atmosphere.**
+- [x] **P3 light + atmosphere.**
   - Lightmap with kind-declared lights; dark rooms centred on player/light.
   - Zone weather and particles, wired to every accessibility switch.
-- [ ] **P4 feel.**
+- [x] **P4 feel.**
   - Acceleration and friction, corner correction, facing-aware targeting.
   - Prompt bubble, camera easing with look-ahead, pad-aware framing.
   - Iris transition.
   - Tests: corner correction gets through a 1-tile door from a 4 u
     offset; targeting prefers what you face; the pad never covers the
     player.
-- [ ] **P5 proof.**
+- [x] **P5 proof.**
   - Human-paced playtest in Obscura and Chromium (desktop + phone touch):
     walk every zone, solve b2–b5, the b6 dark room, the doors.
   - Perf: frame time at 1280×800 and 390×844 with weather on.

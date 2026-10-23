@@ -49,7 +49,7 @@ function boot() {
   w.Element.prototype.getBoundingClientRect = () =>
     ({ left:100, top:100, right:146, bottom:146, width:46, height:46, x:100, y:100 });
 
-  for (const f of ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine.js','game/bullet.js','game/dark.js',
+  for (const f of ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine-look.js', 'core/engine-kinds.js', 'core/engine.js','game/bullet.js','game/dark.js',
                    'game/sans.js','act4/act4.js','act4/rooms-a.js','act4/rooms-d.js','act4/shop.js',
                    'act4/boss-scal.js','act4/quiz.js','game/deck.js','core/dev.js']) {
     const p = path.join(ROOT, 'js', f);

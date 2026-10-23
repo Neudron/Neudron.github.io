@@ -27,14 +27,14 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 ## B — Game feel / juice
 - [x] B1 (P1,B) hit-stop/shake/particle tier audit vs preset table — B1
 - [ ] B2 (P2,B) directional shake bias along impact vector
-- [ ] B3 (P2,B) camera kick on gunfire/landings
+- [x] B3 (P2,B) camera kick on gunfire/landings — engine v2
 - [ ] B4 (P1,B) ±5-10% pitch variance pooled sfx
 - [ ] B5 (P3,B) layered one-shots boss hits (transient/body/tail)
 - [ ] B6 (P2,B) damage-number pops w/ drift (SC fight)
 - [ ] B7 (P2,B) rising charge-loop sound polt telegraph
 - [ ] B8 (P2,B) phase-change music stingers
 - [x] B9 (P1,B) settings toggles: hit-stop + particles — 673f872
-- [ ] B10 (P3,B) squash-stretch walk landings
+- [x] B10 (P3,B) squash-stretch walk landings — engine v2
 - [ ] B11 (P3,B) standard UI hover/press tone pair
 - [ ] B12 (P2,B) low-HP heartbeat cue bullet room
 
@@ -49,7 +49,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] C8 (P1,B) quiz relaxed-timer toggle
 - [ ] C9 (P1,B) dialogue aria-live mirror
 - [ ] C10 (P2,B) bullet HP/score live region
-- [ ] C11 (P2,V) overlay focus-trap audit incl tbox/tpad
+- [ ] C11 (P2,V) overlay focus-trap audit incl tbox/tpad — partial: confirmExit is an alertdialog with focus + Tab trap; shop/panel not trapped
 - [ ] C12 (P3,V) lang attribute audit
 
 ## D — PWA / install
@@ -76,14 +76,14 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] F1 (P0,B) engine.js:406 const→var — this commit
 - [ ] F2 (P2,B) danmaku shard cache key +time-bucket
 - [x] F3 (P2,B) music voice reap off-rAF — B1
-- [ ] F4 (P1,B) later() scene-scoped timer helper + migrate W5/W6-class sites
+- [ ] F4 (P1,B) later() scene-scoped timer helper + migrate W5/W6-class sites — partial: engine api.later for rooms; sans.js sites not migrated
 - [ ] F5 (P1,B) persist opt_charge at charge/dock
 - [ ] F6 (P2,B) shopStep from save flags
 - [x] F7 (P0,B) ES5 regex gate in run-all — B1
 - [ ] F8 (P2,B) dead-code prune inventory
 - [x] F9 (P3,B) listener-count drift detector — B1
 - [x] F10 (P2,V) load-order doc vs index.html assert — B1
-- [ ] F11 (P3,O) TILE/REACH cross-ref comment contract
+- [x] F11 (P3,O) TILE/REACH cross-ref comment contract — engine v2
 - [x] F12 (P1,B) duplicate var-declaration detector — B1
 
 ## G — Testing infra
@@ -131,14 +131,14 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] K2 (P3,B) navigator.vibrate hits behind noShake
 - [ ] K3 (P1,V) installed-PWA standalone CDP check
 - [ ] K4 (P3,B) saveData lighter boot
-- [ ] K5 (P2,V) tpad thumb-overlap audit
+- [ ] K5 (P2,V) tpad thumb-overlap audit — partial: rooms frame around the pad; fight reserve unchanged
 - [ ] K6 (P2,U+O) real-device matrix doc + manual protocol
 
 ## L — Audio / music
 - [ ] L1 (P1,B) sfx loudness normalization
 - [x] L2 (P1,B) M-key global mute persisted — B1
 - [x] L3 (P2,B) duck attack/release ramp — B1
-- [ ] L4 (P3,B) zone ambience one-shots
+- [ ] L4 (P3,B) zone ambience one-shots — partial: per-zone visual atmosphere; no audio one-shots yet
 - [ ] L5 (P3,V) equal-power crossfade audit
 - [x] L6 (P2,V) loop-seam/dead-air check — B1
 

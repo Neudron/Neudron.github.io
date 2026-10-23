@@ -1,44 +1,37 @@
-/* engine.js — rooms, as data.
+/* engine.js — rooms, as data. (v2)
    ───────────────────────────────────────────────────────────────────
-   Act IV is ~35 rooms. The existing scenes each hand-code their own
-   movement, their own collision and their own interaction, which was
-   right for three of them and is how a codebase dies at thirty-five:
-   thirty-five slightly different collision bugs, none of them the same
-   shape twice.
+   Act IV is ~35 rooms. One implementation of movement, collision and
+   interaction, and rooms are DATA: a tile string, spawns, entities,
+   a few hooks. That was v1's idea and it was right; v2 keeps every
+   room file and every hook exactly as they were and rebuilds what it
+   feels like to be inside one.
 
-   So: one implementation, and rooms become DATA.
+   What v1 got right and v2 keeps verbatim:
+   1. TILES ARE A STRING, one character per cell, readable in place.
+   2. TILESETS HAVE A PALETTE FALLBACK, so a room plays before its art.
+   3. COLLISION IS SWEPT, ALWAYS. Movement is resolved axis by axis in
+      sub-steps no longer than half a tile, so nothing tunnels at any
+      frame rate.
+   4. THE WALK CYCLE ADVANCES ON DISTANCE, NOT TIME.
 
-   The five decisions this file rests on:
-
-   1. TILES ARE A STRING, one character per cell. A room is about a
-      kilobyte of text you can read and edit in place. Binary or JSON
-      arrays would be smaller and completely unreadable, and the thing
-      that actually costs time here is authoring, not bytes.
-
-   2. TILESETS HAVE A PALETTE FALLBACK. A tileset can point at an
-      atlas image OR at a table of flat colours. That means every room
-      is playable and testable the moment its layout exists, before
-      any art for it does — no phase is ever blocked waiting on a
-      sprite sheet.
-
-   3. COLLISION IS SWEPT, ALWAYS. The player moves fast enough to
-      cross a 16px tile in a frame at 60fps and much further on a
-      120Hz display. Point-testing the destination tunnels through
-      walls; the same bug already cost this project a round when the
-      thrown key passed through the cube door. Movement is resolved
-      axis-by-axis against the tiles the whole segment crosses.
-
-   4. THE WALK CYCLE ADVANCES ON DISTANCE, NOT TIME. Lifted verbatim
-      out of dark.js, which is where it was proven. Time-driven legs
-      keep walking when you stop and slide when you change speed.
-
-   5. THE CAMERA HAS A DEAD ZONE AND CLAMPS TO THE ROOM. Without a
-      dead zone the whole world jitters under a player who is nudging
-      one pixel at a time; without clamping you see past the edge of
-      the map, which instantly reads as broken.
-
-   Everything renders with integer fillRect / drawImage at DPR with
-   smoothing off — same rules as the rest of the site.               */
+   What v2 changes, and why (full review: .opencode/plans/engine-v2.md):
+   5. A FIXED 60 Hz STEP. Physics no longer depends on the display's
+      refresh rate; a 144 Hz screen and a 60 Hz phone play the same.
+   6. MOVEMENT HAS WEIGHT. ~90 ms to reach full speed, ~70 ms to stop.
+      Top speed is unchanged, so every puzzle's timing holds.
+   7. CORNERS FORGIVE. Walking into a wall edge you overlap by a few
+      units slides you around it — one-tile doorways stop snagging.
+   8. YOU INTERACT WITH WHAT YOU FACE. When two things are in reach, the
+      one in front of you wins. REACH itself is unchanged.
+   9. THE CAMERA EASES, LEADS AND KNOWS ABOUT THUMBS. Exponential follow
+      with a little look-ahead; on a phone the touch pad's height is
+      taken out of the view so the player is never under it.
+  10. THE VIEW FITS THE SCREEN. About 20×12 tiles at the largest integer
+      scale that fits, instead of a fixed 3× that showed 8 tiles on a
+      phone and a postage stamp on a desktop.
+  11. WHAT THINGS DO lives in engine-kinds.js, one record per kind; WHAT
+      THINGS LOOK LIKE lives in engine-look.js. This file is the sim, the
+      loop, the camera and the API.                                    */
 
 (function () {
   'use strict';
@@ -51,120 +44,37 @@
   var ctx = cv.getContext ? cv.getContext('2d') : null;
   if (!ctx) { NEU.engine = { enter: function () {}, leave: function () {} }; return; }
 
-  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var reduced = false;
+  try { reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
   var TILE = 16;              // world units per cell
-  var SCALE = 3;              // drawn at 3x — 48px cells, readable, pixel-exact
-  var SPEED = 96;             // world units/sec
+  var SPEED = 96;             // world units/sec — top speed, unchanged from v1
+  var ACCEL = 1100;           // u/s²: full speed in ~87 ms
+  var FRICTION = 1400;        // u/s²: stop in ~69 ms, ~3 u of slide
+  var CORNER = 5;             // u of overlap a corner forgives
   var PLAYER_W = 10, PLAYER_H = 8;   // the FEET box. smaller than the sprite.
   var REACH = 22;
+  var STEP = 1 / 60;
+  var LOOKAHEAD = 12;         // u the camera leads in the facing direction
+  var INTERACT_COOLDOWN = 500; // ms
+
+  function look() { return NEU.engineLook || null; }
+  function kinds() { return NEU.engineKinds || null; }
 
   /* ── state ────────────────────────────────────────────────────── */
   var rooms = {}, tilesets = {};
-  var room = null, running = false, last = 0;
-  var px = 0, py = 0, keys = {}, face = 'down', walked = 0, moving = false;
-  var camX = 0, camY = 0;
+  var room = null, running = false, last = 0, acc = 0;
+  var px = 0, py = 0, vx = 0, vy = 0, keys = {}, face = 'down', walked = 0, moving = false;
+  var movedFor = 0, settle = 0;
+  var camX = 0, camY = 0, kickX = 0, kickY = 0;
+  var S = 3, padH = 0, padPoll = 0;
   var fade = 0, fadeDir = 0, fadeThen = null;
   var busy = false;                    // a cutscene owns input
   var ents = [];                       // live copy of room.entities
   var images = {};
-
-  /* ── the character ────────────────────────────────────────────────
-     Same 9x13 cells as dark.js. Right is generated by mirroring left,
-     so only three directions are drawn by hand. */
-  var PAL = { h: '#241d2e', s: '#E8DCC8', e: '#241d2e', c: '#6F5FA6', b: '#191426' };
-  function mirror(rows) {
-    return rows.map(function (r) { return r.split('').reverse().join(''); });
-  }
-  var BODY_DOWN = ['..hhhhh..','.hhhhhhh.','.hsssssh.','.hsesesh.','.hsssssh.',
-                   '..sssss..','.ccccccc.','scccccccs','.ccccccc.','..ccccc..'];
-  var BODY_UP   = ['..hhhhh..','.hhhhhhh.','.hhhhhhh.','.hhhhhhh.','.hhhhhhh.',
-                   '..sssss..','.ccccccc.','scccccccs','.ccccccc.','..ccccc..'];
-  var BODY_LEFT = ['..hhhh...','.hhhhhh..','.hssssh..','.essssh..','.hssssh..',
-                   '..sssss..','..ccccc..','.sccccc..','..ccccc..','..cccc...'];
-  var LEGS = [['..c...c..','..b...b..','..b...b..'],
-              ['...c.c...','...b.b...','..b...b..'],
-              ['..c...c..','..bb.bb..','..b...b..']];
-  var BODIES = { down: BODY_DOWN, up: BODY_UP, left: BODY_LEFT, right: mirror(BODY_LEFT) };
-
-  function stamp(rows, cx, cy, s) {
-    var h = rows.length, w = rows[0].length;
-    var x0 = (cx - w * s / 2) | 0, y0 = (cy - h * s) | 0;   // anchored at the feet
-    for (var r = 0; r < h; r++) for (var c = 0; c < w; c++) {
-      var ch = rows[r][c];
-      if (ch === '.' || !PAL[ch]) continue;
-      ctx.fillStyle = PAL[ch];
-      ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
-    }
-  }
-
-  /* ── prop sprites ─────────────────────────────────────────────────
-     Same ASCII-rows-plus-a-palette form the player is drawn in, because
-     that is this project's pixel-art primitive and a second one would be
-     a second thing to keep on the grid. Drawn at SCALE, the size a tile
-     pixel is, so props sit on the same grid as the world they stand in.
-
-     These two are here rather than in a PNG because there is no art in
-     the repo for either: the altar and the save point were falling
-     through drawEnt to the generic 18x18 square, so the stone bowl the
-     room describes at length ("a stone bowl on a stone plinth… a ring of
-     ash in it") was a lilac rectangle. Colours are the castle ramp's
-     own, plus the save star in the brazier's warm pair. */
-  var PROP = {
-    /* The bowl has to be LIGHTER than the plinth it stands on. The
-       plinth tile is #6A5C74 and the first draft used the castle's dark
-       stone, so the altar read as a hole punched in its own plinth —
-       the exact failure the 'A' tile was added to fix in the first
-       place (see the comment on the castle tileset). */
-    altar: { pal: { k: '#2A2238', s: '#8A8598', l: '#C4B8CC', a: '#4A4560' },
-             rows: ['...kkkkk...',
-                    '..klllllk..',
-                    '..klaaalk..',
-                    '..kklllkk..',
-                    '...kkkkk...',
-                    '....sss....',
-                    '....sss....',
-                    '...sssss...',
-                    '..kssssskk.',
-                    '..kkkkkkkk.'] },
-    save:  { pal: { y: '#E4C46A', w: '#FFF2C4', k: '#8F7016' },
-             rows: ['....k....',
-                    '....y....',
-                    '...kyk...',
-                    '.kkyywkk.',
-                    'kyywwwyyk',
-                    '.kkyywkk.',
-                    '...kyk...',
-                    '....y....',
-                    '....k....'] }
-  };
-
-  function stampPal(rows, pal, cx, cy, s) {
-    var h = rows.length, w = rows[0].length;
-    var x0 = (cx - w * s / 2) | 0, y0 = (cy - h * s) | 0;
-    for (var r = 0; r < h; r++) for (var c = 0; c < w; c++) {
-      var ch = rows[r][c];
-      if (ch === '.' || !pal[ch]) continue;
-      ctx.fillStyle = pal[ch];
-      ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
-    }
-  }
-
-  function drawPlayer(targetCtx, sx, sy, fce, wlk, mov, anchorFeet, sc) {
-    var c = targetCtx || ctx;
-    var s = sc || 2;
-    var f = mov ? (1 + (((wlk / (anchorFeet ? 10 : 16)) | 0) % 2)) : 0;
-    var rows = BODIES[fce || 'down'].concat(LEGS[f]);
-    var h = rows.length, w = rows[0].length;
-    var x0 = (sx - w * s / 2) | 0;
-    var y0 = anchorFeet ? ((sy - h * s) | 0) : ((sy - h * s / 2) | 0);
-    for (var r = 0; r < h; r++) for (var cl = 0; cl < w; cl++) {
-      var ch = rows[r][cl];
-      if (ch === '.' || !PAL[ch]) continue;
-      c.fillStyle = PAL[ch];
-      c.fillRect(x0 + cl * s, y0 + r * s, s, s);
-    }
-  }
+  var layers = {};                     // baked static layer per room id
+  var timers = [];                     // api.later — die with the visit
+  var promptFor = null, promptT = 0, clock = 0;
 
   /* ── tilesets ─────────────────────────────────────────────────── */
   function tileset(name, def) {
@@ -191,6 +101,7 @@
     def.h = def.grid.length;
     def.w = def.grid.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
     rooms[id] = def;
+    delete layers[id];
     return def;
   }
 
@@ -245,26 +156,24 @@
     return null;
   }
 
-  var lastReset = 0;
-  var slideD = 0;   /* direction of an active ice slide; 0 = not sliding */
+  /* -Infinity, not 0. v1 started this at 0 against performance.now(),
+     so every reset in the first four seconds after the PAGE loaded was
+     refused as spam. */
+  var lastReset = -Infinity;
+  var slideD = 0;         /* direction of an active ice slide; 0 = not sliding */
   var slideDead = false;  /* the direction a slide just died in — a held key must not re-commit */
 
   /* ── push blocks ────────────────────────────────────────────────
-     Walk into one and it moves a whole cell in the direction you are
-     facing, if the cell beyond is clear. Grid-snapped rather than
-     free — a block that slides continuously can end up straddling two
-     cells, and then "is it on the plate" has no honest answer.
-
-     There is no undo. Instead, an unsolvable arrangement resets the
-     WHOLE room (`resetPuzzle`), which is Deltarune's answer and the
-     right one: undo makes you think about the interface, a reset makes
-     you think about the puzzle. */
+     Walk into one and press e: it moves a whole cell in the direction
+     you face, if the cell beyond is clear. Grid-snapped — a block that
+     slides continuously can straddle two cells, and then "is it on the
+     plate" has no honest answer. No undo; an unsolvable arrangement
+     resets the WHOLE room (Deltarune's answer, and the right one). */
   var DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
   function tryPush() {
     var d = DIRV[face];
     if (!d) return false;
-    /* the cell directly in front of the player's feet */
     var cx = Math.floor(px / TILE) + d[0];
     var cy = Math.floor((py - 1) / TILE) + d[1];
     var b = entHere(cx, cy, 'block');
@@ -273,9 +182,10 @@
     if (solidAt(tx, ty) || entSolid(tx, ty)) return false;
     b.x = tx; b.y = ty;
     if (NEU.juice) NEU.juice.hit('tick');
+    kick(d[0] * 2, d[1] * 2);
     /* Ice. The block keeps going until something stops it, which is
-       what turns "push a block" into "aim a block". Bounded by the
-       room size so a malformed map cannot spin forever. */
+       what turns "push a block" into "aim a block". Bounded so a
+       malformed map cannot spin forever. */
     var guard = 0;
     while (at(b.x, b.y) === 'i' && guard++ < 64) {
       var nx = b.x + d[0], ny = b.y + d[1];
@@ -288,8 +198,7 @@
   }
 
   /* A slide dies on the last ice cell. If that cell holds a slideOnly
-     plate, the plate locks — arming by landing, never by walking up
-     to it, which is what keeps the ice route honest. */
+     plate, the plate locks — arming by landing, never by walking up. */
   function stopSlide() {
     var ci = Math.floor(px / TILE), cj = Math.floor((py - 1) / TILE);
     var pl = entHere(ci, cj, 'plate');
@@ -303,9 +212,8 @@
     checkPuzzle();
   }
 
-  /* A room is solved when every plate has a block on it. Rooms can
-     override with their own `solved(ctx)` for the ones that are not
-     about blocks. */
+  /* A room is solved when every plate has a block on it, or when its
+     own `solved(ctx)` says so. */
   function checkPuzzle() {
     if (!room || room.__solved) return;
     var done;
@@ -313,8 +221,7 @@
     else {
       var plates = ents.filter(function (e) { return e.t === 'plate' && !e.dead; });
       done = plates.length > 0 && plates.every(function (p) {
-        var b = entHere(p.x, p.y, 'block');
-        return !!b;
+        return !!entHere(p.x, p.y, 'block');
       });
     }
     if (!done) return;
@@ -323,14 +230,14 @@
     /* Solving a room is a LARGE moment. It is the only reward the
        puzzle gives and it should feel like one. */
     if (NEU.juice) NEU.juice.hit('large', { colour: '#7BE38A' });
+    kick(0, 3);
     if (room.onSolved) room.onSolved(API);
   }
 
   function resetPuzzle() {
     if (!room) return;
     /* R-spam is the cheese: brute-forcing a puzzle by resetting every
-       second is not solving it. The room needs a moment to settle, and
-       it says so instead of silently ignoring the press. */
+       second is not solving it. */
     if (performance.now() - lastReset < 4000) {
       say(['the room is still settling. give it a moment.'], 'narr');
       return;
@@ -340,177 +247,120 @@
     slideD = 0;
     slideDead = false;
     ents = spawnEnts(room);
-    /* Rooms keep their own working state (a light sequence, a carried
-       torch, a mirror that was turned) in closures that re-spawning
-       entities cannot reach — give them a hook so a reset is honest. */
     if (room.onReset) room.onReset();
     say(['the room resets itself. it has done this before.'], 'narr');
   }
 
-  /* Swept along one axis: step in whole sub-steps no larger than half
-     a tile, stopping at the last legal position. This is what stops
-     fast movement tunnelling, and it degrades gracefully on a slow
-     frame instead of teleporting through a wall. */
-  function sweep(x, y, dx, dy) {
-    var dist = Math.hypot(dx, dy);
-    if (!dist) return { x: x, y: y };
-    var steps = Math.max(1, Math.ceil(dist / (TILE / 2)));
-    var sx = dx / steps, sy = dy / steps;
-    for (var i = 0; i < steps; i++) {
-      if (!blocked(x + sx, y)) x += sx;
-      if (!blocked(x, y + sy)) y += sy;
+  /* ── movement ─────────────────────────────────────────────────────
+     Swept along each axis in sub-steps no larger than half a tile
+     (decision 3). When an axis is blocked and the player is not also
+     pressing the other axis, look up to CORNER units either side: if a
+     sideways shift would clear the edge, take one sub-step of it. The
+     sideways move is itself collision-checked, so the forgiveness can
+     never put you inside anything. */
+  function nudge(x, y, tx, ty, axis, stepLen) {
+    for (var d = 1; d <= CORNER; d++) {
+      for (var sgn = -1; sgn <= 1; sgn += 2) {
+        var ox = axis === 'x' ? sgn * d : 0, oy = axis === 'y' ? sgn * d : 0;
+        if (!blocked(tx + ox, ty + oy) && !blocked(x + ox, y + oy)) {
+          var m = sgn * Math.min(d, stepLen);
+          return axis === 'x' ? { x: m, y: 0 } : { x: 0, y: m };
+        }
+      }
     }
-    return { x: x, y: y };
+    return null;
+  }
+
+  function sweep(x, y, dx, dy, ix, iy) {
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var out = { x: x, y: y, bx: false, by: false };
+    if (!dist) return out;
+    var steps = Math.max(1, Math.ceil(dist / (TILE / 2)));
+    var sx = dx / steps, sy = dy / steps, n;
+    for (var i = 0; i < steps; i++) {
+      if (sx) {
+        if (!blocked(x + sx, y)) x += sx;
+        else {
+          out.bx = true;
+          if (!iy && (n = nudge(x, y, x + sx, y, 'y', Math.abs(sx)))) { x += n.x; y += n.y; }
+        }
+      }
+      if (sy) {
+        if (!blocked(x, y + sy)) y += sy;
+        else {
+          out.by = true;
+          if (!ix && (n = nudge(x, y, x, y + sy, 'x', Math.abs(sy)))) { x += n.x; y += n.y; }
+        }
+      }
+    }
+    out.x = x; out.y = y;
+    return out;
+  }
+
+  function approach(v, target, delta) {
+    if (v < target) return Math.min(target, v + delta);
+    if (v > target) return Math.max(target, v - delta);
+    return v;
   }
 
   /* ── entities ─────────────────────────────────────────────────── */
   function entAt(e) { return { x: (e.x + 0.5) * TILE, y: (e.y + 1) * TILE }; }
 
-  /* What `fire` can actually DO something with — the list below is
-     exactly the set of branches fire() has.
-
-     This exists because the E handler was `if (nearest()) fire(it); else
-     tryPush()`, and `nearest` returned whatever entity was closest
-     including blocks and plates. fire() has no branch for either, so it
-     returned in silence and tryPush() was never reached: standing
-     correctly against a block with open floor beyond it and pressing e
-     did nothing, in every room, for every block. Every block puzzle in
-     the game was unsolvable no matter how the room was laid out. */
   function interactive(e) {
-    return typeof e.run === 'function' ||
-           e.t === 'exit' || e.t === 'pickup' || e.t === 'save' ||
-           e.t === 'npc'  || e.t === 'altar' || e.t === 'sign';
+    var K = kinds();
+    if (K) return K.interactive(e);
+    return typeof e.run === 'function' || e.t === 'exit' || e.t === 'pickup' ||
+           e.t === 'save' || e.t === 'npc' || e.t === 'altar' || e.t === 'sign';
+  }
+  function promptable(e) {
+    var K = kinds();
+    return K ? K.promptable(e) : (interactive(e) || (e.t === 'block' && e.push));
   }
 
-  /* A pushable block is worth an `e` prompt even though pressing e goes
-     through tryPush rather than fire. A plate is not: it is floor paint
-     and there has never been anything to press. */
-  function promptable(e) { return interactive(e) || (e.t === 'block' && e.push); }
-
+  /* Within REACH, the lowest distance plus a facing penalty: something
+     straight ahead costs nothing extra, something behind you costs ten
+     units. Decision 8. */
   function nearest(want) {
-    var best = null, bd = REACH;
+    var best = null, bs = Infinity;
+    var f = DIRV[face] || [0, 1];
+    var cy = py - PLAYER_H / 2;
     for (var i = 0; i < ents.length; i++) {
       var e = ents[i];
       if (e.dead || e.t === 'trigger') continue;
       if (want && !want(e)) continue;
       var p = entAt(e);
-      var d = Math.hypot(p.x - px, p.y - (py - PLAYER_H / 2));
-      if (d < bd) { bd = d; best = e; }
+      var dx = p.x - px, dy = p.y - cy;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d >= REACH) continue;
+      var score = d + (d > 0.5 ? 10 * (1 - (dx * f[0] + dy * f[1]) / d) : 0);
+      if (score < bs) { bs = score; best = e; }
     }
     return best;
   }
 
-  /* ── interaction state ──────────────────────────────────────────────
-   Track last interacted entity to prevent dialog reset on rapid E presses. */
+  /* Rapid e on the same entity inside the cooldown is one press. */
   var lastInteractedEntity = null, lastInteractedTime = 0;
-  var INTERACT_COOLDOWN = 500; // ms
+
+  var SYS = {
+    say: function (l, w) { say(l, w); },
+    go: function (id, sp) { go(id, sp); },
+    flag: function (k, v) { return flag(k, v); },
+    room: function () { return room; },
+    burst: function (e, n, col) {
+      if (!NEU.juice || !NEU.juice.burst) return;
+      var p = entAt(e);
+      NEU.juice.burst(Math.round((p.x - camX) * S), Math.round((p.y - camY - 6) * S), n, col);
+    }
+  };
 
   function fire(e) {
     if (!e) return;
     var now = Date.now();
-    /* Prevent dialog reset on repeated E press on same entity */
-    if (e === lastInteractedEntity && now - lastInteractedTime < INTERACT_COOLDOWN) {
-      return;
-    }
+    if (e === lastInteractedEntity && now - lastInteractedTime < INTERACT_COOLDOWN) return;
     lastInteractedEntity = e;
     lastInteractedTime = now;
-    if (e.t === 'exit') {
-      /* A locked door says what it is waiting for. "Nothing happens"
-         is the least useful sentence a game can produce. */
-      if (e.locked && !(NEU.save && NEU.save.flagged(e.locked))) {
-        say(e.lines || ['it will not move yet.'], 'narr');
-        if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
-        return;
-      }
-      go(e.to, e.spawn); return;
-    }
-    if (e.t === 'pickup') {
-      if (e.dead) return;
-      e.dead = true;
-      NEU.save && NEU.save.give(e.item);
-      say(e.lines || ['you take it.'], e.who || 'narr');
-      NEU.sfx && NEU.sfx.snap && NEU.sfx.snap();
-      /* SMALL. A pickup must register without competing with a boss
-         death — the tier table is what keeps that honest. */
-      if (NEU.juice) {
-        var pp = entAt(e);
-        NEU.juice.hit('small');
-        NEU.juice.burst((pp.x - camX) * SCALE, (pp.y - camY) * SCALE, 10, '#B892FF');
-      }
-      return;
-    }
-    if (e.t === 'save') {
-      NEU.save && NEU.save.capture();
-      NEU.save && NEU.save.flush();
-      say(['saved.'], 'narr');
-      NEU.sfx && NEU.sfx.tick && NEU.sfx.tick();
-      return;
-    }
-    if (e.t === 'sign') {
-      /* A hint the player asked for by walking up to it. Signs are
-         read, never consumed, and they always answer in narration.
-         Same guard as the npc branch below, and for the same reason:
-         `say()` here is unconditional and untracked (no dk/at resume),
-         so pressing e again while THIS sign's own box was still typing
-         restarted it from line 1 instead of leaving it alone. The four
-         V3 puzzle-hint signs were the demonstrated case. Only 'sign'
-         and the npc dialogue path get this — a RUN HOOK (mushrooms,
-         the witch, the merchant, every puzzle stone) has its own
-         state logic and must still fire even while an unrelated box is
-         open, the same way walking into a locked door still says so;
-         a blanket guard here previously blocked every run hook in the
-         game, including a stone press that was never state-tracked by
-         any dialogue at all. */
-      if (NEU.tboxOpen && NEU.tboxOpen()) return;
-      say(e.lines || ['a wooden sign. nothing else.'], 'narr');
-      NEU.sfx && NEU.sfx.tick && NEU.sfx.tick();
-      return;
-    }
-    if (e.t === 'npc') {
-      /* A run hook wins over lines. Entities that are only a hook —
-         the mushrooms, the witch, the merchant — answer differently
-         depending on the state of the world, and a fixed `lines`
-         array cannot do that. */
-      if (typeof e.run === 'function') { e.run(API); return; }
-      /* E while THIS dialogue is showing is a no-op. Restarting a
-         conversation mid-line read as the box resetting under your
-         thumb — the dk/at resume logic below exists so a finished
-         line isn't lost, but that only helps once the box has closed. */
-      if (NEU.tboxOpen && NEU.tboxOpen()) return;
-      var dk = 'd:' + room.id + ':' + e.x + ',' + e.y;
-      var at = NEU.save ? (NEU.save.flag(dk) || 0) : 0;
-      var base = e.lines || ['...'];
-      var total = base.length;
-      var who = e.who || 'narr';
-      /* Picked up where they left off: resume from the line they were
-         at, capped with a closing beat. Finished talks replay whole. */
-      var lines = (at > 0 && at < total)
-        ? base.slice(at).concat(e.close || ['...'])
-        : base;
-      say(lines, who);
-      if (NEU.talkWatch) {
-        var seen = at;
-        NEU.talkWatch(function (i) {
-          if (i < 0) {
-            NEU.talkUnwatch();
-            if (NEU.save) NEU.save.flag(dk, seen >= total ? 0 : seen);
-            return;
-          }
-          seen = at + i;
-        });
-      }
-      return;
-    }
-    if (e.t === 'altar') {
-      if (!NEU.save || !NEU.save.has(e.needs)) {
-        say(e.empty || ['it wants something you do not have.'], 'narr');
-        return;
-      }
-      NEU.save.take(e.needs);
-      flag(e.gives, 1);
-      say(e.lines || ['it takes it.'], 'narr');
-      return;
-    }
+    var K = kinds();
+    if (K) { K.fire(e, SYS); return; }
     if (typeof e.run === 'function') e.run(API);
   }
 
@@ -538,23 +388,24 @@
       fadeDir = -1;
       fadeThen = function () { busy = false; };
     };
-    if (reduced) { fade = 1; }              // no crossfade, just the cut
+    if (reduced) { fade = 1; }              // no iris, just the cut
   }
 
   function spawnEnts(r) {
     return (r.entities || []).map(function (e) {
       var c = {}; for (var k in e) c[k] = e[k];
       /* Pickups already taken and one-shot triggers already fired stay
-         gone across a reload — otherwise the save file quietly hands
-         out infinite copies of every item. */
-      if (c.t === 'pickup' && NEU.save && NEU.save.has(c.item)) c.dead = true;
+         gone across a reload — otherwise the save file hands out
+         infinite copies of every item. "Taken" is its own flag now, not
+         "still in your pocket" (see engine-kinds pickup). */
+      if (c.t === 'pickup' && NEU.save &&
+          (NEU.save.has(c.item) || NEU.save.flagged('p:' + r.id + ':' + c.x + ',' + c.y))) c.dead = true;
       if (c.once && NEU.save && NEU.save.flagged('t:' + r.id + ':' + c.x + ',' + c.y)) c.dead = true;
       return c;
     });
   }
 
-  /* Only reached by a room that declares no spawns at all: the first cell
-     you could actually stand in, in reading order. */
+  /* Only reached by a room that declares no spawns at all. */
   function firstOpenCell() {
     for (var y = 0; y < room.h; y++)
       for (var x = 0; x < room.w; x++)
@@ -564,22 +415,17 @@
 
   function land(id, spawn) {
     if (room && room.onExit) room.onExit(API);
+    clearLater();
     room = rooms[id];
     /* A solved puzzle stays solved across a revisit, but the blocks go
-       back to their starting cells — otherwise re-entering a solved
-       room shows an arrangement that no longer means anything. */
+       back to their starting cells. */
     room.__solved = NEU.save ? NEU.save.flagged('solved:' + id) : false;
     ents = spawnEnts(room);
     var s = (room.spawns && room.spawns[spawn]) || (room.spawns && room.spawns.default);
     if (!s) {
-      /* An exit naming a spawn the target room does not declare used to
-         fall through to a hard-coded {x:2,y:2}. That cell is inside a
-         wall in four of the rooms shipped here and the wrong end of the
-         room in the rest, so a single typo in an exit became a silent
-         soft-lock that no spawn check could see — d3_square was exactly
-         this. Prefer any spawn the room really declares, then go looking
-         for floor, and say so out loud: a missing spawn is a bug in the
-         room and it should not be able to pass for level design. */
+      /* An exit naming a spawn the target room does not declare is a
+         bug in the room, and it must not be able to pass for level
+         design: prefer any declared spawn, then floor, and say so. */
       var names = room.spawns ? Object.keys(room.spawns) : [];
       s = names.length ? room.spawns[names[0]] : firstOpenCell();
       if (window.console && console.warn)
@@ -587,46 +433,84 @@
                      '" — landing at ' + s.x + ',' + s.y);
     }
     px = (s.x + 0.5) * TILE; py = (s.y + 1) * TILE;
-    walked = 0; face = s.face || 'down';
+    vx = 0; vy = 0; walked = 0; face = s.face || 'down';
+    slideD = 0; slideDead = false; promptFor = null;
     room.__spawn = spawn;
+    bake();
     camSnap();
-    /* A room change must not carry the old room's dialogue. The talk
-       box is global; without this, walking through a door while a line
-       is typing leaves that text on screen for good — the new room's
-       onEnter only replaces it if the room actually has lines to say. */
+    var L = look();
+    if (L) L.weatherReset(L.zone(room.tileset).weather, room);
+    /* A room change must not carry the old room's dialogue. */
     if (NEU.talk && NEU.talk.close) NEU.talk.close();
     if (room.onEnter) room.onEnter(API);
     if (NEU.save) NEU.save.capture();
   }
 
+  /* ── api.later: timers that die with the visit (F4) ──────────────
+     A hook that schedules something and then gets walked away from
+     must not fire into the next room. */
+  function later(fn, ms) {
+    var id = setTimeout(function () {
+      var i = timers.indexOf(id); if (i >= 0) timers.splice(i, 1);
+      if (running) fn(API);
+    }, ms);
+    timers.push(id);
+    return id;
+  }
+  function clearLater() { for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]); timers = []; }
+
+  /* ── the baked layer ──────────────────────────────────────────── */
+  function bake() {
+    var L = look();
+    if (!L || !room || layers[room.id]) return;
+    var ts = tilesets[room.tileset];
+    try { layers[room.id] = L.bakeRoom(room, ts, room.tileset); } catch (e) { layers[room.id] = null; }
+  }
+
   /* ── camera ───────────────────────────────────────────────────── */
+  function chooseScale() {
+    var s = Math.floor(Math.min(innerWidth / (20 * TILE), innerHeight / (12 * TILE)));
+    return Math.max(2, Math.min(6, s || 2));
+  }
+  /* How much of the bottom of the screen the touch pad covers. */
+  function measurePad() {
+    var el = document.querySelector && document.querySelector('.tpad');
+    if (!el || el.hidden) return 0;
+    try {
+      var cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return 0;
+    } catch (e) {}
+    var r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+    if (!r || !r.height) return 0;
+    return Math.max(0, Math.min(r.height, innerHeight - r.top, innerHeight * 0.45));
+  }
   function view() {
-    return { w: innerWidth / SCALE, h: innerHeight / SCALE };
+    return { w: innerWidth / S, h: innerHeight / S, uh: Math.max(1, innerHeight - padH) / S };
   }
   function camClamp() {
     var v = view();
-    var maxX = Math.max(0, room.w * TILE - v.w), maxY = Math.max(0, room.h * TILE - v.h);
+    var maxX = Math.max(0, room.w * TILE - v.w), maxY = Math.max(0, room.h * TILE - v.uh);
     camX = Math.min(Math.max(camX, 0), maxX);
     camY = Math.min(Math.max(camY, 0), maxY);
     if (room.w * TILE < v.w) camX = (room.w * TILE - v.w) / 2;
-    if (room.h * TILE < v.h) camY = (room.h * TILE - v.h) / 2;
+    if (room.h * TILE < v.uh) camY = (room.h * TILE - v.uh) / 2;
   }
-  function camSnap() {
-    var v = view();
-    camX = px - v.w / 2; camY = py - v.h / 2;
+  function camTarget() {
+    var v = view(), f = DIRV[face] || [0, 0];
+    var lead = reduced ? 0 : LOOKAHEAD;
+    return { x: px + f[0] * lead - v.w / 2, y: py - 6 + f[1] * lead - v.uh / 2 };
+  }
+  function camSnap() { var t = camTarget(); camX = t.x; camY = t.y; camClamp(); }
+  function camFollow(dt) {
+    var t = camTarget(), k = 1 - Math.exp(-10 * dt);
+    camX += (t.x - camX) * k; camY += (t.y - camY) * k;
     camClamp();
   }
-  function camFollow() {
-    /* Dead zone: the camera only moves once the player leaves the
-       middle third. Without it, one-pixel nudges shake the world. */
-    var v = view();
-    var dzx = v.w * 0.16, dzy = v.h * 0.16;
-    var cx = camX + v.w / 2, cy = camY + v.h / 2;
-    if (px - cx >  dzx) camX += (px - cx) - dzx;
-    if (px - cx < -dzx) camX += (px - cx) + dzx;
-    if (py - cy >  dzy) camY += (py - cy) - dzy;
-    if (py - cy < -dzy) camY += (py - cy) + dzy;
-    camClamp();
+  /* A small directional camera impulse (B3): a push, a solved room.
+     Part of shake, so it obeys the same switches. */
+  function kick(x, y) {
+    if (reduced || (NEU.juice && NEU.juice.noShake)) return;
+    kickX += x; kickY += y;
   }
 
   /* ── loop ─────────────────────────────────────────────────────── */
@@ -636,178 +520,235 @@
     cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
+    S = chooseScale();
+    padH = measurePad();
     if (room) camClamp();
   }
   addEventListener('resize', function () { if (running) layout(); });
 
+  function update(dt) {
+    clock += dt;
+    if (fadeDir) {
+      fade += fadeDir * dt / 0.22;
+      if (fade >= 1 && fadeDir > 0) { fade = 1; fadeDir = 0; var f = fadeThen; fadeThen = null; if (f) f(); }
+      else if (fade <= 0 && fadeDir < 0) { fade = 0; fadeDir = 0; var g = fadeThen; fadeThen = null; if (g) g(); }
+    }
+    if ((padPoll -= dt) <= 0) { padPoll = 0.5; var ph = measurePad(); if (ph !== padH) padH = ph; }
+    if (!room) return;
+
+    if (!busy) move(dt); else { vx = 0; vy = 0; moving = false; }
+    camFollow(dt);
+    var decay = Math.exp(-14 * dt);
+    kickX *= decay; kickY *= decay;
+    if (settle > 0) settle -= dt;
+    var L = look();
+    if (L) L.weatherStep(dt, room);
+  }
+
+  function move(dt) {
+    var ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    var iy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+    /* A fresh press is a fresh commitment; the key that killed a slide
+       must not immediately re-commit to the same line. */
+    if (!ix && !iy) slideDead = false;
+    var wasMoving = moving;
+
+    if (slideD) {
+      /* Sliding: input does nothing until the ice runs out. */
+      face = slideD; vx = 0; vy = 0; moving = true;
+      var d = DIRV[slideD];
+      var ci = Math.floor(px / TILE), cj = Math.floor((py - 1) / TILE);
+      var ni = ci + d[0], nj = cj + d[1];
+      /* Predict before moving: the slide dies when the cell ahead is not
+         ice, so the stop lands exactly ON the last ice cell. */
+      if (at(ci, cj) !== 'i' || at(ni, nj) !== 'i') {
+        stopSlide(); checkTriggers(); checkPuzzle();
+      } else {
+        var bp = px, bq = py;
+        var sp = sweep(px, py, d[0] * SPEED * dt, d[1] * SPEED * dt, d[0], d[1]);
+        px = sp.x; py = sp.y;
+        walked += Math.sqrt((px - bp) * (px - bp) + (py - bq) * (py - bq));
+        checkTriggers(); checkPuzzle();
+      }
+      return;
+    }
+
+    if (ix || iy) {
+      var len = Math.sqrt(ix * ix + iy * iy);
+      vx = approach(vx, ix / len * SPEED, ACCEL * dt);
+      vy = approach(vy, iy / len * SPEED, ACCEL * dt);
+      face = Math.abs(ix) > Math.abs(iy) ? (ix > 0 ? 'right' : 'left') : (iy > 0 ? 'down' : 'up');
+      if (!ix) vx = approach(vx, 0, FRICTION * dt);
+      if (!iy) vy = approach(vy, 0, FRICTION * dt);
+    } else {
+      vx = approach(vx, 0, FRICTION * dt);
+      vy = approach(vy, 0, FRICTION * dt);
+    }
+    moving = !!(ix || iy);
+    if (moving) movedFor += dt;
+    else { if (wasMoving && movedFor > 0.25) settle = 0.09; movedFor = 0; }
+    if (!vx && !vy) return;
+
+    var bx = px, by = py;
+    var p = sweep(px, py, vx * dt, vy * dt, ix, iy);
+    px = p.x; py = p.y;
+    if (p.bx && !ix) vx = 0;
+    if (p.by && !iy) vy = 0;
+    if (p.bx && px === bx) vx = 0;
+    if (p.by && py === by) vy = 0;
+    walked += Math.sqrt((px - bx) * (px - bx) + (py - by) * (py - by));
+    /* Ice catches you: the moment your feet are on it, you are committed
+       to that line of travel. */
+    var eci = Math.floor(px / TILE), ecj = Math.floor((py - 1) / TILE);
+    if (at(eci, ecj) === 'i' && !slideDead && moving) { slideD = face; vx = 0; vy = 0; }
+    checkTriggers();
+    /* solved() can become true on a WALK (b5: you stand on one plate
+       while the block holds the other). */
+    checkPuzzle();
+  }
+
   function step(now) {
     if (!running) return;
     requestAnimationFrame(step);
-    var dt = Math.min(0.033, (now - last) / 1000); last = now;
-
-    if (fadeDir) {
-      fade += fadeDir * dt / 0.22;
-      if (fade >= 1 && fadeDir > 0) { fade = 1; fadeDir = 0; var f = fadeThen; fadeThen = null; f && f(); }
-      else if (fade <= 0 && fadeDir < 0) { fade = 0; fadeDir = 0; var g = fadeThen; fadeThen = null; g && g(); }
-    }
-
-    if (room && !busy) {
-      var vx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-      var vy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
-      moving = !!(vx || vy);
-      if (vx && vy) { vx *= 0.7071; vy *= 0.7071; }
-      /* A fresh press is a fresh commitment; the key that killed a
-         slide must not immediately re-commit to the same line, or
-         walking off the end of the ice would stutter frame by frame. */
-      if (!vx && !vy) slideDead = false;
-      if (moving && !slideD) {
-        face = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'right' : 'left')
-                                           : (vy > 0 ? 'down' : 'up');
-        var before = px, bY = py;
-        var p = sweep(px, py, vx * SPEED * dt, vy * SPEED * dt);
-        px = p.x; py = p.y;
-        walked += Math.hypot(px - before, py - bY);
-        /* Ice catches you: the moment your feet are on it, you are
-           committed to that line of travel. No turning, no stopping —
-           that is the whole puzzle. */
-        var eci = Math.floor(px / TILE), ecj = Math.floor((py - 1) / TILE);
-        if (at(eci, ecj) === 'i' && !slideDead) slideD = face;
-        checkTriggers();
-        /* A room's solved() can become true on a WALK, not just on a
-           push — b5 needs you standing on one plate while the block
-           holds the other, and the walk onto the plate is the final
-           move. Check every moving frame; __solved makes it a no-op
-           once the room is done. */
-        checkPuzzle();
-      } else if (slideD) {
-        /* Sliding: input does nothing until the ice runs out. */
-        face = slideD;
-        var d = DIRV[slideD];
-        var ci = Math.floor(px / TILE), cj = Math.floor((py - 1) / TILE);
-        var ni = ci + d[0], nj = cj + d[1];
-        /* Predict before moving: the slide dies when the cell ahead is
-           not ice, so the stop lands exactly ON the last ice cell —
-           checking after the move would overshoot by a frame and miss
-           the plate that sits there. */
-        if (at(ci, cj) !== 'i' || at(ni, nj) !== 'i') {
-          stopSlide();
-          checkTriggers();
-          checkPuzzle();
-        } else {
-          var bp = px, bq = py;
-          var sp2 = sweep(px, py, d[0] * SPEED * dt, d[1] * SPEED * dt);
-          px = sp2.x; py = sp2.y;
-          walked += Math.hypot(px - bp, py - bq);
-          checkTriggers();
-          checkPuzzle();
-        }
-      }
-      camFollow();
-    }
+    var dt = (now - last) / 1000; last = now;
+    if (!(dt > 0)) dt = 0;
+    if (dt > 0.25) dt = 0.25;
+    acc += dt;
+    var n = 0;
+    while (acc >= STEP && n < 16) { update(STEP); acc -= STEP; n++; }
+    if (n >= 16) acc = 0;
     draw(now);
+  }
+
+  /* ── draw ─────────────────────────────────────────────────────── */
+  function lightsFor(now, camSX, camSY, v) {
+    var L = look(), K = kinds(), out = [];
+    var z = L.zone(room.tileset);
+    var darkAmt = typeof room.dark === 'function' ? room.dark(API) : room.dark;
+    var ambient = z.ambient;
+    var d = drawCtx(now);
+    if (darkAmt > 0) {
+      /* A dark room. The light follows the room's `light` hook (b6's
+         carried torch), else the player carries a faint one of their
+         own — v1 centred it on the SCREEN, so in a room narrower than
+         the view you could not see yourself at all. */
+      ambient = 0.03;
+      var lt = room.light ? room.light(API) : null;
+      if (lt) out.push({ x: lt.x, y: lt.y - 6, r: darkAmt * 0.7, col: z.warm, glow: 0.18, a: 1 });
+      else out.push({ x: px, y: py - 6, r: 20, a: 0.8 });
+    } else if (ambient < 0.8) {
+      out.push({ x: px, y: py - 6, r: 34, a: 0.5 });
+    }
+    /* entity lights */
+    for (var i = 0; i < ents.length; i++) {
+      var e = ents[i];
+      if (e.dead) continue;
+      var k = K ? K.get(e) : null;
+      var li = k && k.light ? k.light(e, d) : null;
+      if (!li) continue;
+      var p = entAt(e);
+      var r = li.r;
+      if (li.flicker && !reduced) r *= 1 + Math.sin(now / 70 + e.x * 3) * 0.05;
+      out.push({ x: p.x, y: p.y - 8, r: r, col: li.col, glow: li.glow, a: li.a });
+    }
+    /* the lit path lights itself in the dark zones — "lit ground is
+       walkable" is the woods' whole tutorial */
+    if (ambient < 0.8 && !darkAmt) {
+      var x0 = Math.max(0, Math.floor(camSX / TILE)), y0 = Math.max(0, Math.floor(camSY / TILE));
+      var x1 = Math.min(room.w - 1, Math.ceil((camSX + v.w) / TILE)), y1 = Math.min(room.h - 1, Math.ceil((camSY + v.h) / TILE));
+      for (var cy = y0; cy <= y1; cy++) for (var cx = x0; cx <= x1; cx++)
+        if (at(cx, cy) === ',') out.push({ x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE, r: 20, a: 0.55 });
+    }
+    return { ambient: ambient, night: z.night, list: out };
+  }
+
+  function drawCtx(now) {
+    return { S: S, sx: 0, sy: 0, now: now, api: API, room: room, entHere: entHere };
   }
 
   function draw(now) {
     var w = innerWidth, h = innerHeight;
-    ctx.fillStyle = '#08080B'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#050507'; ctx.fillRect(0, 0, w, h);
     if (!room) return;
+    var L = look(), K = kinds();
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
-    var ts = tilesets[room.tileset] || { colours: {} };
     var v = view();
+    /* Pixel-snap the camera once; every world→screen conversion below
+       rounds against the same origin, so sprites never shimmer against
+       the floor. */
+    var ox = Math.round((camX + kickX) * S), oy = Math.round((camY + kickY) * S);
+    var camSX = ox / S, camSY = oy / S;
+    function sx(wx) { return Math.round(wx * S) - ox; }
+    function sy(wy) { return Math.round(wy * S) - oy; }
 
-    var cx0 = Math.max(0, Math.floor(camX / TILE));
-    var cy0 = Math.max(0, Math.floor(camY / TILE));
-    var cx1 = Math.min(room.w - 1, Math.ceil((camX + v.w) / TILE));
-    var cy1 = Math.min(room.h - 1, Math.ceil((camY + v.h) / TILE));
-    var atlas = ts.src ? images[ts.src] : null;
-    var usable = atlas && atlas.complete && atlas.naturalWidth && !atlas.__failed;
+    var layer = layers[room.id];
+    if (layer && L) {
+      var smooth = ctx.imageSmoothingEnabled;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(layer, -ox, -oy, layer.width * S, layer.height * S);
+      ctx.imageSmoothingEnabled = smooth;
+      L.drawAnimated(ctx, room, tilesets[room.tileset], room.tileset, camSX, camSY, S, now, v);
+    } else drawFlat(camSX, camSY, v);
 
-    for (var cy = cy0; cy <= cy1; cy++) {
-      for (var cx = cx0; cx <= cx1; cx++) {
-        var ch = at(cx, cy);
-        var sx = ((cx * TILE - camX) * SCALE) | 0;
-        var sy = ((cy * TILE - camY) * SCALE) | 0;
-        var s = TILE * SCALE;
-        if (usable && ts.rects && ts.rects[ch]) {
-          var r = ts.rects[ch];
-          ctx.drawImage(atlas, r[0], r[1], TILE, TILE, sx, sy, s, s);
-        } else {
-          /* palette fallback — see note 2 */
-          var col = (ts.colours && ts.colours[ch]) ||
-                    (ch === 'i' ? '#2E3D52' : ch === 'M' ? '#4A4560' : ch === 'P' ? '#221D33' :
-                     ts.solid.indexOf(ch) >= 0 ? '#1a1a24' : '#0d0d12');
-          ctx.fillStyle = col;
-          ctx.fillRect(sx, sy, s, s);
-        }
-      }
+    var d = drawCtx(now);
+    /* floor decals first and unsorted — sorting a plate by foot Y makes
+       a block vanish underneath its own plate */
+    var i, e, k;
+    for (i = 0; i < ents.length; i++) {
+      e = ents[i];
+      if (e.dead) continue;
+      k = K ? K.get(e) : null;
+      if (!k || !k.floor || !k.draw) continue;
+      var pf = entAt(e); d.sx = sx(pf.x); d.sy = sy(pf.y);
+      k.draw(ctx, e, d);
     }
-
-    /* entities, then the player, sorted by foot Y so things in front
-       overlap things behind */
-    /* Plates first and unsorted — they are floor paint, and sorting
-       them by foot Y makes a block vanish underneath its own plate. */
-    for (var pi = 0; pi < ents.length; pi++)
-      if (!ents[pi].dead && ents[pi].t === 'plate') drawEnt(ents[pi], now);
-
-    /* An exit is normally a hole in the wall with nothing to draw — but
-       one carrying a `sheet` is a THING, and blanket-filtering exits
-       meant the only entity sheet binding in the whole game never drew.
-       b7_altar's fire door has had `sheet: 'firedoor'` on it since the
-       room was written and has never once appeared on screen. */
-    var drawn = ents.filter(function (e) {
-      return !e.dead && e.t !== 'trigger' && e.t !== 'plate' &&
-             (e.t !== 'exit' || e.sheet); })
-                    .map(function (e) { return { e: e, y: (e.y + 1) * TILE }; });
+    /* everything that stands, sorted by foot Y */
+    var drawn = [];
+    for (i = 0; i < ents.length; i++) {
+      e = ents[i];
+      if (e.dead || e.t === 'trigger') continue;
+      k = K ? K.get(e) : null;
+      if (k && (k.floor || k.hidden)) continue;
+      drawn.push({ e: e, k: k, y: (e.y + 1) * TILE });
+    }
     drawn.push({ e: null, y: py });
     drawn.sort(function (a, b) { return a.y - b.y; });
-
-    for (var i = 0; i < drawn.length; i++) {
-      var d = drawn[i];
-      if (!d.e) {
-        var f = moving ? (1 + (((walked / 10) | 0) % 2)) : 0;
-        /* SCALE, not 2. The world draws a pixel at 3 CSS px and the
-           character drew one at 2, so the two never shared a grid and
-           fine detail always fought the character. It also fixes a
-           mismatch the other way: at 2 the sprite was 6 world units
-           wide against a 10-unit collision box, so she read as smaller
-           than the space she actually occupied. */
-        stamp(BODIES[face].concat(LEGS[f]),
-              ((px - camX) * SCALE) | 0, ((py - camY) * SCALE) | 0, SCALE);
+    /* shadows under all of it, then the things themselves */
+    if (L) {
+      for (i = 0; i < drawn.length; i++) {
+        var it = drawn[i];
+        if (!it.e) { L.shadow(ctx, sx(px), sy(py), 9, S, 0.42); continue; }
+        var ww = it.k && it.k.width ? it.k.width(it.e, S) : 9;
+        if (ww > 0) { var pe = entAt(it.e); L.shadow(ctx, sx(pe.x), sy(pe.y), Math.min(14, ww * 0.8), S, 0.32); }
+      }
+    }
+    for (i = 0; i < drawn.length; i++) {
+      var dr = drawn[i];
+      if (!dr.e) {
+        if (L) L.drawPlayer(ctx, sx(px), sy(py), face, walked, moving, S, now, { settle: settle > 0 });
         continue;
       }
-      drawEnt(d.e, now);
+      var pp = entAt(dr.e); d.sx = sx(pp.x); d.sy = sy(pp.y);
+      if (dr.k && dr.k.draw) dr.k.draw(ctx, dr.e, d);
+      else { ctx.fillStyle = dr.e.colour || '#B892FF'; ctx.fillRect(d.sx - 3 * S, d.sy - 6 * S, 6 * S, 6 * S); }
     }
 
-    /* the interact prompt */
-    var n = nearest(promptable);
-    if (n && !busy) {
-      var p = entAt(n);
-      ctx.fillStyle = '#EDE7DE';
-      ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('e', ((p.x - camX) * SCALE) | 0, ((p.y - camY) * SCALE - 34 * SCALE / 3) | 0);
-      ctx.textAlign = 'left';
+    if (L) {
+      L.weatherDraw(ctx, camSX, camSY, S, w, h);
+      var lt = lightsFor(now, camSX, camSY, v);
+      L.drawLight(ctx, w, h, lt.ambient, lt.night, lt.list, camSX, camSY, S);
     }
 
-    /* A room can be dark. Same STEPPED falloff as the blackout — five
-       discrete rings, not a soft vignette, because every other pixel
-       on this site has a hard edge and a smooth gradient reads as a
-       different program. `dark` may be a number or a hook (b6's goes
-       out when its torch is placed); a `light` hook (a carried torch)
-       centres the light on the returned point instead of the room. */
-    var darkAmt = typeof room.dark === 'function' ? room.dark(API) : room.dark;
-    if (darkAmt > 0) {
-      var lt = room.light ? room.light(API) : null;
-      var lx = lt ? ((lt.x - camX) * SCALE) : w / 2;
-      var ly = lt ? ((lt.y - camY) * SCALE) : h / 2;
-      var g = ctx.createRadialGradient(lx, ly, 0, lx, ly, darkAmt * SCALE / 2);
-      g.addColorStop(0.00, 'rgba(0,0,0,0)');
-      g.addColorStop(0.45, 'rgba(0,0,0,0)');
-      g.addColorStop(0.46, 'rgba(0,0,0,0.55)');
-      g.addColorStop(0.70, 'rgba(0,0,0,0.55)');
-      g.addColorStop(0.71, 'rgba(0,0,0,0.86)');
-      g.addColorStop(1.00, 'rgba(0,0,0,0.98)');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    /* the interact prompt, above the light so it is always readable */
+    var n = (!busy && !(NEU.tboxOpen && NEU.tboxOpen())) ? nearest(promptable) : null;
+    if (n !== promptFor) { promptFor = n; promptT = 0; }
+    if (n && L) {
+      promptT += 1 / 60;
+      var pn = entAt(n);
+      var a = reduced ? 1 : Math.min(1, promptT / 0.12);
+      ctx.globalAlpha = a;
+      L.drawPrompt(ctx, sx(pn.x), sy(pn.y - 18), S, clock, padH > 0);
+      ctx.globalAlpha = 1;
     }
 
     if (NEU.juice) { NEU.juice.drawParts(ctx, 1 / 60);
@@ -815,82 +756,21 @@
                      NEU.juice.overlay(ctx, w, h); }
 
     if (fade > 0) {
-      ctx.fillStyle = 'rgba(8,8,11,' + fade.toFixed(3) + ')';
-      ctx.fillRect(0, 0, w, h);
+      if (L && !reduced) L.drawIris(ctx, w, h, sx(px), sy(py - 8), fade);
+      else { ctx.fillStyle = 'rgba(5,5,7,' + fade.toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); }
     }
   }
 
-  function drawEnt(e, now) {
-    var p = entAt(e);
-    var sx = ((p.x - camX) * SCALE) | 0, sy = ((p.y - camY) * SCALE) | 0;
-    if (e.t === 'sign') {
-      /* a post, a board, two carved lines — the castle's hints */
-      ctx.fillStyle = '#6B4F2F';
-      ctx.fillRect(sx - 11, sy - 26, 22, 18);
-      ctx.fillStyle = '#3E2F1D';
-      ctx.fillRect(sx - 2, sy - 8, 4, 8);
-      ctx.fillStyle = '#C8B48A';
-      ctx.fillRect(sx - 7, sy - 22, 14, 2);
-      ctx.fillRect(sx - 5, sy - 17, 10, 2);
-      return;
+  /* No look kit loaded: v1's flat palette, so the engine is never blind. */
+  function drawFlat(camSX, camSY, v) {
+    var ts = tilesets[room.tileset] || { colours: {}, solid: '#' };
+    var cx0 = Math.max(0, Math.floor(camSX / TILE)), cy0 = Math.max(0, Math.floor(camSY / TILE));
+    var cx1 = Math.min(room.w - 1, Math.ceil((camSX + v.w) / TILE)), cy1 = Math.min(room.h - 1, Math.ceil((camSY + v.h) / TILE));
+    for (var cy = cy0; cy <= cy1; cy++) for (var cx = cx0; cx <= cx1; cx++) {
+      var ch = at(cx, cy);
+      ctx.fillStyle = (ts.colours && ts.colours[ch]) || (ts.solid.indexOf(ch) >= 0 ? '#1a1a24' : '#0d0d12');
+      ctx.fillRect(Math.round((cx * TILE - camSX) * S), Math.round((cy * TILE - camSY) * S), TILE * S, TILE * S);
     }
-    var sheet = e.sheet && NEU.sheets && NEU.sheets[e.sheet];
-    if (sheet) {
-      /* One blitter, in data/sheets.js — it is the only thing that
-         knows about `cols`, and it is shared with both bosses. */
-      if (NEU.sheetDraw && NEU.sheetDraw(ctx, e.sheet, sx, sy, {
-            frame: sheet.fps ? null : (e.frame || 0),
-            col: e.col || 0, scale: e.scale || 1,
-            anchor: 'feet', now: now })) return;
-      /* Missing art is LOUD. A silently absent sprite gets mistaken
-         for a logic bug and costs an hour; a magenta box does not. */
-      ctx.fillStyle = '#FF00A0';
-      ctx.fillRect(sx - 12, sy - 24, 24, 24);
-      return;
-    }
-    if (e.t === 'plate') {
-      /* Drawn UNDER everything and inset, so a block sitting on one is
-         still visibly a block on a plate rather than a block. A slide-
-         armed plate stays lit once it locks. */
-      var lit = !!entHere(e.x, e.y, 'block') || !!e.armed;
-      ctx.fillStyle = lit ? '#7BE38A' : '#4A4560';
-      ctx.fillRect(sx - 6 * SCALE / 2, sy - 6 * SCALE / 2 - 2, 6 * SCALE, 6 * SCALE / 2);
-      return;
-    }
-    if (e.t === 'block') {
-      var s2 = 14 * SCALE / 2;
-      ctx.fillStyle = '#3A3245'; ctx.fillRect(sx - s2, sy - s2 * 2, s2 * 2, s2 * 2);
-      ctx.fillStyle = '#564B66'; ctx.fillRect(sx - s2 + 2, sy - s2 * 2 + 2, s2 * 2 - 4, s2 * 2 - 4);
-      ctx.fillStyle = '#241d2e'; ctx.fillRect(sx - s2, sy - 3, s2 * 2, 3);
-      return;
-    }
-    if (e.t === 'brazier') {
-      var on = !!e.lit;
-      ctx.fillStyle = '#241d2e';
-      ctx.fillRect(sx - 5 * SCALE / 2, sy - 12, 5 * SCALE, 12);
-      ctx.fillStyle = on ? '#E4C46A' : '#2A2A38';
-      var wob = on ? ((now / 90 | 0) % 2) * 2 : 0;
-      ctx.fillRect(sx - 4 * SCALE / 2, sy - 22 - wob, 4 * SCALE, 12 + wob);
-      if (on) { ctx.fillStyle = '#FFF2C4'; ctx.fillRect(sx - 3, sy - 18 - wob, 6, 6); }
-      return;
-    }
-    if (PROP[e.t]) {
-      /* 2 is the player's pixel size, so a prop and a person are on the
-         same grid. The save point breathes; the altar does not. */
-      var pr = PROP[e.t];
-      if (e.t === 'save') {
-        var pulse = 1 + Math.sin(now / 420) * 0.06;
-        ctx.save();
-        ctx.globalAlpha = 0.85 + Math.sin(now / 420) * 0.15;
-        stampPal(pr.rows, pr.pal, sx, (sy - 6 + (1 - pulse) * 8) | 0, SCALE);
-        ctx.restore();
-        return;
-      }
-      stampPal(pr.rows, pr.pal, sx, sy, SCALE);
-      return;
-    }
-    ctx.fillStyle = e.colour || '#B892FF';
-    ctx.fillRect(sx - 9, sy - 18, 18, 18);
   }
 
   /* ── input ────────────────────────────────────────────────────── */
@@ -904,10 +784,7 @@
   }
   addEventListener('keydown', function (e) {
     if (!running) return;
-    /* A minigame owns the page while it is open — the fight canvas
-       sits over the room, but the room's keydown still listened to
-       the same window and walked the character underneath it, and
-       Escape left the room while the fight's own overlay was up. */
+    /* A minigame owns the page while it is open. */
     if (NEU.activeMinigame) return;
     if (e.key === 'Escape') { e.preventDefault(); leave(); return; }
     if (e.key === 'e' || e.key === 'E') {
@@ -920,15 +797,13 @@
       return;
     }
     if (e.key === 'r' || e.key === 'R') { e.preventDefault(); if (!busy) resetPuzzle(); return; }
-    var n = keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
+    var kn = keyName(e); if (kn) { keys[kn] = true; e.preventDefault(); }
   });
   addEventListener('keyup', function (e) {
     if (!running || NEU.activeMinigame) return;
-    var n = keyName(e); if (n) keys[n] = false;
+    var kn = keyName(e); if (kn) keys[kn] = false;
   });
-  /* Alt-tab away with a key held and the keyup never arrives — the
-     player would keep walking the moment the tab comes back. Same
-     release-all the touch layer does. */
+  /* Alt-tab away with a key held and the keyup never arrives. */
   addEventListener('blur', function () { keys = {}; });
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) keys = {};
@@ -947,9 +822,9 @@
     layout();
     land(id, spawn);
     fade = 1; fadeDir = -1; fadeThen = null;
-    keys = {}; busy = false;
-    /* rhythm and craft re-enter while the room still runs — spawning a
-       second loop here would tick everything at double speed. */
+    keys = {}; busy = false; acc = 0;
+    /* rhythm and craft re-enter while the room still runs — a second
+       loop here would tick everything at double speed. */
     if (!running) {
       running = true; last = performance.now();
       requestAnimationFrame(step);
@@ -957,11 +832,16 @@
     return true;
   }
 
-  /* ESC confirmation dialog utility */
+  /* ESC confirmation dialog — every minigame's "leave?" */
   function confirmExit(minigameName, onConfirm) {
     if (document.getElementById('confirmExit')) return;
+    var before = document.activeElement;
     var overlay = document.createElement('div');
     overlay.id = 'confirmExit';
+    overlay.setAttribute('role', 'alertdialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Leave ' + minigameName + '?');
+    overlay.tabIndex = -1;
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:95;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = '<div style="background:#1A1016;padding:32px 48px;border:2px solid #E23B55;border-radius:4px;text-align:center;">' +
       '<p style="font:24px \'Determination Mono\',monospace;color:#EDE7DE;margin:0 0 16px;">Leave ' + minigameName + '?</p>' +
@@ -972,30 +852,38 @@
       '</div>' +
       '<div style="font:14px monospace;color:#555;">Progress will be lost.</div></div>';
     document.body.appendChild(overlay);
+    /* Focus moves INTO the prompt (C11) — onto the dialog itself, not a
+       button, so "Enter = Yes" stays true and nothing looks pre-picked. */
+    try { overlay.focus(); } catch (x) {}
     var done = false;
     function cleanup() {
       if (done) return;
       done = true;
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       removeEventListener('keydown', onKey, true);
+      if (before && before.focus && document.contains(before)) { try { before.focus(); } catch (x) {} }
     }
-    /* Window, capture phase, and stopImmediatePropagation. The touch
-       pad dispatches its synthetic Enter/Escape on window, which a
-       document listener never hears — so on a phone this prompt could
-       not be answered at all and every confirmed exit was a soft-lock.
-       Capturing on window runs before the minigames' own window
-       listeners, and stopping immediate propagation keeps them from
-       seeing the same press: without it Escape-to-decline would clean
-       the overlay up and the minigame would build a new one. */
+    /* Window, capture phase, and stopImmediatePropagation: the touch pad
+       dispatches its synthetic Enter/Escape on window, which a document
+       listener never hears, and the minigames listen on window too. */
     function onKey(e) {
       e.stopImmediatePropagation();
       if (e.key !== 'Enter' && e.key !== 'Escape' && e.key !== 'Tab') return;
       e.preventDefault();
-      if (e.key === 'Enter') { cleanup(); onConfirm(); }
-      else if (e.key === 'Escape') { cleanup(); }
+      if (e.key === 'Tab') {
+        /* a two-button trap */
+        var bs = overlay.querySelectorAll('button');
+        var i = Array.prototype.indexOf.call(bs, document.activeElement);
+        var nx = e.shiftKey ? (i <= 0 ? bs.length - 1 : i - 1) : (i + 1) % bs.length;
+        if (bs[nx]) bs[nx].focus();
+        return;
+      }
+      var focused = document.activeElement && document.activeElement.getAttribute &&
+                    document.activeElement.getAttribute('data-ans');
+      if (e.key === 'Escape' || focused === 'no') { cleanup(); return; }
+      cleanup(); onConfirm();
     }
     addEventListener('keydown', onKey, true);
-    /* And something to tap, for a phone with the pad switched off. */
     overlay.addEventListener('click', function (e) {
       var ans = e.target && e.target.getAttribute && e.target.getAttribute('data-ans');
       if (ans === 'yes') { cleanup(); onConfirm(); }
@@ -1003,10 +891,7 @@
     });
   }
 
-  /* The room's quit button is the same exit as its ESC: rooms cost
-     nothing to leave, so it goes straight out — the save point is
-     never far. It sat unwired, doing nothing, since the button was
-     added to the markup. */
+  /* The room's quit button is the same exit as its ESC. */
   var engQuitBtn = document.getElementById('engQuit');
   if (engQuitBtn) engQuitBtn.addEventListener('click', function () {
     if (!running) return;
@@ -1015,6 +900,7 @@
 
   function leave() {
     running = false;
+    clearLater();
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
@@ -1025,19 +911,30 @@
   var API = {
     say: say, flag: flag,
     flagged: function (k) { return NEU.save ? NEU.save.flagged(k) : false; },
-    give: function (i) { NEU.save && NEU.save.give(i); },
+    give: function (i) { if (NEU.save) NEU.save.give(i); },
     has: function (i) { return NEU.save ? NEU.save.has(i) : false; },
     go: go, leave: leave,
     busy: function (on) { busy = !!on; },
     entHere: entHere, reset: resetPuzzle, check: checkPuzzle,
     ents: function () { return ents; },
     solved: function (id) { return NEU.save ? NEU.save.flagged('solved:' + id) : false; },
-    markSolved: function (id) { NEU.save && NEU.save.flag('solved:' + id, 1); },
+    markSolved: function (id) { if (NEU.save) NEU.save.flag('solved:' + id, 1); },
+    later: later,
     /* the live room definition — rooms with hooks (dark, light, onReset)
        expose their state through it, and tests read it the same way */
     get room() { return room; },
     get player() { return { x: px, y: py, face: face }; }
   };
+  SYS.api = API;
+
+  /* v1's signature, kept for dark.js: anchorFeet false centres the
+     sprite vertically on (sx, sy). */
+  function drawPlayerCompat(targetCtx, sx, sy, fce, wlk, mov, anchorFeet, sc) {
+    var L = look(), s = sc || 2;
+    if (!L) return;
+    var y = anchorFeet ? sy : sy + (13 * s) / 2;
+    L.drawPlayer(targetCtx || ctx, sx, y, fce || 'down', wlk || 0, !!mov, s, Date.now());
+  }
 
   NEU.engine = {
     register: register, tileset: tileset, enter: enter, leave: leave, go: go,
@@ -1046,20 +943,25 @@
     get running() { return running; },
     get room() { return room ? room.id : null; },
     /* Which zone the player is standing in, by tileset name. music.js
-       keys its tracks off this rather than off a room-id prefix map:
-       a second mapping would be a second source of truth and would
-       drift the first time a room changed tileset. */
+       and engine-look both key off this — one source of truth. */
     zone: function () { return room ? room.tileset : null; },
     get rooms() { return Object.keys(rooms); },
-    /* Read-only view of the tileset registry. The dev console uses it to
-       answer "is this zone drawing art or falling back to colours", and
-       fixes14 uses it to assert every zone carries src + rects at
-       runtime rather than merely in the source text. */
     tilesets: function () { return tilesets; },
     api: API,
     /* dev */
     warp: function (id, spawn) { if (running) { land(id, spawn); } else { enter(id, spawn); } },
-    drawPlayer: drawPlayer,
-    TILE: TILE, SCALE: SCALE
+    drawPlayer: drawPlayerCompat,
+    TILE: TILE,
+    /* live: the scale the view was fitted at (decision 10) */
+    get SCALE() { return S; },
+    REACH: REACH, PLAYER_H: PLAYER_H, PLAYER_W: PLAYER_W, SPEED: SPEED,
+    /* read-only internals for tests and the dev console */
+    get debug() {
+      return { scale: S, cam: { x: camX, y: camY }, vel: { x: vx, y: vy }, padH: padH,
+               baked: !!(room && layers[room.id]), fade: fade, prompt: promptFor,
+               lights: (room && look()) ? lightsFor(0, camX, camY, view()).list.length : 0,
+               view: view(), timers: timers.length };
+    },
+    nearest: function () { return nearest(promptable); }
   };
 })();

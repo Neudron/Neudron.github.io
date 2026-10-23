@@ -6,6 +6,7 @@
    scripted playthrough only proves for the one route it took. */
 
 import { JSDOM } from 'jsdom';
+import { seedRandom } from './lib/seed.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -53,7 +54,7 @@ function boot() {
   w.Element.prototype.getBoundingClientRect = () =>
     ({ left:100, top:100, right:146, bottom:146, width:46, height:46, x:100, y:100 });
 
-  for (const f of ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine.js','game/bullet.js','game/dark.js',
+  for (const f of ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine-look.js', 'core/engine-kinds.js', 'core/engine.js','game/bullet.js','game/dark.js',
                    'game/sans.js','act4/act4.js','act4/rooms-a.js','act4/rooms-d.js','act4/scal-worm.js','act4/boss-scal.js','act4/quiz.js','game/deck.js','core/dev.js']) {
     const p = path.join(ROOT, 'js', f);
     if (!fs.existsSync(p)) { console.log('  !! missing ' + f); continue; }
@@ -328,13 +329,18 @@ console.log('\n4c. the mirror holds the second plate');
   ok('the mirror is there to press', !!NEU.engine.api.ents().find(e => e.mirror));
 
   /* spawn (1,5). up to the mirror at (7,1), turn it east (face 1),
-     back down, then walk east and up onto plate R at (12,4). */
-  key('keydown', 'ArrowUp'); pump(30); key('keyup', 'ArrowUp');        // to (1,2)
-  key('keydown', 'ArrowRight'); pump(55); key('keyup', 'ArrowRight');  // to (7,2), under the mirror
+     back down, then walk east and up onto plate R at (12,4).
+     Walk until the CELL is reached rather than for a frame count: v2
+     movement accelerates and forgives corners, so a dead-reckoned
+     frame budget is a statement about physics, not about the puzzle. */
+  const cell = () => { const p = NEU.engine.api.player; return [Math.floor(p.x / 16), Math.floor((p.y - 1) / 16)]; };
+  const hold = (k, pred, max = 400) => { key('keydown', k); let n = 0; while (!pred() && n++ < max) pump(1); key('keyup', k); pump(6); return pred(); };
+  ok('walked up to row 2', hold('ArrowUp', () => cell()[1] <= 2));
+  ok('walked east under the mirror', hold('ArrowRight', () => cell()[0] >= 7));
   key('keydown', 'e'); key('keyup', 'e'); pump(4);                     // turn it → looks east
-  key('keydown', 'ArrowDown'); pump(30); key('keyup', 'ArrowDown');    // back to row 5
-  key('keydown', 'ArrowRight'); pump(55); key('keyup', 'ArrowRight');  // to (12,5)
-  key('keydown', 'ArrowUp'); pump(10); key('keyup', 'ArrowUp');        // onto plate R at (12,4)
+  ok('back down to row 5', hold('ArrowDown', () => cell()[1] >= 5));
+  ok('east to column 12', hold('ArrowRight', () => cell()[0] >= 12));
+  ok('up onto plate R', hold('ArrowUp', () => cell()[1] <= 4));
   pump(8);
   ok('>>> mirror east + you on the east plate solves the room <<<',
      NEU.save.flagged('solved:b5_two') === true);
@@ -361,17 +367,22 @@ console.log('\n4d. the ice ring locks on the slides');
   NEU.engine.enter('b4_ice', 'west');
   ok('b4 loaded with three slide-only plates', plates().length === 3);
 
-  key('keydown', 'ArrowUp'); pump(32); key('keyup', 'ArrowUp');        // (1,2), dry
-  key('keydown', 'ArrowRight'); pump(18); key('keyup', 'ArrowRight');  // step onto (3,2): ice commits you
-  pump(100);                                                            // slide east along the top row
+  /* Outcome-driven, same reason as 4c: hold until the cell is reached,
+     and let a slide run until the player stops moving. */
+  const pl = () => NEU.engine.api.player;
+  const cell = () => [Math.floor(pl().x / 16), Math.floor((pl().y - 1) / 16)];
+  const settle = (max = 600) => { let last = '', same = 0, n = 0; while (n++ < max) { pump(1); const c = pl().x + ',' + pl().y; if (c === last) { if (++same > 6) return; } else same = 0; last = c; } };
+  key('keydown', 'ArrowUp'); { let n = 0; while (cell()[1] > 2 && n++ < 300) pump(1); } key('keyup', 'ArrowUp'); settle();   // (1,2), dry
+  key('keydown', 'ArrowRight'); { let n = 0; while (cell()[0] < 3 && n++ < 300) pump(1); } key('keyup', 'ArrowRight');     // onto (3,2): ice commits you
+  settle();                                                             // slide east along the top row
   ok('slide one dies on (11,2) and arms it', plates().includes('11,2:armed'));
 
-  key('keydown', 'ArrowDown'); pump(8); key('keyup', 'ArrowDown');     // tap south: the commit fires, the slide runs out
-  pump(70);                                                            // and dies on (11,7)
+  key('keydown', 'ArrowDown'); { let n = 0; while (cell()[1] < 3 && n++ < 60) pump(1); } key('keyup', 'ArrowDown');  // tap south: the commit fires
+  settle();                                                             // and dies on (11,7)
   ok('slide two dies on (11,7) and arms it', plates().includes('11,7:armed'));
 
   pump(2);                                                             // a real release between slides
-  key('keydown', 'ArrowLeft'); pump(100); key('keyup', 'ArrowLeft');   // step west: slide along the bottom row
+  key('keydown', 'ArrowLeft'); { let n = 0; while (cell()[0] > 10 && n++ < 60) pump(1); } settle(); key('keyup', 'ArrowLeft');   // step west: slide along the bottom row
   ok('slide three dies on (3,7) and arms it', plates().includes('3,7:armed'));
   pump(8);
   ok('>>> all three armed solves the room <<<',
@@ -419,7 +430,8 @@ console.log('\n4e. the torch and the socket');
 console.log('\n5. gating');
 {
   const { NEU } = boot();
-  const src = fs.readFileSync(path.join(ROOT,'js','core/engine.js'), 'utf8');
+  /* v2: exit behaviour lives in engine-kinds.js */
+  const src = ['core/engine.js', 'core/engine-kinds.js'].map(f => fs.readFileSync(path.join(ROOT,'js',f), 'utf8')).join('\n');
   ok('exits support a lock', /if \(e\.locked &&/.test(src));
   ok('>>> a locked door speaks <<<', /it will not move yet/.test(src));
 
@@ -545,6 +557,15 @@ NEU.scal.close();
 console.log('\n6b. the sepulchre, the brothers, and the win');
 {
   const { w, NEU } = boot();
+  /* The drive below plays a real fight, and Calamitas' patterns roll
+     Math.random — so unseeded, ~1 run in 12 dealt a wall the drive could
+     not wait out and "six more call the second wall" went red for no
+     reason in the code (memory/pending.md, V6 follow-ups). Seeded, the
+     fight is the same fight every run. The seed is printed so a failure
+     is reproducible. */
+  const SEED = 20261023;
+  seedRandom(w, SEED);
+  console.log('       seed ' + SEED);
   let frames = [];
   w.requestAnimationFrame = cb => { frames.push(cb); return frames.length; };
   let t = w.performance.now();

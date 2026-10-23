@@ -50,7 +50,10 @@ core/quest.js   FIRST — everything reports progress into it
 core/save.js    mirrors quest; must precede anything that saves
 core/juice.js   feedback; every scene calls into it
 data/sheets.js  the sprite manifest
-core/engine.js  rooms
+core/engine-look.js   the rooms' look kit: zone palettes, the baked 3/4 layer,
+                      lightmap, weather, sprites and props (engine v2)
+core/engine-kinds.js  what each entity kind does / looks like / emits
+core/engine.js  rooms — the sim, the loop, the camera, the API
 page/*          the website
 game/*          acts I-III
 act4/*          the woods
@@ -179,3 +182,22 @@ Required jsdom setup (see `memory/workflow.md` for the traps):
 `runScripts: 'outside-only'`, hand-driven `IntersectionObserver`, a stubbed
 `AudioContext`, a **non-null** 2d context proxy, and a `getBoundingClientRect`
 that returns a real box.
+
+## Engine v2 (2026-10-23)
+
+`engine.js` was rebuilt in three files (review and plan:
+`.opencode/plans/engine-v2.md`). The public surface (`NEU.engine.*`) and the
+hook API rooms receive are unchanged; `tests/fixes22.mjs` pins them and passed
+on v1 before a line moved, `tests/fixes35.mjs` pins what v2 changed.
+
+| File | Owns |
+|---|---|
+| `core/engine-look.js` | `NEU.engineLook` — zone looks keyed by tileset name, value-remapped palettes, `bakeRoom` (3/4 walls, floor texture, contact shadows) baked once per room, animated tiles, stepped lightmap + additive glow, weather, player/prop sprites, the prompt cap, the iris |
+| `core/engine-kinds.js` | `NEU.engineKinds` — one record per entity kind (`interactive`, `promptable`, `fire`, `draw`, `light`, `width`, `floor`); unknown kinds fall back to `default` |
+| `core/engine.js` | rooms, collision (swept + corner forgiveness), fixed 60 Hz step, movement with acceleration, facing-aware targeting, eased pad-aware camera, viewport-fitted integer scale (`SCALE` is now a getter), transitions, `api.later`, `confirmExit`, `debug` |
+
+Room entities may carry an optional `look: 'merchant' | 'sans' | 'gate' |
+'bigdoor' | 'vending' | …` (any key of `NEU.engineLook.props`); without one, a
+plain npc's prop is inferred from its first line. The tileset atlases
+(`src`/`rects`) are kept as data and no longer drawn — every room is baked
+from its tileset's own `colours`.
