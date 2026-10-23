@@ -403,7 +403,7 @@
   /* ── interaction state ──────────────────────────────────────────────
    Track last interacted entity to prevent dialog reset on rapid E presses. */
   var lastInteractedEntity = null, lastInteractedTime = 0;
-  const INTERACT_COOLDOWN = 500; // ms
+  var INTERACT_COOLDOWN = 500; // ms
 
   function fire(e) {
     if (!e) return;
