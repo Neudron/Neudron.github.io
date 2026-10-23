@@ -378,8 +378,11 @@ console.log('\n5. walking, walls, triggers');
   key(w, 'ArrowUp', 'keyup');
   await wait(60);
   const y = E.api.player.y;
-  /* feet box is PLAYER_H tall: its top stops on row 0's bottom edge */
-  ok('>>> walls stop you <<<', y >= 16 + 8 && y <= 16 + 8 + 1, 'y=' + y);
+  /* feet box is PLAYER_H tall: its top stops at row 0's bottom edge —
+     never inside it, and no further away than one frame's travel (a
+     sub-step that would enter the wall is refused whole, and v1 caps a
+     frame at 33ms ≈ 3.2u, so a loaded machine stops a little short) */
+  ok('>>> walls stop you <<< (y=' + y.toFixed(2) + ')', y >= 16 + 8 && y < 16 + 8 + 3.5);
   ok('faces up', E.api.player.face === 'up');
 
   /* busy() freezes input */

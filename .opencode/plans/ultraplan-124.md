@@ -25,7 +25,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] A14 (P1,V) post-fix CWV re-measure into ledger
 
 ## B — Game feel / juice
-- [ ] B1 (P1,B) hit-stop/shake/particle tier audit vs preset table
+- [x] B1 (P1,B) hit-stop/shake/particle tier audit vs preset table — B1
 - [ ] B2 (P2,B) directional shake bias along impact vector
 - [ ] B3 (P2,B) camera kick on gunfire/landings
 - [ ] B4 (P1,B) ±5-10% pitch variance pooled sfx
@@ -79,27 +79,27 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] F4 (P1,B) later() scene-scoped timer helper + migrate W5/W6-class sites
 - [ ] F5 (P1,B) persist opt_charge at charge/dock
 - [ ] F6 (P2,B) shopStep from save flags
-- [ ] F7 (P0,B) ES5 regex gate in run-all
+- [x] F7 (P0,B) ES5 regex gate in run-all — B1
 - [ ] F8 (P2,B) dead-code prune inventory
-- [ ] F9 (P3,B) listener-count drift detector
-- [ ] F10 (P2,V) load-order doc vs index.html assert
+- [x] F9 (P3,B) listener-count drift detector — B1
+- [x] F10 (P2,V) load-order doc vs index.html assert — B1
 - [ ] F11 (P3,O) TILE/REACH cross-ref comment contract
-- [ ] F12 (P1,B) duplicate var-declaration detector
+- [x] F12 (P1,B) duplicate var-declaration detector — B1
 
 ## G — Testing infra
-- [ ] G1 (P2,V) suite timing regression tracker
-- [ ] G2 (P1,V) coverage matrix behavioral-vs-grep
+- [x] G1 (P2,V) suite timing regression tracker — B1
+- [x] G2 (P1,V) coverage matrix behavioral-vs-grep — B1
 - [ ] G3 (P2,V) CDP probe env-opt-in suite
 - [ ] G4 (P3,B) screenshot pixel-diff smoke
-- [ ] G5 (P2,B) fuzz: random keys no-NaN harness
+- [x] G5 (P2,B) fuzz: random keys no-NaN harness — B1
 - [x] G6 (P1,B) save-migration fixtures — B1
 - [x] G7 (P1,B) contrast assertions from CSS vars — B1
 - [x] G8 (P2,B) budgets css≤100KB img≤400KB — B1
-- [ ] G9 (P2,B) seeded RNG util
-- [ ] G10 (P3,V) runner 2-worker parallelization
+- [x] G9 (P2,B) seeded RNG util — B1
+- [x] G10 (P3,V) runner 2-worker parallelization — B1
 
 ## H — Tooling / DevX
-- [ ] H1 (P2,O) newfix.mjs scaffold
+- [x] H1 (P2,O) newfix.mjs scaffold — B1
 - [ ] H2 (P1,O) pre-commit hook gate
 - [x] H3 (P1,O) staging-list single source file — B1
 - [ ] H4 (P3,O) changelog generator
@@ -140,7 +140,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] L3 (P2,B) duck attack/release ramp — B1
 - [ ] L4 (P3,B) zone ambience one-shots
 - [ ] L5 (P3,V) equal-power crossfade audit
-- [ ] L6 (P2,V) loop-seam/dead-air check
+- [x] L6 (P2,V) loop-seam/dead-air check — B1
 
 ## M — Process / docs
 - [ ] M1 (P3,O) decisions template
