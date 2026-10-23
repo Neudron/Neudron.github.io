@@ -71,7 +71,7 @@ minute and there is no staging step. Hence the prompt.
 index.html              every <script> tag, in load order
 css/style.css           one stylesheet, ~1900 lines, with a TOC at the top
 js/
-  core/   quest save juice danmaku engine music perf settings touch dev
+  core/   quest save juice danmaku engine(-look,-kinds) music perf settings touch dev
   page/   main stars scene            the website itself
   game/   sword sans bullet dark deck  acts I-III
   act4/   act4 rooms-* boss-* quiz rhythm craft crack shop

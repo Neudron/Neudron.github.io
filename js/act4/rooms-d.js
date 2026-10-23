@@ -90,7 +90,7 @@
     spawns: { fire: { x: 2, y: 4, face: 'right' }, east: { x: 22, y: 4, face: 'left' } },
     entities: [
       { t: 'save', x: 4, y: 8 },
-      { t: 'npc', x: 9, y: 5, colour: '#E4C46A', run: function (c) { shop(c); } },
+      { t: 'npc', x: 9, y: 5, colour: '#E4C46A', look: 'merchant', run: function (c) { shop(c); } },
       { t: 'npc', x: 13, y: 6, colour: '#8A8598', sheet: 'axe',
         lines: ['an axe, on the counter, behind the till.',
                 'it is not on the board with the prices.'] },
@@ -286,7 +286,7 @@
     spawns: { south: { x: 2, y: 3, face: 'right' } },
     entities: [
       { t: 'save', x: 3, y: 5 },
-      { t: 'npc', x: 18, y: 3, colour: '#EDE7DE', run: function (c) { lastTalk(c); } },
+      { t: 'npc', x: 18, y: 3, colour: '#EDE7DE', look: 'sans', run: function (c) { lastTalk(c); } },
       { t: 'exit', x: 0, y: 3, to: 'e3_hall', spawn: 'north' }
     ],
     onEnter: function (c) {
