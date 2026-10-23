@@ -38,6 +38,9 @@
   if (!sans || !btn || !sword || !tbox || !ttxt) return;
 
   var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* every sound in this file stops for reduced motion, as it always has,
+     and for the Sound switch (settings.js), read at the moment it plays */
+  function hush() { return reduced || !!(NEU.settings && NEU.settings.muted); }
   var CARRY   = matchMedia('(pointer: coarse)').matches;   // tap-to-carry
 
   /* The contract follows the pointer that made THIS gesture, not a
@@ -141,7 +144,7 @@
   };
 
   function blip(who) {
-    if (reduced) return;
+    if (hush()) return;
     if (who && who !== 'sans') { synthVoice(VOICE[who] || VOICE.narr); return; }
     if (blipOk && blipPool.length) {
       try {
@@ -219,7 +222,7 @@
   } catch (e) { tSampleOk = false; }
 
   function totemSound() {
-    if (reduced) return;
+    if (hush()) return;
     if (tSampleOk && tSample) {
       try {
         tSample.currentTime = 0;
@@ -283,7 +286,7 @@
   }
 
   function whoosh() {
-    if (reduced) return;
+    if (hush()) return;
     try {
       var a = ctx(), t = a.currentTime, len = 0.26;
       var s = a.createBufferSource(); s.buffer = noiseBuf(len);
@@ -301,7 +304,7 @@
   }
 
   function snap() {
-    if (reduced) return;
+    if (hush()) return;
     try {
       var a = ctx(), t = a.currentTime;
       var s = a.createBufferSource(); s.buffer = noiseBuf(0.09);
@@ -324,7 +327,7 @@
   }
 
   function locked() {
-    if (reduced) return;
+    if (hush()) return;
     try {
       var a = ctx(), t = a.currentTime;
       for (var k = 0; k < 2; k++) {
@@ -344,7 +347,7 @@
      it fires on every arrow key, and anything with body to it becomes
      unbearable by the fourth tile. Sine, 25ms, no decay tail. */
   function tick() {
-    if (reduced) return;
+    if (hush()) return;
     try {
       var a = ctx(), t = a.currentTime;
       var o = a.createOscillator(), g = a.createGain();
@@ -357,7 +360,86 @@
     } catch (e) {}
   }
 
-  NEU.sfx = { whoosh: whoosh, snap: snap, locked: locked, tick: tick };
+  /* ── the gathering and the beat ─────────────────────────────────
+     rise is a sine climbing 180 -> 620 Hz over ms, quiet enough to sit
+     under the fight. It hands back its own stop, because a charge that
+     is cancelled must not keep climbing into the next room; calling
+     stop twice is harmless. stinger is a three-note rising figure, a
+     major third and then a fifth over the root, for a phase change;
+     kind 3 is a fourth higher than kind 2 so the second change sounds
+     like the first, only more so. heart is the soul at one hit from
+     death: two low 60 Hz thumps, 180 ms apart, the way a heartbeat
+     lands. Every one of them is quiet, and every one is a silent no-op
+     when there is no AudioContext. */
+  function rise(ms) {
+    var stopped = false, o = null, g = null, a = null, len = ms / 1000;
+    if (hush()) return function () {};
+    try {
+      a = ctx();
+      var t = a.currentTime;
+      o = a.createOscillator(); g = a.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(180, t);
+      o.frequency.exponentialRampToValueAtTime(620, t + len);
+      g.gain.setValueAtTime(0.04, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      o.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + len);
+    } catch (e) {}
+    return function stop() {
+      if (stopped || !o) return;
+      stopped = true;
+      try {
+        /* fade from wherever the tone is now, not from the old envelope */
+        var n = a.currentTime, v = Math.max(0.0001, g.gain.value);
+        g.gain.cancelScheduledValues(n);
+        g.gain.setValueAtTime(v, n);
+        g.gain.exponentialRampToValueAtTime(0.0001, n + 0.03);
+        o.stop(n + 0.035);
+      } catch (e) {}
+    };
+  }
+
+  function stinger(kind) {
+    if (hush()) return;
+    try {
+      var a = ctx(), t = a.currentTime;
+      var root = kind === 3 ? 523.25 : 392;      /* C5 for kind 3, G4 for kind 2 */
+      var steps = [1, 1.26, 1.5];                /* root, a major third up, a fifth up */
+      for (var k = 0; k < 3; k++) {
+        var st = t + k * 0.075;
+        var o = a.createOscillator(), g = a.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(root * steps[k], st);
+        g.gain.setValueAtTime(0.0001, st);
+        g.gain.exponentialRampToValueAtTime(0.09, st + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, st + 0.13);
+        o.connect(g); g.connect(a.destination);
+        o.start(st); o.stop(st + 0.14);
+      }
+    } catch (e) {}
+  }
+
+  function heart() {
+    if (hush()) return;
+    try {
+      var a = ctx(), t = a.currentTime;
+      for (var k = 0; k < 2; k++) {
+        var st = t + k * 0.18;
+        var o = a.createOscillator(), g = a.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(60, st);
+        g.gain.setValueAtTime(0.0001, st);
+        g.gain.exponentialRampToValueAtTime(0.16, st + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, st + 0.04);
+        o.connect(g); g.connect(a.destination);
+        o.start(st); o.stop(st + 0.045);
+      }
+    } catch (e) {}
+  }
+
+  NEU.sfx = { whoosh: whoosh, snap: snap, locked: locked, tick: tick,
+              rise: rise, stinger: stinger, heart: heart };
 
   /* ── the particles ──────────────────────────────────────────────
      Drawn as integer-aligned fillRects, never circles — this page is
@@ -1720,6 +1802,10 @@
       tvState();
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
       if (NEU.quest) NEU.quest.mark('docked');
+      /* The dock only opens at a full charge, so the save records that
+         here too. It is the same value the blaster's crossing wrote, set
+         again at the point where the console goes into the dock. */
+      if (NEU.save) NEU.save.flag('console_charge', 100);
       /* The television used to start a fight. It starts a home screen
          now — a fight has one punchline and you can only hear it
          once, a library is a joke you can browse. */

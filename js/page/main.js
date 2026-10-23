@@ -176,8 +176,12 @@
     /* A switch that clicks but does not engage: a dry contact tick,
        no body behind it, then a weaker second tick as it drops back.
        The absence of any low end is what makes it read as "broken". */
+    /* the Sound switch (settings.js); read when the sound plays, because
+       this file loads before settings.js does */
+    function hushed() { return !!(NEU.settings && NEU.settings.muted); }
+
     function dud() {
-      if (!wake()) return;
+      if (hushed() || !wake()) return;
       [[0, 0.5], [0.075, 0.22]].forEach(function (p) {
         var t = ctx.currentTime + p[0];
         var src = noise(0.05);
@@ -271,6 +275,7 @@
     } catch (e) { sample = null; }
 
     function boom() {
+      if (hushed()) return;
       if (sampleOk && sample) {
         try { sample.currentTime = 0; sample.play(); return; } catch (e) {}
       }

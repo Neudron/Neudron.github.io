@@ -1949,3 +1949,30 @@ html.text-lg .eng { zoom: 0.8; }
     display: block; font-size: 16px; margin-top: 16px;
   }
 }
+
+/* ── portrait fight hint ─────────────────────────────────────────────
+   Shown only while touch.js has set body.is-portrait-fight: a fight is
+   live and the phone is held upright. It is a pseudo-element, so there
+   is no markup for it. z-index 95 is one below the dialogue box (96),
+   and pointer-events are off so it never takes a tap meant for the
+   fight. It stays for a few seconds and fades. Under reduced motion it
+   stays the same length and is cut instead of faded.                */
+body.is-portrait-fight::before {
+  content: "turn your phone sideways for more room";
+  position: fixed; top: 12px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 95;
+  pointer-events: none;
+  padding: 6px 10px;
+  font-size: 16px; line-height: 1.3;
+  white-space: nowrap;
+  color: var(--bone); background: var(--void);
+  animation: portraitHint 4s ease-out forwards;
+}
+@keyframes portraitHint {
+  0%, 60% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.is-portrait-fight::before { animation: portraitHint 4s step-end forwards; }
+}

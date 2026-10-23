@@ -105,13 +105,23 @@
      Charge survives between runs — asking someone to take both hits in
      a single attempt would make a joke into a grind. */
   var ELEC_EVERY = 4.4;
-  var charge = 0, chargeFx = 0, emptyFx = 0;
+  /* Read back from the save, so a full console is still full after a
+     reload. A missing flag is undefined, and `| 0` makes that 0. */
+  var charge = (NEU.save && NEU.save.flag('console_charge')) | 0, chargeFx = 0, emptyFx = 0;
   /* sans.js owns the console; this room only asks whether it is in
      your hands right now. */
   function carrying() { return !!(NEU.hasConsole && NEU.hasConsole()); }
+  /* Only a full charge is written, and only as it arrives. The blaster
+     stops accruing at 100, so this runs once, never per frame. Partial
+     charge is not saved: it is re-earned on the next visit, as it was
+     before this was saved at all. */
+  function keepCharge() {
+    if (charge >= 100 && NEU.save) NEU.save.flag('console_charge', 100);
+  }
   NEU.charge = function () { return charge; };
   NEU.devCharge = function (n) {
     charge = Math.max(0, Math.min(100, n | 0));
+    keepCharge();
     if (NEU.quest) NEU.quest.bump('charge', charge / 50);
     if (NEU.tvState) NEU.tvState();
     return charge;
@@ -273,6 +283,9 @@
   }
 
   /* ── loop ─────────────────────────────────────────────────────────*/
+  /* frame time of the last heartbeat (sfx.heart). begin() puts it back to
+     -Infinity, so a new run's first beat is not held up by the last one. */
+  var beatAt = -Infinity;
   function step(now) {
     if (!running) return;
     requestAnimationFrame(step);
@@ -309,8 +322,9 @@
         if (dx * dx + dy * dy < rr * rr) {
           hp--; inv = dm.IFRAMES || 1.15; hpLine();
           /* MEDIUM: felt, but never enough to make the pattern
-             unreadable on the frame you most need to read it. */
-          if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
+             unreadable on the frame you most need to read it. The shake
+             leans the way the bullet was travelling (juice.js bias). */
+          if (NEU.juice) { NEU.juice.hit('medium', { dx: b.vx, dy: b.vy }); NEU.juice.burst(px, py, 10, COL.soul); }
           if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
           if (hp <= 0) { startDeath(); return; }
         }
@@ -342,6 +356,7 @@
             if (held && carrying()) {
               bl.took = true;
               charge = Math.min(100, charge + 50);
+              keepCharge();
               chargeFx = performance.now();
               if (NEU.juice) { NEU.juice.hit('large', { colour: '#4FC3F7' });
                                NEU.juice.burst(px, py, 26, '#4FC3F7', 190); }
@@ -375,6 +390,13 @@
     }
     blasters = kb;
 
+    /* One hit from death, the soul beats about once a second of frame
+       time. Not at three HP or two. A death frame returns from startDeath
+       above, so it never reaches this line. */
+    if (hp === 1 && t - beatAt >= 0.9) {
+      beatAt = t;
+      if (NEU.sfx && NEU.sfx.heart) NEU.sfx.heart();
+    }
     if (!endless && t >= SURVIVE) { finish(true); return; }
     draw();
   }
@@ -540,6 +562,7 @@
     dying = 0;                           /* a pending death animation is cancelled by restarting */
     layout();
     t = 0; hp = 3; inv = 0; won = false; cheat = '';
+    beatAt = -Infinity;
     bullets = []; resetEmitters();
     px = AX + AW / 2; py = AY + AH - 60;
     keys = {};

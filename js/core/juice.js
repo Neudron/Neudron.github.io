@@ -56,6 +56,19 @@
   var MAXX = 14, MAXY = 10, MAXROLL = 0.045;
   var lastT = 0, phase = 0;
 
+  /* ── impact direction ───────────────────────────────────────────
+     The unit vector of the last hit's impact, or {0,0} when that hit
+     had none. The next hit() without a direction clears it, so a stale
+     lean never outlives the impact that made it. */
+  var bias = { x: 0, y: 0 };
+
+  /* How much of each axis comes from the impact rather than the waves.
+     0.4 is a starting point, not a measured value: enough push to read
+     as a direction, with the waves keeping 0.6 so the shake still
+     wobbles. Tune it by feel if directed hits read too weak or too
+     sliding. */
+  var LEAN = 0.4;
+
   /* ── hit-stop ───────────────────────────────────────────────────
      `until` is a real timestamp. Modules ask `frozen()` at the top of
      their step and skip the simulation while it is true — the render
@@ -77,16 +90,45 @@
     huge:   { shake: 1.00, stop: 0.16,  flash: 0.10, parts: 44 }
   };
 
+  /* Stores an impact direction as a unit vector. A missing, zero or
+     non-finite direction stores {0,0}. "No direction" is the default, and
+     it is the path every existing caller takes, so it must stay inert. */
+  function setBias(dx, dy) {
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (!(len > 0) || !isFinite(len)) { bias = { x: 0, y: 0 }; return; }
+    bias = { x: dx / len, y: dy / len };
+  }
+
+  /* ── haptics ────────────────────────────────────────────────────
+     Only the two big tiers buzz. A phone that buzzes on every pickup
+     stops meaning anything, and a buzz on every tick would be constant.
+     The buzz rides the shake gate, so the setting that stops the screen
+     moving also stops the phone. Durations are short on purpose (18ms
+     and 30ms, felt as a tap, not a rumble). Browsers may refuse
+     vibrate() without a user gesture or by policy, so a refusal is
+     swallowed and the shake still lands. */
+  function buzz(tier) {
+    var ms = tier === 'huge' ? 30 : tier === 'large' ? 18 : 0;
+    if (!ms) return;
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(ms);
+    } catch (e) { /* refused: the shake still lands */ }
+  }
+
   function hit(tier, opts) {
     var t = TIER[tier] || TIER.small;
     opts = opts || {};
     var noShake = reduced || customNoShake;
     var noFlash = reduced || customNoFlash;
+    /* Recorded even when shake is gated off, so `bias` always describes
+       the last hit. A hit with no direction clears it. */
+    setBias(opts.dx, opts.dy);
     if (!noShake) {
       /* Hits ADD. Two impacts in a row must stack, not reset — a reset
          makes the second hit feel weaker than the first, which is
          exactly backwards. */
       trauma = Math.min(1, trauma + (opts.shake != null ? opts.shake : t.shake));
+      buzz(tier);
     }
     if (!noFlash && t.flash) {
       flashUntil = performance.now() + t.flash * 1000;
@@ -122,9 +164,17 @@
     step(performance.now());
     if (trauma <= 0 || reduced || customNoShake) return false;
     var s = amount();
+    /* A directed hit leans the x and y offsets toward its impact. The
+       mix is a weighted average, not an addition: the waves keep
+       (1 - LEAN) of each axis and the impact takes LEAN. Because the bias
+       is a unit vector, no axis can exceed its old ceiling. An undirected
+       hit has lean 0, which leaves the offsets exactly as they were. The
+       trauma² factor scales the impact with the waves, so the lean fades
+       as the shake does. */
+    var lean = (bias.x || bias.y) ? LEAN : 0;
     /* Three incommensurate frequencies. Sampled, never random. */
-    var ox = MAXX * s * Math.sin(phase * 1.00);
-    var oy = MAXY * s * Math.sin(phase * 1.37 + 1.1);
+    var ox = MAXX * s * ((1 - lean) * Math.sin(phase * 1.00) + lean * bias.x);
+    var oy = MAXY * s * ((1 - lean) * Math.sin(phase * 1.37 + 1.1) + lean * bias.y);
     var rot = MAXROLL * s * Math.sin(phase * 0.71 + 2.3);
     ctx.save();
     ctx.translate(w / 2, h / 2);
@@ -238,9 +288,11 @@
     get noHitstop() { return customNoHitstop; },
     get noParticles() { return customNoParticles; },
     get trauma() { return trauma; },
+    /* A copy, so a caller cannot write into the live direction. */
+    get bias() { return { x: bias.x, y: bias.y }; },
     get reduced() { return reduced; },
     tiers: TIER,
     /* tests + the dev console */
-    _reset: function () { trauma = 0; freezeUntil = 0; flashUntil = 0; }
+    _reset: function () { trauma = 0; bias = { x: 0, y: 0 }; freezeUntil = 0; flashUntil = 0; }
   };
 })();
