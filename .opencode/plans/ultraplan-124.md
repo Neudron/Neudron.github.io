@@ -26,17 +26,17 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 
 ## B — Game feel / juice
 - [x] B1 (P1,B) hit-stop/shake/particle tier audit vs preset table — B1
-- [ ] B2 (P2,B) directional shake bias along impact vector
+- [x] B2 (P2,B) directional shake bias along impact vector — W2b; bullet soul hit leans along the bullet
 - [x] B3 (P2,B) camera kick on gunfire/landings — engine v2
-- [ ] B4 (P1,B) ±5-10% pitch variance pooled sfx
+- [x] B4 (P1,B) ±5-10% pitch variance pooled sfx — W2c (Calamitas pool ±5%; blips already had it)
 - [ ] B5 (P3,B) layered one-shots boss hits (transient/body/tail)
 - [ ] B6 (P2,B) damage-number pops w/ drift (SC fight)
-- [ ] B7 (P2,B) rising charge-loop sound polt telegraph
-- [ ] B8 (P2,B) phase-change music stingers
+- [x] B7 (P2,B) rising charge-loop sound polt telegraph — W2c
+- [x] B8 (P2,B) phase-change music stingers — W2c (polt 2/3, Calamitas 2)
 - [x] B9 (P1,B) settings toggles: hit-stop + particles — 673f872
 - [x] B10 (P3,B) squash-stretch walk landings — engine v2
 - [ ] B11 (P3,B) standard UI hover/press tone pair
-- [ ] B12 (P2,B) low-HP heartbeat cue bullet room
+- [x] B12 (P2,B) low-HP heartbeat cue bullet room — W2c
 
 ## C — Accessibility / WCAG 2.2
 - [x] C1 (P0,Sc/V) axe scan baseline; fix criticals — orch: axe 0 violations
@@ -74,13 +74,13 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 
 ## F — Architecture / code quality
 - [x] F1 (P0,B) engine.js:406 const→var — this commit
-- [ ] F2 (P2,B) danmaku shard cache key +time-bucket
+- [x] F2 (P2,B) danmaku shard cache key +time-bucket — W4 (cache dropped inside the 420ms held heart)
 - [x] F3 (P2,B) music voice reap off-rAF — B1
 - [ ] F4 (P1,B) later() scene-scoped timer helper + migrate W5/W6-class sites — partial: engine api.later for rooms; sans.js sites not migrated
-- [ ] F5 (P1,B) persist opt_charge at charge/dock
-- [ ] F6 (P2,B) shopStep from save flags
+- [x] F5 (P1,B) persist opt_charge at charge/dock — W4, flag renamed console_charge (opt_ is the settings namespace)
+- [x] F6 (P2,B) shopStep from save flags — W4 (shop_seen)
 - [x] F7 (P0,B) ES5 regex gate in run-all — B1
-- [ ] F8 (P2,B) dead-code prune inventory
+- [x] F8 (P2,B) dead-code prune inventory — W4: both candidates are live (dark.js seedDebris, main.js renderWorks); nothing to prune
 - [x] F9 (P3,B) listener-count drift detector — B1
 - [x] F10 (P2,V) load-order doc vs index.html assert — B1
 - [x] F11 (P3,O) TILE/REACH cross-ref comment contract — engine v2
@@ -127,8 +127,8 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] J8 (P2,V) dialogue proofread vs story.md — W5 + orch
 
 ## K — Mobile deep-pass
-- [ ] K1 (P2,B) portrait-fight hint overlay
-- [ ] K2 (P3,B) navigator.vibrate hits behind noShake
+- [x] K1 (P2,B) portrait-fight hint overlay — W4
+- [x] K2 (P3,B) navigator.vibrate hits behind noShake — W2b
 - [ ] K3 (P1,V) installed-PWA standalone CDP check
 - [ ] K4 (P3,B) saveData lighter boot
 - [ ] K5 (P2,V) tpad thumb-overlap audit — partial: rooms frame around the pad; fight reserve unchanged

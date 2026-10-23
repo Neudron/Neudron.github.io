@@ -54,7 +54,7 @@
     /* Each knock is lower and longer than the last. Pitch dropping is
        what makes three identical clicks read as something getting
        closer rather than a button being pressed three times. */
-    try {
+    if (!(NEU.settings && NEU.settings.muted)) try {      /* the Sound switch */
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
       var a = actx;
       var o = a.createOscillator(), g = a.createGain(), t = a.currentTime;

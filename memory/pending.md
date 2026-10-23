@@ -394,9 +394,19 @@ phone the top-right `esc` button overlaps the "20 / 20 · N right" counter.
   digest"). Re-hash all five if the three version changes.
 
 **Proofread (J8), applied:** b7's fire door now opens in the *south* wall
-(the line said east; the east wall holds the exit to a3). Pending the W3/W4
-merge: the merchant's third-state lines use speaker 'dog' (dog portrait +
-voice for a man) → 'narr'; bullet win text "take the dog food." → "dog food?".
+(the line said east; the east wall holds the exit to a3). After the W3/W4
+merges: the merchant's third-state lines now use speaker 'narr' (they used
+'dog': the dog portrait and voice, for a man); the bullet win text is "take
+the dog food?".
+
+**Last batch (W2b, W2c, W4 + orch):** directional shake and phone buzz, fight
+stingers/telegraph tone/heartbeat, the console's full charge and the shop's
+first visit saved, the portrait-fight hint, the danmaku shard cache. The
+Sound switch now silences every effect, not only the music (sans.js sfx and
+blips, the Calamitas voice pool, rhythm notes, the crack, the light switch;
+fixes30 §11). `bullet.js` was the only CRLF file; 9d5c55c normalised it to
+LF, which is why that commit shows it whole. fixes25's js total budget was
+re-based (engine v2 + this batch). F8: nothing to prune, both candidates live.
 
 **Open — needs you:**
 - "find the **sixth** tile" (act4.js, tests) vs story.md "behind a

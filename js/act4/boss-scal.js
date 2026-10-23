@@ -176,9 +176,14 @@
   function sfxPlay(name) {
     var pool = SFX && SFX[name];
     if (!pool || !pool.length) return;
+    if (NEU.settings && NEU.settings.muted) return;       /* the Sound switch */
     var a = pool[sfxI++ % pool.length];
     try {
       a.currentTime = 0;
+      /* the same scatter sans.js gives its text blips: a voice played
+         at one fixed pitch every time reads as a recording, and the
+         four pooled copies would otherwise sound like one clip */
+      a.playbackRate = 1 + (Math.random() * 0.1 - 0.05);
       var p = a.play();
       if (p && p.catch) p.catch(function () {});
     } catch (e) {}
@@ -858,6 +863,7 @@
 
     if (!bros.length) {
       invuln = false; phase = 2; mode = 'fight';
+      if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(2);
       stepT = 1.0; /* the laugh is the interlude; let it land */
       say("* she laughs. that is the first noise she has made.");
       later(function () { if (running) say("* now she is trying."); }, 2200);

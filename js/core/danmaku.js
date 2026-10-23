@@ -130,6 +130,14 @@
   }
 
   function death(ctx, px, py, sinceMs, col) {
+    /* A death that was interrupted never reaches 1700ms, so the reset
+       below never runs, and its shards stay cached on the same (px, py).
+       The next death at those coordinates replayed that exact burst.
+       Shards are only built after the 420ms held heart, so any frame
+       still inside that window belongs to a new death: drop the old
+       cache before it can be used. */
+    if (sinceMs < 420) cachedShards = null;
+
     if (sinceMs > 1700) {
       cachedShards = null;
       return false;

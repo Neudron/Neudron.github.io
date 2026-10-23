@@ -79,8 +79,10 @@ for (const b of BUDGETS) {
 
 const jsFiles = walk(path.join(ROOT, 'js')).filter(f => f.endsWith('.js')).sort();
 const jsTotal = jsFiles.reduce((n, f) => n + gz(f), 0);
-const JS_TOTAL_BUDGET = 239253;   // today 217502 B x 1.10, rounded up
-ok(`all ${jsFiles.length} js/**/*.js gzip, summed: ${jsTotal} B <= ${JS_TOTAL_BUDGET} B (today 217502 B)`,
+/* re-based after engine v2 (two new engine files) and the fight-effects
+   batch; it was 239253 on a measured 217502 B before them */
+const JS_TOTAL_BUDGET = 265765;   // today 241604 B x 1.10, rounded up
+ok(`all ${jsFiles.length} js/**/*.js gzip, summed: ${jsTotal} B <= ${JS_TOTAL_BUDGET} B (today 241604 B)`,
    jsTotal <= JS_TOTAL_BUDGET);
 
 /* ═══ 3. H3: the deploy stages exactly the web-facing top level ════*/

@@ -1,9 +1,10 @@
 /* fixes30.mjs — the sound switch, and three music fixes beside it.
    Run: node tests/fixes30.mjs
 
-   M mutes the soundtrack from anywhere, and a switch in the top-right
-   cluster does the same for touch. Mute is a save flag, not a volume:
-   the slider keeps its number, so unmuting lands back where it was.
+   M mutes the page from anywhere, music and effects alike, and a
+   switch in the top-right cluster does the same for touch. Mute is a
+   save flag, not a volume: the slider keeps its number, so unmuting
+   lands back where it was.
 
    Alongside it: the duck ramps are timed (0.12 s down, 0.5 s up), a
    faded voice is reaped on the audio clock instead of a wall-clock
@@ -415,6 +416,56 @@ console.log('\n10. music.js stays under its gate');
   ok('music.js is under 24 KiB (' + kb.toFixed(2) + ' KiB)', kb < 24);
   ok('music.js has no arrow functions', !/=>/.test(M));
   ok('music.js has no let or const', !/\b(let|const)\s+[A-Za-z_$]/.test(M));
+}
+
+/* ═══ 11. the switch is labelled Sound, so it silences the effects ═*/
+console.log('\n11. the switch silences the effects too, not only the music');
+{
+  const { w, NEU } = boot();
+  /* Every context any module makes from here on: the effects build
+     their own, apart from the music's. */
+  const ctxs = [];
+  const Base = w.AudioContext;
+  w.AudioContext = w.webkitAudioContext = class extends Base { constructor() { super(); ctxs.push(this); } };
+  const notes = () => ctxs.reduce((n, c) => n + c.notes.length, 0);
+  const all = () => {
+    NEU.sfx.whoosh(); NEU.sfx.snap(); NEU.sfx.locked(); NEU.sfx.tick();
+    NEU.sfx.stinger(2); NEU.sfx.heart(); NEU.sfx.rise(300)();
+  };
+
+  all();
+  const loud = notes();
+  ok('with sound on, the effects play (' + loud + ' notes)', loud > 0);
+
+  NEU.settings.set('opt_mute', true);
+  const before = notes();
+  all();
+  ok('>>> muted, not one effect starts a note <<<', notes() === before);
+  ok('and rise still hands back a stop that is safe to call',
+     typeof NEU.sfx.rise(300) === 'function');
+
+  NEU.settings.set('opt_mute', false);
+  all();
+  ok('unmuted, they play again', notes() > before);
+
+  /* The rest live inside fights and the page's light switch, which
+     this boot does not drive; each one reads the switch where it plays. */
+  const S = read('js/game/sans.js');
+  ok('sans.js: every sound gate is hush(), and hush reads the switch',
+     (S.match(/if \(hush\(\)\) return/g) || []).length === 9 &&
+     /function hush\(\) \{ return reduced \|\| !!\(NEU\.settings && NEU\.settings\.muted\); \}/.test(S));
+  ok('the Calamitas voice pool reads it before it plays',
+     /if \(!pool \|\| !pool\.length\) return;\s*\n\s*if \(NEU\.settings && NEU\.settings\.muted\) return;/
+       .test(read('js/act4/boss-scal.js')));
+  ok('the rhythm game\'s notes read it',
+     /function blip\(lane, mine\) \{\s*\n\s*if \(NEU\.settings && NEU\.settings\.muted\) return;/
+       .test(read('js/act4/rhythm.js')));
+  ok('the crack\'s knock reads it',
+     /if \(!\(NEU\.settings && NEU\.settings\.muted\)\) try \{/.test(read('js/act4/crack.js')));
+  const P = read('js/page/main.js');
+  ok('the light switch\'s dud and boom read it',
+     /function dud\(\) \{\s*\n\s*if \(hushed\(\) \|\| !wake\(\)\) return;/.test(P) &&
+     /function boom\(\) \{\s*\n\s*if \(hushed\(\)\) return;/.test(P));
 }
 
 console.log('\n' + (fail ? 'FAILED ' : 'passed ') + pass + '/' + (pass + fail));

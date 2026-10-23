@@ -120,14 +120,13 @@
     ['an axe', 'not for sale', false, 'axe']
   ];
 
-  var shopStep = 0;
   function shop(c) {
     /* Third state. The axe was refused hours ago and the refusal was a
        person, not a price — so the way past it is also a person. */
     if (NEU.save && NEU.save.flagged('tripping') && !NEU.save.has('axe')) {
       c.say(["you again. you look terrible.",
              "the axe? still not for sale.",
-             "...but i'll go against you for it. you look like you'd lose."], 'dog');
+             "...but i'll go against you for it. you look like you'd lose."], 'narr');
       setTimeout(function () {
         c.leave();
         if (NEU.rhythm) NEU.rhythm.open();
@@ -142,8 +141,12 @@
        selectable rows, prices, and per-item quips. The text dump it
        replaced is gone. The engine pauses while it is up. */
     c.leave();
-    if (NEU.shop) NEU.shop.open(shopStep);
-    shopStep = 1;
+    /* The first-visit line is a save flag, not a closure variable. A
+       reload used to replay it, because the variable started at 0 every
+       time the page loaded. The board opens on step 0 only until the
+       flag is written. */
+    if (NEU.shop) NEU.shop.open(NEU.save && NEU.save.flagged('shop_seen') ? 1 : 0);
+    if (NEU.save) NEU.save.flag('shop_seen', 1);
   }
 
   /* ══ D2 / D3 — the rest of the city ══════════════════════════════*/
