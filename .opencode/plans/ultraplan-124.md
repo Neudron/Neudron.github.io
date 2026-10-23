@@ -14,10 +14,10 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] A3 (P1,B) fallback metric overrides vs Pixelify Sans
 - [ ] A4 (P0,O) identify LCP element; fetchpriority/preload it
 - [x] A5 (P0,O) width/height on all <img> — 3e20703
-- [ ] A6 (P1,O) loading=lazy below-fold imgs
+- [x] A6 (P1,O) loading=lazy below-fold imgs — B2 W3
 - [x] A7 (P2,O) decoding=async decorative imgs — 3e20703
 - [ ] A8 (P2,B) split critical CSS + deferred rest (no build step)
-- [ ] A9 (P1,O) prune unused preconnect origins
+- [x] A9 (P1,O) prune unused preconnect origins — B2 W3
 - [x] A10 (P2,B) boot long-task audit >50ms slicing — orch: attributed to WebGL; compileAsync; real-GPU measure open
 - [x] A11 (P2,B) passive listener audit — B1
 - [ ] A12 (P3,V) HTTP/3 verification measurement
@@ -43,12 +43,12 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] C2 (P0,B) focus-visible ≥3:1 everywhere — 4be0442
 - [x] C3 (P2,B) forced-colors pass — 4be0442
 - [x] C4 (P3,B) prefers-contrast support — 4be0442
-- [ ] C5 (P1,B) target-size ≥24px audit incl tpad
+- [ ] C5 (P1,B) target-size ≥24px audit incl tpad — open: .crack's clip-path also clips a ::before hit area; needs the paint moved to ::after
 - [ ] C6 (P2,B) drag-alternative codified test (sword throw)
 - [x] C7 (P1,B) one-interaction global mute anywhere — B1
-- [ ] C8 (P1,B) quiz relaxed-timer toggle
-- [ ] C9 (P1,B) dialogue aria-live mirror
-- [ ] C10 (P2,B) bullet HP/score live region
+- [x] C8 (P1,B) quiz relaxed-timer toggle — B2 W3
+- [x] C9 (P1,B) dialogue aria-live mirror — B2 W3
+- [x] C10 (P2,B) bullet HP/score live region — B2 W3
 - [ ] C11 (P2,V) overlay focus-trap audit incl tbox/tpad — partial: confirmExit is an alertdialog with focus + Tab trap; shop/panel not trapped
 - [ ] C12 (P3,V) lang attribute audit
 
@@ -113,14 +113,14 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] I2 (P2,O) referrer meta explicit — 3e20703
 - [ ] I3 (P1,O) rel=noopener external links
 - [ ] I4 (P3,B) report-only CSP eval
-- [ ] I5 (P2,O) footer privacy/trust line
+- [x] I5 (P2,O) footer privacy/trust line — B2 W3
 - [x] I6 (P2,O) AI-crawler allows in robots — 3e20703
 
 ## J — Content / design polish
 - [x] J1 (P3,O) ::selection theming — 4be0442
 - [x] J2 (P3,O) themed scrollbar — 4be0442
 - [ ] J3 (P2,B) favicon prefers-color-scheme variant
-- [ ] J4 (P3,B) print stylesheet easter egg
+- [x] J4 (P3,B) print stylesheet easter egg — B2 W3
 - [ ] J5 (P2,B) in-tone error overlay
 - [ ] J6 (P3,V) konami-code audit
 - [x] J7 (P1,O) public footer credits/attribution — 3e20703

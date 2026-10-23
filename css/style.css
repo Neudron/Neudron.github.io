@@ -1934,3 +1934,18 @@ html.text-lg .eng { zoom: 0.8; }
 @media (prefers-reduced-motion: reduce) {
   .tpad__nub, .tpad__b { transition: none; }
 }
+
+/* ── print ───────────────────────────────────────────────────────
+   Printed, the page should give you the words and not the room. The
+   star field, the glass and the game layers are fixed canvases and
+   overlays that come out of a printer as black slabs over the text,
+   so they are taken out of the page. The one line at the end is the
+   only thing the page says on paper. */
+@media print {
+  .stars, .glass, .ctl, .bh, .dk, .eng, .quiz, .fnf, .craft, .polt,
+  .shop, .deck, .tpad, .tbox { display: none !important; }
+  body::after {
+    content: '...printed. the stars did not come with it.';
+    display: block; font-size: 16px; margin-top: 16px;
+  }
+}

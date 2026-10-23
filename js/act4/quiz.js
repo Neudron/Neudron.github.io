@@ -110,7 +110,17 @@
     return out;
   }
 
-  var TIME = 12;
+  /* How long a question gives you. Twelve is the limit the header was
+     written for. The relaxed switch in settings.js doubles it for a
+     player who needs longer to read four options. It is read when a
+     question starts, and the question keeps the number it started
+     with (span below), so a switch thrown mid-question cannot leave
+     the bar and the clock disagreeing about that question. */
+  function limit() {
+    var s = NEU.settings;
+    return s && s.relaxedQuiz ? 24 : 12;
+  }
+  var span = 12;
   var i = 0, score = 0, t = 0, tick = null, askTimer = null, locked = false, open_ = false;
   /* The end screen is a state of its own, not "i ran past the last
      question": the shoot phase and Tenna's faux Round 3 both run with
@@ -300,11 +310,12 @@
          twelve-second timer runs while you look for it. */
       if (elOpts.firstChild && elOpts.firstChild.focus) elOpts.firstChild.focus();
     }
-    t = TIME;
+    span = limit();
+    t = span;
     clearInterval(tick);
     tick = setInterval(function () {
       t -= 0.1;
-      if (elBar) elBar.style.width = Math.max(0, (t / TIME) * 100) + '%';
+      if (elBar) elBar.style.width = Math.max(0, (t / span) * 100) + '%';
       /* Running out is a wrong answer, not an ejection. */
       if (t <= 0) { clearInterval(tick); answer(-1); }
     }, 100);
@@ -649,6 +660,7 @@
                get index() { return i; },
                get phase() { return phase; },
                get ended() { return ended; },
+               get limit() { return limit(); },
                get soul() { return { x: soul.x, y: soul.y }; },
                questions: Q, ranks: RANKS,
                rankFor: rankFor, opens: opens };

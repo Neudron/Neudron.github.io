@@ -4,13 +4,14 @@
    danmaku.js dims instead of blinking, and nothing let a player
    reach any of it. This is the panel.
 
-   FIVE SWITCHES, PERSISTED IN THE SAVE FILE:
+   THE SWITCHES, PERSISTED IN THE SAVE FILE:
 
      reduce screen shake — juice.js stops adding trauma
      reduce flashing    — juice.js stops the white overlay
      larger text        — zooms the whole page 1.25x
      reduce hit-stop    — juice.js skips the frozen frame on impacts
      reduce particles   — juice.js stops spawning impact debris
+     relaxed quiz timer — the show gives twenty-four seconds, not twelve
 
    Larger text is a zoom, not a font-size, and that is deliberate:
    the Undertale faces are drawn on a 16px grid, so resampling a
@@ -35,6 +36,7 @@
   var K_TEXT  = 'opt_largeText';
   var K_STOP  = 'opt_hitstop';      /* on = juice skips the held frame   */
   var K_PART  = 'opt_particles';    /* on = juice spawns no debris       */
+  var K_RELAX = 'opt_relaxedQuiz';  /* on = the quiz gives twice the time */
   var K_MUSIC = 'opt_music';        /* owned by music.js; read here    */
   var K_MUTE  = 'opt_mute';         /* on = silent; the level is kept  */
 
@@ -221,6 +223,13 @@
         'hits leave no debris behind', false, function (on) {
       set(K_PART, on);
     }));
+    /* The quiz's clock. quiz.js reads it as each question starts, so a
+       switch thrown mid-question changes the next question, not this
+       one — the bar and the clock never disagree about one question. */
+    box.appendChild(row('settRelaxed', 'relaxed quiz timer',
+        'twenty-four seconds a question, not twelve', false, function (on) {
+      set(K_RELAX, on);
+    }));
     /* Thumb controls appear on their own on a touch screen. This is
        the override for the two cases auto-detection gets wrong: a
        laptop with a touchscreen that does not want them, and a tablet
@@ -283,6 +292,7 @@
       ['settText',  state(K_TEXT)],
       ['settHitstop',   state(K_STOP)],
       ['settParticles', state(K_PART)],
+      ['settRelaxed', state(K_RELAX)],
       ['settTouch', NEU.touch ? NEU.touch.visible || NEU.touch.mode === 'on' : false]
     ];
     for (var i = 0; i < rows.length; i++) {
@@ -391,6 +401,7 @@
     get text() { return state(K_TEXT); },
     get hitstop() { return state(K_STOP); },
     get particles() { return state(K_PART); },
+    get relaxedQuiz() { return state(K_RELAX); },
     get muted() { return state(K_MUTE); },
     get music() { return num(K_MUSIC, 55); }
   };
