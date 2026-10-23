@@ -3,6 +3,46 @@
 Why things are the way they are — including what was tried and rejected, so it
 does not get re-tried.
 
+## How to add one (template + numbering)
+
+New entries get the next free number and this shape. Existing dated
+entries below keep their dates; numbering starts with the first new one,
+so `grep -c '^### DEC-'` counts everything decided since 2026-10-23.
+
+```
+### DEC-NNN <the decision, as a sentence>
+Date: YYYY-MM-DD · Owner: <who decided> · Status: active | superseded by DEC-MMM
+Context: what forced the choice — the bug, the constraint, the number.
+Decision: what we do now, concretely enough to check in code.
+Rejected: the options we did not take, and the one-line reason each lost.
+Consequence: what this makes harder, and what would make us revisit it.
+Pinned by: the suite/section that fails if this is undone.
+```
+
+### DEC-001 The room engine is three files: sim, kinds, look
+Date: 2026-10-23 · Owner: orchestrator · Status: active
+Context: v1's `fire()` and `drawEnt()` were parallel `if (e.t === …)`
+chains that had already drifted once (every block puzzle unsolvable),
+and the rooms were unreadable (value range of a few percent).
+Decision: `engine.js` = sim/loop/camera/API; `engine-kinds.js` = one
+record per kind (fire/draw/light); `engine-look.js` = palettes, baked
+3/4 layer, light, weather, sprites. Public + hook API unchanged.
+Rejected: a single bigger engine.js (the drift problem stays); new tile
+art (blocked on rips; value remapping fixes readability without it).
+Consequence: every suite's MODULES list names three engine files.
+Pinned by: fixes22 (contract), fixes35 (v2 behaviour), fixes26 (order).
+
+### DEC-002 Builders are Haiku workers in worktrees; only the orchestrator commits
+Date: 2026-10-23 · Owner: orchestrator · Status: active
+Context: ~100 ultraplan items, most small and file-disjoint.
+Decision: scouts audit read-only; builders get one bounded work order,
+TDD, no commits; the orchestrator applies each diff 3-way, runs the
+gate, reviews, commits. Worktrees start from an old base: every brief
+begins with `git checkout --detach <working branch>`.
+Rejected: letting builders commit (no single gate); serial builders
+(the file sets are disjoint, the gate is per merge).
+Pinned by: AGENTS.md protocol; `.opencode/plans/ultra-batches.md`.
+
 ## Decisions 2026-08-22
 
 **Every room-level overlay claims `NEU.activeMinigame` while open.**

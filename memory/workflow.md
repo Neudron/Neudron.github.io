@@ -68,6 +68,19 @@ npm install jsdom --prefix tests   # once per session — the sandbox is wiped b
    found the phrase quoted inside an explanatory comment and read the wrong
    block. Use `'\n' + sel + ' {'`.
 
+7. **jsdom 30 applies `<noscript>` styles.** Under `runScripts:
+   'outside-only'` the parser treats scripting as off, so index.html's
+   `<noscript><style>` hides every overlay — and jsdom 30 refuses
+   `focus()` inside `display:none`. Every boot strips `noscript` first:
+   `w.document.querySelectorAll('noscript').forEach(n => n.remove())`.
+   This silently broke focus checks in fixes10/17/20 on a clean install.
+8. **Wait for outcomes, not durations.** A check like "hold right for
+   700ms, expect 30 units" goes red on a loaded machine (the runner runs
+   two suites at once, and engine v1 capped a frame's dt). Hold until
+   the outcome or a generous timeout, then assert. fixes22 §5 and the
+   fixes8 routes are written this way; fixes8's Calamitas drive is also
+   seeded (`tests/lib/seed.mjs`) so the fight is the same every run.
+
 ### PowerShell traps
 
 - `-clike` treats `[hidden]` as a wildcard character class — false negatives.
@@ -94,3 +107,20 @@ ends in this project were only caught that way.
 
 When a test fails, check the harness before the site. Five of the failures so
 far have been test bugs reporting working code as broken.
+
+## Sitemap `lastmod` (E6)
+
+`sitemap.xml` has one URL. Bump its `<lastmod>` to the commit date **in the
+same commit** as any change to what `index.html` shows a visitor (copy,
+sections, the colophon). Game-only changes (js/act4, rooms, fights) do not
+bump it — crawlers never see them. It is a hand edit; there is no tool,
+because a tool that touches a hands-off file is a second thing to trust.
+
+## Memory retention (M8)
+
+`memory/pending.md` is the ledger, not an archive. When it passes ~200
+lines, move every closed dated section (shipped, verified, nothing open)
+into `memory/archive/pending-YYYY-MM.md`, oldest first, and leave a
+one-line pointer. Open items never move. `PLAN.md`, `decisions.md` and
+`story.md` are never trimmed: they are the reasons, and reasons do not
+expire. `.opencode/log/` is git-ignored and local by design.

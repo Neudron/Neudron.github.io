@@ -1,0 +1,11 @@
+#!/bin/sh
+# Pre-commit gate (ultraplan H2): the ES5 gate and every suite must pass
+# before a commit lands — AGENTS.md's "done" rule, enforced locally.
+# Enable once per clone:   git config core.hooksPath .githooks
+# Skip in an emergency:    git commit --no-verify   (and say why in the message)
+cd "$(git rev-parse --show-toplevel)" || exit 1
+if [ ! -d tests/node_modules ]; then
+  echo "pre-commit: tests/node_modules missing — run: npm install --prefix tests" >&2
+  exit 1
+fi
+timeout 900 node tests/run-all.mjs || { echo "pre-commit: suites red — commit refused" >&2; exit 1; }

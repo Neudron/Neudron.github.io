@@ -374,3 +374,43 @@ profile regex tripped on a comment in touch.js. All 18 suites green.
 **Open (cosmetic, not blocking):** the end-screen quit button still says
 "Progress will be lost" although the score is already saved. On a 390px
 phone the top-right `esc` button overlaps the "20 / 20 · N right" counter.
+
+## 2026-10-23 — ultraplan (Haiku waves) + engine v2
+
+**Shipped:** see `git log` 3ff2974..HEAD and `.opencode/plans/ultraplan-124.md`
+(ticked items carry their batch). Engine v2: `.opencode/plans/engine-v2.md`
+(P0–P5 done), DEC-001/DEC-002 in decisions.md.
+
+**Measured (Chromium 140 headless, lab — not field data):**
+- C1 axe-core 4.10.2 on the booted home page: **0 violations**, desktop
+  1280×800 and phone 390×844.
+- A14 lab: LCP 80–168ms (the boot mark), CLS 0.000 both viewports.
+- A10: every boot long task is WebGL (0 long tasks with WebGL disabled);
+  1.7–5.2s each on software GL. `scene.js` now compiles via
+  `renderer.compileAsync` before the first frame. Software GL cannot show
+  the gain — **needs a real-GPU/phone measurement (you).**
+- I1: SRI on the import map verified both ways (genuine bytes load; a
+  tampered RoomEnvironment.js is blocked with "Failed to find a valid
+  digest"). Re-hash all five if the three version changes.
+
+**Proofread (J8), applied:** b7's fire door now opens in the *south* wall
+(the line said east; the east wall holds the exit to a3). Pending the W3/W4
+merge: the merchant's third-state lines use speaker 'dog' (dog portrait +
+voice for a man) → 'narr'; bullet win text "take the dog food." → "dog food?".
+
+**Open — needs you:**
+- "find the **sixth** tile" (act4.js, tests) vs story.md "behind a
+  **seventh** tile" vs deck.js listing the woods third of seven. Which is
+  canon?
+- memory/story.md has drifted from the shipped game (it is canon, so not
+  edited): ranks are T…Z not D-…S+; Calamitas is a 24-step cycle with five
+  walls, ten hearts, brothers at 35%, a 20% Soul Seeker ring; b2 is riddle
+  stones, b4 ice, b5 a mirror; Zone E/F throws the key at the TV rather
+  than hitting it with the sword.
+- E7 (Search Console token), E8 (description copy), D3 (fullscreen
+  display), B5/B11/L1 (taste), K3/K6 (real devices), M5 (dependency-review
+  schedule), M10 (what goes in a public roadmap), H8 (what the deploy
+  drill rebuilds).
+
+**pending.md is 400+ lines** — past the M8 threshold; archive the closed
+dated sections next.

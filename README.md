@@ -1,5 +1,9 @@
 # neu
 
+<!-- badges:start -->
+**tests:** 28 suites · 1591+ checks · all green · ES5 gate clean
+<!-- badges:end -->
+
 A personal site at **[www.neu.ac](https://www.neu.ac)**. Black pixel art, one
 piece of rotating glass, a short list of work underneath.
 

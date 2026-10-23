@@ -45,23 +45,35 @@ Moving a file means updating **three** places, and a stale path is a silent
 
 ## Load order (matters)
 
+The real order, as `index.html` has it — `tests/fixes26.mjs` fails if the
+two drift. (Before 2026-10-23 this section said quest.js loads first; three
+page scripts precede it, and nothing breaks because none of them reports
+progress at load time.)
+
 ```
-core/quest.js   FIRST — everything reports progress into it
-core/save.js    mirrors quest; must precede anything that saves
-core/juice.js   feedback; every scene calls into it
-data/sheets.js  the sprite manifest
-core/engine-look.js   the rooms' look kit: zone palettes, the baked 3/4 layer,
-                      lightmap, weather, sprites and props (engine v2)
+data/data.js        the projects list — the page renders from it
+page/main.js        the scrolling website (boot card, sections, controls)
+page/stars.js       the starfield canvas
+core/quest.js       progress — everything that reports progress loads after
+core/save.js        mirrors quest; must precede anything that saves
+core/juice.js       feedback; every scene calls into it
+core/danmaku.js     shared bullet-hell helpers for the three fights
+data/sheets.js      the sprite manifest — before the engine draws a sheet
+core/engine-look.js   the rooms' look kit (engine v2)
 core/engine-kinds.js  what each entity kind does / looks like / emits
-core/engine.js  rooms — the sim, the loop, the camera, the API
-page/*          the website
-game/*          acts I-III
-act4/*          the woods
-core/music.js   after every scene — it polls them for which is running,
-                and before settings.js, which reads its volume
-core/settings.js the accessibility panel
-core/touch.js   after every scene — it polls them for which is running
-core/dev.js     LAST — the dev console needs everything else present
+core/engine.js      rooms — the sim, the loop, the camera, the API
+game/*              acts I-III: sword sans bullet dark
+act4/*              the woods: act4, rooms-a, rooms-d, shop, boss-scal,
+                    scal-worm, scal-seekers, rooms-g, quiz, rhythm, craft,
+                    boss-polt, crack
+game/deck.js        the console's home screen (after every game it lists)
+core/music.js       after every scene — it polls them for which is running,
+                    and before settings.js, which reads its volume
+core/perf.js        the dev frame meter
+core/settings.js    the accessibility panel
+core/touch.js       after every scene — it polls them for which is running
+core/dev.js         LAST classic script — the dev console needs everything
+page/scene.js       type="module": deferred, runs after parsing
 ```
 
 Two modules poll instead of being called — `music.js` and `touch.js`. That is

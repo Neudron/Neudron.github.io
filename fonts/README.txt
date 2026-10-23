@@ -74,3 +74,7 @@ Undertale and its typography: Toby Fox.
 8-Bit Operator JVE: Jayvee Enaguas.
 Determination Mono / Sans: Haley Wakamatsu.
 Webfonts kit: Carter Sande - https://gitlab.com/cartr/undertale-fonts
+
+  3. Re-add the four font-display lines (see the comment at the top of
+     webfonts/stylesheet.css): Determination Mono/Sans = swap, Undertale
+     Papyrus/Sans = optional. The kit ships without them.

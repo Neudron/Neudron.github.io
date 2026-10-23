@@ -10,7 +10,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 
 ## A — Performance / Core Web Vitals
 - [x] A1 (P0,B) preload Determination Mono woff2 crossorigin — 3e20703
-- [ ] A2 (P1,B) font-display audit; optional for body faces
+- [x] A2 (P1,B) font-display audit; optional for body faces — orch
 - [ ] A3 (P1,B) fallback metric overrides vs Pixelify Sans
 - [ ] A4 (P0,O) identify LCP element; fetchpriority/preload it
 - [x] A5 (P0,O) width/height on all <img> — 3e20703
@@ -18,11 +18,11 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] A7 (P2,O) decoding=async decorative imgs — 3e20703
 - [ ] A8 (P2,B) split critical CSS + deferred rest (no build step)
 - [ ] A9 (P1,O) prune unused preconnect origins
-- [ ] A10 (P2,B) boot long-task audit >50ms slicing
+- [x] A10 (P2,B) boot long-task audit >50ms slicing — orch: attributed to WebGL; compileAsync; real-GPU measure open
 - [x] A11 (P2,B) passive listener audit — B1
 - [ ] A12 (P3,V) HTTP/3 verification measurement
 - [x] A13 (P1,B) gzipped budgets top-5 JS in fixes17 — B1
-- [ ] A14 (P1,V) post-fix CWV re-measure into ledger
+- [x] A14 (P1,V) post-fix CWV re-measure into ledger — orch: lab only (LCP ≤168ms, CLS 0); field needs deploy
 
 ## B — Game feel / juice
 - [x] B1 (P1,B) hit-stop/shake/particle tier audit vs preset table — B1
@@ -39,7 +39,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] B12 (P2,B) low-HP heartbeat cue bullet room
 
 ## C — Accessibility / WCAG 2.2
-- [ ] C1 (P0,Sc/V) axe scan baseline; fix criticals
+- [x] C1 (P0,Sc/V) axe scan baseline; fix criticals — orch: axe 0 violations
 - [x] C2 (P0,B) focus-visible ≥3:1 everywhere — 4be0442
 - [x] C3 (P2,B) forced-colors pass — 4be0442
 - [x] C4 (P3,B) prefers-contrast support — 4be0442
@@ -53,14 +53,14 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] C12 (P3,V) lang attribute audit
 
 ## D — PWA / install
-- [ ] D1 (P1,B) 512 maskable icon
+- [x] D1 (P1,B) 512 maskable icon — orch
 - [ ] D2 (P3,B) manifest shortcuts
 - [ ] D3 (P2,B) display_override fullscreen eval
 - [ ] D4 (P2,B) theme-color media variants
 - [x] D5 (P1,O) themed /404.html — 3e20703
 - [ ] D6 (P2,B) beforeinstallprompt button
 - [ ] D7 (P3,B) apple-touch 152/167 variants
-- [ ] D8 (P2,B) manifest id+scope verify
+- [x] D8 (P2,B) manifest id+scope verify — orch
 
 ## E — SEO / discovery
 - [x] E1 (P2,O) llms.txt — 3e20703
@@ -68,7 +68,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] E3 (P2,O) twitter:image:alt — 3e20703
 - [x] E4 (P3,O) og:locale — 3e20703
 - [x] E5 (P2,O) robots max-image-preview:large — 3e20703
-- [ ] E6 (P2,O) sitemap lastmod protocol doc
+- [x] E6 (P2,O) sitemap lastmod protocol doc — orch
 - [ ] E7 (P3,U) GSC verification meta (user account)
 - [ ] E8 (P3,V) description/title length tune
 
@@ -100,16 +100,16 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 
 ## H — Tooling / DevX
 - [x] H1 (P2,O) newfix.mjs scaffold — B1
-- [ ] H2 (P1,O) pre-commit hook gate
+- [x] H2 (P1,O) pre-commit hook gate — orch
 - [x] H3 (P1,O) staging-list single source file — B1
-- [ ] H4 (P3,O) changelog generator
-- [ ] H5 (P2,O) neu-docs sixth agent
+- [x] H4 (P3,O) changelog generator — orch
+- [x] H5 (P2,O) neu-docs sixth agent — orch
 - [ ] H6 (P3,O) log digest formatter
-- [ ] H7 (P3,O) README badge script
+- [x] H7 (P3,O) README badge script — orch
 - [ ] H8 (P3,O) _deploy rebuild drill doc
 
 ## I — Security / trust
-- [ ] I1 (P1,B) SRI on jsDelivr three.js importmap
+- [x] I1 (P1,B) SRI on jsDelivr three.js importmap — orch, verified both ways
 - [x] I2 (P2,O) referrer meta explicit — 3e20703
 - [ ] I3 (P1,O) rel=noopener external links
 - [ ] I4 (P3,B) report-only CSP eval
@@ -124,7 +124,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] J5 (P2,B) in-tone error overlay
 - [ ] J6 (P3,V) konami-code audit
 - [x] J7 (P1,O) public footer credits/attribution — 3e20703
-- [ ] J8 (P2,V) dialogue proofread vs story.md
+- [x] J8 (P2,V) dialogue proofread vs story.md — W5 + orch
 
 ## K — Mobile deep-pass
 - [ ] K1 (P2,B) portrait-fight hint overlay
@@ -143,13 +143,13 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] L6 (P2,V) loop-seam/dead-air check — B1
 
 ## M — Process / docs
-- [ ] M1 (P3,O) decisions template
-- [ ] M2 (P3,O) ADR numbering
-- [ ] M3 (P2,O) AGENTS.md worked example
-- [ ] M4 (P2,O) sprite provenance autogen
+- [x] M1 (P3,O) decisions template — orch
+- [x] M2 (P3,O) ADR numbering — orch
+- [x] M3 (P2,O) AGENTS.md worked example — orch
+- [x] M4 (P2,O) sprite provenance autogen — orch
 - [ ] M5 (P2,O) quarterly dep-review task
 - [ ] M6 (P3,O) _deploy rebuild drill
-- [ ] M7 (P1,O) incident playbook
-- [ ] M8 (P2,O) memory retention policy
+- [x] M7 (P1,O) incident playbook — orch
+- [x] M8 (P2,O) memory retention policy — orch
 - [ ] M9 (P3,O) README badge script
 - [ ] M10 (P2,O) public ROADMAP split

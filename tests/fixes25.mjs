@@ -90,7 +90,7 @@ const WEB_EXPLICIT = ['index.html', '404.html', 'css', 'js', 'fonts', 'img', 'au
   'apple-touch-icon.png', '.well-known'];
 const WEB_PATTERN = /\.(html|txt|png|json|svg|ico)$/;
 const DEV_EXPLICIT = ['README.md', 'AGENTS.md', 'memory', 'tests', '_scripts', '.opencode', '.kilo',
-  'opencode.json', '.git', '.github', '.gitignore', '.claude'];
+  'opencode.json', '.git', '.github', '.gitignore', '.claude', '.githooks'];
 const DEV_PATTERN = /\.md$/;
 
 /* Every `cp -r <names> _stage/` line; the names are the allow-list. */
