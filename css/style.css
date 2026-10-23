@@ -248,6 +248,9 @@ html { scrollbar-color: #3A3548 #14141C; scrollbar-width: thin; }
   transition: color .25s;
 }
 .sw:hover .sw__label { color: var(--text); }
+/* The plate is 34px wide and the label is short, so the target would
+   be narrower than a thumb without this. */
+.sw--mute { min-width: 44px; min-height: 44px; }
 
 /* the contact fails: the lever twitches and drops back */
 .sw.is-broken .sw__lever { animation: swFail .34s steps(3, end); }
