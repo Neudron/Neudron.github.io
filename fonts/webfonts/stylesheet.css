@@ -1,5 +1,11 @@
+/* font-display (ultraplan A2): the two Determination faces carry real
+   text, so they swap in as soon as they arrive; the Papyrus and
+   Undertale Sans faces only dress game overlays, so they are
+   `optional` and never block or reflow the page. Re-add these lines
+   if the font kit is ever re-downloaded over this file. */
 @font-face {
     font-family: 'Undertale Papyrus';
+    font-display: optional;
     src: url('papyrus-webfont.eot');
     src: url('papyrus-webfont.eot?#iefix') format('embedded-opentype'),
          url('papyrus-webfont.woff2') format('woff2'),
@@ -16,6 +22,7 @@
 
 @font-face {
     font-family: 'Undertale Sans';
+    font-display: optional;
     src: url('sans-webfont.eot');
     src: url('sans-webfont.eot?#iefix') format('embedded-opentype'),
          url('sans-webfont.woff2') format('woff2'),
@@ -32,6 +39,7 @@
 
 @font-face {
     font-family: 'Determination Mono';
+    font-display: swap;
     src: url('determinationmonoweb-webfont.eot');
     src: url('determinationmonoweb-webfont.eot?#iefix') format('embedded-opentype'),
          url('determinationmonoweb-webfont.woff2') format('woff2'),
@@ -48,6 +56,7 @@
 
 @font-face {
     font-family: 'Determination Sans';
+    font-display: swap;
     src: url('determinationsansweb-webfont.eot');
     src: url('determinationsansweb-webfont.eot?#iefix') format('embedded-opentype'),
          url('determinationsansweb-webfont.woff2') format('woff2'),

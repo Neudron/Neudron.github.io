@@ -432,10 +432,21 @@
 
 </main>
 
+<!-- integrity: sha384 of the exact bytes at each pinned URL (ultraplan I1).
+     three.module.js imports ./three.core.js, so the core is listed too.
+     Bumping the three version means re-hashing all five:
+     curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A -->
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+},
+  "integrity": {
+  "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js": "sha384-Ecdwhw2t8c3nTR0hkEDZbwj+5rkKqzJ376RCQN2x1uofujOCuW/EvGg3BQzE7TS6",
+  "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.core.js": "sha384-tfsIoyn3ACQbjob5Sw0zEGbcRscYZPCUEypq6YYs/TKQlq7Yg9jILDm/oZnfpq3D",
+  "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/loaders/SVGLoader.js": "sha384-kjEHr+WzxvIznprG0mIWROae4RI64aqDDQR3h4hOi0GARly6NsJqGmSSQqYMKNqg",
+  "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/geometries/RoundedBoxGeometry.js": "sha384-m+SW6ck0YrNVYfWDtmmM+7evPsCWUtbGER9vBnHirmScdpGOAm/3Hq88TEufx01e",
+  "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/environments/RoomEnvironment.js": "sha384-/H49oz0ZtMgJNgMZ+OhhuMuKBOsaiC3kY0/PZSvgJJXAOJJwmSBJjzlV5lJul3MB"
 }}
 </script>
 <script src="js/data/data.js"></script>
