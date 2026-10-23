@@ -19,9 +19,9 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] A8 (P2,B) split critical CSS + deferred rest (no build step)
 - [ ] A9 (P1,O) prune unused preconnect origins
 - [ ] A10 (P2,B) boot long-task audit >50ms slicing
-- [ ] A11 (P2,B) passive listener audit
+- [x] A11 (P2,B) passive listener audit — B1
 - [ ] A12 (P3,V) HTTP/3 verification measurement
-- [ ] A13 (P1,B) gzipped budgets top-5 JS in fixes17
+- [x] A13 (P1,B) gzipped budgets top-5 JS in fixes17 — B1
 - [ ] A14 (P1,V) post-fix CWV re-measure into ledger
 
 ## B — Game feel / juice
@@ -45,7 +45,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] C4 (P3,B) prefers-contrast support — 4be0442
 - [ ] C5 (P1,B) target-size ≥24px audit incl tpad
 - [ ] C6 (P2,B) drag-alternative codified test (sword throw)
-- [ ] C7 (P1,B) one-interaction global mute anywhere
+- [x] C7 (P1,B) one-interaction global mute anywhere — B1
 - [ ] C8 (P1,B) quiz relaxed-timer toggle
 - [ ] C9 (P1,B) dialogue aria-live mirror
 - [ ] C10 (P2,B) bullet HP/score live region
@@ -75,7 +75,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 ## F — Architecture / code quality
 - [x] F1 (P0,B) engine.js:406 const→var — this commit
 - [ ] F2 (P2,B) danmaku shard cache key +time-bucket
-- [ ] F3 (P2,B) music voice reap off-rAF
+- [x] F3 (P2,B) music voice reap off-rAF — B1
 - [ ] F4 (P1,B) later() scene-scoped timer helper + migrate W5/W6-class sites
 - [ ] F5 (P1,B) persist opt_charge at charge/dock
 - [ ] F6 (P2,B) shopStep from save flags
@@ -92,16 +92,16 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] G3 (P2,V) CDP probe env-opt-in suite
 - [ ] G4 (P3,B) screenshot pixel-diff smoke
 - [ ] G5 (P2,B) fuzz: random keys no-NaN harness
-- [ ] G6 (P1,B) save-migration fixtures
-- [ ] G7 (P1,B) contrast assertions from CSS vars
-- [ ] G8 (P2,B) budgets css≤100KB img≤400KB
+- [x] G6 (P1,B) save-migration fixtures — B1
+- [x] G7 (P1,B) contrast assertions from CSS vars — B1
+- [x] G8 (P2,B) budgets css≤100KB img≤400KB — B1
 - [ ] G9 (P2,B) seeded RNG util
 - [ ] G10 (P3,V) runner 2-worker parallelization
 
 ## H — Tooling / DevX
 - [ ] H1 (P2,O) newfix.mjs scaffold
 - [ ] H2 (P1,O) pre-commit hook gate
-- [ ] H3 (P1,O) staging-list single source file
+- [x] H3 (P1,O) staging-list single source file — B1
 - [ ] H4 (P3,O) changelog generator
 - [ ] H5 (P2,O) neu-docs sixth agent
 - [ ] H6 (P3,O) log digest formatter
@@ -136,8 +136,8 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 
 ## L — Audio / music
 - [ ] L1 (P1,B) sfx loudness normalization
-- [ ] L2 (P1,B) M-key global mute persisted
-- [ ] L3 (P2,B) duck attack/release ramp
+- [x] L2 (P1,B) M-key global mute persisted — B1
+- [x] L3 (P2,B) duck attack/release ramp — B1
 - [ ] L4 (P3,B) zone ambience one-shots
 - [ ] L5 (P3,V) equal-power crossfade audit
 - [ ] L6 (P2,V) loop-seam/dead-air check

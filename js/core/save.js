@@ -74,17 +74,18 @@
         'B+': 'B', 'B': 'B\u2013', 'C': 'C', 'D': 'C\u2013', 'D-': 'Z'
       };
       if (s.flags) {
-        var old = {};
-        for (var k in s.flags) {
-          if (k.slice(0, 5) === 'rank:') {
-            var name = k.slice(5);
-            old[k] = MAP[name] ? 'rank:' + MAP[name] : k;
-          }
+        /* Translate from a snapshot, then swap the whole set. Renaming in
+           place collided: A+ became A, and then A's own rename to A–
+           deleted the A it had just been given — every A+ and B+ holder
+           lost a door. fixes23 has the fixture that caught it. */
+        var moved = {}, k;
+        for (k in s.flags) {
+          if (k.slice(0, 5) !== 'rank:') continue;
+          var name = k.slice(5), to = MAP[name] ? 'rank:' + MAP[name] : k;
+          moved[to] = moved[to] || s.flags[k];
         }
-        for (var ok in old) {
-          s.flags[old[ok]] = s.flags[ok];
-          if (old[ok] !== ok) delete s.flags[ok];
-        }
+        for (k in s.flags) if (k.slice(0, 5) === 'rank:') delete s.flags[k];
+        for (k in moved) s.flags[k] = moved[k];
       }
       if (s.quiz && s.quiz.rank && MAP[s.quiz.rank]) s.quiz.rank = MAP[s.quiz.rank];
       if (s.flags && s.flags.quiz_rank && MAP[s.flags.quiz_rank])

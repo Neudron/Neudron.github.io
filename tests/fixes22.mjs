@@ -356,8 +356,11 @@ console.log('\n5. walking, walls, triggers');
   const E = NEU.engine;
   E.enter('k_all', 'walk'); await wait(30);
   const x0 = E.api.player.x;
+  /* Wait for the outcome, not a fixed time: under load the RAF stub
+     delivers fewer frames and v1 caps each frame's dt, so a fixed hold
+     simulates less walking on a slow machine. */
   key(w, 'ArrowRight');
-  await wait(700);
+  await until(() => E.api.player.x - x0 > 30 && log.trig >= 1, 4000);
   key(w, 'ArrowRight', 'keyup');
   await wait(60);
   const x1 = E.api.player.x;
@@ -370,7 +373,8 @@ console.log('\n5. walking, walls, triggers');
 
   /* walls: hold up for a long time, you stop at the wall */
   key(w, 'ArrowUp');
-  await wait(1200);
+  await until(() => E.api.player.y <= 16 + 8 + 1, 4000);
+  await wait(300);                     /* keep pushing: it must not go further */
   key(w, 'ArrowUp', 'keyup');
   await wait(60);
   const y = E.api.player.y;
@@ -396,7 +400,10 @@ console.log('\n5. walking, walls, triggers');
     spawns: { default: { x: 2, y: 2 } }
   });
   E3.enter('k_wall', 'default'); await wait(30);
-  key(w3, 'ArrowRight'); await wait(1500); key(w3, 'ArrowRight', 'keyup');
+  key(w3, 'ArrowRight');
+  await until(() => E3.api.player.x >= 4 * 16 - 6, 3000);   /* reached the wall… */
+  await wait(800);                                           /* …and kept pushing */
+  key(w3, 'ArrowRight', 'keyup');
   ok('>>> holding into a 1-tile wall never tunnels <<<', E3.api.player.x < 4 * 16);
   E3.leave();
 }

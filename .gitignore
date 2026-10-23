@@ -70,3 +70,9 @@ Thumbs.db
 .opencode/log/
 .opencode/plans/*.txt
 .worktrees/
+
+# Claude Code builder worktrees (local only)
+.claude/
+
+# run-all timing history (local only)
+tests/.timings.json

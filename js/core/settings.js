@@ -36,6 +36,7 @@
   var K_STOP  = 'opt_hitstop';      /* on = juice skips the held frame   */
   var K_PART  = 'opt_particles';    /* on = juice spawns no debris       */
   var K_MUSIC = 'opt_music';        /* owned by music.js; read here    */
+  var K_MUTE  = 'opt_mute';         /* on = silent; the level is kept  */
 
   var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -69,11 +70,34 @@
       NEU.juice.setNoParticles(state(K_PART));
     }
     document.documentElement.classList.toggle('text-lg', !!state(K_TEXT));
+    /* Music reads the flag itself. Sound effects (sans.js) read this
+       attribute, so they need no import from this file. */
+    document.documentElement.dataset.muted = state(K_MUTE) ? '1' : '';
+    /* Pressed means sound is ON: the label is "Sound", and a lever
+       that reads "pressed" while muted would say the opposite. */
+    var mt = document.getElementById('muteToggle');
+    if (mt) mt.setAttribute('aria-pressed', state(K_MUTE) ? 'false' : 'true');
   }
 
   function set(k, v) {
     if (NEU.save) NEU.save.flag(k, v ? 1 : 0);
     apply();
+  }
+
+  /* Mute is a flag, not a level. The slider keeps its number and the
+     bus is silenced on top of it, so unmuting lands back where it was.
+     Music is told directly so the bus moves now, not on its next poll. */
+  function mute(on) {
+    set(K_MUTE, on);
+    if (NEU.music) NEU.music.refresh();
+  }
+
+  /* A letter typed into a field is not a mute. */
+  function typing() {
+    var a = document.activeElement || {};
+    var ce = a.getAttribute ? a.getAttribute('contenteditable') : null;
+    return /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName || '') ||
+           a.isContentEditable === true || (ce !== null && ce !== 'false');
   }
 
   /* ── the panel ──────────────────────────────────────────────────*/
@@ -208,9 +232,11 @@
     /* The soundtrack is synthesised, so this is a real level and not a
        "load the files or not" decision — dragging it to zero costs
        nothing and can be undone mid-room. */
+    /* Reads the saved level, never NEU.music.volume, which is zero while
+       muted: the slider must show the number the player chose. */
     box.appendChild(slider('settMusic', 'music',
         'the act IV soundtrack. drag to zero for silence.',
-        function () { return NEU.music ? NEU.music.volume : num(K_MUSIC, 55); },
+        function () { return num(K_MUSIC, 55); },
         function (v) {
           if (NEU.music) NEU.music.setVolume(v);
           else if (NEU.save) NEU.save.flag(K_MUSIC, v);
@@ -264,7 +290,7 @@
       if (el) el.setAttribute('aria-checked', String(!!rows[i][1]));
     }
     var m = document.getElementById('settMusic');
-    if (m) m.value = String(NEU.music ? NEU.music.volume : num(K_MUSIC, 55));
+    if (m) m.value = String(num(K_MUSIC, 55));
   }
 
   /* The panel's focusables — everything EXCEPT the disabled switches.
@@ -322,6 +348,10 @@
       open_ ? close() : open();
       return;
     }
+    /* M mutes from anywhere. A modifier is someone else's shortcut, and
+       a held key auto-repeats, which must not flicker the mute. */
+    if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey &&
+        !e.altKey && !e.repeat && !typing()) mute(!state(K_MUTE));
     if (!open_ || !panel) return;
     if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); return; }
     if (e.key === 'Tab') {
@@ -347,6 +377,9 @@
   if (NEU.settings) return;                    // already built (re-run)
   build();
   apply();
+  /* The switch is in index.html's .ctl cluster, beside the light. */
+  var mt = document.getElementById('muteToggle');
+  if (mt) mt.addEventListener('click', function () { mute(!state(K_MUTE)); });
 
   NEU.settings = {
     open: open, close: close,
@@ -358,6 +391,7 @@
     get text() { return state(K_TEXT); },
     get hitstop() { return state(K_STOP); },
     get particles() { return state(K_PART); },
-    get music() { return NEU.music ? NEU.music.volume : num(K_MUSIC, 55); }
+    get muted() { return state(K_MUTE); },
+    get music() { return num(K_MUSIC, 55); }
   };
 })();
