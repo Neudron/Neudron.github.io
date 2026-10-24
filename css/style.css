@@ -1272,6 +1272,7 @@ body.is-blackout::before {
   background: #0E0820; border: 3px solid #4A2C74;
   image-rendering: pixelated;
 }
+.quiz__canvas.is-hit { animation: quizWrong .25s linear; }
 @keyframes quizIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes quizRight { 0% { transform: scale(1); } 40% { transform: scale(1.04); } 100% { transform: scale(1); } }
 @keyframes quizWrong {
@@ -1286,6 +1287,8 @@ body.is-blackout::before {
 .quiz.is-finale .quiz__opts, .quiz.is-finale .quiz__timer { display: none; }
 /* the answer keys mean nothing now; the go button says what does */
 .quiz.is-finale .bh__keys { visibility: hidden; }
+/* On a phone the line names keys there are none of, and the pad sits on it. */
+@media (pointer: coarse) { .quiz .bh__keys { display: none; } }
 .quiz__end {
   clear: both; display: grid; justify-items: center; gap: 8px;
   padding: 8px 0 24px; text-align: center;

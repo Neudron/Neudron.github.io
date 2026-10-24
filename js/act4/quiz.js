@@ -433,6 +433,9 @@
     /* Where to put the player back when they leave. Only captured once
        per visit, so a replay cannot overwrite it with a button inside. */
     if (!lastFocus) lastFocus = document.activeElement;
+    /* The show owns the screen. A line still on the room's box (the
+       break narration, a replay) sat on top of the first question. */
+    if (NEU.hush) NEU.hush();
     wrap.hidden = false;
     NEU.activeMinigame = 'quiz';        /* the room underneath must not move or take Escape */
     document.body.classList.add('is-playing');
@@ -783,6 +786,16 @@
     cx.font = '16px "Determination Mono", monospace';
     cx.fillStyle = col; cx.fillText(label, 10, 24);
   }
+  /* A hit has to read at a glance, not only in the counter: Tenna
+     reacts for a moment and goes back to the round's pose, and a hit
+     you take shakes the arena (not under reduced motion). */
+  var reactT = 0;
+  function react(p, f, back, shake) {
+    pose(p, f);
+    clearTimeout(reactT);
+    reactT = later(function () { pose(back[0], back[1]); }, 450);
+    if (shake && cv && !reduced) { cv.classList.remove('is-hit'); void cv.offsetWidth; cv.classList.add('is-hit'); }
+  }
   function soulAt(x, y) {
     x = Math.round(x); y = Math.round(y);
     cx.fillStyle = hurt > 0 && Math.floor(hurt * 20) % 2 ? '#FFFFFF' : '#FF2030';
@@ -823,10 +836,13 @@
         dodgeHits++; fires.splice(f, 1);
         hurt = 0.4;
         if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
+        react('shock', 'shock', ['point', 'grin'], true);
       }
     }
     if (hurt > 0) {
       hurt -= DT;
+      cx.fillStyle = 'rgba(255, 32, 48, ' + (Math.max(0, hurt) * 0.6).toFixed(2) + ')';
+      cx.fillRect(0, 0, 480, 240);
       cx.strokeStyle = '#FF2030'; cx.lineWidth = 4; cx.strokeRect(2, 2, 476, 236);
     }
     soulAt(soul.x, soul.y);
@@ -894,6 +910,7 @@
       pops[n].t -= DT;
       if (pops[n].t <= 0) { pops.splice(n, 1); continue; }
       var pr = 22 - pops[n].t * 50;
+      if (pops[n].t > 0.2) { cx.fillStyle = '#FFFFFF'; cx.fillRect(pops[n].x - 10, pops[n].y - 10, 20, 20); }
       cx.strokeStyle = '#FFFFFF'; cx.lineWidth = 2;
       cx.strokeRect(pops[n].x - pr, pops[n].y - pr, pr * 2, pr * 2);
     }
@@ -915,6 +932,7 @@
         pops.push({ x: targets[n].x, y: targets[n].y, t: 0.3 });
         targets.splice(n, 1);
         if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+        react('cheer', 'stars', ['shock', 'grin'], false);
         return;
       }
     }

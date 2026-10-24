@@ -351,6 +351,33 @@ console.log('\n7. the switch-on, switch-off and stamp exist, and calm down for r
      /prefers-reduced-motion: reduce\) \{\s*\.quiz\.is-on \.quiz__tv \{ animation: none; \}\s*\.quiz\.is-off \.quiz__tv \{ animation: quizFade/.test(rm));
 }
 
+/* ═══ 8. nothing of the room sits on the show ════════════════════*/
+console.log('\n8. the room\'s box clears when the show opens, and the talk face is in hand');
+{
+  const { w, NEU, doc } = boot();
+  const tbox = doc.getElementById('tbox');
+  NEU.save.flag('tv_breakable', 1);
+  ok('the television breaks and says so', NEU.breakTV() === true && tbox.hidden === false);
+  ok('>>> the show climbs out of it <<<', await until(() => NEU.quiz.running, 3000));
+  /* On a phone the box sat over the first question and the timer
+     until the narration was clicked through. */
+  ok('>>> and the box that said so is gone from on top of it <<<', tbox.hidden === true);
+  NEU.quiz.close();
+  const S = fs.readFileSync(path.join(ROOT, 'js', 'game', 'sans.js'), 'utf8');
+  ok('the broken TV replays the show without a line the show would wipe',
+     !/press e to go again/.test(S));
+  const Q = fs.readFileSync(path.join(ROOT, 'js', 'act4', 'quiz.js'), 'utf8');
+  ok('a hit in the arena shakes it and Tenna flinches',
+     /react\('shock', 'shock', \['point', 'grin'\], true\)/.test(Q) && /classList\.add\('is-hit'\)/.test(Q) &&
+     /\.quiz__canvas\.is-hit \{ animation: quizWrong/.test(fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8')));
+  ok('  and the shake is skipped under reduced motion', /shake && cv && !reduced/.test(Q));
+  /* Undertale Sans is font-display: optional. Fetched on first use it
+     misses the 100ms window and the page keeps the fallback (serif, or
+     a script face on phones) for the whole visit — seen in Chromium. */
+  ok('>>> the talk face is preloaded, so `optional` finds it ready <<<',
+     /rel="preload" href="fonts\/webfonts\/sans-webfont\.woff2" as="font" type="font\/woff2" crossorigin/.test(HTML));
+}
+
 console.log('');
 console.log(fail ? `${fail} FAILED, ${pass} passed` : `ALL PASS (${pass})`);
 process.exit(fail ? 1 : 0);

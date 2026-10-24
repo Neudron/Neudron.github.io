@@ -1811,9 +1811,9 @@
     /* After the show has run at least once, the broken TV re-opens
        it. The 'only ever improves' save rule means a worse run
        can't close doors, so replay is safe. */
+    /* The show opens over the room and clears the box as it does, so
+       the replay goes straight in rather than saying a line nobody sees. */
     if (tvBroken && NEU.save && NEU.save.flagged('quiz_rank') && NEU.quiz) {
-      say(['the screen is cracked but the show is still on inside it.',
-            'you can hear him. press e to go again.'], 'narr');
       NEU.quiz.open(); return;
     }
     if (docked || docking) {

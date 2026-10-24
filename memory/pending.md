@@ -307,6 +307,22 @@ skips to the switch-off with the result landed. One numbered timeline
 Esc on the finale now goes on (it used to replay); the broken TV replays.
 fixes40 (81); fixes21 updated; quiz.js budget re-based.
 
+**Played (Haiku 5.5, low effort, in Obscura, no tests):** run 1 got 18/20 (S),
+run 2 got 19/20 (S). Both saw the finale and were taken to `g0_hall` with no
+input. Run 2 asked for clearer hits in the arena. **Follow-up:**
+- A hit you take now shakes the arena, washes it red, and Tenna flinches.
+  A target you hit flashes white, and Tenna cheers.
+- `quiz.open()` clears the room's text box. The break narration sat over
+  question 1 and the timer on a phone.
+- The broken-TV replay no longer says a line that the show would wipe.
+- `sans-webfont.woff2` is preloaded. It is `optional`, and fetched on first
+  use it missed the 100ms window. All dialogue then fell back for the
+  visit: serif in Chromium, a script face on iOS and Android.
+
+fixes40 has 91 checks. The cosmetic items in the 2026-10-22 soft-lock entry above are
+closed by v2: quit on the finale skips without a confirm, and on 390px
+`esc` sits in the marquee row, clear of the counter.
+
 ## 2026-10-23 — ultraplan (Haiku waves) + engine v2
 
 **Shipped:** see `git log` 3ff2974..HEAD and `.opencode/plans/ultraplan-124.md`
