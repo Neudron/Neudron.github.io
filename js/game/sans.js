@@ -43,6 +43,32 @@
   function hush() { return reduced || !!(NEU.settings && NEU.settings.muted); }
   var CARRY   = matchMedia('(pointer: coarse)').matches;   // tap-to-carry
 
+  /* ── scene timers (F4) ──────────────────────────────────────────
+     A timer set in one room of the bedroom loop is a promise about the
+     room as it was when it was set. Blackout, sleep and the hammer's
+     hand-off each end the room they belong to, and a bare setTimeout
+     from one of them would still fire into the next: the grey room
+     opening after the light was fixed, or the walk-up scrolling a page
+     whose sans is already asleep. later() keeps the id so cancelLater()
+     can clear every pending one at the point the room ends. Only timers
+     that act on scene state go through here. Cosmetic class removals
+     stay plain setTimeouts, and a timer that belongs to one control
+     keeps its own handle (panelT, deckT), so one teardown cannot cancel
+     a timer that belongs to something else. */
+  var laters = [];
+  function later(fn, ms) {
+    var id = setTimeout(function () {
+      var i = laters.indexOf(id); if (i >= 0) laters.splice(i, 1);
+      fn();
+    }, ms);
+    laters.push(id);
+    return id;
+  }
+  function cancelLater() {
+    for (var i = 0; i < laters.length; i++) clearTimeout(laters[i]);
+    laters = [];
+  }
+
   /* The contract follows the pointer that made THIS gesture, not a
      fact frozen at page load. A phone with a bluetooth mouse and an
      iPad with a trackpad both get press-and-hold on the mouse and
@@ -1238,9 +1264,15 @@
      scene.js raycasts the click and calls this; it does not know or
      care whether you are carrying anything. */
   var panel = document.getElementById('panel');
+  /* The hide that follows a close. Its own handle, not the scene list:
+     closing the panel must not cancel a bedroom timer. */
+  var panelT = 0;
 
   function openPanel() {
     if (!panel) return;
+    /* A close that is still fading would hide the panel we are opening
+       now. Cancel that hide first. */
+    clearTimeout(panelT);
     panel.hidden = false;
     requestAnimationFrame(function () { panel.classList.add('is-open'); });
     var c = document.getElementById('panelClose');
@@ -1249,7 +1281,10 @@
   function closePanel() {
     if (!panel) return;
     panel.classList.remove('is-open');
-    setTimeout(function () { panel.hidden = true; }, 420);
+    /* A second close inside the fade replaces the first hide, so only one
+       is ever pending. */
+    clearTimeout(panelT);
+    panelT = setTimeout(function () { panel.hidden = true; }, 420);
   }
 
   /* ── the door stays unlocked ────────────────────────────────────
@@ -1478,7 +1513,7 @@
       if (swBtn) swBtn.classList.add('is-stuck');
       /* He stops fidgeting once he has given the thing up. */
       if (dogEl) dogEl.classList.add('is-settled');
-      setTimeout(function () {
+      later(function () {
         /* Narration, then him. He does not narrate the dog. */
         say(["he spat out a hammer.",
              "huh. cosmolight's jammed too. that's new.",
@@ -1490,6 +1525,9 @@
   if (dogBtn) dogBtn.addEventListener('click', talkDog);
 
   function smashLight() {
+    /* The hammer is spent, so the narration it was handed with is about
+       a thing that is gone. Clear it before anything else. */
+    cancelLater();
     /* Every state the last repair consumed has to come back, or the
        second blackout is a dead end: the grey door remembers it
        already handed over a clicker, so it hands over nothing, and
@@ -1506,7 +1544,7 @@
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     if (NEU.quest) NEU.quest.mark('smash');
     showChip(darkChip, true);
-    setTimeout(function () { if (NEU.dark) NEU.dark.open(); }, 750);
+    later(function () { if (NEU.dark) NEU.dark.open(); }, 750);
   }
 
   NEU.grantClicker = function () {
@@ -1518,6 +1556,9 @@
   NEU.fitClicker = function () { fitClicker(); };
   NEU.hasClicker = function () { return hasClicker; };
   function fitClicker() {
+    /* The blackout is over, so the grey room opening that was queued for
+       it must not happen now. */
+    cancelLater();
     /* Reset the dog so the whole loop can be run again from the top. */
     dogTalks = 0;
     if (dogEl) dogEl.classList.remove('is-settled');
@@ -1540,7 +1581,7 @@
          "i'm gonna go lie down. don't wait up."]
       : ["huh. it fits. again.",
          "you really like that hammer."]);
-    if (first) setTimeout(goUp, 2600);
+    if (first) later(goUp, 2600);
   }
 
   /* main.js asks this before doing anything with the switch. Returning
@@ -1606,12 +1647,15 @@
     /* Belt and braces: if the page cannot scroll (short viewport, or a
        browser that ignores the request) nothing will ever leave the
        screen, and a queued sleep that never fires is a dead end. */
-    setTimeout(function () { if (wantSleep && !asleep && !onScreen) goToSleep(); }, 1200);
-    setTimeout(function () { if (wantSleep && !asleep) goToSleep(); }, 6000);
+    later(function () { if (wantSleep && !asleep && !onScreen) goToSleep(); }, 1200);
+    later(function () { if (wantSleep && !asleep) goToSleep(); }, 6000);
   }
 
   function goToSleep() {
     if (asleep) return;
+    /* He is down, so the walk-up that was meant to get him off the screen
+       has nothing left to do. A scroll now would move a settled page. */
+    cancelLater();
     asleep = true; wantSleep = false;
     if (dogEl)   { dogEl.classList.remove('is-in'); setTimeout(function () { dogEl.hidden = true; }, 520); }
     /* The dog is leaving the page with him, so the flag has to follow
@@ -1757,6 +1801,9 @@
     return true;
   };
 
+  /* The handoff timer that opens the deck after a dock. Kept so a
+     hand-open can cancel it (see the docked branch below). */
+  var deckT = 0;
   if (tvEl) tvEl.addEventListener('click', function () {
     /* Breaking is not a click any more: keyHit owns that moment — you
        put a thrown key through the screen — so a tap here only means
@@ -1771,7 +1818,12 @@
     }
     if (docked || docking) {
       /* Once it is in, the television is just a way back to the menu. */
-      if (docked && NEU.deck) { NEU.deck.open(); return; }
+      if (docked && NEU.deck) {
+        /* A hand-open supersedes the handoff still pending from the dock.
+           Left alone, that timer would reopen a deck the visitor closed. */
+        clearTimeout(deckT);
+        NEU.deck.open(); return;
+      }
       say(["it's already playing."], 'tv'); return;
     }
     if (!switchSeen) { say(["a television. nothing to put in it."], 'tv'); return; }
@@ -1809,7 +1861,7 @@
       /* The television used to start a fight. It starts a home screen
          now — a fight has one punchline and you can only hear it
          once, a library is a joke you can browse. */
-      setTimeout(function () { if (NEU.deck) NEU.deck.open(); }, 420);
+      deckT = setTimeout(function () { if (NEU.deck) NEU.deck.open(); }, 420);
     });
   });
 

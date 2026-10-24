@@ -1979,3 +1979,34 @@ body.is-portrait-fight::before {
 @media (prefers-reduced-motion: reduce) {
   body.is-portrait-fight::before { animation: portraitHint 4s step-end forwards; }
 }
+
+/* ── the one-line error ──────────────────────────────────────────────
+   main.js adds this line once when something throws. It never shows
+   the error itself. It is pinned to the bottom of the viewport on the
+   page's own bone-on-void, and it sits one step below the dialogue box
+   (96) so the box still wins if both are up. The 16px gutter holds at
+   phone width. The slide-in is cut under reduced motion.             */
+.errline {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  z-index: 94;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 16px;
+  margin: 0; padding: 16px;
+  font: 400 16px/1.3 var(--font);
+  color: var(--bone); background: var(--void);
+  border-top: 2px solid var(--edge);
+  animation: errlineIn .3s ease-out both;
+}
+.errline button {
+  min-height: 44px; padding: 8px 16px;
+  font: 400 16px/1 var(--font);
+  color: var(--bone); background: var(--crypt);
+  border: 2px solid var(--edge); cursor: pointer;
+}
+@keyframes errlineIn {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .errline { animation: none; }
+}
