@@ -374,6 +374,14 @@ console.log('\n8. the room\'s box clears when the show opens, and the talk face 
   /* Undertale Sans is font-display: optional. Fetched on first use it
      misses the 100ms window and the page keeps the fallback (serif, or
      a script face on phones) for the whole visit — seen in Chromium. */
+  /* Live Chromium run, hero still on screen: the 3D object rendered
+     behind the opaque show on software GL, and the dodge round's
+     33ms ticks starved until it never ended. */
+  const SC = fs.readFileSync(path.join(ROOT, 'js', 'page', 'scene.js'), 'utf8');
+  ok('>>> the hero\'s 3D scene does not render behind a full-screen overlay <<<',
+     /if \(!visible \|\| t < 0\.02 \|\| document\.body\.classList\.contains\('is-playing'\)\) return;/.test(SC));
+  ok('the quiz sets is-playing while it is open', (() => { NEU.quiz.open(); const on = doc.body.classList.contains('is-playing'); NEU.quiz.close(); return on; })());
+  ok('the go button keeps its arrow on its line', /\n\.quiz__go \{[^}]*white-space: nowrap/.test(fs.readFileSync(path.join(ROOT, 'css', 'style.css'), 'utf8')));
   ok('>>> the talk face is preloaded, so `optional` finds it ready <<<',
      /rel="preload" href="fonts\/webfonts\/sans-webfont\.woff2" as="font" type="font\/woff2" crossorigin/.test(HTML));
 }

@@ -323,6 +323,17 @@ fixes40 has 91 checks. The cosmetic items in the 2026-10-22 soft-lock entry abov
 closed by v2: quit on the finale skips without a confirm, and on 390px
 `esc` sits in the marquee row, clear of the counter.
 
+**Shipped to neu.ac (owner's go-ahead, 2026-10-24):** PR #3 merged into main
+(d3708fc), and the Pages deploy was live within ~15s. A third Haiku run played
+the live site: the finale played, it moved to `g0_hall` with no input, and
+walking works there. A Chromium run on live with the hero still on screen
+found one more bug. The hero's 3D scene kept rendering behind the opaque
+show; on software GL that starved the dodge round's 33ms ticks, so the round
+never ended. scene.js now skips frames while `body.is-playing`. Re-run with
+the fix: it finished at 17/20 (rank A) and moved to `g0_hall`.
+`audio/vine-boom.mp3` 404s on every boot by design (an optional sample with a
+synth fallback).
+
 ## 2026-10-23 — ultraplan (Haiku waves) + engine v2
 
 **Shipped:** see `git log` 3ff2974..HEAD and `.opencode/plans/ultraplan-124.md`

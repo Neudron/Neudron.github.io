@@ -1310,7 +1310,7 @@ body.is-blackout::before {
 .quiz__go {
   min-height: 44px; padding: 10px 20px; margin-top: 8px;
   font: 400 16px/1 var(--font); color: #1B0E2E; background: #FFD34E;
-  border: 0; cursor: pointer;
+  border: 0; cursor: pointer; white-space: nowrap;
 }
 .quiz__go:hover, .quiz__go:focus-visible { background: #FFE58A; outline: 3px solid #FF8ACF; outline-offset: 3px; }
 .quiz__small { margin: 0; font: 400 16px/1.5 var(--font); color: #A39BBA; }
