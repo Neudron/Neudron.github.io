@@ -11,8 +11,8 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 ## A — Performance / Core Web Vitals
 - [x] A1 (P0,B) preload Determination Mono woff2 crossorigin — 3e20703
 - [x] A2 (P1,B) font-display audit; optional for body faces — orch
-- [ ] A3 (P1,B) fallback metric overrides vs Pixelify Sans
-- [ ] A4 (P0,O) identify LCP element; fetchpriority/preload it
+- [x] A3 (P1,B) fallback metric overrides vs Pixelify Sans — orch: local Courier/Arial faces sized to the real metrics (fontTools); Chromium: 1439.7 vs 1440 px and 1117.9 vs 1118 px, same line box; fixes39
+- [x] A4 (P0,O) identify LCP element; fetchpriority/preload it — orch: the LCP is the boot mark (text, lab 80–168ms); its face is already preloaded (index.html:30); there is no LCP image to prioritise
 - [x] A5 (P0,O) width/height on all <img> — 3e20703
 - [x] A6 (P1,O) loading=lazy below-fold imgs — B2 W3
 - [x] A7 (P2,O) decoding=async decorative imgs — 3e20703
@@ -50,13 +50,13 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] C9 (P1,B) dialogue aria-live mirror — B2 W3
 - [x] C10 (P2,B) bullet HP/score live region — B2 W3
 - [ ] C11 (P2,V) overlay focus-trap audit incl tbox/tpad — partial: confirmExit is an alertdialog with focus + Tab trap; shop/panel not trapped
-- [ ] C12 (P3,V) lang attribute audit
+- [x] C12 (P3,V) lang attribute audit — orch: `<html lang="en">`, no other-language passage in the page or the scripts
 
 ## D — PWA / install
 - [x] D1 (P1,B) 512 maskable icon — orch
 - [ ] D2 (P3,B) manifest shortcuts
 - [ ] D3 (P2,B) display_override fullscreen eval
-- [ ] D4 (P2,B) theme-color media variants
+- [x] D4 (P2,B) theme-color media variants — orch: not applicable, the page has one scheme (no prefers-color-scheme anywhere); one theme-color is right
 - [x] D5 (P1,O) themed /404.html — 3e20703
 - [ ] D6 (P2,B) beforeinstallprompt button
 - [ ] D7 (P3,B) apple-touch 152/167 variants
@@ -111,7 +111,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 ## I — Security / trust
 - [x] I1 (P1,B) SRI on jsDelivr three.js importmap — orch, verified both ways
 - [x] I2 (P2,O) referrer meta explicit — 3e20703
-- [ ] I3 (P1,O) rel=noopener external links
+- [x] I3 (P1,O) rel=noopener external links — orch: verified; the one static external link has rel="me noopener", main.js gives every script-made external link target=_blank + rel=noopener
 - [ ] I4 (P3,B) report-only CSP eval
 - [x] I5 (P2,O) footer privacy/trust line — B2 W3
 - [x] I6 (P2,O) AI-crawler allows in robots — 3e20703
@@ -139,7 +139,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] L2 (P1,B) M-key global mute persisted — B1
 - [x] L3 (P2,B) duck attack/release ramp — B1
 - [ ] L4 (P3,B) zone ambience one-shots — partial: per-zone visual atmosphere; no audio one-shots yet
-- [ ] L5 (P3,V) equal-power crossfade audit
+- [x] L5 (P3,V) equal-power crossfade audit — orch: zone crossfades are linear ramps over 1.1 s (music.js ramp()), about a 3 dB dip mid-fade on uncorrelated tracks; an equal-power curve (setValueCurveAtTime) needs ~200 B and music.js has 157 B left under its 24 KiB gate, so it is not changed
 - [x] L6 (P2,V) loop-seam/dead-air check — B1
 
 ## M — Process / docs
@@ -151,5 +151,5 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] M6 (P3,O) _deploy rebuild drill
 - [x] M7 (P1,O) incident playbook — orch
 - [x] M8 (P2,O) memory retention policy — orch
-- [ ] M9 (P3,O) README badge script
+- [x] M9 (P3,O) README badge script — duplicate of H7 (`_scripts/badges.mjs`)
 - [ ] M10 (P2,O) public ROADMAP split

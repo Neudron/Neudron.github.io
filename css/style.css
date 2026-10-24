@@ -77,15 +77,18 @@
   --edge: #5C5C70;           /* interactive control borders — 3.07:1 on --void */
   --accent: var(--lilac);    /* the accent that is actually safe to read */
 
-  /* Determination Mono is the in-game text; Sans is its variant. */
-  --font:  "Determination Mono", "Pixelify Sans", ui-monospace, monospace;
+  /* Determination Mono is the in-game text; Sans is its variant. The
+     *Fallback faces (fonts/webfonts/stylesheet.css) are local fonts
+     resized to the real faces' metrics: they hold the text while the
+     real face loads, so its swap does not move the page. */
+  --font:  "Determination Mono", "Pixelify Sans", "Determination Mono Fallback", ui-monospace, monospace;
   --font-talk: 'Undertale Sans', 'Comic Sans MS', 'Comic Neue', cursive;
   /* Papyrus for the objectives panel. It is the one place a second
      in-game face belongs: a list of tasks is not the site's voice, it
      is an overlay on top of it, and giving it its own typeface stops
      it reading as page content. The kit ships it; nothing new loads. */
   --font-quest: 'Undertale Papyrus', 'Determination Mono', 'Pixelify Sans', monospace;
-  --font-display: "Determination Sans", "Determination Mono", "Pixelify Sans", ui-monospace, monospace;
+  --font-display: "Determination Sans", "Determination Mono", "Pixelify Sans", "Determination Sans Fallback", ui-monospace, monospace;
 
   --bounce: cubic-bezier(.34, 1.36, .64, 1);
   --gutter: clamp(24px, 7vw, 120px);

@@ -42,6 +42,14 @@ orchestrator applies that diff, runs the gate, reviews it and commits it.
 | **W4 fixes** | F2 shard cache reset · F5 persist console charge (`opt_charge`) · F6 `shop_seen` flag · F8 delete `seedDebris`/`renderWorks` if truly dead · M4(1) dangling citation in sheets.js · K1 portrait-fight hint · K5 pad-aware fight reserve | `js/core/danmaku.js`, `js/game/bullet.js`, `js/game/sans.js` (dock only), `js/act4/rooms-d.js`, `js/game/dark.js`, `js/page/main.js`, `js/data/sheets.js`, `js/core/touch.js`, `css/style.css`, `js/act4/boss-scal.js` (reserve only) | 34 |
 | **W5 proofread** | J8: read-only sweep of dialogue vs `memory/story.md` → typo list with file:line. The orchestrator applies typo fixes only | none | — |
 
+## Wave B3 — after B2 is merged (2026-10-24)
+
+| Order | Items | Files | Suite |
+|---|---|---|---|
+| **W6 a11y** | C5 `.crack` hit area (paint to `::after`, `::before` is the 24px target, unclipped) · C11 focus for the shop board and the settings panel (focus in on open, Tab trapped, Esc closes, focus back on close) · C6 a codified test of the single-pointer path for the sword and the key (touch tap-to-carry); mechanics unchanged, the mouse gap reported | `css/style.css` (crack + panel rules only), `js/act4/crack.js`, `js/act4/shop.js`, `js/core/settings.js` (open/close focus only) | 36 |
+| **W7 fight** | B6 damage numbers with drift in the Supreme Calamitas fight (behind reduce-particles and reduced motion) · K5 the fight arenas keep clear of the touch pad (`.tpad` height, as engine v2 does for rooms) | `js/act4/boss-scal.js`, `js/act4/boss-polt.js` (layout only), `js/game/bullet.js` (layout only) | 37 |
+| **W8 page** | F4 sans.js timers that can fire after their scene closed move to one scene-scoped `later()` · J5 an in-tone error line on an uncaught error · G3 a CDP probe suite that only runs with `NEU_CDP=1` | `js/game/sans.js` (timers only), `js/page/main.js` (error line), `css/style.css` (error line only, appended), `tests/cdp-probe.mjs` | 38 |
+
 ## Orchestrator (not delegated)
 - **Manifest and icons:** D1 512 maskable icon, D8 manifest `id`/`scope`.
 - **Network-facing:** I1 SRI hashes on the importmap; A2 `font-display`

@@ -67,3 +67,33 @@
     font-style: normal;
 
 }
+/* Metric-matched local fallbacks (ultraplan A3). While a Determination
+   face is still arriving (font-display: swap), the text is set in one of
+   these instead: a font every system already has, resized and re-spaced
+   so its advance and line box match the real face. When the real face
+   swaps in, nothing moves. The numbers come from the shipped .ttf files
+   read with fontTools, against Courier New / Arial (Liberation Mono and
+   Liberation Sans are metric-compatible with them):
+     mono: advance 0.5000 em vs 0.6001 em -> size-adjust 83.32%;
+           ascent 0.8125 / 0.8332, descent 0.2070 / 0.8332
+     sans: weighted English advance 0.3944 em vs 0.4402 em gave 89.6%,
+           2% wide in Chromium on a real sentence, so 87.7%;
+           ascent 0.8125 / 0.877, descent 0.2070 / 0.877
+   Re-derive them if either face is ever replaced. */
+@font-face {
+    font-family: 'Determination Mono Fallback';
+    src: local('Courier New'), local('Liberation Mono'), local('DejaVu Sans Mono');
+    size-adjust: 83.32%;
+    ascent-override: 97.52%;
+    descent-override: 24.85%;
+    line-gap-override: 0%;
+}
+
+@font-face {
+    font-family: 'Determination Sans Fallback';
+    src: local('Arial'), local('Liberation Sans'), local('Helvetica');
+    size-adjust: 87.7%;
+    ascent-override: 92.65%;
+    descent-override: 23.61%;
+    line-gap-override: 0%;
+}
