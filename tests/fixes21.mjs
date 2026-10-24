@@ -14,9 +14,10 @@
    with the window's timers time-warped, so twenty questions, two
    phases and the end screen take a couple of seconds instead of a
    minute and a half. Then it asserts the show hands you to g0_hall on
-   its own, that Enter still gets you there sooner, that Esc on the
-   end screen replays BOTH phases (replayable loops run twice), and
-   that Esc mid-phase asks before leaving instead of restarting. */
+   its own, that Enter (or Esc) on the finale gets you there sooner,
+   that opening the show again replays BOTH phases (replayable loops
+   run twice), and that Esc mid-phase asks before leaving instead of
+   restarting. */
 
 import { JSDOM } from 'jsdom';
 import fs from 'node:fs';
@@ -153,7 +154,9 @@ console.log('\n1. the real show (both phases) -> Enter -> prize corridor');
 
   const e = key(w, 'Enter');
   ok('Enter was taken by the show', e.defaultPrevented === true);
-  await wait(30);
+  /* Enter skips the rest of the finale: the result lands at once, the
+     set switches off, then the corridor. A breath, not a wait. */
+  await until(() => NEU.engine.room === 'g0_hall', 1000);
   ok('>>> Enter on the end screen sends you to the prize corridor <<<',
      NEU.engine.room === 'g0_hall');
   ok('>>> and the show is closed behind you <<<',
@@ -180,27 +183,33 @@ console.log('\n2. no input at all on the end screen -> it takes you there');
   ok('the overlay is hidden', doc.getElementById('quiz').hidden === true);
 }
 
-/* ═══ 3. Esc on the end screen replays — and the replay is whole ═══*/
-console.log('\n3. Esc on the end screen -> a full second show');
+/* ═══ 3. Esc on the finale goes on; the TV replays a whole show ═══
+   The finale has nothing to leave (the score is saved the moment it
+   starts), so Escape there means the same as Enter. A replay is the
+   broken television opening the show again, and it must run both
+   phases again: replayable loops run twice. */
+console.log('\n3. Esc on the finale goes on; opening it again is a full second show');
 {
   const { w, NEU, doc } = boot();
   NEU.quiz.open();
   let r = await playShow(w, NEU, doc);
   ok('first show ended', r.ended === true);
-  key(w, 'Escape');
-  await wait(10);
-  ok('Esc restarted the show at question one',
+  const e = key(w, 'Escape');
+  ok('Esc on the finale is taken by the show', e.defaultPrevented === true);
+  ok('>>> and does not restart it <<<', NEU.quiz.index === 20);
+  const went = await until(() => NEU.engine.room === 'g0_hall' && !NEU.quiz.running, 2000);
+  ok('>>> Esc on the finale goes on to the corridor <<<', went);
+  NEU.quiz.open();                          /* the broken TV, again */
+  ok('opening it again starts at question one',
      NEU.quiz.running === true && NEU.quiz.index === 0);
-  ok('the end screen went away', doc.getElementById('quizEnd').hidden === true);
+  ok('the finale went away', doc.getElementById('quizEnd').hidden === true);
   r = await playShow(w, NEU, doc);
   ok('>>> the replay ran DODGE FIRE again <<<', r.dodge === true);
   ok('>>> the replay ran SHOOT THE TARGETS again <<<', r.shoot === true);
   ok('the replay ended', r.ended === true);
-  ok('the auto-advance from the first show did not fire mid-replay',
-     NEU.engine.room !== 'g0_hall' || !NEU.quiz.running);
   key(w, 'Enter');
-  await wait(30);
-  ok('>>> and Enter still leaves after a replay <<<', NEU.engine.room === 'g0_hall');
+  const back = await until(() => NEU.engine.room === 'g0_hall' && !NEU.quiz.running, 1000);
+  ok('>>> and Enter still leaves after a replay <<<', back);
 }
 
 /* ═══ 4. Esc during a phase asks; it does not restart ══════════════*/
@@ -220,8 +229,11 @@ console.log('\n4. Esc mid-phase is a confirmed exit, not a silent restart');
   ok('declining closes the prompt', !doc.getElementById('confirmExit'));
   const fin = await until(() => !doc.getElementById('quizEnd').hidden, 8000);
   ok('the show still reaches its end screen', fin);
+  /* out through the corridor and back to the page, then the TV again */
+  await until(() => !NEU.quiz.running, 2000);
+  if (NEU.engine.leave) NEU.engine.leave();
   /* accept a leave mid-dodge on a fresh show: everything stops */
-  key(w, 'Escape');           /* retry */
+  NEU.quiz.open();
   await until(() => NEU.quiz.phase === 'dodge' || (answerAsked(w, NEU, doc), false), 8000);
   ok('reached DODGE FIRE on the replay', NEU.quiz.phase === 'dodge');
   key(w, 'Escape');
@@ -231,7 +243,7 @@ console.log('\n4. Esc mid-phase is a confirmed exit, not a silent restart');
   ok('>>> and kills the phase loop with it <<<', NEU.quiz.phase === null);
   ok('the canvas is hidden again', doc.getElementById('quizCanvas').hidden === true);
   await wait(400);
-  ok('nothing auto-advanced after a deliberate leave', NEU.engine.room !== 'g0_hall');
+  ok('nothing auto-advanced after a deliberate leave', NEU.engine.running === false);
 }
 
 /* ═══ 5. the stick and the A button can play the show ══════════════

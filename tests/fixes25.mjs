@@ -67,7 +67,7 @@ const BUDGETS = [
   /* engine.js is about to be rewritten and will grow. A flat 40 KiB
      holds until that rewrite lands; then re-measure and set x 1.10. */
   { file: 'js/core/engine.js',    budget: 40 * KIB, today: 15258 },
-  { file: 'js/act4/quiz.js',      budget: 10811, today: 9828 },    // 9828 x 1.10 (re-based after the Tenna fix, a309a70)
+  { file: 'js/act4/quiz.js',      budget: 16344, today: 14858 },   // 14858 x 1.10 (re-based for TV TIME v2: Tenna drawn in code, the finale)
   { file: 'js/page/scene.js',     budget: 10789, today: 9808 },    // 9808 x 1.10
 ];
 for (const b of BUDGETS) {

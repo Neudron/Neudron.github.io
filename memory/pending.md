@@ -287,6 +287,26 @@ profile regex tripped on a comment in touch.js. All 18 suites green.
 "Progress will be lost" although the score is already saved. On a 390px
 phone the top-right `esc` button overlaps the "20 / 20 · N right" counter.
 
+## 2026-10-24 — TV TIME v2: Tenna's show ends on screen and takes you on
+
+**Reported again:** "once you finish Tenna's questions, absolutely nothing
+happens." Two causes. (1) The live site is still the original build:
+`main` (what deploys) sits at f24e219, before the a309a70 fix, so neu.ac
+still has the soft-lock. Nothing on this branch is live until it is merged
+to main. (2) Even with the fix, the end was a text panel and a countdown,
+which reads as "nothing happened".
+
+**Rebuilt (quiz.js, #quiz markup, its CSS):** Tenna is drawn in code (the
+wiki crops were cut off at the neck); a studio look; the finale is a
+sequence that needs no input: title + confetti, the score counts up, the
+rank stamps down and Tenna reacts, the doors it opened light up on the
+board, he bows, the TV switches off like a CRT, and `g0_hall` opens through
+a slow iris (`engine.enter(id, spawn, { iris })`). Any key, click or tap
+skips to the switch-off with the result landed. One numbered timeline
+(`later()`), so no beat of a finished show can fire into the next.
+Esc on the finale now goes on (it used to replay); the broken TV replays.
+fixes40 (81); fixes21 updated; quiz.js budget re-based.
+
 ## 2026-10-23 — ultraplan (Haiku waves) + engine v2
 
 **Shipped:** see `git log` 3ff2974..HEAD and `.opencode/plans/ultraplan-124.md`
