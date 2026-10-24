@@ -76,7 +76,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] F1 (P0,B) engine.js:406 const→var — this commit
 - [x] F2 (P2,B) danmaku shard cache key +time-bucket — W4 (cache dropped inside the 420ms held heart)
 - [x] F3 (P2,B) music voice reap off-rAF — B1
-- [ ] F4 (P1,B) later() scene-scoped timer helper + migrate W5/W6-class sites — partial: engine api.later for rooms; sans.js sites not migrated
+- [x] F4 (P1,B) later() scene-scoped timer helper + migrate W5/W6-class sites — engine api.later for rooms (v2); sans.js later()/cancelLater() for the bedroom loop's scene timers, panel/deck hides on their own handles (W8)
 - [x] F5 (P1,B) persist opt_charge at charge/dock — W4, flag renamed console_charge (opt_ is the settings namespace)
 - [x] F6 (P2,B) shopStep from save flags — W4 (shop_seen)
 - [x] F7 (P0,B) ES5 regex gate in run-all — B1
@@ -89,7 +89,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 ## G — Testing infra
 - [x] G1 (P2,V) suite timing regression tracker — B1
 - [x] G2 (P1,V) coverage matrix behavioral-vs-grep — B1
-- [ ] G3 (P2,V) CDP probe env-opt-in suite
+- [x] G3 (P2,V) CDP probe env-opt-in suite — W8: tests/cdp-probe.mjs, runs only with NEU_CDP=1 (7 checks, heap 2.6 MB after boot)
 - [x] G4 (P3,B) screenshot pixel-diff smoke — won't do: the page animates end to end (stars, WebGL glass, room weather), so a pixel diff needs a frozen-frame mode the page does not have; playtest screenshots are reviewed by eye
 - [x] G5 (P2,B) fuzz: random keys no-NaN harness — B1
 - [x] G6 (P1,B) save-migration fixtures — B1
@@ -121,7 +121,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] J2 (P3,O) themed scrollbar — 4be0442
 - [x] J3 (P2,B) favicon prefers-color-scheme variant — won't do: the inline SVG favicon carries its own dark plate (#08080B) and bone glyph, so it reads on light and dark tab strips alike
 - [x] J4 (P3,B) print stylesheet easter egg — B2 W3
-- [ ] J5 (P2,B) in-tone error overlay
+- [x] J5 (P2,B) in-tone error overlay — W8: one line, once per load, never the message itself; refused media ignored
 - [x] J6 (P3,V) konami-code audit — orch: there is no Konami code; the one cheat is bullet.js's digit buffer "69420" (last five digits, only while a run is live, reset by begin(), no effect in endless). Digits only, so it never collides with movement, Esc, e or m
 - [x] J7 (P1,O) public footer credits/attribution — 3e20703
 - [x] J8 (P2,V) dialogue proofread vs story.md — W5 + orch
