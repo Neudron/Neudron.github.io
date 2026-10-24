@@ -69,6 +69,10 @@
   var camX = 0, camY = 0, kickX = 0, kickY = 0;
   var S = 3, padH = 0, padPoll = 0;
   var fade = 0, fadeDir = 0, fadeThen = null;
+  /* Seconds the iris takes. A door is quick (0.22); arriving from a
+     scene that has just played its own ending can ask for a slower one
+     through enter()'s opts, and it goes back to quick when it is done. */
+  var IRIS = 0.22, fadeSpan = IRIS;
   var busy = false;                    // a cutscene owns input
   var ents = [];                       // live copy of room.entities
   var images = {};
@@ -529,9 +533,9 @@
   function update(dt) {
     clock += dt;
     if (fadeDir) {
-      fade += fadeDir * dt / 0.22;
-      if (fade >= 1 && fadeDir > 0) { fade = 1; fadeDir = 0; var f = fadeThen; fadeThen = null; if (f) f(); }
-      else if (fade <= 0 && fadeDir < 0) { fade = 0; fadeDir = 0; var g = fadeThen; fadeThen = null; if (g) g(); }
+      fade += fadeDir * dt / fadeSpan;
+      if (fade >= 1 && fadeDir > 0) { fade = 1; fadeDir = 0; fadeSpan = IRIS; var f = fadeThen; fadeThen = null; if (f) f(); }
+      else if (fade <= 0 && fadeDir < 0) { fade = 0; fadeDir = 0; fadeSpan = IRIS; var g = fadeThen; fadeThen = null; if (g) g(); }
     }
     if ((padPoll -= dt) <= 0) { padPoll = 0.5; var ph = measurePad(); if (ph !== padH) padH = ph; }
     if (!room) return;
@@ -814,7 +818,8 @@
   function flag(k, v) { return NEU.save ? NEU.save.flag(k, v) : null; }
 
   /* ── open / close ─────────────────────────────────────────────── */
-  function enter(id, spawn) {
+  /* opts.iris: seconds for the iris to open on arrival (default 0.22). */
+  function enter(id, spawn, opts) {
     if (!rooms[id]) return false;
     wrap.hidden = false;
     document.body.classList.add('is-playing');
@@ -822,6 +827,7 @@
     layout();
     land(id, spawn);
     fade = 1; fadeDir = -1; fadeThen = null;
+    fadeSpan = opts && opts.iris > 0 ? opts.iris : IRIS;
     keys = {}; busy = false; acc = 0;
     /* rhythm and craft re-enter while the room still runs — a second
        loop here would tick everything at double speed. */
@@ -958,7 +964,7 @@
     /* read-only internals for tests and the dev console */
     get debug() {
       return { scale: S, cam: { x: camX, y: camY }, vel: { x: vx, y: vy }, padH: padH,
-               baked: !!(room && layers[room.id]), fade: fade, prompt: promptFor,
+               baked: !!(room && layers[room.id]), fade: fade, iris: fadeSpan, prompt: promptFor,
                lights: (room && look()) ? lightsFor(0, camX, camY, view()).list.length : 0,
                view: view(), timers: timers.length };
     },
