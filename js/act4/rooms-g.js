@@ -89,7 +89,7 @@
       var out = [{ t: 'save', x: 27, y: 6 }];
       RANKS.forEach(function (r, n) {
         out.push({ t: 'exit', x: 2 + n * 3, y: 3, to: 'g_' + n, spawn: 'default',
-                   locked: 'rank:' + r,
+                   locked: 'rank:' + r, glowOpen: '#FFD34E', label: r,
                    lines: ['a door marked ' + r + '.',
                            'you did not score high enough for this one. yet.'] });
       });

@@ -260,6 +260,25 @@ console.log('\n3. a skip mid-tally lands the real numbers');
      'B–,C,C–,Z');
   const there = await until(() => NEU.engine.room === 'g0_hall', 2000);
   ok('then the corridor', there);
+  /* the corridor carries the board on: the doors you earned glow in
+     the gold the show lit them with; the ones you did not stay dark */
+  const hall = NEU.engine.api.ents().filter(e => e.t === 'exit' && e.glowOpen);
+  const gold = hall.filter(e => { const l = NEU.engineKinds.get(e).light(e); return l && l.col === '#FFD34E'; });
+  ok('>>> in the corridor, the four doors you earned glow gold; the other five do not <<<',
+     hall.length === 9 && gold.length === 4 &&
+     gold.every(e => NEU.save.flagged(e.locked)));
+  /* and each door wears its letter: gold on the ones you earned */
+  const ink = e => {
+    const fills = [];
+    const g = { set fillStyle(v) { fills.push(v); }, get fillStyle() { return fills[fills.length - 1]; },
+                fillRect() {}, drawImage() {} };
+    NEU.engineKinds.get(e).draw(g, e, { S: 2, sx: 100, sy: 100, now: 0 });
+    return fills;
+  };
+  ok('every corridor door has its rank on a plate',
+     hall.map(e => e.label).join(' ') === 'Z C\u2013 C B\u2013 B A\u2013 A S T');
+  ok('>>> the plates of earned doors are gold, the rest grey <<<',
+     hall.every(e => ink(e).includes(NEU.save.flagged(e.locked) ? '#FFD34E' : '#6E6880')));
 }
 
 /* ═══ 4. a better old score: the stamp is this run, the doors the best */
