@@ -104,6 +104,9 @@
 
   /* ── the panel ──────────────────────────────────────────────────*/
   var panel = null, btn = null, open_ = false, wasPlaying = false;
+  /* The element that had focus when the panel opened. close() hands focus
+     back to it; the gear is the fallback if it has since left the page. */
+  var returnTo = null;
 
   function row(id, label, hint, lockReduced, cb) {
     var r = document.createElement('div');
@@ -323,6 +326,7 @@
   function open() {
     if (open_) return;
     open_ = true;
+    returnTo = document.activeElement;
     refresh();
     panel.hidden = false;
     /* Settings opens over live rooms too — remember whether the room
@@ -343,7 +347,13 @@
     panel.classList.remove('is-in');
     panel.hidden = true;
     if (!wasPlaying) document.body.classList.remove('is-playing');
-    if (btn) btn.focus();
+    /* Back to whatever opened the panel, when it is still on the page. The
+       gear is the fallback for a click on nothing in particular (the body
+       has no focus to return to) and for an opener that has since gone. */
+    var back = returnTo;
+    returnTo = null;
+    if (back && back !== document.body && document.contains(back) && back.focus) back.focus();
+    else if (btn) btn.focus();
   }
 
   /* ── keyboard ───────────────────────────────────────────────────
@@ -364,24 +374,33 @@
         !e.altKey && !e.repeat && !typing()) mute(!state(K_MUTE));
     if (!open_ || !panel) return;
     if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); return; }
+  });
+
+  /* Tab stays inside the panel. This is a CAPTURE listener that stops the
+     press, the way engine.js confirmExit does. quest.js binds Tab on window
+     and preventDefaults every press, and the panel does not lock it. The
+     trap used to run on the bubble phase, after that had already happened,
+     so a Tab in the middle of the panel opened the quest log behind it and
+     focus never moved: only the two ends wrapped. Every Tab is handled here,
+     by index, so the order is the same whatever the browser's own would be.
+
+     Buttons AND inputs. The trap used to collect only buttons, so the moment
+     a slider was added Tab walked straight out of a dialog marked aria-modal
+     and left the player behind the scrim with no way back to the close
+     button. Disabled switches are excluded the same way — a trap that wraps
+     to one eats Tabs silently. */
+  addEventListener('keydown', function (e) {
     if (e.key === 'Tab') {
-      /* Buttons AND inputs. The trap used to collect only buttons, so
-         the moment a slider was added Tab walked straight out of a
-         dialog marked aria-modal and left the player behind the scrim
-         with no way back to the close button. Disabled switches are
-         excluded the same way — a trap that wraps to one eats Tabs
-         silently. */
+      if (!open_ || !panel) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
       var els = focusables();
       if (!els.length) return;
       var i = Array.prototype.indexOf.call(els, document.activeElement);
-      if (e.shiftKey) {
-        if (i <= 0) { e.preventDefault(); els[els.length - 1].focus(); }
-      } else {
-        if (i === -1 || i >= els.length - 1) { e.preventDefault(); els[0].focus(); }
-      }
-      return;
+      var nx = e.shiftKey ? (i <= 0 ? els.length - 1 : i - 1) : (i + 1) % els.length;
+      els[nx].focus();
     }
-  });
+  }, true);
 
   /* ── boot ───────────────────────────────────────────────────────*/
   if (NEU.settings) return;                    // already built (re-run)
