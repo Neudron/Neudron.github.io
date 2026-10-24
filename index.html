@@ -28,6 +28,11 @@
      discovers it inside fonts/webfonts/stylesheet.css. crossorigin is
      required even same-origin: font requests are CORS-mode. -->
 <link rel="preload" href="fonts/webfonts/determinationmonoweb-webfont.woff2" as="font" type="font/woff2" crossorigin>
+<!-- The talk face is `optional`: a download that only starts when the
+     first line is typed misses its 100ms window, and the box falls back
+     (to a script face on phones) for the whole visit. 7.7 KB, so start
+     it here and it is in hand before anyone speaks. -->
+<link rel="preload" href="fonts/webfonts/sans-webfont.woff2" as="font" type="font/woff2" crossorigin>
 <script type="application/ld+json">
 { "@context": "https://schema.org",
   "@type": "WebSite",
