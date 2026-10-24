@@ -58,6 +58,30 @@
     return sh ? sh.fw * sheetScale(sh, S, e) / S : 10;
   }
 
+  /* A door's name plate: a few letters in a 3x5 pixel font, on the wall
+     above it (the prize corridor's ranks). Gold once its lock is
+     satisfied, grey while it is shut. Only the glyphs a plate needs. */
+  var GLYPH = {
+    T: ['111', '010', '010', '010', '010'], S: ['111', '100', '111', '001', '111'],
+    A: ['010', '101', '111', '101', '101'], B: ['110', '101', '110', '101', '110'],
+    C: ['011', '100', '100', '100', '011'], Z: ['111', '001', '010', '100', '111'],
+    '\u2013': ['000', '000', '111', '000', '000']
+  };
+  function plate(g, text, x, y, S, open) {
+    var n = text.length, w = (n * 4 + 3) * S, h = 9 * S, left = Math.round(x - w / 2), top = Math.round(y - h / 2);
+    g.fillStyle = '#0A0810'; g.fillRect(left - S, top - S, w + 2 * S, h + 2 * S);
+    g.fillStyle = open ? '#3A2A10' : '#14121C'; g.fillRect(left, top, w, h);
+    g.fillStyle = open ? '#FFD34E' : '#6E6880';
+    for (var k = 0; k < n; k++) {
+      var gl = GLYPH[text.charAt(k)];
+      if (!gl) continue;
+      for (var r = 0; r < 5; r++) for (var c = 0; c < 3; c++) {
+        if (gl[r].charAt(c) === '1') g.fillRect(left + (2 + k * 4 + c) * S, top + (2 + r) * S, S, S);
+      }
+    }
+  }
+  function unlocked(e) { return !e.locked || !!(NEU.save && NEU.save.flagged(e.locked)); }
+
   /* ── exit ─────────────────────────────────────────────────────────── */
   kind('exit', {
     interactive: function () { return true; },
@@ -78,7 +102,8 @@
     drawn: function (e) { return true; },
     draw: function (g, e, d) {
       if (e.sheet) { drawSheet(g, e, d); return; }
-      if (!(e.locked && !(NEU.save && NEU.save.flagged(e.locked)))) return;
+      if (e.label) plate(g, e.label, d.sx, d.sy - 24 * d.S, d.S, unlocked(e));
+      if (unlocked(e)) return;
       var S = d.S, x = d.sx, y = d.sy - 14 * S;
       g.fillStyle = '#120F18'; g.fillRect(x - 3 * S, y - 3 * S, 6 * S, 7 * S);
       g.fillStyle = '#C8A04A'; g.fillRect(x - 2 * S, y, 4 * S, 3 * S);
@@ -89,6 +114,12 @@
     width: function (e, S) { return e.sheet ? sheetWidth(e, S) : 0; },
     light: function (e) {
       if (e.sheet === 'firedoor') return { r: 70, col: '#FF8A3A', glow: 0.22 };
+      /* A door that carries `glowOpen` glows in that colour once its lock
+         is satisfied: the prize corridor's doors you earned, in the gold
+         the show lit them with on its board a moment before. */
+      if (e.glowOpen && e.locked && NEU.save && NEU.save.flagged(e.locked)) {
+        return { r: 30, col: e.glowOpen, glow: 0.24 };
+      }
       return null;
     }
   });

@@ -773,9 +773,19 @@
     for (var g = 0; g < 480; g += 32) cx.fillRect(g, 0, 1, 240);
     for (g = 0; g < 240; g += 32) cx.fillRect(0, g, 480, 1);
   }
+  /* The rounds are not scored (the twenty questions are), but a hit you
+     cannot see is a round you cannot read: a time bar along the top,
+     a counter in the corner, a flash on every hit. */
+  var hurt = 0, pops = [], roundLen = 8;
+  function hud(left, label, col) {
+    cx.fillStyle = '#2A1747'; cx.fillRect(0, 0, 480, 4);
+    cx.fillStyle = '#FFD34E'; cx.fillRect(0, 0, Math.max(0, left / roundLen) * 480, 4);
+    cx.font = '16px "Determination Mono", monospace';
+    cx.fillStyle = col; cx.fillText(label, 10, 24);
+  }
   function soulAt(x, y) {
     x = Math.round(x); y = Math.round(y);
-    cx.fillStyle = '#FF2030';
+    cx.fillStyle = hurt > 0 && Math.floor(hurt * 20) % 2 ? '#FFFFFF' : '#FF2030';
     cx.fillRect(x - 4, y - 3, 3, 2); cx.fillRect(x + 1, y - 3, 3, 2);
     cx.fillRect(x - 4, y - 1, 8, 2); cx.fillRect(x - 3, y + 1, 6, 1);
     cx.fillRect(x - 2, y + 2, 4, 1); cx.fillRect(x - 1, y + 3, 2, 1);
@@ -785,6 +795,7 @@
     if (!cv || !cx || fast) { dodgeDone(); return; }
     state = 'dodge';
     soul = { x: 240, y: 210 }; dodgeTime = duration; dodgeHits = 0; fires = [];
+    roundLen = duration; hurt = 0;
     cv.hidden = false;
     if (elOpts) elOpts.innerHTML = '';
     if (elQ) elQ.textContent = '';
@@ -810,9 +821,16 @@
       cx.fillStyle = '#FFD34E'; cx.fillRect(fx + 2, fy + 5, 4, 6);
       if (Math.abs(fires[f].x - soul.x) < 10 && Math.abs(fires[f].y - soul.y) < 10) {
         dodgeHits++; fires.splice(f, 1);
+        hurt = 0.4;
+        if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
       }
     }
+    if (hurt > 0) {
+      hurt -= DT;
+      cx.strokeStyle = '#FF2030'; cx.lineWidth = 4; cx.strokeRect(2, 2, 476, 236);
+    }
     soulAt(soul.x, soul.y);
+    hud(dodgeTime, dodgeHits ? 'OUCH \u00d7' + dodgeHits : 'NOT A SCRATCH', dodgeHits ? '#FF6B8A' : '#7BE38A');
     if (dodgeTime <= 0) dodgeDone();
   }
 
@@ -822,7 +840,8 @@
     state = 'intro';
     if (elQ) elQ.textContent = '';
     roundBanner('ROUND 2: THE ONE I SAID WAS LAST');
-    host('ROUND TWO! the one i said was last! i lied!');
+    host((dodgeHits ? 'OUCH! ' + dodgeHits + (dodgeHits === 1 ? ' hit. ' : ' hits. ') : 'NOT A SCRATCH! ') +
+         'ROUND TWO! the one i said was last! i lied!');
     pose('cheer', 'wink');
     later(ask, 800);
   }
@@ -841,6 +860,7 @@
     state = 'shoot';
     shootTime = duration; shootHits = 0; shootMisses = 0; targets = [];
     crosshair = { x: 240, y: 120 };
+    roundLen = duration; pops = [];
     cv.hidden = false;
     if (elOpts) elOpts.innerHTML = '';
     if (elQ) elQ.textContent = '';
@@ -869,6 +889,15 @@
       cx.fillStyle = '#9FF0FF'; cx.fillRect(tx - 4, ty - 4, 2, 2); cx.fillRect(tx + 2, ty - 4, 2, 2);
       cx.fillRect(tx - 3, ty, 6, 1);
     }
+    /* a target you hit bursts: a ring that grows and goes */
+    for (n = pops.length - 1; n >= 0; n--) {
+      pops[n].t -= DT;
+      if (pops[n].t <= 0) { pops.splice(n, 1); continue; }
+      var pr = 22 - pops[n].t * 50;
+      cx.strokeStyle = '#FFFFFF'; cx.lineWidth = 2;
+      cx.strokeRect(pops[n].x - pr, pops[n].y - pr, pr * 2, pr * 2);
+    }
+    hud(shootTime, 'HITS ' + shootHits, '#7BE38A');
     cx.strokeStyle = '#7BE38A'; cx.lineWidth = 2;
     cx.strokeRect(crosshair.x - 12, crosshair.y - 12, 24, 24);
     cx.beginPath();
@@ -882,7 +911,9 @@
     if (phase !== 'shoot') return;
     for (var n = targets.length - 1; n >= 0; n--) {
       if (Math.abs(targets[n].x - crosshair.x) < 16 && Math.abs(targets[n].y - crosshair.y) < 16) {
-        shootHits++; targets.splice(n, 1);
+        shootHits++;
+        pops.push({ x: targets[n].x, y: targets[n].y, t: 0.3 });
+        targets.splice(n, 1);
         if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
         return;
       }
@@ -897,7 +928,8 @@
     if (elQ) elQ.textContent = '';
     roundBanner('');
     /* Faux Round 3: Tenna tries to start a third round, the act breaks. */
-    host('ROUND THREE! TV CITY! collect the— wait. wait. the show is over. it is OVER.');
+    host((shootHits ? 'YOU GOT ' + shootHits + '! ' : 'NOT ONE! ') +
+         'ROUND THREE! TV CITY! collect the— wait. wait. the show is over. it is OVER.');
     pose('shock', 'shock');
     later(finish, 2400);
   }
