@@ -28,6 +28,11 @@
      discovers it inside fonts/webfonts/stylesheet.css. crossorigin is
      required even same-origin: font requests are CORS-mode. -->
 <link rel="preload" href="fonts/webfonts/determinationmonoweb-webfont.woff2" as="font" type="font/woff2" crossorigin>
+<!-- The talk face is `optional`: a download that only starts when the
+     first line is typed misses its 100ms window, and the box falls back
+     (to a script face on phones) for the whole visit. 7.7 KB, so start
+     it here and it is in hand before anyone speaks. -->
+<link rel="preload" href="fonts/webfonts/sans-webfont.woff2" as="font" type="font/woff2" crossorigin>
 <script type="application/ld+json">
 { "@context": "https://schema.org",
   "@type": "WebSite",
@@ -40,6 +45,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <!-- The real Undertale faces — Carter Sande's kit, now SELF-HOSTED in
      fonts/webfonts/ exactly as its author asks. The remote hotlink that
      used to sit above this line is gone; nothing here depends on
@@ -80,6 +86,10 @@
   <button class="sw" id="lightsToggle" aria-pressed="false" aria-label="Cosmolight">
     <span class="sw__plate" aria-hidden="true"><i class="sw__lever"></i></span>
     <span class="sw__label" aria-hidden="true">Cosmolight</span>
+  </button>
+  <button class="sw sw--mute" id="muteToggle" aria-pressed="true" aria-label="Sound">
+    <span class="sw__plate" aria-hidden="true"><i class="sw__lever"></i></span>
+    <span class="sw__label" aria-hidden="true">Sound</span>
   </button>
 </div>
 
@@ -141,7 +151,7 @@
   <button class="crack" id="crack" hidden aria-label="a crack in the panel"></button>
 
   <p class="panel__carry" id="panelCarry" hidden>
-    <img src="img/switch2.svg" alt="" width="34" height="23">
+    <img src="img/switch2.svg" alt="" width="34" height="23" loading="lazy" decoding="async">
     <span id="panelCarryTxt">a console, flat</span>
   </p>
 </aside>
@@ -156,6 +166,11 @@
   <button class="bh__quit" id="bhQuit">esc</button>
   <p class="bh__keys">arrows / wasd &nbsp;&middot;&nbsp; shift to focus &nbsp;&middot;&nbsp; survive 20s</p>
 </div>
+<!-- The HP is drawn on the canvas, which a screen reader cannot read.
+     This line carries the same number as text, and only the bullet-hell
+     script writes it. Visually hidden, polite, and outside #bh so it
+     exists before the room is ever opened. -->
+<p class="sr-only" id="bhLive" aria-live="polite"></p>
 
 <!-- ═══ what you're carrying ═══════════════════════════════════════
      One stack, column-reverse from the bottom-left, so adding an item
@@ -197,18 +212,28 @@
 <!-- ═══ tenna ══════════════════════════════════════════════════════
      A game show, which is an interface, so it is elements. -->
 <div class="quiz" id="quiz" hidden role="dialog" aria-modal="true" aria-label="the show">
-  <div class="quiz__top">
-    <span class="quiz__cat" id="quizCat"></span>
-    <span class="quiz__num" id="quizNum"></span>
+  <div class="quiz__tv" id="quizTv">
+    <i class="quiz__beam quiz__beam--l" hidden></i><i class="quiz__beam quiz__beam--r" hidden></i>
+    <div class="quiz__marquee" aria-hidden="true"><b>TV TIME!</b></div>
+    <div class="quiz__stage">
+      <canvas class="quiz__tenna" id="quizTenna" width="48" height="80" aria-hidden="true"></canvas>
+      <div class="quiz__main">
+        <div class="quiz__top">
+          <span class="quiz__cat" id="quizCat"></span>
+          <span class="quiz__num" id="quizNum"></span>
+        </div>
+        <div class="quiz__board" id="quizBoard" aria-label="rank thresholds"></div>
+        <p class="quiz__host" id="quizSay" aria-live="polite"></p>
+        <div class="quiz__round" id="quizRound" hidden></div>
+        <h2 class="quiz__q" id="quizQ"></h2>
+        <div class="quiz__opts" id="quizOpts"></div>
+        <div class="quiz__timer"><i id="quizBar"></i></div>
+        <canvas class="quiz__canvas" id="quizCanvas" width="480" height="240" hidden></canvas>
+        <div class="quiz__end" id="quizEnd" hidden></div>
+      </div>
+    </div>
   </div>
-  <div class="quiz__board" id="quizBoard" aria-label="rank thresholds"></div>
-  <p class="quiz__host" id="quizSay"></p>
-  <div class="quiz__round" id="quizRound" hidden></div>
-  <h2 class="quiz__q" id="quizQ"></h2>
-  <div class="quiz__opts" id="quizOpts"></div>
-  <div class="quiz__timer"><i id="quizBar"></i></div>
-  <canvas class="quiz__canvas" id="quizCanvas" width="480" height="240" hidden></canvas>
-  <div class="quiz__end" id="quizEnd" hidden></div>
+  <canvas class="quiz__fx" id="quizFx" aria-hidden="true"></canvas>
   <button class="bh__quit" id="quizQuit">esc</button>
   <p class="bh__keys">a b c d &nbsp;&middot;&nbsp; or 1 2 3 4 &nbsp;&middot;&nbsp; esc to leave</p>
 </div>
@@ -316,11 +341,15 @@
   </div>
 </div>
 
-<div class="tbox" id="tbox" hidden role="status" aria-live="polite">
-  <span class="tbox__face" id="tboxFace"><img id="tboxFaceImg" src="img/Sans_sprite.webp" alt="" width="42" height="63"></span>
+<div class="tbox" id="tbox" hidden>
+  <span class="tbox__face" id="tboxFace"><img id="tboxFaceImg" src="img/Sans_sprite.webp" alt="" width="42" height="63" loading="lazy" decoding="async"></span>
   <p class="tbox__txt" id="tboxTxt"></p>
   <span class="tbox__more" id="tboxMore" hidden aria-hidden="true">&#9660;</span>
 </div>
+<!-- The box itself is not a live region: its text is rewritten letter by
+     letter, and a screen reader would read every letter. This sibling
+     gets each whole line once, from sans.js, and is emptied on close. -->
+<p class="sr-only" id="tboxSR" aria-live="polite"></p>
 
 <!-- deepest layer: the pixel sky. Always on, behind everything. -->
 <canvas class="stars" id="starCanvas" aria-hidden="true"></canvas>
@@ -384,27 +413,27 @@
        scrolling when the starfield tried it. -->
   <div class="dog" id="dog" hidden>
     <button class="dog__btn" id="dogBtn" aria-label="the dog">
-      <img src="img/annoying-dog.gif" alt="" width="104" height="90">
+      <img src="img/annoying-dog.gif" alt="" width="104" height="90" loading="lazy" decoding="async">
     </button>
   </div>
 
   <!-- Everyone asleep once the light is back. The switch turns up
        beside them on a later visit; the tv is to their right. -->
   <div class="sleep" id="sleep" hidden>
-    <img class="sleep__blanket" src="img/blanket.svg" alt="" width="18" height="5" decoding="async">
-    <img class="sleep__sans" src="img/Sans_sprite.webp" alt="" width="60" height="90" decoding="async">
-    <img class="sleep__dog" src="img/annoying-dog.gif" alt="" width="104" height="90" decoding="async">
+    <img class="sleep__blanket" src="img/blanket.svg" alt="" width="18" height="5" decoding="async" loading="lazy">
+    <img class="sleep__sans" src="img/Sans_sprite.webp" alt="" width="60" height="90" decoding="async" loading="lazy">
+    <img class="sleep__dog" src="img/annoying-dog.gif" alt="" width="104" height="90" decoding="async" loading="lazy">
     <span class="zzz zzz--1" aria-hidden="true">Z</span>
     <span class="zzz zzz--2" aria-hidden="true">Z</span>
     <span class="zzz zzz--3" aria-hidden="true">Z</span>
-    <img class="sleep__chair" id="armchair" src="img/act4/undertale/armchair.png" alt="" width="45" height="83" decoding="async" hidden>
+    <img class="sleep__chair" id="armchair" src="img/act4/undertale/armchair.png" alt="" width="45" height="83" decoding="async" loading="lazy" hidden>
     <button class="sleep__sw" id="sleepSwitch" aria-label="take the console" hidden>
-      <img src="img/switch2.svg" alt="" width="16" height="7" decoding="async">
+      <img src="img/switch2.svg" alt="" width="16" height="7" decoding="async" loading="lazy">
     </button>
   </div>
 
   <button class="tv" id="tv" hidden aria-label="the television">
-    <img src="img/tv.svg" alt="" width="14" height="9" decoding="async">
+    <img src="img/tv.svg" alt="" width="14" height="9" decoding="async" loading="lazy">
     <span class="tv__lbl" id="tvLbl">dock</span>
   </button>
   <div class="stage">
@@ -423,15 +452,29 @@
       Calamity mod. Fonts by Carter Sande's kit and Pixelify Sans. A personal
       fan page — nothing here is official or for sale.
     </p>
+    <p class="colophon lay lay--colophon">
+      no analytics, no cookies. your save stays in this browser.
+    </p>
   </div>
 </section>
 
 </main>
 
+<!-- integrity: sha384 of the exact bytes at each pinned URL (ultraplan I1).
+     three.module.js imports ./three.core.js, so the core is listed too.
+     Bumping the three version means re-hashing all five:
+     curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A -->
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+},
+  "integrity": {
+  "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js": "sha384-Ecdwhw2t8c3nTR0hkEDZbwj+5rkKqzJ376RCQN2x1uofujOCuW/EvGg3BQzE7TS6",
+  "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.core.js": "sha384-tfsIoyn3ACQbjob5Sw0zEGbcRscYZPCUEypq6YYs/TKQlq7Yg9jILDm/oZnfpq3D",
+  "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/loaders/SVGLoader.js": "sha384-kjEHr+WzxvIznprG0mIWROae4RI64aqDDQR3h4hOi0GARly6NsJqGmSSQqYMKNqg",
+  "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/geometries/RoundedBoxGeometry.js": "sha384-m+SW6ck0YrNVYfWDtmmM+7evPsCWUtbGER9vBnHirmScdpGOAm/3Hq88TEufx01e",
+  "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/environments/RoomEnvironment.js": "sha384-/H49oz0ZtMgJNgMZ+OhhuMuKBOsaiC3kY0/PZSvgJJXAOJJwmSBJjzlV5lJul3MB"
 }}
 </script>
 <script src="js/data/data.js"></script>
@@ -448,6 +491,8 @@
 <script src="js/core/juice.js"></script>
 <script src="js/core/danmaku.js"></script>
 <script src="js/data/sheets.js"></script>
+<script src="js/core/engine-look.js"></script>
+<script src="js/core/engine-kinds.js"></script>
 <script src="js/core/engine.js"></script>
 <script src="js/game/sword.js"></script>
 <script src="js/game/sans.js"></script>

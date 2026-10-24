@@ -108,6 +108,7 @@
   function say(s) { judged = ''; if (msg) { msg.hidden = false; msg.textContent = s; } }
 
   function blip(lane, mine) {
+    if (NEU.settings && NEU.settings.muted) return;       /* the Sound switch; timing still runs on the clock */
     try {
       var a = audio(), tt = a.currentTime;
       var o = a.createOscillator(), g = a.createGain();

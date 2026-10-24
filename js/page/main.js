@@ -176,8 +176,12 @@
     /* A switch that clicks but does not engage: a dry contact tick,
        no body behind it, then a weaker second tick as it drops back.
        The absence of any low end is what makes it read as "broken". */
+    /* the Sound switch (settings.js); read when the sound plays, because
+       this file loads before settings.js does */
+    function hushed() { return !!(NEU.settings && NEU.settings.muted); }
+
     function dud() {
-      if (!wake()) return;
+      if (hushed() || !wake()) return;
       [[0, 0.5], [0.075, 0.22]].forEach(function (p) {
         var t = ctx.currentTime + p[0];
         var src = noise(0.05);
@@ -271,6 +275,7 @@
     } catch (e) { sample = null; }
 
     function boom() {
+      if (hushed()) return;
       if (sampleOk && sample) {
         try { sample.currentTime = 0; sample.play(); return; } catch (e) {}
       }
@@ -519,5 +524,42 @@
       e.preventDefault();
       t.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
     });
+  });
+
+  /* ── the one-line error (J5) ────────────────────────────────────
+     A script that throws used to leave a page that simply stopped, with
+     no word on it. This puts ONE line at the bottom, in the game's
+     voice, with a way out.
+
+     The error itself is never shown. A message can carry a file path, a
+     line number or a stack, and none of that belongs on a visitor's
+     screen. The text is set with textContent, so markup inside a message
+     is only characters. Once per page load: a loop that throws every
+     frame must not stack a line per frame.                              */
+  var brokenShown = false;
+  function showBrokenLine() {
+    if (brokenShown) return;
+    brokenShown = true;
+    var line = document.createElement('p');
+    line.className = 'errline';
+    line.setAttribute('role', 'status');
+    var words = document.createElement('span');
+    words.textContent = "* something broke. it's not your fault. reload?";
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'reload';
+    btn.addEventListener('click', function () { location.reload(); });
+    line.appendChild(words);
+    line.appendChild(btn);
+    (document.body || document.documentElement).appendChild(line);
+  }
+  addEventListener('error', showBrokenLine);
+  addEventListener('unhandledrejection', function (e) {
+    /* A sound the browser refuses, or fails to play, rejects play() with
+       one of these names. Every sound on the page has a synth fallback
+       for that, so it is not a broken page and gets no line. */
+    var r = e && e.reason;
+    if (r && /^(NotAllowedError|NotSupportedError|AbortError)$/.test(r.name)) return;
+    showBrokenLine();
   });
 })();

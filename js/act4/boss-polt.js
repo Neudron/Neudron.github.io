@@ -195,6 +195,11 @@
     if (nextCharge <= 0 && charging <= 0) {
       glow = 0.9;
       nextCharge = [0, 5.5, 4.2, 3.4][phase];
+      /* the telegraph has a sound as well as a glow: a tone that climbs
+         for the 900 ms it takes to fire. The charge stops it (doCharge),
+         and so does leaving the fight (close), so it outlives neither. */
+      stopRise();
+      riseStop = NEU.sfx && NEU.sfx.rise ? NEU.sfx.rise(900) : null;
       chargeTimer = setTimeout(doCharge, 900);
     }
     if (glow > 0) glow -= dt;
@@ -203,8 +208,16 @@
     draw(nowMs);
   }
 
+  /* The telegraph's rising tone (sans.js sfx.rise). It is held here so
+     the charge that fires it can stop it, and so can close(). stop() is
+     safe to call twice, so a stale handle costs nothing. */
+  var riseStop = null;
+  function stopRise() {
+    if (riseStop) { riseStop(); riseStop = null; }
+  }
   var cvx = 0, cvy = 0;
   function doCharge() {
+    stopRise();                          /* the charge fires: the telegraph's tone ends with it */
     if (!running) return;
     var a = Math.atan2(py - by, px - bx);
     cvx = Math.cos(a) * 520; cvy = Math.sin(a) * 520;
@@ -267,10 +280,12 @@
       hooks.forEach(function (h) { h.free = false; });
       clone = { x: bx, y: by, t: 2 };
       say("* it makes another one of itself.");
+      if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(3);
     } else if (pct <= 0.50 && phase < 2) {
       phase = 2;
       hooks.forEach(function (h) { h.free = true; });
       say("* the hooks let go.");
+      if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(2);
     }
   }
 
@@ -499,6 +514,7 @@
   function close() {
     running = false; dying = 0;
     if (chargeTimer) { clearTimeout(chargeTimer); chargeTimer = 0; }
+    stopRise();
     if (NEU.activeMinigame === 'polt') NEU.activeMinigame = null;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');

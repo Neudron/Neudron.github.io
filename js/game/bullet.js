@@ -39,6 +39,13 @@
   var hud  = document.getElementById('bhHud');
   var msg  = document.getElementById('bhMsg');
 
+  /* The HP is painted on the canvas, which a screen reader cannot read,
+     so the same number goes to a visually hidden polite line (#bhLive in
+     index.html) every time it changes. The line is written from here and
+     nowhere else, so the canvas and the spoken number cannot disagree. */
+  var live = document.getElementById('bhLive');
+  function announce(s) { if (live) live.textContent = s; }
+
   var dm = NEU.danmaku || {};
   var SURVIVE   = 20;          // seconds
   var PLAYER_R  = (dm.soul && dm.soul.R) || 6; // TRUE hitbox (matches scale 2 soul sprite ~60px visual, 6px radius)
@@ -98,13 +105,23 @@
      Charge survives between runs — asking someone to take both hits in
      a single attempt would make a joke into a grind. */
   var ELEC_EVERY = 4.4;
-  var charge = 0, chargeFx = 0, emptyFx = 0;
+  /* Read back from the save, so a full console is still full after a
+     reload. A missing flag is undefined, and `| 0` makes that 0. */
+  var charge = (NEU.save && NEU.save.flag('console_charge')) | 0, chargeFx = 0, emptyFx = 0;
   /* sans.js owns the console; this room only asks whether it is in
      your hands right now. */
   function carrying() { return !!(NEU.hasConsole && NEU.hasConsole()); }
+  /* Only a full charge is written, and only as it arrives. The blaster
+     stops accruing at 100, so this runs once, never per frame. Partial
+     charge is not saved: it is re-earned on the next visit, as it was
+     before this was saved at all. */
+  function keepCharge() {
+    if (charge >= 100 && NEU.save) NEU.save.flag('console_charge', 100);
+  }
   NEU.charge = function () { return charge; };
   NEU.devCharge = function (n) {
     charge = Math.max(0, Math.min(100, n | 0));
+    keepCharge();
     if (NEU.quest) NEU.quest.bump('charge', charge / 50);
     if (NEU.tvState) NEU.tvState();
     return charge;
@@ -266,6 +283,9 @@
   }
 
   /* ── loop ─────────────────────────────────────────────────────────*/
+  /* frame time of the last heartbeat (sfx.heart). begin() puts it back to
+     -Infinity, so a new run's first beat is not held up by the last one. */
+  var beatAt = -Infinity;
   function step(now) {
     if (!running) return;
     requestAnimationFrame(step);
@@ -300,10 +320,11 @@
       if (inv <= 0) {
         var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
         if (dx * dx + dy * dy < rr * rr) {
-          hp--; inv = dm.IFRAMES || 1.15;
+          hp--; inv = dm.IFRAMES || 1.15; hpLine();
           /* MEDIUM: felt, but never enough to make the pattern
-             unreadable on the frame you most need to read it. */
-          if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
+             unreadable on the frame you most need to read it. The shake
+             leans the way the bullet was travelling (juice.js bias). */
+          if (NEU.juice) { NEU.juice.hit('medium', { dx: b.vx, dy: b.vy }); NEU.juice.burst(px, py, 10, COL.soul); }
           if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
           if (hp <= 0) { startDeath(); return; }
         }
@@ -335,6 +356,7 @@
             if (held && carrying()) {
               bl.took = true;
               charge = Math.min(100, charge + 50);
+              keepCharge();
               chargeFx = performance.now();
               if (NEU.juice) { NEU.juice.hit('large', { colour: '#4FC3F7' });
                                NEU.juice.burst(px, py, 26, '#4FC3F7', 190); }
@@ -348,7 +370,7 @@
               emptyFx = performance.now();
             } else if (inv <= 0) {
               bl.took = true;
-              hp--; inv = dm.IFRAMES || 1.15;
+              hp--; inv = dm.IFRAMES || 1.15; hpLine();
               /* MEDIUM: felt, but never enough to make the pattern
                  unreadable on the frame you most need to read it. */
               if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
@@ -357,7 +379,7 @@
             }
           }
         } else if (inv <= 0 && inBeam) {
-          hp--; inv = dm.IFRAMES || 1.15;
+          hp--; inv = dm.IFRAMES || 1.15; hpLine();
           /* MEDIUM: felt, but never enough to make the pattern
              unreadable on the frame you most need to read it. */
           if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
@@ -368,6 +390,13 @@
     }
     blasters = kb;
 
+    /* One hit from death, the soul beats about once a second of frame
+       time. Not at three HP or two. A death frame returns from startDeath
+       above, so it never reaches this line. */
+    if (hp === 1 && t - beatAt >= 0.9) {
+      beatAt = t;
+      if (NEU.sfx && NEU.sfx.heart) NEU.sfx.heart();
+    }
     if (!endless && t >= SURVIVE) { finish(true); return; }
     draw();
   }
@@ -533,13 +562,21 @@
     dying = 0;                           /* a pending death animation is cancelled by restarting */
     layout();
     t = 0; hp = 3; inv = 0; won = false; cheat = '';
+    beatAt = -Infinity;
     bullets = []; resetEmitters();
     px = AX + AW / 2; py = AY + AH - 60;
     keys = {};
     running = true; last = performance.now();
     if (msg) msg.hidden = true;
+    hpLine();
     requestAnimationFrame(step);
   }
+
+  /* Called right after each hit takes its point. The spoken line is set
+     from the same hp the canvas paints, so the two cannot disagree. A
+     death is announced by startDeath() on top of this, so the last line
+     a player hears after the final hit is the death line. */
+  function hpLine() { announce('HP ' + Math.max(0, hp) + '/3'); }
 
   /* ── death ────────────────────────────────────────────────────────
      Undertale holds the cracked soul for a beat before it goes, and
@@ -548,6 +585,7 @@
      split down the middle and it reads as a death. */
   function startDeath() {
     running = false;                 // stops the main loop's next frame
+    announce('ouch. the soul broke.');
     dying = performance.now();
     if (dm.resetDeath) dm.resetDeath();
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
@@ -595,16 +633,19 @@
           (pb ? 'a new best.' : 'best ' + prev.toFixed(1) + 's') +
           '<br><small>enter to go again &middot; esc to leave</small>';
       }
+      announce(secs.toFixed(1) + ' seconds. ' +
+               (pb ? 'a new best.' : 'best ' + prev.toFixed(1) + ' seconds.'));
       return;
     }
 
     if (msg) {
       msg.hidden = false;
       msg.innerHTML = good
-        ? '<b>you made it.</b><br>twenty seconds. take the dog food.<br><small>esc to leave</small>'
+        ? '<b>you made it.</b><br>twenty seconds. take the dog food?<br><small>esc to leave</small>'
         : '<b>ouch.</b><br>enter to try again &middot; esc to leave';
     }
     if (good) {
+      announce('you made it. twenty seconds. take the dog food?');
       if (NEU.quest) NEU.quest.mark('survive');
       if (NEU.grantDogFood) NEU.grantDogFood();
     }

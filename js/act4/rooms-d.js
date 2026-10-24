@@ -90,7 +90,7 @@
     spawns: { fire: { x: 2, y: 4, face: 'right' }, east: { x: 22, y: 4, face: 'left' } },
     entities: [
       { t: 'save', x: 4, y: 8 },
-      { t: 'npc', x: 9, y: 5, colour: '#E4C46A', run: function (c) { shop(c); } },
+      { t: 'npc', x: 9, y: 5, colour: '#E4C46A', look: 'merchant', run: function (c) { shop(c); } },
       { t: 'npc', x: 13, y: 6, colour: '#8A8598', sheet: 'axe',
         lines: ['an axe, on the counter, behind the till.',
                 'it is not on the board with the prices.'] },
@@ -120,14 +120,13 @@
     ['an axe', 'not for sale', false, 'axe']
   ];
 
-  var shopStep = 0;
   function shop(c) {
     /* Third state. The axe was refused hours ago and the refusal was a
        person, not a price — so the way past it is also a person. */
     if (NEU.save && NEU.save.flagged('tripping') && !NEU.save.has('axe')) {
       c.say(["you again. you look terrible.",
              "the axe? still not for sale.",
-             "...but i'll go against you for it. you look like you'd lose."], 'dog');
+             "...but i'll go against you for it. you look like you'd lose."], 'narr');
       setTimeout(function () {
         c.leave();
         if (NEU.rhythm) NEU.rhythm.open();
@@ -142,8 +141,12 @@
        selectable rows, prices, and per-item quips. The text dump it
        replaced is gone. The engine pauses while it is up. */
     c.leave();
-    if (NEU.shop) NEU.shop.open(shopStep);
-    shopStep = 1;
+    /* The first-visit line is a save flag, not a closure variable. A
+       reload used to replay it, because the variable started at 0 every
+       time the page loaded. The board opens on step 0 only until the
+       flag is written. */
+    if (NEU.shop) NEU.shop.open(NEU.save && NEU.save.flagged('shop_seen') ? 1 : 0);
+    if (NEU.save) NEU.save.flag('shop_seen', 1);
   }
 
   /* ══ D2 / D3 — the rest of the city ══════════════════════════════*/
@@ -286,7 +289,7 @@
     spawns: { south: { x: 2, y: 3, face: 'right' } },
     entities: [
       { t: 'save', x: 3, y: 5 },
-      { t: 'npc', x: 18, y: 3, colour: '#EDE7DE', run: function (c) { lastTalk(c); } },
+      { t: 'npc', x: 18, y: 3, colour: '#EDE7DE', look: 'sans', run: function (c) { lastTalk(c); } },
       { t: 'exit', x: 0, y: 3, to: 'e3_hall', spawn: 'north' }
     ],
     onEnter: function (c) {

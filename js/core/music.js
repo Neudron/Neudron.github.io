@@ -18,6 +18,7 @@
   if (NEU.music) return;                       /* already built (re-run) */
 
   var K_VOL = 'opt_music';
+  var K_MUTE = 'opt_mute';
   var DEFAULT_VOL = 55;          /* out of 100 — present, not insistent */
   var PEAK = 0.20;               /* what 100 actually means at the bus  */
 
@@ -169,7 +170,7 @@
     var v = NEU.save && NEU.save.flag ? NEU.save.flag(K_VOL) : null;
     if (v === undefined || v === null || isNaN(v)) v = DEFAULT_VOL;
     v = Math.max(0, Math.min(100, +v));
-    return v;
+    return NEU.save && NEU.save.flagged(K_MUTE) ? 0 : v;
   }
 
   /* Ramp a param if the browser gives us one, set it if it does not.
@@ -233,7 +234,8 @@
   }
   addEventListener('pointerdown', arm, true);
   addEventListener('keydown', arm, true);
-  addEventListener('touchstart', arm, true);
+  /* passive: arm() never cancels a touch. */
+  addEventListener('touchstart', arm, { capture: true, passive: true });
   /* pointerup/touchend are the activation triggers the spec names;
      the down-phase ones above are Safari leniency. Both fire on
      one tap, and a repeat costs nothing but coverage. */
@@ -429,6 +431,7 @@
 
     for (var i = voices.length - 1; i >= 0; i--) {
       var v = voices[i];
+      if (v.endAt && now >= v.endAt) v.dead = true;
       if (v.dead) { voices.splice(i, 1); continue; }
       if (!v.g) continue;
 
@@ -475,9 +478,8 @@
       voices[i].dying = true;
       applyLayers(voices[i]);
       ramp(voices[i].g && voices[i].g.gain, 0.0001, FADE);
-      (function (v) {
-        setTimeout(function () { v.dead = true; }, FADE * 1000 + 200);
-      })(voices[i]);
+      /* tick() reaps it on the audio clock: timers stall in hidden tabs. */
+      voices[i].endAt = actx.currentTime + FADE + 0.2;
     }
 
     curId = id;
@@ -503,10 +505,15 @@
     }, FADE * 1000 + 300);
   }
 
+  /* Bus follows the save file: the level, or zero while muted. */
+  function follow() {
+    if (bus) ramp(bus.gain, (vol() / 100) * PEAK, 0.15);
+  }
+
   function setVolume(v) {
     v = Math.max(0, Math.min(100, Math.round(+v || 0)));
     if (NEU.save && NEU.save.flag) NEU.save.flag(K_VOL, v);
-    if (bus) ramp(bus.gain, (v / 100) * PEAK, 0.15);
+    follow();
     return v;
   }
 
@@ -523,7 +530,8 @@
     on = !!on;
     if (on === ducked) return;
     ducked = on;
-    if (duckG) ramp(duckG.gain, on ? DUCK : 1, 0.3);
+    /* Quick in so the line lands; slow out so the bed does not jump. */
+    if (duckG) ramp(duckG.gain, on ? DUCK : 1, on ? 0.12 : 0.5);
   }
 
   /* ── the director ───────────────────────────────────────────────
@@ -567,6 +575,7 @@
     stop: function () { play(null); },
     duck: duck,
     setVolume: setVolume,
+    refresh: follow,
     get volume() { return vol(); },
     get track() { return curId; },
     get playing() { return !!curId && armed; },
