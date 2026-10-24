@@ -43,13 +43,13 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] C2 (P0,B) focus-visible ≥3:1 everywhere — 4be0442
 - [x] C3 (P2,B) forced-colors pass — 4be0442
 - [x] C4 (P3,B) prefers-contrast support — 4be0442
-- [ ] C5 (P1,B) target-size ≥24px audit incl tpad — open: .crack's clip-path also clips a ::before hit area; needs the paint moved to ::after
-- [ ] C6 (P2,B) drag-alternative codified test (sword throw)
+- [x] C5 (P1,B) target-size ≥24px audit incl tpad — W6: the crack's paint is on ::after, a transparent 24px ::before is the target, the element is unclipped
+- [x] C6 (P2,B) drag-alternative codified test (sword throw) — W6: the touch/pen tap-to-carry path for the sword and the key is driven in fixes36. Found: a MOUSE has no single-pointer path (press-hold-drag only) and there is no keyboard path; WCAG 2.5.7 gap, left open below
 - [x] C7 (P1,B) one-interaction global mute anywhere — B1
 - [x] C8 (P1,B) quiz relaxed-timer toggle — B2 W3
 - [x] C9 (P1,B) dialogue aria-live mirror — B2 W3
 - [x] C10 (P2,B) bullet HP/score live region — B2 W3
-- [ ] C11 (P2,V) overlay focus-trap audit incl tbox/tpad — partial: confirmExit is an alertdialog with focus + Tab trap; shop/panel not trapped
+- [x] C11 (P2,V) overlay focus-trap audit incl tbox/tpad — confirmExit (engine v2); W6: the shop board and the settings panel take focus, trap Tab in a capture listener (quest.js's window Tab no longer opens the log behind the panel) and hand focus back on close
 - [x] C12 (P3,V) lang attribute audit — orch: `<html lang="en">`, no other-language passage in the page or the scripts
 
 ## D — PWA / install
@@ -125,6 +125,8 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] J6 (P3,V) konami-code audit — orch: there is no Konami code; the one cheat is bullet.js's digit buffer "69420" (last five digits, only while a run is live, reset by begin(), no effect in endless). Digits only, so it never collides with movement, Esc, e or m
 - [x] J7 (P1,O) public footer credits/attribution — 3e20703
 - [x] J8 (P2,V) dialogue proofread vs story.md — W5 + orch
+
+- [ ] C13 (P2,B) a mouse click-to-carry (and a keyboard path) for the sword and the key — found by C6; a mechanic change in sans.js, so it gets its own cycle
 
 ## K — Mobile deep-pass
 - [x] K1 (P2,B) portrait-fight hint overlay — W4

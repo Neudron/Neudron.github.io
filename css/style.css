@@ -1226,29 +1226,48 @@ body.is-blackout::before {
 /* ── the crack ────────────────────────────────────────────────────
    Four pixels in the corner of the panel. It glows, faintly, because
    the merchant already taught you hours ago that this game points at
-   things by lighting them. */
+   things by lighting them.
+
+   THE TAP TARGET IS NOT THE PAINT. A clip-path clips everything the
+   element draws, its hit box included, so a clipped ten-pixel element
+   was a ten-pixel target. WCAG 2.5.8 asks for 24. So the element stays
+   unclipped and transparent, ::after carries the visible shape, and
+   ::before is an invisible 24px box centred on the crack, which is what
+   a finger actually lands on. */
 .crack {
   position: absolute; right: 14px; bottom: 14px;
   width: 10px; height: 10px; padding: 0; border: 0;
-  background: #000; cursor: pointer;
-  clip-path: polygon(0 40%, 40% 0, 55% 45%, 100% 60%, 60% 100%, 20% 70%);
+  background: transparent; cursor: pointer;
   opacity: 0; transition: opacity .8s ease, transform .3s var(--bounce);
+}
+.crack::before {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 24px; height: 24px; transform: translate(-50%, -50%);
+  background: transparent;
+}
+.crack::after {
+  content: ''; position: absolute; inset: 0;
+  background: #000;
+  clip-path: polygon(0 40%, 40% 0, 55% 45%, 100% 60%, 60% 100%, 20% 70%);
   box-shadow: 0 0 6px rgba(126,80,180,.7);
 }
 .crack.is-in { opacity: 1; }
 .crack[data-n="1"] { transform: scale(1.5); }
-.crack[data-n="2"] { transform: scale(2.4); box-shadow: 0 0 16px rgba(160,80,220,.9); }
+.crack[data-n="2"] { transform: scale(2.4); }
+.crack[data-n="2"]::after { box-shadow: 0 0 16px rgba(160,80,220,.9); }
 .crack.is-hit { animation: crackHit .3s steps(3, end); }
 @keyframes crackHit {
   0%, 100% { filter: none; }
   50%      { filter: invert(1); }
 }
 .crack.is-portal {
-  clip-path: circle(50%);
   width: 54px; height: 54px; right: 8px; bottom: 8px;
+  animation: crackSpin 4s linear infinite;
+}
+.crack.is-portal::after {
+  clip-path: circle(50%);
   background: radial-gradient(circle, #7FE3C4 0%, #1E3A44 45%, #04060A 100%);
   box-shadow: 0 0 30px rgba(127,227,196,.85);
-  animation: crackSpin 4s linear infinite;
 }
 @keyframes crackSpin { to { transform: rotate(360deg); } }
 
