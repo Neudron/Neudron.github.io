@@ -4,13 +4,14 @@
    danmaku.js dims instead of blinking, and nothing let a player
    reach any of it. This is the panel.
 
-   FIVE SWITCHES, PERSISTED IN THE SAVE FILE:
+   THE SWITCHES, PERSISTED IN THE SAVE FILE:
 
      reduce screen shake — juice.js stops adding trauma
      reduce flashing    — juice.js stops the white overlay
      larger text        — zooms the whole page 1.25x
      reduce hit-stop    — juice.js skips the frozen frame on impacts
      reduce particles   — juice.js stops spawning impact debris
+     relaxed quiz timer — the show gives twenty-four seconds, not twelve
 
    Larger text is a zoom, not a font-size, and that is deliberate:
    the Undertale faces are drawn on a 16px grid, so resampling a
@@ -35,7 +36,9 @@
   var K_TEXT  = 'opt_largeText';
   var K_STOP  = 'opt_hitstop';      /* on = juice skips the held frame   */
   var K_PART  = 'opt_particles';    /* on = juice spawns no debris       */
+  var K_RELAX = 'opt_relaxedQuiz';  /* on = the quiz gives twice the time */
   var K_MUSIC = 'opt_music';        /* owned by music.js; read here    */
+  var K_MUTE  = 'opt_mute';         /* on = silent; the level is kept  */
 
   var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -69,6 +72,13 @@
       NEU.juice.setNoParticles(state(K_PART));
     }
     document.documentElement.classList.toggle('text-lg', !!state(K_TEXT));
+    /* Music reads the flag itself. Sound effects (sans.js) read this
+       attribute, so they need no import from this file. */
+    document.documentElement.dataset.muted = state(K_MUTE) ? '1' : '';
+    /* Pressed means sound is ON: the label is "Sound", and a lever
+       that reads "pressed" while muted would say the opposite. */
+    var mt = document.getElementById('muteToggle');
+    if (mt) mt.setAttribute('aria-pressed', state(K_MUTE) ? 'false' : 'true');
   }
 
   function set(k, v) {
@@ -76,8 +86,27 @@
     apply();
   }
 
+  /* Mute is a flag, not a level. The slider keeps its number and the
+     bus is silenced on top of it, so unmuting lands back where it was.
+     Music is told directly so the bus moves now, not on its next poll. */
+  function mute(on) {
+    set(K_MUTE, on);
+    if (NEU.music) NEU.music.refresh();
+  }
+
+  /* A letter typed into a field is not a mute. */
+  function typing() {
+    var a = document.activeElement || {};
+    var ce = a.getAttribute ? a.getAttribute('contenteditable') : null;
+    return /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName || '') ||
+           a.isContentEditable === true || (ce !== null && ce !== 'false');
+  }
+
   /* ── the panel ──────────────────────────────────────────────────*/
   var panel = null, btn = null, open_ = false, wasPlaying = false;
+  /* The element that had focus when the panel opened. close() hands focus
+     back to it; the gear is the fallback if it has since left the page. */
+  var returnTo = null;
 
   function row(id, label, hint, lockReduced, cb) {
     var r = document.createElement('div');
@@ -197,6 +226,13 @@
         'hits leave no debris behind', false, function (on) {
       set(K_PART, on);
     }));
+    /* The quiz's clock. quiz.js reads it as each question starts, so a
+       switch thrown mid-question changes the next question, not this
+       one — the bar and the clock never disagree about one question. */
+    box.appendChild(row('settRelaxed', 'relaxed quiz timer',
+        'twenty-four seconds a question, not twelve', false, function (on) {
+      set(K_RELAX, on);
+    }));
     /* Thumb controls appear on their own on a touch screen. This is
        the override for the two cases auto-detection gets wrong: a
        laptop with a touchscreen that does not want them, and a tablet
@@ -208,9 +244,11 @@
     /* The soundtrack is synthesised, so this is a real level and not a
        "load the files or not" decision — dragging it to zero costs
        nothing and can be undone mid-room. */
+    /* Reads the saved level, never NEU.music.volume, which is zero while
+       muted: the slider must show the number the player chose. */
     box.appendChild(slider('settMusic', 'music',
         'the act IV soundtrack. drag to zero for silence.',
-        function () { return NEU.music ? NEU.music.volume : num(K_MUSIC, 55); },
+        function () { return num(K_MUSIC, 55); },
         function (v) {
           if (NEU.music) NEU.music.setVolume(v);
           else if (NEU.save) NEU.save.flag(K_MUSIC, v);
@@ -257,6 +295,7 @@
       ['settText',  state(K_TEXT)],
       ['settHitstop',   state(K_STOP)],
       ['settParticles', state(K_PART)],
+      ['settRelaxed', state(K_RELAX)],
       ['settTouch', NEU.touch ? NEU.touch.visible || NEU.touch.mode === 'on' : false]
     ];
     for (var i = 0; i < rows.length; i++) {
@@ -264,7 +303,7 @@
       if (el) el.setAttribute('aria-checked', String(!!rows[i][1]));
     }
     var m = document.getElementById('settMusic');
-    if (m) m.value = String(NEU.music ? NEU.music.volume : num(K_MUSIC, 55));
+    if (m) m.value = String(num(K_MUSIC, 55));
   }
 
   /* The panel's focusables — everything EXCEPT the disabled switches.
@@ -287,6 +326,7 @@
   function open() {
     if (open_) return;
     open_ = true;
+    returnTo = document.activeElement;
     refresh();
     panel.hidden = false;
     /* Settings opens over live rooms too — remember whether the room
@@ -307,7 +347,13 @@
     panel.classList.remove('is-in');
     panel.hidden = true;
     if (!wasPlaying) document.body.classList.remove('is-playing');
-    if (btn) btn.focus();
+    /* Back to whatever opened the panel, when it is still on the page. The
+       gear is the fallback for a click on nothing in particular (the body
+       has no focus to return to) and for an opener that has since gone. */
+    var back = returnTo;
+    returnTo = null;
+    if (back && back !== document.body && document.contains(back) && back.focus) back.focus();
+    else if (btn) btn.focus();
   }
 
   /* ── keyboard ───────────────────────────────────────────────────
@@ -322,31 +368,47 @@
       open_ ? close() : open();
       return;
     }
+    /* M mutes from anywhere. A modifier is someone else's shortcut, and
+       a held key auto-repeats, which must not flicker the mute. */
+    if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey &&
+        !e.altKey && !e.repeat && !typing()) mute(!state(K_MUTE));
     if (!open_ || !panel) return;
     if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); return; }
+  });
+
+  /* Tab stays inside the panel. This is a CAPTURE listener that stops the
+     press, the way engine.js confirmExit does. quest.js binds Tab on window
+     and preventDefaults every press, and the panel does not lock it. The
+     trap used to run on the bubble phase, after that had already happened,
+     so a Tab in the middle of the panel opened the quest log behind it and
+     focus never moved: only the two ends wrapped. Every Tab is handled here,
+     by index, so the order is the same whatever the browser's own would be.
+
+     Buttons AND inputs. The trap used to collect only buttons, so the moment
+     a slider was added Tab walked straight out of a dialog marked aria-modal
+     and left the player behind the scrim with no way back to the close
+     button. Disabled switches are excluded the same way — a trap that wraps
+     to one eats Tabs silently. */
+  addEventListener('keydown', function (e) {
     if (e.key === 'Tab') {
-      /* Buttons AND inputs. The trap used to collect only buttons, so
-         the moment a slider was added Tab walked straight out of a
-         dialog marked aria-modal and left the player behind the scrim
-         with no way back to the close button. Disabled switches are
-         excluded the same way — a trap that wraps to one eats Tabs
-         silently. */
+      if (!open_ || !panel) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
       var els = focusables();
       if (!els.length) return;
       var i = Array.prototype.indexOf.call(els, document.activeElement);
-      if (e.shiftKey) {
-        if (i <= 0) { e.preventDefault(); els[els.length - 1].focus(); }
-      } else {
-        if (i === -1 || i >= els.length - 1) { e.preventDefault(); els[0].focus(); }
-      }
-      return;
+      var nx = e.shiftKey ? (i <= 0 ? els.length - 1 : i - 1) : (i + 1) % els.length;
+      els[nx].focus();
     }
-  });
+  }, true);
 
   /* ── boot ───────────────────────────────────────────────────────*/
   if (NEU.settings) return;                    // already built (re-run)
   build();
   apply();
+  /* The switch is in index.html's .ctl cluster, beside the light. */
+  var mt = document.getElementById('muteToggle');
+  if (mt) mt.addEventListener('click', function () { mute(!state(K_MUTE)); });
 
   NEU.settings = {
     open: open, close: close,
@@ -358,6 +420,8 @@
     get text() { return state(K_TEXT); },
     get hitstop() { return state(K_STOP); },
     get particles() { return state(K_PART); },
-    get music() { return NEU.music ? NEU.music.volume : num(K_MUSIC, 55); }
+    get relaxedQuiz() { return state(K_RELAX); },
+    get muted() { return state(K_MUTE); },
+    get music() { return num(K_MUSIC, 55); }
   };
 })();

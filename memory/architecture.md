@@ -45,20 +45,35 @@ Moving a file means updating **three** places, and a stale path is a silent
 
 ## Load order (matters)
 
+The real order, as `index.html` has it — `tests/fixes26.mjs` fails if the
+two drift. (Before 2026-10-23 this section said quest.js loads first; three
+page scripts precede it, and nothing breaks because none of them reports
+progress at load time.)
+
 ```
-core/quest.js   FIRST — everything reports progress into it
-core/save.js    mirrors quest; must precede anything that saves
-core/juice.js   feedback; every scene calls into it
-data/sheets.js  the sprite manifest
-core/engine.js  rooms
-page/*          the website
-game/*          acts I-III
-act4/*          the woods
-core/music.js   after every scene — it polls them for which is running,
-                and before settings.js, which reads its volume
-core/settings.js the accessibility panel
-core/touch.js   after every scene — it polls them for which is running
-core/dev.js     LAST — the dev console needs everything else present
+data/data.js        the projects list — the page renders from it
+page/main.js        the scrolling website (boot card, sections, controls)
+page/stars.js       the starfield canvas
+core/quest.js       progress — everything that reports progress loads after
+core/save.js        mirrors quest; must precede anything that saves
+core/juice.js       feedback; every scene calls into it
+core/danmaku.js     shared bullet-hell helpers for the three fights
+data/sheets.js      the sprite manifest — before the engine draws a sheet
+core/engine-look.js   the rooms' look kit (engine v2)
+core/engine-kinds.js  what each entity kind does / looks like / emits
+core/engine.js      rooms — the sim, the loop, the camera, the API
+game/*              acts I-III: sword sans bullet dark
+act4/*              the woods: act4, rooms-a, rooms-d, shop, boss-scal,
+                    scal-worm, scal-seekers, rooms-g, quiz, rhythm, craft,
+                    boss-polt, crack
+game/deck.js        the console's home screen (after every game it lists)
+core/music.js       after every scene — it polls them for which is running,
+                    and before settings.js, which reads its volume
+core/perf.js        the dev frame meter
+core/settings.js    the accessibility panel
+core/touch.js       after every scene — it polls them for which is running
+core/dev.js         LAST classic script — the dev console needs everything
+page/scene.js       type="module": deferred, runs after parsing
 ```
 
 Two modules poll instead of being called — `music.js` and `touch.js`. That is
@@ -179,3 +194,22 @@ Required jsdom setup (see `memory/workflow.md` for the traps):
 `runScripts: 'outside-only'`, hand-driven `IntersectionObserver`, a stubbed
 `AudioContext`, a **non-null** 2d context proxy, and a `getBoundingClientRect`
 that returns a real box.
+
+## Engine v2 (2026-10-23)
+
+`engine.js` was rebuilt in three files (review and plan:
+`.opencode/plans/engine-v2.md`). The public surface (`NEU.engine.*`) and the
+hook API rooms receive are unchanged; `tests/fixes22.mjs` pins them and passed
+on v1 before a line moved, `tests/fixes35.mjs` pins what v2 changed.
+
+| File | Owns |
+|---|---|
+| `core/engine-look.js` | `NEU.engineLook` — zone looks keyed by tileset name, value-remapped palettes, `bakeRoom` (3/4 walls, floor texture, contact shadows) baked once per room, animated tiles, stepped lightmap + additive glow, weather, player/prop sprites, the prompt cap, the iris |
+| `core/engine-kinds.js` | `NEU.engineKinds` — one record per entity kind (`interactive`, `promptable`, `fire`, `draw`, `light`, `width`, `floor`); unknown kinds fall back to `default` |
+| `core/engine.js` | rooms, collision (swept + corner forgiveness), fixed 60 Hz step, movement with acceleration, facing-aware targeting, eased pad-aware camera, viewport-fitted integer scale (`SCALE` is now a getter), transitions, `api.later`, `confirmExit`, `debug` |
+
+Room entities may carry an optional `look: 'merchant' | 'sans' | 'gate' |
+'bigdoor' | 'vending' | …` (any key of `NEU.engineLook.props`); without one, a
+plain npc's prop is inferred from its first line. The tileset atlases
+(`src`/`rects`) are kept as data and no longer drawn — every room is baked
+from its tileset's own `colours`.

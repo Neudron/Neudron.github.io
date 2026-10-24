@@ -30,7 +30,7 @@ const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 
 const MODULES = [
   'core/quest.js', 'core/save.js', 'core/juice.js', 'core/danmaku.js',
-  'data/sheets.js', 'core/engine.js', 'game/sword.js', 'game/sans.js',
+  'data/sheets.js', 'core/engine-look.js', 'core/engine-kinds.js', 'core/engine.js', 'game/sword.js', 'game/sans.js',
   'game/bullet.js', 'game/dark.js', 'act4/act4.js', 'act4/rooms-a.js',
   'act4/rooms-d.js', 'act4/boss-scal.js', 'act4/rooms-g.js', 'act4/quiz.js',
   'act4/rhythm.js', 'act4/craft.js', 'act4/boss-polt.js', 'act4/crack.js',
@@ -332,8 +332,10 @@ console.log('\n14. dialogue progress is observable');
 /* ═══ 15. dialogs resume where they were abandoned ════════════════*/
 console.log('\n15. dialog resume + E-during-talk is dead');
 {
-  const E = read('core/engine.js');
-  ok('>>> re-interacting mid-talk is a no-op <<<', /NEU\.tboxOpen && NEU\.tboxOpen\(\)\) return/.test(E));
+  /* v2: what an npc does on e moved verbatim into engine-kinds.js (one
+     record per kind); the engine file is the sim. Read both. */
+  const E = read('core/engine.js') + '\n' + read('core/engine-kinds.js');
+  ok('>>> re-interacting mid-talk is a no-op <<<', /(NEU\.tboxOpen && NEU\.tboxOpen\(\)|tboxOpen\(\))\) return/.test(E));
   ok('>>> progress is keyed per room and entity <<<', /var dk = 'd:' \+ room\.id \+ ':' \+ e\.x \+ ',' \+ e\.y/.test(E));
   ok('>>> resumed talks start at the abandoned line <<<', /base\.slice\(at\)\.concat\(e\.close \|\| \['\.\.\.'\]\)/.test(E));
   ok('>>> fully-read talks replay whole <<<', /seen >= total \? 0 : seen/.test(E));

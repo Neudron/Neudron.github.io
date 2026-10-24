@@ -244,7 +244,7 @@ function bootEngine(imageLoads) {
   });
 
   for (const f of ['core/quest.js','core/save.js','core/juice.js','core/danmaku.js',
-                   'data/sheets.js','core/engine.js','act4/rooms-a.js',
+                   'data/sheets.js','core/engine-look.js', 'core/engine-kinds.js', 'core/engine.js','act4/rooms-a.js',
                    'act4/rooms-d.js','act4/rooms-g.js']) {
     try { w.eval(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8')); }
     catch (e) { console.log('  !! ' + f + ': ' + e.message); }
@@ -269,11 +269,16 @@ if (E && E.tilesets) {
   console.log('       (add `tilesets: function(){ return tilesets; }` to engine.js exports)');
 }
 
-/* The draw path itself: engine.js:490-501 gates on
-   `atlas && atlas.complete && atlas.naturalWidth && !atlas.__failed`. */
-const ENG = read('core/engine.js');
-ok('draw path checks complete + naturalWidth before drawing',
-   /atlas\s*&&\s*atlas\.complete\s*&&\s*atlas\.naturalWidth/.test(ENG));
+/* The draw path itself. v1 blitted the atlas and had to gate on
+   `atlas.complete && naturalWidth`. Engine v2 (engine-look.js) bakes
+   every room procedurally from each tileset's own `colours` — the atlas
+   stays as data (provenance, and a texture layer later) and is never
+   drawn, so a half-loaded or 404'd sheet cannot reach the screen at all.
+   Assert that, instead of the gate it made unnecessary. */
+const LOOK = read('core/engine-look.js');
+const ENG = read('core/engine.js') + '\n' + LOOK;
+ok('v2 bakes rooms from the tileset palette, not the atlas',
+   /function bakeRoom/.test(LOOK) && /ts && ts\.colours/.test(LOOK) && !/drawImage\(\s*atlas/.test(LOOK + read('core/engine.js')));
 ok('>>> draw path has an else that fills a colour <<<',
    /ts\.colours/.test(ENG) && /fillRect/.test(ENG));
 ok('a failed atlas is marked so it is not retried every frame',

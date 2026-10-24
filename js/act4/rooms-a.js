@@ -641,7 +641,7 @@
                 'it wants more. it is fairly clear about that.'],
         lines: ['you tip the ashes in.',
                 'the bowl takes them without a sound, which is worse than a sound.',
-                'a door opens in the east wall. it is on fire. it does not seem bothered.'] },
+                'a door opens in the south wall. it is on fire. it does not seem bothered.'] },
       { t: 'npc', x: 12, y: 3, colour: '#C4705F', mush: 'mush2', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush2'); } },
       { t: 'exit', x: 15, y: 5, to: 'a3_fork', spawn: 'altar' },
@@ -682,7 +682,7 @@
          the fire door, every zone after the castle — was unreachable
          because of one entity two cells too far in. It is the door
          itself now, which is also what the room has been calling it. */
-      { t: 'npc', x: 5, y: 4, colour: '#C2405F', run: function (c) { enterArena(c); } },
+      { t: 'npc', x: 5, y: 4, colour: '#C2405F', look: 'gate', run: function (c) { enterArena(c); } },
       { t: 'exit', x: 0, y: 4, to: 'b7_altar', spawn: 'north' }
     ],
     onEnter: function (c) {

@@ -465,7 +465,18 @@ function init() {
     }, 250);
   }
 
-  tick();
+  /* Compile every program before the first frame (ultraplan A10). The
+     first render of a transmissive material compiles its shaders on the
+     main thread, and a lab run measured that as a 1.7–4.4s long task in
+     the middle of boot (zero long tasks with WebGL off). compileAsync
+     uses KHR_parallel_shader_compile where the GPU offers it, so the boot
+     card keeps animating while the driver works; anything else falls
+     back to compiling on the first frame, exactly as before. The lab
+     measurement was software GL, which has no parallel compile, so it
+     could not show the gain — that needs a real GPU (ledger 2026-10-23). */
+  const start = () => tick();
+  if (renderer.compileAsync) renderer.compileAsync(scene, camera).then(start, start);
+  else start();
 
   /* Released on the frame after the first render — not from inside the
      loop, which early-returns when the hero is off screen. A visitor

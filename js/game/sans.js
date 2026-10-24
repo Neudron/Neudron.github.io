@@ -38,7 +38,36 @@
   if (!sans || !btn || !sword || !tbox || !ttxt) return;
 
   var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* every sound in this file stops for reduced motion, as it always has,
+     and for the Sound switch (settings.js), read at the moment it plays */
+  function hush() { return reduced || !!(NEU.settings && NEU.settings.muted); }
   var CARRY   = matchMedia('(pointer: coarse)').matches;   // tap-to-carry
+
+  /* ── scene timers (F4) ──────────────────────────────────────────
+     A timer set in one room of the bedroom loop is a promise about the
+     room as it was when it was set. Blackout, sleep and the hammer's
+     hand-off each end the room they belong to, and a bare setTimeout
+     from one of them would still fire into the next: the grey room
+     opening after the light was fixed, or the walk-up scrolling a page
+     whose sans is already asleep. later() keeps the id so cancelLater()
+     can clear every pending one at the point the room ends. Only timers
+     that act on scene state go through here. Cosmetic class removals
+     stay plain setTimeouts, and a timer that belongs to one control
+     keeps its own handle (panelT, deckT), so one teardown cannot cancel
+     a timer that belongs to something else. */
+  var laters = [];
+  function later(fn, ms) {
+    var id = setTimeout(function () {
+      var i = laters.indexOf(id); if (i >= 0) laters.splice(i, 1);
+      fn();
+    }, ms);
+    laters.push(id);
+    return id;
+  }
+  function cancelLater() {
+    for (var i = 0; i < laters.length; i++) clearTimeout(laters[i]);
+    laters = [];
+  }
 
   /* The contract follows the pointer that made THIS gesture, not a
      fact frozen at page load. A phone with a bluetooth mouse and an
@@ -141,7 +170,7 @@
   };
 
   function blip(who) {
-    if (reduced) return;
+    if (hush()) return;
     if (who && who !== 'sans') { synthVoice(VOICE[who] || VOICE.narr); return; }
     if (blipOk && blipPool.length) {
       try {
@@ -219,7 +248,7 @@
   } catch (e) { tSampleOk = false; }
 
   function totemSound() {
-    if (reduced) return;
+    if (hush()) return;
     if (tSampleOk && tSample) {
       try {
         tSample.currentTime = 0;
@@ -283,7 +312,7 @@
   }
 
   function whoosh() {
-    if (reduced) return;
+    if (hush()) return;
     try {
       var a = ctx(), t = a.currentTime, len = 0.26;
       var s = a.createBufferSource(); s.buffer = noiseBuf(len);
@@ -301,7 +330,7 @@
   }
 
   function snap() {
-    if (reduced) return;
+    if (hush()) return;
     try {
       var a = ctx(), t = a.currentTime;
       var s = a.createBufferSource(); s.buffer = noiseBuf(0.09);
@@ -324,7 +353,7 @@
   }
 
   function locked() {
-    if (reduced) return;
+    if (hush()) return;
     try {
       var a = ctx(), t = a.currentTime;
       for (var k = 0; k < 2; k++) {
@@ -344,7 +373,7 @@
      it fires on every arrow key, and anything with body to it becomes
      unbearable by the fourth tile. Sine, 25ms, no decay tail. */
   function tick() {
-    if (reduced) return;
+    if (hush()) return;
     try {
       var a = ctx(), t = a.currentTime;
       var o = a.createOscillator(), g = a.createGain();
@@ -357,7 +386,86 @@
     } catch (e) {}
   }
 
-  NEU.sfx = { whoosh: whoosh, snap: snap, locked: locked, tick: tick };
+  /* ── the gathering and the beat ─────────────────────────────────
+     rise is a sine climbing 180 -> 620 Hz over ms, quiet enough to sit
+     under the fight. It hands back its own stop, because a charge that
+     is cancelled must not keep climbing into the next room; calling
+     stop twice is harmless. stinger is a three-note rising figure, a
+     major third and then a fifth over the root, for a phase change;
+     kind 3 is a fourth higher than kind 2 so the second change sounds
+     like the first, only more so. heart is the soul at one hit from
+     death: two low 60 Hz thumps, 180 ms apart, the way a heartbeat
+     lands. Every one of them is quiet, and every one is a silent no-op
+     when there is no AudioContext. */
+  function rise(ms) {
+    var stopped = false, o = null, g = null, a = null, len = ms / 1000;
+    if (hush()) return function () {};
+    try {
+      a = ctx();
+      var t = a.currentTime;
+      o = a.createOscillator(); g = a.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(180, t);
+      o.frequency.exponentialRampToValueAtTime(620, t + len);
+      g.gain.setValueAtTime(0.04, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      o.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + len);
+    } catch (e) {}
+    return function stop() {
+      if (stopped || !o) return;
+      stopped = true;
+      try {
+        /* fade from wherever the tone is now, not from the old envelope */
+        var n = a.currentTime, v = Math.max(0.0001, g.gain.value);
+        g.gain.cancelScheduledValues(n);
+        g.gain.setValueAtTime(v, n);
+        g.gain.exponentialRampToValueAtTime(0.0001, n + 0.03);
+        o.stop(n + 0.035);
+      } catch (e) {}
+    };
+  }
+
+  function stinger(kind) {
+    if (hush()) return;
+    try {
+      var a = ctx(), t = a.currentTime;
+      var root = kind === 3 ? 523.25 : 392;      /* C5 for kind 3, G4 for kind 2 */
+      var steps = [1, 1.26, 1.5];                /* root, a major third up, a fifth up */
+      for (var k = 0; k < 3; k++) {
+        var st = t + k * 0.075;
+        var o = a.createOscillator(), g = a.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(root * steps[k], st);
+        g.gain.setValueAtTime(0.0001, st);
+        g.gain.exponentialRampToValueAtTime(0.09, st + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, st + 0.13);
+        o.connect(g); g.connect(a.destination);
+        o.start(st); o.stop(st + 0.14);
+      }
+    } catch (e) {}
+  }
+
+  function heart() {
+    if (hush()) return;
+    try {
+      var a = ctx(), t = a.currentTime;
+      for (var k = 0; k < 2; k++) {
+        var st = t + k * 0.18;
+        var o = a.createOscillator(), g = a.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(60, st);
+        g.gain.setValueAtTime(0.0001, st);
+        g.gain.exponentialRampToValueAtTime(0.16, st + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, st + 0.04);
+        o.connect(g); g.connect(a.destination);
+        o.start(st); o.stop(st + 0.045);
+      }
+    } catch (e) {}
+  }
+
+  NEU.sfx = { whoosh: whoosh, snap: snap, locked: locked, tick: tick,
+              rise: rise, stinger: stinger, heart: heart };
 
   /* ── the particles ──────────────────────────────────────────────
      Drawn as integer-aligned fillRects, never circles — this page is
@@ -420,6 +528,13 @@
   var curIdx = 0, curTotal = 0, watch = null;
   var tface = document.getElementById('tboxFace');
   var tfaceImg = document.getElementById('tboxFaceImg');
+  /* The box is not a live region itself. The typewriter rewrites its
+     text every 42ms, and a screen reader on a live region announces
+     each rewrite, so a line was read out one letter at a time. The
+     whole line goes to this sibling once, when it starts, and the
+     region is emptied when the box closes. */
+  var tboxSR = document.getElementById('tboxSR');
+  function srSay(s) { if (tboxSR) tboxSR.textContent = s; }
   var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/annoying-dog.gif', tv: 'img/tv.svg',
                witch: 'img/act4/witch-face.png',
                /* real mod filenames — HoodlessHeadIcon/HoodedHeadIcon from
@@ -453,11 +568,13 @@
     clearInterval(typing); clearTimeout(next.hold);
     if (!queue.length) {
       tbox.hidden = true;
+      srSay('');
       /* the talk ended or was cut short — the watcher wants to know */
       if (watch) watch(-1, -1);
       return;
     }
     var line = queue.shift(), i = 0;
+    srSay(line);
     curV = queueV.shift() || 'sans';
     curIdx++;
     if (watch) watch(curIdx, curTotal);
@@ -499,6 +616,7 @@
     clearInterval(typing); clearTimeout(next.hold);
     queue = [];
     if (tbox) tbox.hidden = true;
+    srSay('');
     if (watch) watch(-1, -1);
   };
   NEU.hush = function () { shutUp(); };
@@ -515,6 +633,7 @@
   function shutUp() {
     clearInterval(typing); clearTimeout(next.hold);
     queue = []; queueV = []; ttxt.textContent = ''; tbox.hidden = true;
+    srSay('');
     if (watch) watch(-1, -1);
   }
 
@@ -1145,9 +1264,15 @@
      scene.js raycasts the click and calls this; it does not know or
      care whether you are carrying anything. */
   var panel = document.getElementById('panel');
+  /* The hide that follows a close. Its own handle, not the scene list:
+     closing the panel must not cancel a bedroom timer. */
+  var panelT = 0;
 
   function openPanel() {
     if (!panel) return;
+    /* A close that is still fading would hide the panel we are opening
+       now. Cancel that hide first. */
+    clearTimeout(panelT);
     panel.hidden = false;
     requestAnimationFrame(function () { panel.classList.add('is-open'); });
     var c = document.getElementById('panelClose');
@@ -1156,7 +1281,10 @@
   function closePanel() {
     if (!panel) return;
     panel.classList.remove('is-open');
-    setTimeout(function () { panel.hidden = true; }, 420);
+    /* A second close inside the fade replaces the first hide, so only one
+       is ever pending. */
+    clearTimeout(panelT);
+    panelT = setTimeout(function () { panel.hidden = true; }, 420);
   }
 
   /* ── the door stays unlocked ────────────────────────────────────
@@ -1385,7 +1513,7 @@
       if (swBtn) swBtn.classList.add('is-stuck');
       /* He stops fidgeting once he has given the thing up. */
       if (dogEl) dogEl.classList.add('is-settled');
-      setTimeout(function () {
+      later(function () {
         /* Narration, then him. He does not narrate the dog. */
         say(["he spat out a hammer.",
              "huh. cosmolight's jammed too. that's new.",
@@ -1397,6 +1525,9 @@
   if (dogBtn) dogBtn.addEventListener('click', talkDog);
 
   function smashLight() {
+    /* The hammer is spent, so the narration it was handed with is about
+       a thing that is gone. Clear it before anything else. */
+    cancelLater();
     /* Every state the last repair consumed has to come back, or the
        second blackout is a dead end: the grey door remembers it
        already handed over a clicker, so it hands over nothing, and
@@ -1413,7 +1544,7 @@
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     if (NEU.quest) NEU.quest.mark('smash');
     showChip(darkChip, true);
-    setTimeout(function () { if (NEU.dark) NEU.dark.open(); }, 750);
+    later(function () { if (NEU.dark) NEU.dark.open(); }, 750);
   }
 
   NEU.grantClicker = function () {
@@ -1425,6 +1556,9 @@
   NEU.fitClicker = function () { fitClicker(); };
   NEU.hasClicker = function () { return hasClicker; };
   function fitClicker() {
+    /* The blackout is over, so the grey room opening that was queued for
+       it must not happen now. */
+    cancelLater();
     /* Reset the dog so the whole loop can be run again from the top. */
     dogTalks = 0;
     if (dogEl) dogEl.classList.remove('is-settled');
@@ -1447,7 +1581,7 @@
          "i'm gonna go lie down. don't wait up."]
       : ["huh. it fits. again.",
          "you really like that hammer."]);
-    if (first) setTimeout(goUp, 2600);
+    if (first) later(goUp, 2600);
   }
 
   /* main.js asks this before doing anything with the switch. Returning
@@ -1513,12 +1647,15 @@
     /* Belt and braces: if the page cannot scroll (short viewport, or a
        browser that ignores the request) nothing will ever leave the
        screen, and a queued sleep that never fires is a dead end. */
-    setTimeout(function () { if (wantSleep && !asleep && !onScreen) goToSleep(); }, 1200);
-    setTimeout(function () { if (wantSleep && !asleep) goToSleep(); }, 6000);
+    later(function () { if (wantSleep && !asleep && !onScreen) goToSleep(); }, 1200);
+    later(function () { if (wantSleep && !asleep) goToSleep(); }, 6000);
   }
 
   function goToSleep() {
     if (asleep) return;
+    /* He is down, so the walk-up that was meant to get him off the screen
+       has nothing left to do. A scroll now would move a settled page. */
+    cancelLater();
     asleep = true; wantSleep = false;
     if (dogEl)   { dogEl.classList.remove('is-in'); setTimeout(function () { dogEl.hidden = true; }, 520); }
     /* The dog is leaving the page with him, so the flag has to follow
@@ -1664,6 +1801,9 @@
     return true;
   };
 
+  /* The handoff timer that opens the deck after a dock. Kept so a
+     hand-open can cancel it (see the docked branch below). */
+  var deckT = 0;
   if (tvEl) tvEl.addEventListener('click', function () {
     /* Breaking is not a click any more: keyHit owns that moment — you
        put a thrown key through the screen — so a tap here only means
@@ -1671,14 +1811,19 @@
     /* After the show has run at least once, the broken TV re-opens
        it. The 'only ever improves' save rule means a worse run
        can't close doors, so replay is safe. */
+    /* The show opens over the room and clears the box as it does, so
+       the replay goes straight in rather than saying a line nobody sees. */
     if (tvBroken && NEU.save && NEU.save.flagged('quiz_rank') && NEU.quiz) {
-      say(['the screen is cracked but the show is still on inside it.',
-            'you can hear him. press e to go again.'], 'narr');
       NEU.quiz.open(); return;
     }
     if (docked || docking) {
       /* Once it is in, the television is just a way back to the menu. */
-      if (docked && NEU.deck) { NEU.deck.open(); return; }
+      if (docked && NEU.deck) {
+        /* A hand-open supersedes the handoff still pending from the dock.
+           Left alone, that timer would reopen a deck the visitor closed. */
+        clearTimeout(deckT);
+        NEU.deck.open(); return;
+      }
       say(["it's already playing."], 'tv'); return;
     }
     if (!switchSeen) { say(["a television. nothing to put in it."], 'tv'); return; }
@@ -1709,10 +1854,14 @@
       tvState();
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
       if (NEU.quest) NEU.quest.mark('docked');
+      /* The dock only opens at a full charge, so the save records that
+         here too. It is the same value the blaster's crossing wrote, set
+         again at the point where the console goes into the dock. */
+      if (NEU.save) NEU.save.flag('console_charge', 100);
       /* The television used to start a fight. It starts a home screen
          now — a fight has one punchline and you can only hear it
          once, a library is a joke you can browse. */
-      setTimeout(function () { if (NEU.deck) NEU.deck.open(); }, 420);
+      deckT = setTimeout(function () { if (NEU.deck) NEU.deck.open(); }, 420);
     });
   });
 

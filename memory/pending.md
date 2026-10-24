@@ -64,97 +64,9 @@ than trusting the plan document.
 
 ---
 
-## 2026-08-22 — input ownership + phone ergonomics
+## 2026-08-22 — input ownership + phone ergonomics → archived
 
-Two real bugs found by a jsdom probe that opened an overlay while the room
-was still running and pressed Escape:
-
-- **Escape bleed-through.** The engine's keydown yields only to
-  `NEU.activeMinigame`, which `bullet.js` and `boss-scal.js` set — but shop,
-  rhythm, craft and polt never did. One Escape reached both handlers: the
-  room left underneath while the overlay asked "leave?". Declining stranded
-  you in a dead room (rhythm's decline path), and craft's self-heal
-  (`engine.enter` on close) had been papering over the same hole.
-  **Fix:** all four now claim `NEU.activeMinigame` on open and release it on
-  close, guarded so they only ever clear their own claim. fixes18 §17b pins
-  all six claims.
-- **shop.close() crashed every time.** It called `NEU.engine.busy(false)`,
-  but `busy()` exists only on the rooms-only API object, not on public
-  `NEU.engine`. Uncaught TypeError on every Escape/quit — masked, because
-  `wrap.hidden = true` runs first. Line removed; nothing ever set busy(true).
-- **Phone:** shop touch profile; `.tpad` spends `env(safe-area-inset-*)`
-  (the meta viewport already asks for cover); `.eng` gains `100svh`; the
-  fight quit button meets Apple's 44px target.
-- **Runner:** `tests/run-all.mjs` — every suite with a hard 60s kill.
-  fixes5 (~28s) and fixes18 (~30s) are legitimately slow jsdom boots and
-  kept tripping short shell timeouts.
-
-Later the same day, against goal "fully mobile + re-gather sprites":
-
-- **Mobile verified on a real rendering engine**, not just jsdom:
-  `_scripts/cdp-mobile.mjs` drives headless Chrome at 390×844 dpr3 with
-  touch + coarse-pointer emulation over raw CDP (opensteer needs AF_UNIX,
-  which Windows lacks). Results: thumb pad claims `engine`, switches to
-  `shop` when the stall opens, engine survives beneath it; a real
-  touch-event tap selects a shop row and produces its quip; board fits,
-  rows are 46px tall; craft cells shrink to 98px; zero runtime errors.
-  CSS fixes that came out of the audit: craft cells fluid
-  (`min(104px, (100vw−96px)/3)` — 3×104px was wider than a 320px phone),
-  `button { touch-action: manipulation }` so rapid taps never fire
-  double-tap zoom, `.tpad` spends `env(safe-area-inset-*)`, `.eng`
-  gained `100svh`.
-- **Sprites re-gathered from source.** 47 verbatim textures from
-  `CalamityTeam/CalamityModPublic @ 1.4.4` into gitignored
-  `_sources/calamity/` (reproducible: `_scripts/fetch-sprite-sources.ps1`),
-  then `_scripts/verify-sprites.mjs` decoded both sides and compared
-  pixels: **37/37 shipped Calamity sprites are faithful** — 36 byte-exact,
-  `BrimstoneHeart.png` equal after transparent-border trim, **zero
-  mismatches**. The three TP files have no upstream: tp-bar is a recolor
-  of RageBar (identical alpha mask); the 10-frame border and full-anim
-  are Polterghast-styled wiki originals. Provenance written into
-  `memory/assets.md`.
-- **SEO surface shipped:** self-canonical + `WebSite` JSON-LD +
-  `sitemap.xml` + robots `Sitemap:` line, all three URLs agreeing;
-  fixes17 asserts agreement, parseability, staging, and live files.
-- **Agent team stood up** (`AGENTS.md` is the contract): five workers in
-  `.opencode/agents/` pinned to the same free model — scout/researcher
-  (read-only, dispatched through the background-agents plugin's
-  `delegate()` so results persist across compaction), builder (writes,
-  plain `edit: allow` after glob-form permissions proved broken on
-  Windows), verifier (bash allowlist), reviewer (binary SHIP/REJECT on a
-  seven-item checklist; REJECT requires executable evidence or it is
-  overruled). opencode-notify delivers Windows Toasts. Plugin sources were
-  line-reviewed before install.
-- **Pilot B shipped through the full pipeline** (builder → verifier →
-  reviewer SHIP): the audio-unlock gate no longer latches — gestures retry
-  `resume()` while suspended, `pointerup`/`touchend` join the capture pair
-  as spec-guaranteed triggers, `navigator.audioSession.type='playback'`
-  beats the iOS silent switch where supported, and backgrounding re-unlocks
-  on visibilitychange. fixes16 §2b pins all of it (TDD: written RED first).
-  A comment-only trim keeps music.js inside its 24 KB budget (24,460 B).
-- **Scout wave + six-defect sweep shipped.** Two parallel scouts audited
-  every module; 12 findings, 6 confirmed against source after
-  orchestrator verification, fixed and gated (fixes18 §19 pins them):
-  engine double-rAF on mid-room re-enter, settings is-playing strip,
-  settings/dev Escape bleed-through into live rooms, boss-scal charge
-  softlock on retry, polt stale charge timer across reopen, rhythm phase
-  timer duplicating charts. Reviewer SHIP on both waves.
-- **Wave C — full coverage reached, six more shipped** (71bf4c9): two
-  further scouts closed the unread halves (sans/bullet/dark/deck and
-  act4 rooms/craft/shop + page). Verified + fixed: endless-blackout
-  story-chain leak, bullet ghost death loop, BL_HALF dead tuning revert,
-  stacked loops from chip-spam opens, inert restored portal (Polterghast
-  now re-summonable unless dead) + per-knock AudioContext leak, craft
-  take() double-fire. fixes18 §20 (129 checks). Every js/ module has now
-  been scouted at least once.
-- **Wave D — cross-session softlock killed** (804394d): follow-up
-  verification found the sleep→Switch→charge→dock chain living only in
-  module vars — ANY refresh after "let them rest" booted an empty dock
-  with no Switch while objectives said "dock it", and Act IV resumes
-  solely through that dock's deck. Boot now re-arms the chain from its
-  quest marks; an undocked console returns empty so the blaster
-  re-earns charge. Also: reload mid-trip re-arms is-trip visuals
-  (e6f6c3d). fixes18 §20 → 131 checks.
+Closed; moved to `memory/archive/pending-2026-08.md` (M8).
 
 ---
 
@@ -337,7 +249,127 @@ Browser-uat debt (jsdom cannot prove):
 - Second-summon sub-12% arc has no automated coverage.
 - Meter-local +-1px shake isolation (drawn after juice.end).
 Follow-ups:
-- Seed Math.random in fixes8 harness and re-fit drive legs once (~8% residual flake).
+- ~~Seed Math.random in fixes8 harness and re-fit drive legs once (~8% residual flake).~~ Done 2026-10-23: fixes8 §6b drives on `tests/lib/seed.mjs` (SEED 20261023).
 - Name wiki pages in GIGA_AT / skull-constant comments (sourcing pass).
 - Rename drawMeter inner `frames` to aFrames (shadowing trap; text is brief-mandated today).
 Known-red on MAIN checkout only: fixes12/fixes16 (artifacts of unrelated dirty files juice/music/settings); clean checkouts run 15/15.
+
+## 2026-10-22 — Tenna soft-lock: the show now hands you to the corridor
+
+**Bug (reported):** the game got stuck at Tenna and could not move on.
+**Root cause:** `quiz.js` cleared the DODGE FIRE / SHOOT THE TARGETS
+intervals but never nulled their handles, and the handles doubled as "is
+this phase live". After the shoot phase, `shootKey()` stayed armed for the
+rest of the session and ate every Enter, so "enter to go and see" on the end
+screen did nothing. Esc there restarted a show that then skipped both phases,
+and Esc during the shoot phase restarted the show under a live loop. No suite
+caught it because every quiz test ran `fast(true)`, which skips both phases.
+**Fix:** one `phase`/`phaseLoop` pair that `stopPhase()` nulls, plus per-run
+`dodged`/`shot` flags reset by `begin()`. The end screen is now an `ended`
+state with a 7s countdown that opens `g0_hall` on its own (Enter goes now,
+Esc replays). Held-arrow movement in both phases. Arrows/Enter pick answers,
+so the touch stick and A button can play the show.
+**Also fixed (phone):** `engine.confirmExit` listened on `document`, but
+`touch.js` dispatches on `window`, and the prompt covers the pad (z 95 > 92).
+On a phone "Leave X?" could not be answered at all, which soft-locked every
+confirmed exit. It now captures on window, has tappable yes/no buttons, and
+its font quoting no longer breaks the inline style.
+**Proof:** `tests/fixes21.mjs` (48) runs the REAL pacing with time-warped
+timers, so both phases run. Human-paced playtests: Obscura MCP v0.2.5
+(`obscura mcp --allow-private-network`, desktop, 2 runs) and Chromium
+(desktop + 390x844 touch-only). All green; the corridor opened unprompted
+about 7s after the end screen, and the first door was walked into.
+**Harness drift fixed:** jsdom 30.1.3 applies `<noscript>` styles under
+`runScripts:'outside-only'` and refuses focus inside `display:none`. That
+broke the focus checks in fixes10/17/20 on a clean checkout, and fixes15's
+profile regex tripped on a comment in touch.js. All 18 suites green.
+**Open (cosmetic, not blocking):** the end-screen quit button still says
+"Progress will be lost" although the score is already saved. On a 390px
+phone the top-right `esc` button overlaps the "20 / 20 · N right" counter.
+
+## 2026-10-24 — TV TIME v2: Tenna's show ends on screen and takes you on
+
+**Reported again:** "once you finish Tenna's questions, absolutely nothing
+happens." Two causes. (1) The live site is still the original build:
+`main` (what deploys) sits at f24e219, before the a309a70 fix, so neu.ac
+still has the soft-lock. Nothing on this branch is live until it is merged
+to main. (2) Even with the fix, the end was a text panel and a countdown,
+which reads as "nothing happened".
+
+**Rebuilt (quiz.js, #quiz markup, its CSS):** Tenna is drawn in code (the
+wiki crops were cut off at the neck); a studio look; the finale is a
+sequence that needs no input: title + confetti, the score counts up, the
+rank stamps down and Tenna reacts, the doors it opened light up on the
+board, he bows, the TV switches off like a CRT, and `g0_hall` opens through
+a slow iris (`engine.enter(id, spawn, { iris })`). Any key, click or tap
+skips to the switch-off with the result landed. One numbered timeline
+(`later()`), so no beat of a finished show can fire into the next.
+Esc on the finale now goes on (it used to replay); the broken TV replays.
+fixes40 (81); fixes21 updated; quiz.js budget re-based.
+
+**Played (Haiku 5.5, low effort, in Obscura, no tests):** run 1 got 18/20 (S),
+run 2 got 19/20 (S). Both saw the finale and were taken to `g0_hall` with no
+input. Run 2 asked for clearer hits in the arena. **Follow-up:**
+- A hit you take now shakes the arena, washes it red, and Tenna flinches.
+  A target you hit flashes white, and Tenna cheers.
+- `quiz.open()` clears the room's text box. The break narration sat over
+  question 1 and the timer on a phone.
+- The broken-TV replay no longer says a line that the show would wipe.
+- `sans-webfont.woff2` is preloaded. It is `optional`, and fetched on first
+  use it missed the 100ms window. All dialogue then fell back for the
+  visit: serif in Chromium, a script face on iOS and Android.
+
+fixes40 has 91 checks. The cosmetic items in the 2026-10-22 soft-lock entry above are
+closed by v2: quit on the finale skips without a confirm, and on 390px
+`esc` sits in the marquee row, clear of the counter.
+
+## 2026-10-23 — ultraplan (Haiku waves) + engine v2
+
+**Shipped:** see `git log` 3ff2974..HEAD and `.opencode/plans/ultraplan-124.md`
+(ticked items carry their batch). Engine v2: `.opencode/plans/engine-v2.md`
+(P0–P5 done), DEC-001/DEC-002 in decisions.md.
+
+**Measured (Chromium 140 headless, lab — not field data):**
+- C1 axe-core 4.10.2 on the booted home page: **0 violations**, desktop
+  1280×800 and phone 390×844.
+- A14 lab: LCP 80–168ms (the boot mark), CLS 0.000 both viewports.
+- A10: every boot long task is WebGL (0 long tasks with WebGL disabled);
+  1.7–5.2s each on software GL. `scene.js` now compiles via
+  `renderer.compileAsync` before the first frame. Software GL cannot show
+  the gain — **needs a real-GPU/phone measurement (you).**
+- I1: SRI on the import map verified both ways (genuine bytes load; a
+  tampered RoomEnvironment.js is blocked with "Failed to find a valid
+  digest"). Re-hash all five if the three version changes.
+
+**Proofread (J8), applied:** b7's fire door now opens in the *south* wall
+(the line said east; the east wall holds the exit to a3). After the W3/W4
+merges: the merchant's third-state lines now use speaker 'narr' (they used
+'dog': the dog portrait and voice, for a man); the bullet win text is "take
+the dog food?".
+
+**Last batch (W2b, W2c, W4 + orch):** directional shake and phone buzz, fight
+stingers/telegraph tone/heartbeat, the console's full charge and the shop's
+first visit saved, the portrait-fight hint, the danmaku shard cache. The
+Sound switch now silences every effect, not only the music (sans.js sfx and
+blips, the Calamitas voice pool, rhythm notes, the crack, the light switch;
+fixes30 §11). `bullet.js` was the only CRLF file; 9d5c55c normalised it to
+LF, which is why that commit shows it whole. fixes25's js total budget was
+re-based (engine v2 + this batch). F8: nothing to prune, both candidates live.
+
+**Open — needs you:**
+- "find the **sixth** tile" (act4.js, tests) vs story.md "behind a
+  **seventh** tile" vs deck.js listing the woods third of seven. Which is
+  canon?
+- memory/story.md has drifted from the shipped game (it is canon, so not
+  edited): ranks are T…Z not D-…S+; Calamitas is a 24-step cycle with five
+  walls, ten hearts, brothers at 35%, a 20% Soul Seeker ring; b2 is riddle
+  stones, b4 ice, b5 a mirror; Zone E/F throws the key at the TV rather
+  than hitting it with the sword.
+- E7 (Search Console token), E8 (description copy), D3 (fullscreen
+  display), B5/B11/L1 (taste), K3/K6 (real devices), M5 (dependency-review
+  schedule), M10 (what goes in a public roadmap), H8 (what the deploy
+  drill rebuilds).
+
+**M8 applied 2026-10-24:** the closed 2026-08-22 section moved to
+`memory/archive/pending-2026-08.md`. V5/V6 and the Tenna section still carry
+open browser-UAT debt or a cosmetic item, so they stay.

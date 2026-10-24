@@ -77,15 +77,18 @@
   --edge: #5C5C70;           /* interactive control borders — 3.07:1 on --void */
   --accent: var(--lilac);    /* the accent that is actually safe to read */
 
-  /* Determination Mono is the in-game text; Sans is its variant. */
-  --font:  "Determination Mono", "Pixelify Sans", ui-monospace, monospace;
+  /* Determination Mono is the in-game text; Sans is its variant. The
+     *Fallback faces (fonts/webfonts/stylesheet.css) are local fonts
+     resized to the real faces' metrics: they hold the text while the
+     real face loads, so its swap does not move the page. */
+  --font:  "Determination Mono", "Pixelify Sans", "Determination Mono Fallback", ui-monospace, monospace;
   --font-talk: 'Undertale Sans', 'Comic Sans MS', 'Comic Neue', cursive;
   /* Papyrus for the objectives panel. It is the one place a second
      in-game face belongs: a list of tasks is not the site's voice, it
      is an overlay on top of it, and giving it its own typeface stops
      it reading as page content. The kit ships it; nothing new loads. */
   --font-quest: 'Undertale Papyrus', 'Determination Mono', 'Pixelify Sans', monospace;
-  --font-display: "Determination Sans", "Determination Mono", "Pixelify Sans", ui-monospace, monospace;
+  --font-display: "Determination Sans", "Determination Mono", "Pixelify Sans", "Determination Sans Fallback", ui-monospace, monospace;
 
   --bounce: cubic-bezier(.34, 1.36, .64, 1);
   --gutter: clamp(24px, 7vw, 120px);
@@ -248,6 +251,9 @@ html { scrollbar-color: #3A3548 #14141C; scrollbar-width: thin; }
   transition: color .25s;
 }
 .sw:hover .sw__label { color: var(--text); }
+/* The plate is 34px wide and the label is short, so the target would
+   be narrower than a thumb without this. */
+.sw--mute { min-width: 44px; min-height: 44px; }
 
 /* the contact fails: the lever twitches and drops back */
 .sw.is-broken .sw__lever { animation: swFail .34s steps(3, end); }
@@ -1161,56 +1167,204 @@ body.is-blackout::before {
 }
 
 /* ── the show ─────────────────────────────────────────────────────
-   Loud on purpose. This is the one screen in Act IV allowed to be
-   bright — a game show that respects the site's palette is not a game
-   show, and the tonal whiplash after New Home is the joke. */
+   TV TIME. Loud on purpose: the one screen in Act IV allowed to be
+   bright, because a game show that respects the site's palette is not
+   a game show, and the tonal whiplash after New Home is the joke.
+
+   .quiz is the black around the television and .quiz__tv is the
+   picture. That split is what lets the picture switch on and off like
+   a CRT (is-on, is-off) without the page showing through around it. */
 .quiz {
   position: fixed; inset: 0; z-index: 76;
-  background: #1B0E2E;
-  display: grid; align-content: start; gap: 14px;
-  padding: clamp(18px, 4vw, 54px);
-  overflow: auto;
+  background: #000;
+  overflow: hidden;
 }
-.quiz__top { display: flex; justify-content: space-between; font: 400 16px/1 var(--font); }
+.quiz__tv {
+  position: absolute; inset: 0;
+  overflow: auto;
+  padding: clamp(16px, 4vw, 48px);
+  /* the colour on its own line, so an engine that rejects the glows
+     still paints the studio, not the black behind it */
+  background-color: #1B0E2E;
+  background-image:
+    radial-gradient(ellipse 70% 45% at 50% -8%, rgba(255, 138, 207, .20), transparent 70%),
+    radial-gradient(ellipse 80% 40% at 50% 112%, rgba(79, 195, 247, .14), transparent 70%);
+  transform-origin: 50% 50%;
+}
+/* the marquee: a title between two rows of chasing bulbs */
+.quiz__marquee {
+  position: relative; z-index: 1;
+  max-width: 1180px; margin: 0 auto 16px; padding: 12px 0;
+  text-align: center;
+}
+.quiz__marquee b {
+  font: 400 32px/1 var(--font-display); color: #FFD34E;
+  letter-spacing: 6px; text-shadow: 3px 3px 0 #C8203A;
+}
+.quiz__marquee::before, .quiz__marquee::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 6px;
+  background: radial-gradient(circle at 3px 3px, #FFD34E 0 2px, transparent 3px) 0 0 / 16px 6px repeat-x;
+  animation: quizBulbs .5s steps(2) infinite;
+}
+/* on a phone the esc button sits on the marquee's right end; keep clear */
+@media (max-width: 759px) { .quiz__marquee { margin-right: 64px; } }
+.quiz__marquee::before { top: 0; }
+.quiz__marquee::after { bottom: 0; animation-direction: reverse; }
+@keyframes quizBulbs { to { background-position: 8px 0; } }
+
+/* Tenna stands to the left of the questions on a wide screen. On a
+   narrow one he floats top right, beside the board and his own line,
+   and everything from the question down clears him. */
+.quiz__stage { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; }
+.quiz__tenna {
+  float: right; width: 96px; height: 160px; margin: 0 0 8px 16px;
+  image-rendering: pixelated;
+}
+.quiz__main > * + * { margin-top: 14px; }
+@media (min-width: 760px) {
+  .quiz__stage { display: grid; grid-template-columns: 192px minmax(0, 1fr); gap: 40px; align-items: start; }
+  .quiz__tenna { float: none; width: 192px; height: 320px; margin: 16px 0 0; }
+}
+.quiz__top { display: flex; justify-content: space-between; gap: 16px; font: 400 16px/1 var(--font); }
 .quiz__cat { color: #FFD34E; letter-spacing: 3px; }
 .quiz__num { color: var(--ghost); }
 .quiz__board { display: flex; flex-wrap: wrap; gap: 6px; }
 .quiz__board span {
   font: 400 16px/1 var(--font); color: var(--ghost);
   background: #2A1747; padding: 5px 9px;
+  transition: background-color .2s, color .2s, box-shadow .2s;
 }
 .quiz__board b { color: #FFD34E; margin-right: 6px; }
+/* a door the show just opened */
+.quiz__board span.is-lit { background: #FFD34E; color: #1B0E2E; box-shadow: 0 0 12px rgba(255, 211, 78, .6); }
+.quiz__board span.is-lit b { color: #8A1028; }
 .quiz__host {
-  margin: 4px 0 0; min-height: 1.4em;
+  margin: 0; min-height: 2.8em;
   font: 400 16px/1.4 var(--font-talk); color: #FF8ACF;
 }
-.quiz__q { margin: 6px 0 0; font: 400 32px/1.2 var(--font-display); color: var(--bone); }
-.quiz__opts { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.quiz__round {
+  font: 400 22px/1.2 var(--font-display); color: #FFD34E;
+  letter-spacing: 2px; text-transform: uppercase;
+}
+.quiz__q { clear: both; margin: 0; font: 400 32px/1.2 var(--font-display); color: var(--bone); }
+.quiz__q.is-in { animation: quizIn .35s var(--bounce) both; }
+.quiz__opts { clear: both; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .quiz__o {
   display: flex; align-items: center; gap: 12px;
   padding: 14px 16px; text-align: left;
   border: 3px solid #4A2C74; background: #24123D; color: var(--bone);
   font: 400 16px/1.3 var(--font); cursor: pointer;
   transition: transform .12s var(--bounce), border-color .15s, background-color .15s;
+  animation: quizIn .3s var(--bounce) both;
 }
+.quiz__o:nth-child(2) { animation-delay: .05s; }
+.quiz__o:nth-child(3) { animation-delay: .1s; }
+.quiz__o:nth-child(4) { animation-delay: .15s; }
 .quiz__o:hover { transform: translateY(-2px); border-color: #FFD34E; }
 .quiz__o b { color: #FFD34E; }
-.quiz__o.is-right { border-color: #7BE38A; background: #14331C; }
-.quiz__o.is-wrong { border-color: #FF6B8A; background: #331419; }
-.quiz__timer { height: 8px; background: #2A1747; }
+.quiz__o.is-right { border-color: #7BE38A; background: #14331C; animation: quizRight .5s ease-out; }
+.quiz__o.is-wrong { border-color: #FF6B8A; background: #331419; animation: quizWrong .35s ease-out; }
+.quiz__timer { clear: both; height: 8px; background: #2A1747; }
 .quiz__timer i { display: block; height: 100%; width: 100%; background: #FFD34E; }
-.quiz__end { display: grid; gap: 4px; justify-items: start; margin-top: 10px; }
-.quiz__end b { font: 400 32px/1 var(--font-display); color: var(--bone); }
-.quiz__end em { font: 400 96px/1 var(--font-display); color: #FFD34E; font-style: normal; }
-.quiz__end p { margin: 0; font: 400 16px/1.5 var(--font); color: var(--ghost); }
-.quiz__small { color: #6E6880 !important; }
-.quiz__round {
-  font: 400 22px/1.2 var(--font-display); color: #FFD34E;
-  letter-spacing: 2px; text-transform: uppercase; margin: 4px 0;
-}
+.quiz__timer i.is-low { background: #FF4D6A; }
 .quiz__canvas {
-  display: block; width: 100%; max-width: 480px; height: auto;
-  background: #0E0820; border: 3px solid #4A2C74; margin: 4px 0;
+  clear: both; display: block; width: 100%; max-width: 480px; height: auto;
+  background: #0E0820; border: 3px solid #4A2C74;
+  image-rendering: pixelated;
+}
+.quiz__canvas.is-hit { animation: quizWrong .25s linear; }
+@keyframes quizIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes quizRight { 0% { transform: scale(1); } 40% { transform: scale(1.04); } 100% { transform: scale(1); } }
+@keyframes quizWrong {
+  0%, 100% { transform: none; }
+  25% { transform: translateX(-6px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-3px); }
+}
+
+/* ── the finale ──────────────────────────────────────────────────
+   The questions go; the score counts up, the rank stamps down and the
+   doors it opened light up on the board, under two sweeping lights. */
+.quiz.is-finale .quiz__top, .quiz.is-finale .quiz__q,
+.quiz.is-finale .quiz__opts, .quiz.is-finale .quiz__timer { display: none; }
+/* the answer keys mean nothing now; the go button says what does */
+.quiz.is-finale .bh__keys { visibility: hidden; }
+/* On a phone the line names keys there are none of, and the pad sits on it. */
+@media (pointer: coarse) { .quiz .bh__keys { display: none; } }
+.quiz__end {
+  clear: both; display: grid; justify-items: center; gap: 8px;
+  padding: 8px 0 24px; text-align: center;
+}
+.quiz__fin {
+  margin: 0; font: 400 32px/1.1 var(--font-display); color: #FFD34E;
+  letter-spacing: 2px; text-shadow: 3px 3px 0 #8A1028;
+  animation: quizPop .5s var(--bounce) both;
+}
+.quiz__score { margin: 0; font: 400 32px/1 var(--font-display); color: var(--ghost); }
+.quiz__score b { font: 400 64px/1 var(--font-display); color: var(--bone); }
+.quiz__rank {
+  margin: 0; min-height: 128px;
+  font: 400 128px/1 var(--font-display); color: #FFD34E;
+  text-shadow: 6px 6px 0 #C8203A, 0 0 32px rgba(255, 211, 78, .5);
+}
+.quiz__rank.is-stamped { animation: quizStamp .5s cubic-bezier(.2, 1.5, .4, 1) both; }
+.quiz__doors { margin: 0; min-height: 1.5em; font: 400 16px/1.5 var(--font); color: var(--bone); }
+.quiz__go {
+  min-height: 44px; padding: 10px 20px; margin-top: 8px;
+  font: 400 16px/1 var(--font); color: #1B0E2E; background: #FFD34E;
+  border: 0; cursor: pointer;
+}
+.quiz__go:hover, .quiz__go:focus-visible { background: #FFE58A; outline: 3px solid #FF8ACF; outline-offset: 3px; }
+.quiz__small { margin: 0; font: 400 16px/1.5 var(--font); color: #A39BBA; }
+@keyframes quizPop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes quizStamp {
+  0%   { opacity: 0; transform: scale(3) rotate(-14deg); }
+  60%  { opacity: 1; transform: scale(.92) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(-4deg); }
+}
+/* two spotlights, only while the finale is on. Real elements that
+   quiz.js un-hides, so the hidden attribute (which every engine
+   honours) is what keeps them off the rest of the show. */
+.quiz__beam {
+  position: absolute; top: -20%; z-index: 0;
+  width: 44vmax; height: 140%;
+  background: linear-gradient(to bottom, rgba(255, 240, 190, .30), rgba(255, 240, 190, 0) 75%);
+  clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%);
+  transform-origin: 50% 0;
+  pointer-events: none;
+  animation: quizBeamIn .6s ease-out both, quizSweepL 3s ease-in-out infinite alternate;
+}
+.quiz__beam--l { left: -4%; }
+.quiz__beam--r { right: -4%; animation-name: quizBeamIn, quizSweepR; }
+@keyframes quizBeamIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes quizSweepL { from { transform: rotate(-30deg); } to { transform: rotate(16deg); } }
+@keyframes quizSweepR { from { transform: rotate(30deg); } to { transform: rotate(-16deg); } }
+/* confetti, over the picture */
+.quiz__fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; transition: opacity .25s; }
+
+/* ── the set switching on and off ────────────────────────────────
+   On: a dot, a bright line, the picture. Off: the same, backwards.
+   The black around it is .quiz itself, so nothing shows through. */
+.quiz.is-on .quiz__tv { animation: quizCrtOn .55s ease-out both; }
+.quiz.is-off .quiz__tv { animation: quizCrtOff .62s ease-in forwards; }
+.quiz.is-off .quiz__fx, .quiz.is-off .bh__quit, .quiz.is-off .bh__keys { opacity: 0; transition: opacity .2s; }
+@keyframes quizCrtOn {
+  0%   { transform: scale(.02, .004); filter: brightness(5); }
+  45%  { transform: scale(1, .006); filter: brightness(3); }
+  100% { transform: none; filter: none; }
+}
+@keyframes quizCrtOff {
+  0%   { transform: none; filter: none; }
+  45%  { transform: scale(1, .006); filter: brightness(3); }
+  80%  { transform: scale(.02, .006); filter: brightness(5); opacity: 1; }
+  100% { transform: scale(0, 0); filter: brightness(5); opacity: 0; }
+}
+@keyframes quizFade { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .quiz.is-on .quiz__tv { animation: none; }
+  .quiz.is-off .quiz__tv { animation: quizFade .3s forwards; }
+  .quiz__marquee::before, .quiz__marquee::after,
+  .quiz__q.is-in, .quiz__o, .quiz__o.is-right, .quiz__o.is-wrong,
+  .quiz__fin, .quiz__rank.is-stamped { animation: none; }
+  .quiz__beam { animation: none; }
 }
 
 /* ── through the crack ────────────────────────────────────────────*/
@@ -1220,29 +1374,48 @@ body.is-blackout::before {
 /* ── the crack ────────────────────────────────────────────────────
    Four pixels in the corner of the panel. It glows, faintly, because
    the merchant already taught you hours ago that this game points at
-   things by lighting them. */
+   things by lighting them.
+
+   THE TAP TARGET IS NOT THE PAINT. A clip-path clips everything the
+   element draws, its hit box included, so a clipped ten-pixel element
+   was a ten-pixel target. WCAG 2.5.8 asks for 24. So the element stays
+   unclipped and transparent, ::after carries the visible shape, and
+   ::before is an invisible 24px box centred on the crack, which is what
+   a finger actually lands on. */
 .crack {
   position: absolute; right: 14px; bottom: 14px;
   width: 10px; height: 10px; padding: 0; border: 0;
-  background: #000; cursor: pointer;
-  clip-path: polygon(0 40%, 40% 0, 55% 45%, 100% 60%, 60% 100%, 20% 70%);
+  background: transparent; cursor: pointer;
   opacity: 0; transition: opacity .8s ease, transform .3s var(--bounce);
+}
+.crack::before {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 24px; height: 24px; transform: translate(-50%, -50%);
+  background: transparent;
+}
+.crack::after {
+  content: ''; position: absolute; inset: 0;
+  background: #000;
+  clip-path: polygon(0 40%, 40% 0, 55% 45%, 100% 60%, 60% 100%, 20% 70%);
   box-shadow: 0 0 6px rgba(126,80,180,.7);
 }
 .crack.is-in { opacity: 1; }
 .crack[data-n="1"] { transform: scale(1.5); }
-.crack[data-n="2"] { transform: scale(2.4); box-shadow: 0 0 16px rgba(160,80,220,.9); }
+.crack[data-n="2"] { transform: scale(2.4); }
+.crack[data-n="2"]::after { box-shadow: 0 0 16px rgba(160,80,220,.9); }
 .crack.is-hit { animation: crackHit .3s steps(3, end); }
 @keyframes crackHit {
   0%, 100% { filter: none; }
   50%      { filter: invert(1); }
 }
 .crack.is-portal {
-  clip-path: circle(50%);
   width: 54px; height: 54px; right: 8px; bottom: 8px;
+  animation: crackSpin 4s linear infinite;
+}
+.crack.is-portal::after {
+  clip-path: circle(50%);
   background: radial-gradient(circle, #7FE3C4 0%, #1E3A44 45%, #04060A 100%);
   box-shadow: 0 0 30px rgba(127,227,196,.85);
-  animation: crackSpin 4s linear infinite;
 }
 @keyframes crackSpin { to { transform: rotate(360deg); } }
 
@@ -1930,4 +2103,77 @@ html.text-lg .eng { zoom: 0.8; }
 
 @media (prefers-reduced-motion: reduce) {
   .tpad__nub, .tpad__b { transition: none; }
+}
+
+/* ── print ───────────────────────────────────────────────────────
+   Printed, the page should give you the words and not the room. The
+   star field, the glass and the game layers are fixed canvases and
+   overlays that come out of a printer as black slabs over the text,
+   so they are taken out of the page. The one line at the end is the
+   only thing the page says on paper. */
+@media print {
+  .stars, .glass, .ctl, .bh, .dk, .eng, .quiz, .fnf, .craft, .polt,
+  .shop, .deck, .tpad, .tbox { display: none !important; }
+  body::after {
+    content: '...printed. the stars did not come with it.';
+    display: block; font-size: 16px; margin-top: 16px;
+  }
+}
+
+/* ── portrait fight hint ─────────────────────────────────────────────
+   Shown only while touch.js has set body.is-portrait-fight: a fight is
+   live and the phone is held upright. It is a pseudo-element, so there
+   is no markup for it. z-index 95 is one below the dialogue box (96),
+   and pointer-events are off so it never takes a tap meant for the
+   fight. It stays for a few seconds and fades. Under reduced motion it
+   stays the same length and is cut instead of faded.                */
+body.is-portrait-fight::before {
+  content: "turn your phone sideways for more room";
+  position: fixed; top: 12px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 95;
+  pointer-events: none;
+  padding: 6px 10px;
+  font-size: 16px; line-height: 1.3;
+  white-space: nowrap;
+  color: var(--bone); background: var(--void);
+  animation: portraitHint 4s ease-out forwards;
+}
+@keyframes portraitHint {
+  0%, 60% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.is-portrait-fight::before { animation: portraitHint 4s step-end forwards; }
+}
+
+/* ── the one-line error ──────────────────────────────────────────────
+   main.js adds this line once when something throws. It never shows
+   the error itself. It is pinned to the bottom of the viewport on the
+   page's own bone-on-void, and it sits one step below the dialogue box
+   (96) so the box still wins if both are up. The 16px gutter holds at
+   phone width. The slide-in is cut under reduced motion.             */
+.errline {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  z-index: 94;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 16px;
+  margin: 0; padding: 16px;
+  font: 400 16px/1.3 var(--font);
+  color: var(--bone); background: var(--void);
+  border-top: 2px solid var(--edge);
+  animation: errlineIn .3s ease-out both;
+}
+.errline button {
+  min-height: 44px; padding: 8px 16px;
+  font: 400 16px/1 var(--font);
+  color: var(--bone); background: var(--crypt);
+  border: 2px solid var(--edge); cursor: pointer;
+}
+@keyframes errlineIn {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .errline { animation: none; }
 }

@@ -52,7 +52,7 @@ function boot() {
   w.Element.prototype.getBoundingClientRect = () =>
     ({ left:100, top:100, right:146, bottom:146, width:46, height:46, x:100, y:100 });
 
-  for (const f of ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine.js',
+  for (const f of ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine-look.js', 'core/engine-kinds.js', 'core/engine.js',
                    'game/bullet.js','game/dark.js','game/sans.js','game/deck.js','core/dev.js']) {
     const p = path.join(ROOT, 'js', f);
     if (!fs.existsSync(p)) { console.log('  !! missing ' + f); continue; }
@@ -379,7 +379,7 @@ console.log('\n7. weight');
   w.scrollTo = () => {};
   w.requestAnimationFrame = cb => w.setTimeout(() => cb(Date.now()), 0);
   w.Element.prototype.getBoundingClientRect = () => ({ left:100, top:100, right:146, bottom:146, width:46, height:46 });
-  for (const f of ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine.js',
+  for (const f of ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine-look.js', 'core/engine-kinds.js', 'core/engine.js',
                    'game/bullet.js','game/dark.js','game/sans.js','game/deck.js','core/dev.js']) {
     const p = path.join(ROOT, 'js', f);
     if (!fs.existsSync(p)) continue;

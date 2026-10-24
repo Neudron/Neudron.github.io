@@ -392,6 +392,14 @@
 
   function sync() {
     var p = active();
+    /* A fight held upright gets a narrow arena (the width runs out
+       first), so a hint asks for a sideways phone. The hint itself is
+       CSS only (body.is-portrait-fight::before); this class is the whole
+       mechanism. It rides on sync() because sync already polls every
+       200ms and already knows which profile is live. Only for a touch
+       player (wanted()): a tall desktop window has no phone to turn. */
+    var fight = !!p && (p.id === 'bullet' || p.id === 'scal' || p.id === 'polt');
+    document.body.classList.toggle('is-portrait-fight', fight && innerHeight > innerWidth && wanted());
     var show = !!p && wanted() && !talking();
 
     if (!show) {

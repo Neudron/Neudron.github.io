@@ -145,8 +145,8 @@
                  w: 800, h: 1840, frames: 8, cols: 2, fw: 400, fh: 230, fps: 10 },
     /* their thrown attacks — Projectiles/Boss/*.cs, projFrames 4 each.
        Pose identified 2026-08-17 by rendering both files at 4x onto a
-       checkerboard with the cell grid drawn over them
-       (`_scripts/contact-sheet.mjs`): SupremeCatastropheSlash.png is
+       checkerboard with the cell grid drawn over them and read by eye
+       (no script for this is kept): SupremeCatastropheSlash.png is
        a bar along the BOTTOM of its cell hooking upward — the lower
        jaw of the pincer; SupremeCatastropheSlashAlt.png is a bar
        along the TOP curving down — the upper jaw. That reading is

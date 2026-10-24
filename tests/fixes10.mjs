@@ -17,7 +17,7 @@ let pass = 0, fail = 0;
 const ok = (n, c) => { c ? (pass++, console.log('  ok   ' + n))
                          : (fail++, console.log('  FAIL ' + n)); };
 
-const FILES = ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine.js','game/bullet.js','game/dark.js',
+const FILES = ['core/quest.js','core/save.js','core/danmaku.js','data/sheets.js','core/engine-look.js', 'core/engine-kinds.js', 'core/engine.js','game/bullet.js','game/dark.js',
   'game/sans.js','act4/act4.js','act4/rooms-a.js','act4/rooms-d.js','act4/rooms-g.js',
   'act4/boss-scal.js','act4/quiz.js','act4/rhythm.js','act4/craft.js',
   'act4/boss-polt.js','act4/crack.js','game/deck.js','core/dev.js'];
@@ -27,6 +27,11 @@ function boot() {
   const dom = new JSDOM(html, { pretendToBeVisual: true, url: 'https://www.neu.ac/',
                                 runScripts: 'outside-only' });
   const w = dom.window;
+  /* jsdom 30 parses <noscript> as live markup under runScripts:
+     'outside-only', so its fallback style hides every overlay and
+     focus() into one silently does nothing. A browser running the
+     page never applies that block. */
+  w.document.querySelectorAll('noscript').forEach(n => n.remove());
   const obs = [];
   w.IntersectionObserver = class { constructor(cb){this.cb=cb;obs.push(this);} observe(){} disconnect(){} };
   w.matchMedia = () => ({ matches:false, addListener(){}, addEventListener(){} });
@@ -250,6 +255,9 @@ console.log('\n6. crafting');
     return e;
   };
   const settBtn = w.document.getElementById('sansBtn');
+  /* sans is on screen long before crafting exists; jsdom 30 will not
+     focus a button inside a [hidden] ancestor. */
+  w.document.getElementById('sans').hidden = false;
   settBtn.focus();                       /* the gear — what had focus */
   NEU.craft.open();
   await wait(80);                        /* open() defers focusCell */

@@ -50,7 +50,7 @@ function boot(reducedMotion = false) {
   w.Element.prototype.getBoundingClientRect = () =>
     ({ left:100, top:100, right:146, bottom:146, width:46, height:46, x:100, y:100 });
 
-  for (const f of ['core/quest.js','core/save.js','core/juice.js','core/danmaku.js','data/sheets.js','core/engine.js',
+  for (const f of ['core/quest.js','core/save.js','core/juice.js','core/danmaku.js','data/sheets.js','core/engine-look.js', 'core/engine-kinds.js', 'core/engine.js',
                    'game/bullet.js','game/dark.js','game/sans.js','act4/act4.js','act4/rooms-a.js',
                    'act4/rooms-d.js','act4/rooms-g.js','act4/boss-scal.js','act4/quiz.js',
                    'act4/rhythm.js','act4/craft.js','act4/boss-polt.js','act4/crack.js',
@@ -81,7 +81,7 @@ console.log('\n1. the settings module');
     for (const want of ['settShake', 'settFlash', 'settText', 'settTouch',
                         'settHitstop', 'settParticles'])
       ok('switch: ' + want, ids.includes(want));
-    ok('no unexpected switches (' + ids.length + ')', ids.length === 6);
+    ok('no unexpected switches (' + ids.length + ')', ids.length === 7);
   }
   ok('close button exists', !!w.document.querySelector('.sett__x'));
   ok('dialog role + label', w.document.querySelector('.sett').getAttribute('role') === 'dialog');

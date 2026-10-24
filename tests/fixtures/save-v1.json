@@ -1,0 +1,42 @@
+{
+  "v": 1,
+  "act": 3,
+  "room": "g0_hall",
+  "spawn": "default",
+  "flags": {
+    "tv_broken": 1,
+    "soup_made": 1,
+    "crack_clicks": 4,
+    "dog_gone": 1,
+    "witch_talks": 2,
+    "quiz_rank": "S+",
+    "rank:S+": 1,
+    "rank:S": 1,
+    "rank:A+": 1,
+    "rank:A": 1,
+    "rank:B+": 1,
+    "rank:B": 1,
+    "rank:C": 1,
+    "rank:D": 1,
+    "rank:D-": 1
+  },
+  "items": ["axe", "soup", "nutz"],
+  "quest": {
+    "done": {
+      "a4_in": true,
+      "a4_witch": true,
+      "a4_home": true,
+      "a4_told": true,
+      "a4_smash": true,
+      "a4_tenna": true,
+      "a4_rank": true,
+      "a4_axe": true,
+      "a4_soup": true,
+      "a4_nutz": true
+    },
+    "counts": { "a4_rooms": 6 }
+  },
+  "quiz": { "rank": "S+", "score": 21 },
+  "best": { "twenty": 1480 },
+  "stamp": 1787000000000
+}

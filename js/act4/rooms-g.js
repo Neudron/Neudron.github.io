@@ -89,7 +89,7 @@
       var out = [{ t: 'save', x: 27, y: 6 }];
       RANKS.forEach(function (r, n) {
         out.push({ t: 'exit', x: 2 + n * 3, y: 3, to: 'g_' + n, spawn: 'default',
-                   locked: 'rank:' + r,
+                   locked: 'rank:' + r, glowOpen: '#FFD34E', label: r,
                    lines: ['a door marked ' + r + '.',
                            'you did not score high enough for this one. yet.'] });
       });
@@ -175,7 +175,7 @@
          at (9,3), sealed inside the 2x2 the frame encloses — the same
          mistake as b8_arena, and here it walled off h2_machine and
          h3_trip, which nothing else leads to. */
-      { t: 'npc', x: 8, y: 4, colour: '#7FA8FF', run: function (c) { c.go('h2_machine', 'door'); } },
+      { t: 'npc', x: 8, y: 4, colour: '#7FA8FF', look: 'bigdoor', run: function (c) { c.go('h2_machine', 'door'); } },
       { t: 'exit', x: 2, y: 6, to: 'g_8', spawn: 'default' }
     ],
     onEnter: function (c) {
@@ -198,7 +198,7 @@
     ].join('\n'),
     spawns: { door: { x: 13, y: 4, face: 'left' } },
     entities: [
-      { t: 'npc', x: 6, y: 3, colour: '#E4C46A', run: function (c) { punch(c); } },
+      { t: 'npc', x: 6, y: 3, colour: '#E4C46A', look: 'vending', run: function (c) { punch(c); } },
       { t: 'exit', x: 14, y: 4, to: 'h1_storm', spawn: 'top' }
     ],
     onEnter: function (c) {

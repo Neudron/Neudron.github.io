@@ -1,6 +1,6 @@
 # neu — agent team protocol
 
-The repo carries a five-worker agent team in `.opencode/agents/`, all pinned
+The repo carries a six-worker agent team in `.opencode/agents/`, all pinned
 to the same free model. This file is the orchestration contract: how work
 enters the team, what each worker may do, and what must be true before
 anything is committed.
@@ -14,6 +14,7 @@ anything is committed.
 | `neu-builder` | yes | `js/ css/ tests/ index.html` only | syntax gate only | implements ONE bounded work order |
 | `neu-verifier` | yes | no | tests + syntax check | executable gate; reports, never fixes |
 | `neu-reviewer` | diff/code | no | git read-only | independent SHIP/REJECT on a fixed checklist |
+| `neu-docs` | yes | `README.md memory/*.md .opencode/plans/` (not story.md) | git read-only | keeps docs true to the code after a change |
 
 Hands-off for every worker: `memory/ _sources/ .github/ _deploy/ CNAME
 manifest.json og.png robots.txt sitemap.xml`. The orchestrator (primary
@@ -43,11 +44,14 @@ session) is the only role that commits or pushes.
   hung a session indefinitely.
 - `git push` asks, always. Local commits happen only after the gate.
 - Two failed builder cycles on one task → the orchestrator takes it over.
+- The gate is also a git hook: `git config core.hooksPath .githooks` once
+  per clone, and `.githooks/pre-commit` runs `node tests/run-all.mjs` (the
+  ES5 gate + every suite) before any commit lands.
 
 ## Smoke test
 
 After editing `.opencode/agents/*.md`: `opencode agent list` must show all
-five `neu-*` agents. Headless run shape:
+six `neu-*` agents. Headless run shape:
 `opencode run --agent <name> "<brief>"` (wrap in an explicit timeout).
 
 ## Delegation routing (plugins installed 2026-08-22)
@@ -71,3 +75,22 @@ Rules:
   and pagers banned.
 - Plugin sources were reviewed before install; updates require re-review
   (manual copy from the ocx monorepo paths listed in workflow.md).
+
+## Worked example (one real cycle, 2026-10-23)
+
+1. **Wave A.** Three read-only scouts audited the open ultraplan items. The
+   "web" scout's row for G6 said there was no executable v1 save fixture.
+2. **Synthesis.** `.opencode/plans/ultra-batches.md` put G6 into work
+   order W1b, which also held G7, G8, A13 and H3. The order listed the
+   files, the suite numbers (23–25) and the acceptance checks.
+3. **Wave B.** One builder ran in its own worktree. It wrote
+   `tests/fixtures/save-v1.json` and `tests/fixes23.mjs` *first*, so the
+   new suite was red. The red was real: renaming rank flags in place made
+   A+ → A, and then A → A– deleted the A it had just written.
+4. **Gate.** The orchestrator applied the diff 3-way and fixed
+   `save.js` (translate from a snapshot). It then ran
+   `node tests/run-all.mjs` (all green) and reviewed the diff.
+5. **Commit + ledger.** One commit names the bug, the fix and the suite,
+   and the item is ticked in `ultraplan-124.md`. The builder's two false
+   alarms (a contrast check measuring the wrong surface, a gzip budget
+   measured on an old base) were corrected in the suite, not hidden.
