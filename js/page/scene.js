@@ -375,7 +375,10 @@ function init() {
   /* ── loop ─────────────────────────────────────────────────────────
      Rendered only while the hero is on screen and the tab is visible.
      A transmissive material is expensive enough that leaving it
-     running behind the rest of the page is a real battery cost. */
+     running behind the rest of the page is a real battery cost. The
+     same goes for a full-screen overlay (a room, the show, a fight:
+     body.is-playing): on software GL the frames it drew behind the
+     quiz starved the arena's timer until the dodge round never ended. */
   let visible = !document.hidden;
   document.addEventListener('visibilitychange', () => { visible = !document.hidden; });
 
@@ -385,7 +388,7 @@ function init() {
     requestAnimationFrame(tick);
 
     const t = NEU.heroT;
-    if (!visible || t < 0.02) return;
+    if (!visible || t < 0.02 || document.body.classList.contains('is-playing')) return;
 
     const dt = Math.min(clock.getDelta(), 1 / 30);
 
