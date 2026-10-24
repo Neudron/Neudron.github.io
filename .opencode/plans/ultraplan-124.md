@@ -16,7 +16,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] A5 (P0,O) width/height on all <img> — 3e20703
 - [x] A6 (P1,O) loading=lazy below-fold imgs — B2 W3
 - [x] A7 (P2,O) decoding=async decorative imgs — 3e20703
-- [ ] A8 (P2,B) split critical CSS + deferred rest (no build step)
+- [x] A8 (P2,B) split critical CSS + deferred rest (no build step) — won't do: lab LCP is already 80–168 ms, and a hand-split with no build step would duplicate rules nothing keeps in sync
 - [x] A9 (P1,O) prune unused preconnect origins — B2 W3
 - [x] A10 (P2,B) boot long-task audit >50ms slicing — orch: attributed to WebGL; compileAsync; real-GPU measure open
 - [x] A11 (P2,B) passive listener audit — B1
@@ -54,12 +54,12 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 
 ## D — PWA / install
 - [x] D1 (P1,B) 512 maskable icon — orch
-- [ ] D2 (P3,B) manifest shortcuts
+- [x] D2 (P3,B) manifest shortcuts — won't do: the installed app is one page; its sections are a scroll away, so a long-press menu adds nothing
 - [ ] D3 (P2,B) display_override fullscreen eval
 - [x] D4 (P2,B) theme-color media variants — orch: not applicable, the page has one scheme (no prefers-color-scheme anywhere); one theme-color is right
 - [x] D5 (P1,O) themed /404.html — 3e20703
 - [ ] D6 (P2,B) beforeinstallprompt button
-- [ ] D7 (P3,B) apple-touch 152/167 variants
+- [x] D7 (P3,B) apple-touch 152/167 variants — won't do: iOS scales the single 180 px apple-touch-icon.png; 152/167 are legacy iPad sizes
 - [x] D8 (P2,B) manifest id+scope verify — orch
 
 ## E — SEO / discovery
@@ -70,7 +70,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] E5 (P2,O) robots max-image-preview:large — 3e20703
 - [x] E6 (P2,O) sitemap lastmod protocol doc — orch
 - [ ] E7 (P3,U) GSC verification meta (user account)
-- [ ] E8 (P3,V) description/title length tune
+- [ ] E8 (P3,V) description/title length tune — measured: title "neu" (3 chars), description 37 chars, both well under the 60/160 limits; lengthening them is copy in your voice. Needs you
 
 ## F — Architecture / code quality
 - [x] F1 (P0,B) engine.js:406 const→var — this commit
@@ -90,7 +90,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] G1 (P2,V) suite timing regression tracker — B1
 - [x] G2 (P1,V) coverage matrix behavioral-vs-grep — B1
 - [ ] G3 (P2,V) CDP probe env-opt-in suite
-- [ ] G4 (P3,B) screenshot pixel-diff smoke
+- [x] G4 (P3,B) screenshot pixel-diff smoke — won't do: the page animates end to end (stars, WebGL glass, room weather), so a pixel diff needs a frozen-frame mode the page does not have; playtest screenshots are reviewed by eye
 - [x] G5 (P2,B) fuzz: random keys no-NaN harness — B1
 - [x] G6 (P1,B) save-migration fixtures — B1
 - [x] G7 (P1,B) contrast assertions from CSS vars — B1
@@ -104,7 +104,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] H3 (P1,O) staging-list single source file — B1
 - [x] H4 (P3,O) changelog generator — orch
 - [x] H5 (P2,O) neu-docs sixth agent — orch
-- [ ] H6 (P3,O) log digest formatter
+- [x] H6 (P3,O) log digest formatter — won't do: `.opencode/log/` is git-ignored and local by design (M8); the ledger that matters is memory/pending.md
 - [x] H7 (P3,O) README badge script — orch
 - [ ] H8 (P3,O) _deploy rebuild drill doc
 
@@ -112,17 +112,17 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] I1 (P1,B) SRI on jsDelivr three.js importmap — orch, verified both ways
 - [x] I2 (P2,O) referrer meta explicit — 3e20703
 - [x] I3 (P1,O) rel=noopener external links — orch: verified; the one static external link has rel="me noopener", main.js gives every script-made external link target=_blank + rel=noopener
-- [ ] I4 (P3,B) report-only CSP eval
+- [x] I4 (P3,B) report-only CSP eval — orch: not possible here; Content-Security-Policy-Report-Only is header-only (a <meta> cannot carry it) and GitHub Pages sets no custom headers. An enforcing <meta> CSP is a separate call
 - [x] I5 (P2,O) footer privacy/trust line — B2 W3
 - [x] I6 (P2,O) AI-crawler allows in robots — 3e20703
 
 ## J — Content / design polish
 - [x] J1 (P3,O) ::selection theming — 4be0442
 - [x] J2 (P3,O) themed scrollbar — 4be0442
-- [ ] J3 (P2,B) favicon prefers-color-scheme variant
+- [x] J3 (P2,B) favicon prefers-color-scheme variant — won't do: the inline SVG favicon carries its own dark plate (#08080B) and bone glyph, so it reads on light and dark tab strips alike
 - [x] J4 (P3,B) print stylesheet easter egg — B2 W3
 - [ ] J5 (P2,B) in-tone error overlay
-- [ ] J6 (P3,V) konami-code audit
+- [x] J6 (P3,V) konami-code audit — orch: there is no Konami code; the one cheat is bullet.js's digit buffer "69420" (last five digits, only while a run is live, reset by begin(), no effect in endless). Digits only, so it never collides with movement, Esc, e or m
 - [x] J7 (P1,O) public footer credits/attribution — 3e20703
 - [x] J8 (P2,V) dialogue proofread vs story.md — W5 + orch
 
@@ -138,7 +138,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [ ] L1 (P1,B) sfx loudness normalization
 - [x] L2 (P1,B) M-key global mute persisted — B1
 - [x] L3 (P2,B) duck attack/release ramp — B1
-- [ ] L4 (P3,B) zone ambience one-shots — partial: per-zone visual atmosphere; no audio one-shots yet
+- [ ] L4 (P3,B) zone ambience one-shots — partial: per-zone visual atmosphere; no audio one-shots yet. Needs you: sound-design taste, with B5/B11/L1
 - [x] L5 (P3,V) equal-power crossfade audit — orch: zone crossfades are linear ramps over 1.1 s (music.js ramp()), about a 3 dB dip mid-fade on uncorrelated tracks; an equal-power curve (setValueCurveAtTime) needs ~200 B and music.js has 157 B left under its 24 KiB gate, so it is not changed
 - [x] L6 (P2,V) loop-seam/dead-air check — B1
 
