@@ -608,6 +608,7 @@
 
     moveBullets(dt);
     moveMyShots(dt);
+    updatePops(dt);
     draw(now);
   }
 
@@ -1181,6 +1182,7 @@
       var hi = hearts.indexOf(ref);
       if (hi < 0) return;
       ref.hp -= eff;
+      spawnPop(ref.x, ref.y, eff);
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
       if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(ref.x, ref.y, 4, COL.brimHi); }
       if (ref.hp > 0) return;              /* cracked, not broken */
@@ -1191,6 +1193,9 @@
     }
     if (kind === 'bro') {
       if (bros.indexOf(ref) < 0) return;
+      /* the number shows the strike, not the 25% DR split: the brother's
+         own bar still moves by the real amount */
+      spawnPop(ref.x, ref.y, eff);
       /* 25% DR while both brothers alive */
       var dmg = (bros.length === 2 ? 0.75 : 1) * eff;
       ref.dmgAccum = (ref.dmgAccum || 0) + dmg;
@@ -1206,6 +1211,7 @@
     }
     if (invuln || mode !== 'fight') return;
     bossHP -= eff;
+    spawnPop(bx, by, eff);
     if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
     /* Landing one is SMALL — it happens often, and shaking hard on
        every strike would drown out the phase transitions. */
@@ -1273,6 +1279,55 @@
       return;
     }
     requestAnimationFrame(deathStep);
+  }
+
+  /* ── damage numbers ─────────────────────────────────────────────
+     Every landed hit pops its damage as a small number that drifts up
+     and fades. The strike sparks already say a hit landed; the number
+     says how hard, which is what a player who is busy dodging can still
+     read off the fight's pace.
+     Drawn in the fight's own 16px face, and every position is rounded
+     to a whole pixel, so the glyphs do not shimmer as the shake moves
+     them. At most twelve are alive: a fast volley can land more in a
+     second, and the oldest number is the one nobody is reading any more.
+     Reduce particles skips them outright. It is the same switch that
+     silences impact debris, and the number is decoration on top of the
+     health bar. Reduced motion keeps the number and holds it still: the
+     drift is the motion the switch is for, while the number carries the
+     information, so dropping it would leave reduced-motion players as the
+     only ones who cannot see how hard they hit.                      */
+  var pops = [];
+  var POP_MAX = 12, POP_LIFE = 0.7, POP_RISE = 24;
+  function spawnPop(x, y, amount) {
+    if (NEU.settings && NEU.settings.particles) return;
+    if (pops.length >= POP_MAX) pops.shift();
+    pops.push({ x: x, y0: y, y: y, n: Math.max(1, Math.round(amount)), age: 0 });
+  }
+  function updatePops(dt) {
+    var still = !!(NEU.settings && NEU.settings.reduced);
+    for (var i = pops.length - 1; i >= 0; i--) {
+      var p = pops[i];
+      p.age += dt;
+      if (p.age >= POP_LIFE) { pops.splice(i, 1); continue; }
+      if (!still) {
+        /* ease-out: it leaves the hit quickly and settles near the top */
+        var k = p.age / POP_LIFE;
+        p.y = p.y0 - POP_RISE * (1 - (1 - k) * (1 - k));
+      }
+    }
+  }
+  function drawPops() {
+    if (!pops.length) return;
+    ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillStyle = COL.brimHi;
+    for (var i = 0; i < pops.length; i++) {
+      var p = pops[i];
+      ctx.globalAlpha = Math.max(0, 1 - p.age / POP_LIFE);
+      ctx.fillText(String(p.n), Math.round(p.x), Math.round(p.y));
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
   }
 
   /* ── draw ───────────────────────────────────────────────────────*/
@@ -1507,6 +1562,8 @@
     ctx.fillStyle = COL.dim;
     ctx.fillText('shift to focus  ·  f near her to strike', AX + 120, AY + AH + 12);
 
+    /* inside the shake, so the numbers move with the hit they belong to */
+    drawPops();
     if (NEU.juice) NEU.juice.drawParts(ctx, 1 / 60);
     if (NEU.juice) NEU.juice.end(ctx, shook);
     if (NEU.juice) NEU.juice.overlay(ctx, w, h);
@@ -1730,6 +1787,7 @@
     rageAnimT = 9; tpAnimT = 9; rageFullPrev = 0; tpFullPrev = 0;
     rageShown = 0; tpShown = 0; grazeT = 0;
     myShots = []; charging = false; chargeF = 0; shotCd = 0;
+    pops = [];
     /* charge state too — dying mid multi-charge used to carry a live
        telegraph/dash into the retry and softlock her at the early-return */
     chargeT = 0; chargeTelegraph = 0; chargeBurst = 0; chargeBurstMax = 0; chargeGap = 0;
@@ -1773,6 +1831,7 @@
   }
   function close() {
     active = false; running = false; dying = 0;
+    pops = [];
     clearSched();
     scalWormReady = false;
     seekersReady = false;
@@ -1859,6 +1918,10 @@
                 get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy }; }); },
                 get meters() { return meterRects.map(function (m) { return { x: m.x, y: m.y, w: m.w, h: m.h }; }); },
                 get myShots() { return myShots.map(function (s) { return { x: s.x, y: s.y, vx: s.vx, vy: s.vy, k: s.k }; }); },
+                /* test-only read (same class as wormSegs): the damage
+                   numbers in flight, copied so a caller cannot write into
+                   the live list */
+                get _pops() { return pops.map(function (p) { return { x: p.x, y: p.y, y0: p.y0, n: p.n, age: p.age }; }); },
                 meterSlots: meterSlots,
                 cycle: CYCLE };
 })();

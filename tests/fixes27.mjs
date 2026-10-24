@@ -36,13 +36,13 @@ const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
    real outlier — an exemption that stops being needed is removed,
    not left to rot (see the stale-entry check below). */
 const ALLOWLIST = [
-  /* boss-scal.js:881 — hitPlayer(), the path where the standing barrier
+  /* boss-scal.js:882 — hitPlayer(), the path where the standing barrier
      absorbs a hit. It asks for a 'small' hit and throws 12 sparks, where
      the small budget is 4 (cap 8). No comment in the code explains the
      12. It is exempted here rather than the code changed, until someone
      decides whether the barrier pop is meant to be bigger than a small
      hit. Remove the entry if the count is brought down to 8. */
-  'js/act4/boss-scal.js:881',
+  'js/act4/boss-scal.js:882',
 ];
 
 /* ═══ B1. hit → burst, within the tier budget ════════════════════*/

@@ -30,7 +30,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] B3 (P2,B) camera kick on gunfire/landings — engine v2
 - [x] B4 (P1,B) ±5-10% pitch variance pooled sfx — W2c (Calamitas pool ±5%; blips already had it)
 - [ ] B5 (P3,B) layered one-shots boss hits (transient/body/tail)
-- [ ] B6 (P2,B) damage-number pops w/ drift (SC fight)
+- [x] B6 (P2,B) damage-number pops w/ drift (SC fight) — W7: up to 12 alive, 0.7 s rise and fade, none with reduce-particles, static under reduced motion
 - [x] B7 (P2,B) rising charge-loop sound polt telegraph — W2c
 - [x] B8 (P2,B) phase-change music stingers — W2c (polt 2/3, Calamitas 2)
 - [x] B9 (P1,B) settings toggles: hit-stop + particles — 673f872
@@ -133,7 +133,7 @@ Roles: B=builder · V=verifier · R=reviewer · O=orchestrator · Sc=scout
 - [x] K2 (P3,B) navigator.vibrate hits behind noShake — W2b
 - [ ] K3 (P1,V) installed-PWA standalone CDP check
 - [ ] K4 (P3,B) saveData lighter boot
-- [ ] K5 (P2,V) tpad thumb-overlap audit — partial: rooms frame around the pad; fight reserve unchanged
+- [x] K5 (P2,V) tpad thumb-overlap audit — rooms frame around the pad (engine v2); W7: danmaku.arena() fits the three fight arenas above a visible pad; orch: only when that leaves at least 60% of the arena (a sideways phone keeps its old size instead of a 52px sliver)
 - [ ] K6 (P2,U+O) real-device matrix doc + manual protocol
 
 ## L — Audio / music
