@@ -332,6 +332,7 @@
       { t: 'exit', x: 0, y: 4, to: 'b1_throne', spawn: 'north' }
     ],
     onEnter: function (c) {
+      b2picked = c.flagged('solved:b2_blocks') ? 'ash' : '';
       if (c.flagged('b2_seen')) return;
       c.flag('b2_seen', 1);
       say(c, ['the way east is a wall of three loose stones.',
@@ -534,6 +535,7 @@
       return (b5face === 1 && onR) || (b5face === 2 && onL);
     },
     onEnter: function (c) {
+      b5face = 0;
       if (c.flagged('b5_seen')) return;
       c.flag('b5_seen', 1);
       say(c, ['two plates. there is nobody to hold the second one.',
@@ -604,6 +606,8 @@
       { t: 'exit', x: 0, y: 5, to: 'b5_two', spawn: 'west' }
     ],
     onEnter: function (c) {
+      b6carry = false;
+      b6lit = !!c.flagged('solved:b6_dark');
       if (c.flagged('b6_seen')) return;
       c.flag('b6_seen', 1);
       say(c, ['the lights here have been out for some time.',
