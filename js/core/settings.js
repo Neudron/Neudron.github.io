@@ -362,6 +362,9 @@
      accident, exactly like the console. e.code because with the
      modifiers held the key value varies by layout. */
   addEventListener('keydown', function (e) {
+    /* A Leave prompt owns the keyboard: it is a capture listener of its own
+       (engine.js confirmExit), and nothing here may open over it. */
+    if (document.getElementById('confirmExit')) return;
     if (e.ctrlKey && e.shiftKey &&
         (e.code === 'Comma' || e.key === ',' || e.key === '<')) {
       e.preventDefault();
@@ -374,7 +377,9 @@
         !e.altKey && !e.repeat && !typing()) mute(!state(K_MUTE));
     if (!open_ || !panel) return;
     if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); return; }
-  });
+  }, true);
+  /* Capture, not bubble: the minigames bind ESC on window too, and a bubble
+     listener runs after them, so their ESC branch would already have fired. */
 
   /* Tab stays inside the panel. This is a CAPTURE listener that stops the
      press, the way engine.js confirmExit does. quest.js binds Tab on window

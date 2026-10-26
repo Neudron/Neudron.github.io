@@ -202,6 +202,11 @@
       { t: 'exit', x: 14, y: 4, to: 'h1_storm', spawn: 'top' }
     ],
     onEnter: function (c) {
+      /* The trip is committed on the fifth punch, so a reload before the
+         eat has played lands here tripping: carry on to h3 from here. A
+         save from before that change holds nutz and no trip; finish it. */
+      if (NEU.save && NEU.save.has('nutz')) { NEU.save.take('nutz'); NEU.save.flag('tripping', 1); }
+      if (c.flagged('tripping')) { setTimeout(function () { c.go('h3_trip', 'in'); }, 600); return; }
       if (c.flagged('h2_seen')) return;
       c.flag('h2_seen', 1);
       say(c, ['a vending machine, humming, alone, in the biggest room in the world.',
@@ -220,15 +225,18 @@
   ];
 
   function punch(c) {
-    if (c.has('nutz')) { c.say(['it has turned its light off. that is a boundary.'], 'narr'); return; }
     var n = (NEU.save && NEU.save.flag('punches')) || 0;
-    c.say([PUNCH[Math.min(n, PUNCH.length - 1)]], 'narr');
+    if (n >= PUNCH.length) { c.say(['it has turned its light off. that is a boundary.'], 'narr'); return; }
+    c.say([PUNCH[n]], 'narr');
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     n++;
     if (NEU.save) NEU.save.flag('punches', n);
     if (n >= PUNCH.length) {
-      if (NEU.save) NEU.save.give('nutz');
-      if (NEU.quest) NEU.quest.mark('a4_nutz');
+      /* The trip is written in this same step, not 2.6s later: a reload
+         anywhere after this point must not leave the trip unset. The
+         timer below only narrates and moves you. */
+      if (NEU.save) NEU.save.flag('tripping', 1);
+      if (NEU.quest) { NEU.quest.mark('a4_nutz'); NEU.quest.mark('a4_trip'); }
       setTimeout(function () { eat(c); }, 2600);
     }
   }
@@ -238,8 +246,6 @@
            'they are fine.',
            '...',
            'they are not fine.'], 'narr');
-    if (NEU.save) { NEU.save.take('nutz'); NEU.save.flag('tripping', 1); }
-    if (NEU.quest) NEU.quest.mark('a4_trip');
     document.body.classList.add('is-trip');
     setTimeout(function () { c.go('h3_trip', 'in'); }, 5200);
   }

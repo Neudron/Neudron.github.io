@@ -147,6 +147,8 @@
     if (!running) return;
     requestAnimationFrame(step);
     var tn = now();
+    /* Leave prompt up: hold the frame. Notes that pass meanwhile are judged on resume. ponytail: audio clock keeps running, so pause the judging, not the song. */
+    if (NEU.juice && NEU.juice.frozen()) { draw(tn); return; }
 
     for (var i = 0; i < notes.length; i++) {
       var n = notes[i];

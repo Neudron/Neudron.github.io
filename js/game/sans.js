@@ -1453,7 +1453,8 @@
     if (NEU.devCharge) NEU.devCharge(100);
     if (sleepSw) sleepSw.click();
   };
-  NEU.devReset = function () { location.reload(); };
+  /* Wipe first: a reload alone flushes the save back and lands in the same place. */
+  NEU.devReset = function () { if (NEU.save) NEU.save.wipe(); location.reload(); };
 
   /* ── the dog, the hammer, and the light ─────────────────────────
      Talk to him enough and he produces a hammer. There is exactly one

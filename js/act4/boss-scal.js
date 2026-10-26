@@ -546,7 +546,7 @@
 
   /* ── loop ───────────────────────────────────────────────────────*/
   function stepFn(now) {
-    if (!running) { if (dying) deathStep(now); return; }
+    if (!running) return;   /* startDeath() owns the death loop; handing off here started a second one */
     requestAnimationFrame(stepFn);
     var dt = Math.min(0.033, (now - last) / 1000); last = now;
     lastDt = dt;

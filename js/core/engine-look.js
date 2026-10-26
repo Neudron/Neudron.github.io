@@ -625,21 +625,31 @@
     if (lcv.width !== W || lcv.height !== H) { lcv.width = W; lcv.height = H; }
     return lctx;
   }
-  /* Four hard bands, centre fully lit. `a` scales the whole light. */
+  /* Four hard bands, centre fully lit. `a` scales the whole light.
+     The gradient is built once at the origin and placed by translate,
+     and the last one is kept: a run of lights with the same radius and
+     alpha (every path tile) shares it. ponytail: one-slot cache, so
+     interleaved radii rebuild; a per-radius map if that ever shows. */
+  var cutGr = null, cutR = 0, cutA = 0;
   function cutLight(g, x, y, r, a) {
     if (r <= 0) return;
-    var gr = g.createRadialGradient(x, y, 0, x, y, r);
     var k = a === undefined ? 1 : a;
-    gr.addColorStop(0, 'rgba(0,0,0,' + k + ')');
-    gr.addColorStop(0.42, 'rgba(0,0,0,' + k + ')');
-    gr.addColorStop(0.43, 'rgba(0,0,0,' + (k * 0.72) + ')');
-    gr.addColorStop(0.66, 'rgba(0,0,0,' + (k * 0.72) + ')');
-    gr.addColorStop(0.67, 'rgba(0,0,0,' + (k * 0.4) + ')');
-    gr.addColorStop(0.88, 'rgba(0,0,0,' + (k * 0.4) + ')');
-    gr.addColorStop(0.89, 'rgba(0,0,0,' + (k * 0.14) + ')');
-    gr.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = gr;
-    g.fillRect(x - r, y - r, r * 2, r * 2);
+    if (!cutGr || r !== cutR || k !== cutA) {
+      cutGr = g.createRadialGradient(0, 0, 0, 0, 0, r); cutR = r; cutA = k;
+      cutGr.addColorStop(0, 'rgba(0,0,0,' + k + ')');
+      cutGr.addColorStop(0.42, 'rgba(0,0,0,' + k + ')');
+      cutGr.addColorStop(0.43, 'rgba(0,0,0,' + (k * 0.72) + ')');
+      cutGr.addColorStop(0.66, 'rgba(0,0,0,' + (k * 0.72) + ')');
+      cutGr.addColorStop(0.67, 'rgba(0,0,0,' + (k * 0.4) + ')');
+      cutGr.addColorStop(0.88, 'rgba(0,0,0,' + (k * 0.4) + ')');
+      cutGr.addColorStop(0.89, 'rgba(0,0,0,' + (k * 0.14) + ')');
+      cutGr.addColorStop(1, 'rgba(0,0,0,0)');
+    }
+    g.save();
+    g.translate(x, y);
+    g.fillStyle = cutGr;
+    g.fillRect(-r, -r, r * 2, r * 2);
+    g.restore();
   }
   function glow(ctx, x, y, r, col, a) {
     var gr = ctx.createRadialGradient(x, y, 0, x, y, r);

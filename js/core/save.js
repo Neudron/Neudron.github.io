@@ -118,7 +118,8 @@
     if (!s || typeof s !== 'object' || typeof s.v !== 'number') {
       /* Quarantine rather than delete. If someone ever asks "where did
          my file go", the answer is a key away. */
-      try { st.setItem(BAD, raw); st.removeItem(KEY); } catch (e2) {}
+      /* A second corrupt save gets its own key, so the first copy stays. */
+      try { st.setItem(st.getItem(BAD) === null ? BAD : BAD + '.' + Date.now(), raw); st.removeItem(KEY); } catch (e2) {}
       warn("your save file was unreadable. starting fresh.");
       return null;
     }
@@ -132,12 +133,22 @@
     dirty = false;
     var st = store();
     if (!st) { ok = false; return; }
+    /* Another tab saved after this one loaded, so its file is newer than
+       our copy. Writing ours would silently throw its progress away. */
+    try {
+      var theirs = JSON.parse(st.getItem(KEY));
+      if (theirs && theirs.stamp > mem.stamp) {
+        warn('this game is open in another tab, which has newer progress. reload to save here.');
+        return;
+      }
+    } catch (e0) {}
     mem.stamp = Date.now();
     try {
       st.setItem(KEY, JSON.stringify(mem));
       ok = true;
     } catch (e) {
       ok = false;
+      dirty = true;   // keep the change: the next flush retries it
       warn("couldn't save — storage is full or blocked. this session still works.");
     }
   }

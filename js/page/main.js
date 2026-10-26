@@ -442,13 +442,18 @@
 
     if (reduce) return;
 
+    /* Read every box first, then write: interleaving forced a style
+       flush per mover on every scroll frame. */
+    var ps = [];
     for (var i = 0; i < movers.length; i++) {
       var m = movers[i];
-      if (!m.__d) continue;
+      if (!m.__d) { ps[i] = null; continue; }
       var box = m.parentNode.getBoundingClientRect();
-      if (box.bottom < -vh || box.top > vh * 2) continue;   // far off-screen
-      var p = (box.top + box.height / 2 - vh / 2) / vh;     // -1 … 1
-      m.style.setProperty('--ty', (p * m.__d * vh).toFixed(1) + 'px');
+      ps[i] = (box.bottom < -vh || box.top > vh * 2) ? null   // far off-screen
+            : (box.top + box.height / 2 - vh / 2) / vh;       // -1 … 1
+    }
+    for (i = 0; i < movers.length; i++) {
+      if (ps[i] !== null) movers[i].style.setProperty('--ty', (ps[i] * movers[i].__d * vh).toFixed(1) + 'px');
     }
 
     showIfNear();

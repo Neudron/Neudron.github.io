@@ -242,7 +242,9 @@
   }
   function hide() { panel.hidden = true; input.blur(); }
 
+  /* Capture, so the console's ESC lands before the minigames' ESC on window. */
   addEventListener('keydown', function (e) {
+    if (document.getElementById('confirmExit')) return;   /* a Leave prompt owns the keyboard */
     /* `e.code` rather than `e.key`: with Ctrl+Shift held, `key` for
        this physical key varies by layout and by browser, but the code
        is always Backquote. */
@@ -256,7 +258,7 @@
       e.stopImmediatePropagation();          /* the console ate this key — the room must not also read it as leave */
       hide();
     }
-  });
+  }, true);
 
   input.addEventListener('keydown', function (e) {
     e.stopPropagation();                       // don't drive the game from in here

@@ -75,6 +75,9 @@
      still runs, which is what makes the freeze read as a held frame
      rather than a dropped one. */
   var freezeUntil = 0;
+  /* A Leave prompt holds the same freeze, for as long as it is up. */
+  var paused = false;
+  function pause(on) { paused = !!on; }
 
   /* ── flash ──────────────────────────────────────────────────────*/
   var flashUntil = 0, flashCol = '#FFFFFF', flashFrom = 0;
@@ -143,7 +146,7 @@
     return t;
   }
 
-  function frozen() { return performance.now() < freezeUntil; }
+  function frozen() { return paused || performance.now() < freezeUntil; }
 
   /* ── the camera ─────────────────────────────────────────────────
      Call `begin(ctx)` before drawing a scene and `end(ctx)` after.
@@ -274,7 +277,7 @@
   }
 
   NEU.juice = {
-    hit: hit, frozen: frozen,
+    hit: hit, frozen: frozen, pause: pause,
     begin: begin, end: end, overlay: overlay,
     burst: burst, drawParts: drawParts,
     pop: pop, backOut: backOut, outCubic: outCubic, outElastic: outElastic,

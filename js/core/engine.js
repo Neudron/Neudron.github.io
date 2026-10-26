@@ -870,6 +870,7 @@
   function confirmExit(minigameName, onConfirm) {
     if (document.getElementById('confirmExit')) return;
     var before = document.activeElement;
+    if (NEU.juice) NEU.juice.pause(true);
     var overlay = document.createElement('div');
     overlay.id = 'confirmExit';
     overlay.setAttribute('role', 'alertdialog');
@@ -895,6 +896,7 @@
       done = true;
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       removeEventListener('keydown', onKey, true);
+      if (NEU.juice) NEU.juice.pause(false);
       if (before && before.focus && document.contains(before)) { try { before.focus(); } catch (x) {} }
     }
     /* Window, capture phase, and stopImmediatePropagation: the touch pad
@@ -903,6 +905,9 @@
     function onKey(e) {
       e.stopImmediatePropagation();
       if (e.key !== 'Enter' && e.key !== 'Escape' && e.key !== 'Tab') return;
+      /* Held Escape repeats: swallow them, or the prompt closes and the
+         minigame's ESC reopens it on the next repeat. */
+      if (e.key === 'Escape' && e.repeat) { e.preventDefault(); return; }
       e.preventDefault();
       if (e.key === 'Tab') {
         /* a two-button trap */

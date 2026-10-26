@@ -78,8 +78,14 @@
      because you were not entirely present for most of it. */
   function wake() {
     document.body.classList.remove('is-trip');
-    if (NEU.save) NEU.save.flag('tripping', 0);
-    if (NEU.quest) NEU.quest.mark('a4_wake');
+    /* Everything the save needs is written now, not in settle() 26s
+       later: a reload in that window would leave the crack unarmed and
+       the boss unreachable. Only the DOM and the narration wait. */
+    if (NEU.save) {
+      NEU.save.flag('tripping', 0);
+      NEU.save.flag('dog_gone', 1); NEU.save.flag('sans_sits', 1); NEU.save.flag('crack_armed', 1);
+    }
+    if (NEU.quest) { NEU.quest.mark('a4_wake'); NEU.quest.mark('a4_chair'); }
     var lines = [
       ["you're awake.", 'sans'],
       ["you've been out about four hours. toby sat with you.", 'sans'],
@@ -98,8 +104,6 @@
      available — the object you spent an act charging is finally his,
      which is the small joke the whole chain has been walking toward. */
   function settle() {
-    if (NEU.save) { NEU.save.flag('dog_gone', 1); NEU.save.flag('sans_sits', 1); }
-    if (NEU.quest) NEU.quest.mark('a4_chair');
     var dog = document.getElementById('dog');
     if (dog) { dog.classList.remove('is-in'); setTimeout(function () { dog.hidden = true; }, 520); }
     var chair = document.getElementById('armchair');
