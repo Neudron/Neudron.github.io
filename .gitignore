@@ -76,3 +76,22 @@ Thumbs.db
 
 # run-all timing history (local only)
 tests/.timings.json
+
+# opencode plugin dependencies (symlink to ~/.config/opencode/node_modules)
+.opencode/node_modules
+
+# ── not source: docs, plans, agent tooling, dev scripts, tests ───
+# Untracked 2026-10-26: the repo holds only the site code and assets.
+# These stay on disk for local work.
+*.md
+!/README.md
+memory/
+.kilo/
+.opencode/
+opencode.json
+.githooks/
+_scripts/
+tests/
+audio/README.txt
+fonts/README.txt
+.omc/
