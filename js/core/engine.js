@@ -332,8 +332,16 @@
       var e = ents[i];
       if (e.dead || e.t === 'trigger') continue;
       if (want && !want(e)) continue;
-      var p = entAt(e);
-      var dx = p.x - px, dy = p.y - cy;
+      /* exit tiles: measure to the face you can stand at, not the tile's
+         far wall — a door embedded in a wall was only reachable in a sliver. */
+      if (e.t === 'exit') {
+        var qx = Math.max(e.x * TILE, Math.min(px, e.x * TILE + TILE));
+        var qy = Math.max(e.y * TILE, Math.min(cy, e.y * TILE + TILE));
+        var dx = qx - px, dy = qy - cy;
+      } else {
+        var p = entAt(e);
+        var dx = p.x - px, dy = p.y - cy;
+      }
       var d = Math.sqrt(dx * dx + dy * dy);
       if (d >= REACH) continue;
       var score = d + (d > 0.5 ? 10 * (1 - (dx * f[0] + dy * f[1]) / d) : 0);
@@ -604,6 +612,9 @@
     /* Ice catches you: the moment your feet are on it, you are committed
        to that line of travel. */
     var eci = Math.floor(px / TILE), ecj = Math.floor((py - 1) / TILE);
+    /* A dead slide lifts once your feet leave the ice: without this the
+       death state latched forever and chained slides could never start. */
+    if (slideDead && !slideD && at(eci, ecj) !== 'i') slideDead = false;
     if (at(eci, ecj) === 'i' && !slideDead && moving) { slideD = face; vx = 0; vy = 0; }
     checkTriggers();
     /* solved() can become true on a WALK (b5: you stand on one plate

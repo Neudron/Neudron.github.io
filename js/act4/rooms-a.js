@@ -519,12 +519,12 @@
         run: function (c) { mirrorTurn(c); } },
       { t: 'sign', x: 9, y: 1,
         lines: ['the mirror holds whatever it looks at.',
-                'stand on the other plate.'] },
+                'stand where it looks.'] },
       { t: 'exit', x: 17, y: 5, to: 'b6_dark', spawn: 'west', locked: 'solved:b5_two' },
       { t: 'exit', x: 0, y: 5, to: 'b4_ice', spawn: 'west' }
     ],
-    /* One plate under the mirror's gaze, and you standing on the
-       other. The mirror turns with e; the room counts what it looks
+    /* One plate under the mirror's gaze, and you standing where it
+       looks. The mirror turns with e; the room counts what it looks
        at as held. */
     solved: function (c) {
       if (!b5face) return false;

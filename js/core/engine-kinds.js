@@ -95,17 +95,22 @@
       }
       sys.go(e.to, e.spawn);
     },
-    /* An exit is normally a hole in the wall with nothing to draw — but
-       one carrying a `sheet` is a THING (b7_altar's fire door). A locked
-       one gets a small padlock so "this is a door, and it is shut" can
-       be read before you walk into it. */
+    /* An exit carrying a `sheet` is a THING (b7_altar's fire door); a
+       labelled one takes a plate. Every bare exit still draws a small
+       door plate, so a doorway reads before you walk into it — and a
+       locked one gets a small padlock so "this is a door, and it is
+       shut" can be read at a glance. */
     drawn: function (e) { return true; },
     draw: function (g, e, d) {
       if (e.sheet) { drawSheet(g, e, d); return; }
-      if (e.label) plate(g, e.label, d.sx, d.sy - 24 * d.S, d.S, unlocked(e));
-      if (unlocked(e)) return;
       var S = d.S, x = d.sx, y = d.sy - 14 * S;
-      g.fillStyle = '#120F18'; g.fillRect(x - 3 * S, y - 3 * S, 6 * S, 7 * S);
+      if (e.label) plate(g, e.label, d.sx, d.sy - 24 * S, d.S, unlocked(e));
+      else {
+        g.fillStyle = '#120F18'; g.fillRect(x - 3 * S, y - 3 * S, 6 * S, 7 * S);
+        g.fillStyle = unlocked(e) ? '#C8A04A' : '#5A5160';
+        g.fillRect(x - 2 * S, y, 4 * S, 3 * S);
+      }
+      if (unlocked(e)) return;
       g.fillStyle = '#C8A04A'; g.fillRect(x - 2 * S, y, 4 * S, 3 * S);
       g.fillStyle = '#8A7A4A'; g.fillRect(x - 2 * S, y - 2 * S, S, 2 * S); g.fillRect(x + S, y - 2 * S, S, 2 * S);
       g.fillRect(x - 2 * S, y - 3 * S, 4 * S, S);
