@@ -801,7 +801,24 @@
     if (!running) return;
     /* A minigame owns the page while it is open. */
     if (NEU.activeMinigame) return;
-    if (e.key === 'Escape') { e.preventDefault(); leave(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      /* ESC never leaves the console — leaving is the quit button's job.
+         It only closes whatever is currently open (a dialogue box, a shop
+         board, a minigame), so a stray press cannot drop you out of the
+         room mid-puzzle. */
+      if (NEU.tboxOpen && NEU.tboxOpen()) { if (NEU.talk && NEU.talk.close) NEU.talk.close(); return; }
+      if (NEU.activeMinigame === 'shop' && NEU.shop && NEU.shop.close) { NEU.shop.close(); return; }
+      if (NEU.activeMinigame === 'quiz' && NEU.quiz && NEU.quiz.close) { NEU.quiz.close(); return; }
+      if (NEU.activeMinigame === 'craft' && NEU.craft && NEU.craft.close) { NEU.craft.close(); return; }
+      if (NEU.activeMinigame === 'rhythm' && NEU.rhythm && NEU.rhythm.close) { NEU.rhythm.close(); return; }
+      if (NEU.activeMinigame === 'dark' && NEU.dark && NEU.dark.close) { NEU.dark.close(); return; }
+      if (NEU.activeMinigame === 'bullet' && NEU.bullet && NEU.bullet.close) { NEU.bullet.close(); return; }
+      if (NEU.activeMinigame === 'deck' && NEU.deck && NEU.deck.close) { NEU.deck.close(); return; }
+      var ce = document.getElementById('confirmExit');
+      if (ce) { ce.remove(); return; }
+      return;
+    }
     if (e.key === 'e' || e.key === 'E') {
       e.preventDefault();
       if (busy) return;
