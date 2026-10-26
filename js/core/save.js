@@ -156,6 +156,8 @@
     if (document.visibilityState === 'hidden') flush();
   });
   addEventListener('pagehide', flush);
+  addEventListener('beforeunload', flush);
+  addEventListener('blur', flush);
 
   /* ── the public surface ─────────────────────────────────────────*/
   NEU.save = {
@@ -177,23 +179,23 @@
 
     flag: function (k, v) {
       if (arguments.length === 1) return mem.flags[k];
-      mem.flags[k] = v; write(); return v;
+      mem.flags[k] = v; write(true); return v;
     },
     flagged: function (k) { return !!mem.flags[k]; },
 
     give: function (item) {
-      if (mem.items.indexOf(item) < 0) { mem.items.push(item); write(); }
+      if (mem.items.indexOf(item) < 0) { mem.items.push(item); write(true); }
     },
     take: function (item) {
       var i = mem.items.indexOf(item);
-      if (i >= 0) { mem.items.splice(i, 1); write(); }
+      if (i >= 0) { mem.items.splice(i, 1); write(true); }
     },
     has: function (item) { return mem.items.indexOf(item) >= 0; },
 
     /* Endless-mode personal bests. Only ever moves up. */
     best: function (game, score) {
       if (arguments.length === 1) return mem.best[game] || 0;
-      if (score > (mem.best[game] || 0)) { mem.best[game] = score; write(); }
+      if (score > (mem.best[game] || 0)) { mem.best[game] = score; write(true); }
       return mem.best[game];
     },
 
