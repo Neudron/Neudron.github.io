@@ -475,8 +475,9 @@
     }
     if (!running && !dying && e.key === 'Enter') { e.preventDefault(); open(); return; }
     /* c dash, v (or shift+z) adrenaline, b rage: the shared keys */
-    if (running && dm.key(F, e)) { e.preventDefault(); return; }
+    /* z strikes before the shared keys look, so shift (focus) + z is still a strike */
     if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); tryHit(); return; }
+    if (running && dm.key(F, e)) { e.preventDefault(); return; }
     var n = dm.keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
   });
   addEventListener('keyup', function (e) {

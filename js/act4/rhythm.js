@@ -509,7 +509,7 @@
       } else { close(); }
       return;
     }
-    if (!running && e.key === 'Enter') { e.preventDefault(); retry(); return; }
+    if (!running && !won && e.key === 'Enter') { e.preventDefault(); retry(); return; }
     var l = laneOf(e);
     if (l >= 0) { e.preventDefault(); if (!keys[LANES[l]]) press(l); keys[LANES[l]] = true; }
   });
