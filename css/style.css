@@ -1186,83 +1186,115 @@ body.is-blackout::before {
   background: #000;
   transform-origin: 50% 50%;
 }
-/* the old CSS marquee; the sign is part of the set now */
-.quiz__marquee { display: none; }
 
-/* Deltarune's 640x480 split: a 2:1 stage over the dialog box. Width
-   follows the viewport, the stage keeps its ratio, the box takes what
-   it needs below, so a phone scrolls instead of squeezing the choices.
-   Everything on the stage shares one grid cell; .quiz__main is
-   display: contents so its children can be placed in either row. */
+/* Deltarune's 640x480 split: a 2:1 stage over the dialog box, laid out in
+   percentages of the 640x320 picture (x / 6.4, y / 3.2). */
 .quiz__stage {
   position: relative; z-index: 1;
-  --w: min(100vw, 133.333vh);
-  width: var(--w);
-  display: grid; grid-template-rows: auto auto;
+  width: min(100vw, calc((100vh - 260px) * 1.7778));
+  background: #000;
 }
 .quiz__main { display: contents; }
-.quiz__set, .quiz__tenna, .quiz__top, .quiz__board, .quiz__round,
-.quiz__canvas, .quiz__end { grid-area: 1 / 1; }
-.quiz__set { height: calc(var(--w) / 2); background: #000; }
-/* portrait: the 2:1 stage is too short to hold board, banner and host */
-@media (max-width: 759px) { .quiz__set { height: calc(var(--w) * .8); } }
-.quiz__tenna {
-  justify-self: end; align-self: end;
-  /* 48x80 canvas at 31% of the picture width tall: Tenna in the
-     reference stands about two thirds of the stage height */
-  height: calc(var(--w) * .31); width: calc(var(--w) * .186);
-  margin: 0 calc(var(--w) * .1) calc(var(--w) * .015) 0;
+.quiz__set {
+  position: relative; width: 100%; aspect-ratio: 2 / 1;
+  background: #000 url(../img/act4/deltarune/tvtime/stage-bg.png) 0 0 / 100% 100% no-repeat;
   image-rendering: pixelated;
 }
+/* name podiums: 12-frame strip, one frame each */
+.quiz__pod {
+  position: absolute; bottom: 8.125%; width: 10.625%; height: 27.5%;
+  background: url(../img/act4/deltarune/tvtime/podium.png) 0 0 / 1200% 100% no-repeat;
+  image-rendering: pixelated;
+}
+.quiz__pod:nth-of-type(1) { left: 10.625%; background-position: 0 0; }
+.quiz__pod:nth-of-type(2) { left: 23.75%; background-position: 36.364% 0; }
+.quiz__pod:nth-of-type(3) { left: 36.875%; background-position: 72.727% 0; }
+/* crowd band behind the dialog box: 3 frames, 4.5 fps */
+.quiz__set::after {
+  content: ''; position: absolute; left: 0; width: 100%; top: 100%; height: 12.5%;
+  background: url(../img/act4/deltarune/tvtime/crowd.png) 0 0 / 300% auto repeat-x;
+  image-rendering: pixelated; pointer-events: none;
+  animation: quizCrowd .667s steps(1) infinite;
+}
+@keyframes quizCrowd { 33.3% { background-position-x: 50%; } 66.6% { background-position-x: 100%; } }
+/* Tenna: 140x146 at 2x, feet 20 units above the floor edge */
+.quiz__tenna {
+  position: absolute; z-index: 1; left: 53%; bottom: 6.25%;
+  width: 43.75%; height: 91.25%;
+  image-rendering: pixelated; pointer-events: none;
+}
+i[data-s=tvTenPodium] { background-image: url(../img/act4/deltarune/tvtime/tenna-podium.png); }
+i[data-s=tvTenPoint] { background-image: url(../img/act4/deltarune/tvtime/tenna-point.png); }
+i[data-s=tvTenCheer] { background-image: url(../img/act4/deltarune/tvtime/tenna-cheer.png); }
+i[data-s=tvTenShrug] { background-image: url(../img/act4/deltarune/tvtime/tenna-shrug.png); }
+i[data-s=tvTenShock] { background-image: url(../img/act4/deltarune/tvtime/tenna-shock.png); }
+i[data-s=tvTenBow] { background-image: url(../img/act4/deltarune/tvtime/tenna-bow.png); }
+i[data-s=tvFaces] { background-image: url(../img/act4/deltarune/tvtime/faces.png); }
+i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-static.png); }
+.quiz.is-mini .quiz__tenna { visibility: hidden; }
 .quiz__top {
-  align-self: start;
+  position: relative; z-index: 2;
   display: flex; justify-content: space-between; gap: 16px;
-  padding: 12px 16px;
+  padding: 8px 16px;
   font: 400 16px/1 var(--font); color: #FFF;
 }
 .quiz__cat { color: #FFFF00; }
 .quiz__num { color: #FFF; }
-/* the rank thresholds, lettered on the backdrop like a score board */
+/* rank thresholds on the backdrop screen, left of Tenna */
 .quiz__board {
-  align-self: start; justify-self: center;
-  max-width: 72%; margin-top: 44px;
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px;
+  position: absolute; left: 22%; top: 12%; width: 37%; padding: 4px 0;
+  display: grid; grid-template-columns: repeat(5, auto); justify-content: center; gap: 0 4px;
+  background: #000; border: 2px solid #FFF;
 }
 .quiz__board span { font: 400 16px/1.2 var(--font); color: #FFF; padding: 0 4px; white-space: nowrap; transition: background-color .2s, color .2s; }
 .quiz__board b { color: #FFFF00; margin-right: 4px; }
-/* a door the show just opened */
-.quiz__board span.is-lit { background: #FFFF00; color: #000; }
+.quiz__board span.is-lit { background: #FFFF00; color: #000; text-shadow: none; }
 .quiz__board span.is-lit b { color: #000; }
 .quiz__round {
-  align-self: center; justify-self: center;
-  font: 400 32px/1.2 var(--font-display); color: #FFFF00;
-  text-align: center; text-transform: uppercase;
-  text-shadow: 2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000, -2px -2px 0 #000;
+  position: absolute; z-index: 1; left: 50%; top: 0; transform: translateX(-50%);
+  padding: 2px 8px; background: #000; white-space: nowrap;
+  font: 400 16px/1.2 var(--font-display); color: #FFFF00; text-transform: uppercase;
 }
+/* the minigames: 320x160 at 2x over the stage */
 .quiz__canvas {
-  align-self: center; justify-self: center;
-  display: block; width: 75%; height: auto;
-  background: #000; border: 3px solid #FFF;
+  position: absolute; z-index: 1; inset: 0; display: block; width: 100%; height: 100%;
+  background: #000;
   image-rendering: pixelated;
+}
+/* phone: the board sits under the stage */
+@media (max-width: 759px) {
+  .quiz__set { margin-bottom: 56px; }
+  .quiz__board { top: 100%; left: 0; width: 100%; padding: 4px 0; background: #000; z-index: 2; }
 }
 .quiz__canvas.is-hit { animation: quizWrong .25s linear; }
 
-/* the dialog box: black, a white frame, "* " lines in the game face */
+/* the dialog box: a 16px 9-slice, 2x on a wide stage */
 .quiz__box {
+  position: relative; z-index: 2;
   display: grid; gap: 8px; align-content: start;
-  margin: 4px 16px 12px; padding: 12px 20px 14px;
-  background: #000; border: 3px solid #FFF;
+  margin: 5% 0 12px;
+  border: 16px solid #8888C8; background: #000;
+  border-image: url(../img/act4/deltarune/tvtime/box9.png) 16 fill / 16px stretch;
+  padding: 0 0 0 80px; min-height: 56px; box-sizing: content-box;
+  image-rendering: pixelated;
+}
+/* Tenna's head, left of the host line */
+.quiz__face {
+  position: absolute; left: 0; top: 0; width: 72px; height: 56px;
+  image-rendering: pixelated;
+}
+@media (min-width: 700px) {
+  .quiz__box { border-width: 32px; border-image-width: 32px; padding-left: 152px; min-height: 112px; }
+  .quiz__face { width: 144px; height: 112px; }
 }
 .quiz__host {
   display: grid; grid-template-columns: 24px 1fr;
   margin: 0; min-height: 1.4em;
   font: 400 16px/1.4 var(--font); color: #FFF;
 }
-/* the asterisk gets its own column, so wrapped lines align under the words */
 .quiz__host:not(:empty)::before { content: '*'; }
 .quiz__q { margin: 0; font: 400 16px/1.4 var(--font); color: #FFF; }
 .quiz__q.is-in { animation: quizIn .2s steps(2) both; }
-/* the choicer: two columns, the soul sits beside the one in hand */
 .quiz__opts { display: grid; gap: 4px 32px; grid-template-columns: 1fr 1fr; }
 @media (max-width: 479px) { .quiz__opts { grid-template-columns: 1fr; } }
 .quiz__o {
@@ -1274,11 +1306,11 @@ body.is-blackout::before {
 }
 @media (pointer: coarse) { .quiz__o { min-height: 44px; } }
 .quiz__o b { color: #808080; }
-.quiz__o:hover, .quiz__o:focus-visible { color: #FFFF00; outline: none; }
-.quiz__o:hover::before, .quiz__o:focus-visible::before, .quiz__o.is-right::before {
+.quiz__o:hover, .quiz__o:focus { color: #FFFF00; outline: none; }
+.quiz__o.is-sel::before, .quiz__o:hover::before, .quiz__o.is-right::before {
   content: ''; position: absolute; left: 4px; top: 50%;
   width: 16px; height: 16px; margin-top: -8px;
-  background: url(../img/act4/undertale/soul.png) 0 0 / 100% 100%;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
   image-rendering: pixelated;
 }
 .quiz__o.is-right { color: #00FF00; animation: quizRight .5s ease-out; }
@@ -1288,10 +1320,11 @@ body.is-blackout::before {
 .quiz__timer i.is-low { background: #FF0000; }
 /* a big screen gets Deltarune's own scale: 2x text, 2x soul */
 @media (min-width: 1100px) and (min-height: 760px) {
+  .quiz__stage { width: min(100vw, calc((100vh - 400px) * 1.8)); }
   .quiz__host, .quiz__q, .quiz__o { font-size: 32px; }
   .quiz__host { grid-template-columns: 48px 1fr; }
   .quiz__o { padding-left: 48px; }
-  .quiz__o:hover::before, .quiz__o:focus-visible::before, .quiz__o.is-right::before { width: 32px; height: 32px; margin-top: -16px; }
+  .quiz__o.is-sel::before, .quiz__o:hover::before, .quiz__o.is-right::before { width: 32px; height: 32px; margin-top: -16px; }
 }
 @keyframes quizIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes quizRight { 0% { transform: scale(1); } 40% { transform: scale(1.04); } 100% { transform: scale(1); } }
@@ -1310,8 +1343,9 @@ body.is-blackout::before {
 /* On a phone the line names keys there are none of, and the pad sits on it. */
 @media (pointer: coarse) { .quiz .bh__keys { display: none; } }
 .quiz__end {
-  clear: both; display: grid; justify-items: center; gap: 8px;
-  padding: 8px 0 24px; text-align: center;
+  position: absolute; z-index: 3; inset: 0; overflow: auto;
+  display: grid; justify-items: center; align-content: center; gap: 8px;
+  padding: 8px 0 24px; text-align: center; background: rgba(0, 0, 0, .6);
 }
 .quiz__fin {
   margin: 0; font: 400 32px/1.1 var(--font-display); color: #FFD34E;
@@ -1381,7 +1415,8 @@ body.is-blackout::before {
 @media (prefers-reduced-motion: reduce) {
   .quiz.is-on .quiz__tv { animation: none; }
   .quiz.is-off .quiz__tv { animation: quizFade .3s forwards; }
-  .quiz__marquee::before, .quiz__marquee::after,
+  .quiz__set::after { animation: none; }
+
   .quiz__q.is-in, .quiz__o, .quiz__o.is-right, .quiz__o.is-wrong,
   .quiz__fin, .quiz__rank.is-stamped { animation: none; }
   .quiz__beam { animation: none; }

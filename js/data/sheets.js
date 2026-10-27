@@ -49,6 +49,7 @@
   var NEU = window.NEU = window.NEU || {};
 
   var IMG = 'img/act4/';
+  var TV = IMG + 'deltarune/tvtime/';
 
   NEU.sheets = {
 
@@ -347,8 +348,19 @@
     slot:      { src: IMG + 'terraria/slot.png',          w: 52, h: 52, frames: 1, fw: 52, fh: 52, fps: 0 },
 
     /* ── characters and set dressing — same caveat as above ──────*/
-    tenna:     { src: IMG + 'deltarune/tenna-idle.png',  w: 70, h: 92,  frames: 1, fw: 70, fh: 92,  fps: 0 },
-    tennaPt:   { src: IMG + 'deltarune/tenna-point.png', w: 90, h: 120, frames: 1, fw: 90, fh: 120, fps: 0 },
+    /* TV TIME, extracted Deltarune Ch3 art. These are HORIZONTAL strips, one row of
+       cols frames (width = fw * cols), drawn by quiz.js; ax/ay is the sprite's
+       anchor (foot) inside a native-size frame. */
+    tvTenPodium: { src: TV + 'tenna-podium.png', w: 440, h: 133, frames: 1, cols: 5, fw: 88,  fh: 133, fps: 0, ax: 55, ay: 133 },
+    tvTenPoint:  { src: TV + 'tenna-point.png',  w: 82,  h: 121, frames: 1, fw: 82,  fh: 121, fps: 0, ax: 49, ay: 121 },
+    tvTenCheer:  { src: TV + 'tenna-cheer.png',  w: 595, h: 121, frames: 1, cols: 5, fw: 119, fh: 121, fps: 8, ax: 66, ay: 121 },
+    tvTenShrug:  { src: TV + 'tenna-shrug.png',  w: 94,  h: 121, frames: 1, fw: 94,  fh: 121, fps: 0, ax: 40, ay: 121 },
+    tvTenShock:  { src: TV + 'tenna-shock.png',  w: 66,  h: 125, frames: 1, fw: 66,  fh: 125, fps: 0, ax: 30, ay: 125 },
+    tvTenBow:    { src: TV + 'tenna-bow.png',    w: 225, h: 144, frames: 1, cols: 3, fw: 75,  fh: 144, fps: 7, ax: 44, ay: 144 },
+    tvFaces:     { src: TV + 'faces.png',        w: 576, h: 56,  frames: 1, cols: 8, fw: 72,  fh: 56,  fps: 0 },
+    tvStatic:    { src: TV + 'face-static.png', w: 189, h: 24,  frames: 1, cols: 7, fw: 27,  fh: 24,  fps: 12 },
+    tvMini:      { src: TV + 'mini.png',        w: 400, h: 136, frames: 1, fw: 400, fh: 136, fps: 0 },
+    tvShootBg:   { src: TV + 'shoot-bg.png',    w: 320, h: 160, frames: 1, fw: 320, fh: 160, fps: 0 },
     firedoor:  { src: IMG + 'undertale/firedoor.png',    w: 55, h: 70,  frames: 1, fw: 55, fh: 70,  fps: 0 },
     armchair:  { src: IMG + 'undertale/armchair.png',    w: 45, h: 83,  frames: 1, fw: 45, fh: 83,  fps: 0 },
     corridor:  { src: IMG + 'undertale/newhome-corridor.png', w: 743, h: 76, frames: 1, fw: 743, fh: 76, fps: 0 }

@@ -219,124 +219,71 @@
     'Z': ['shock', 'shock']
   };
 
-  /* ── Tenna, drawn ───────────────────────────────────────────────
-     The two wiki crops in img/act4/deltarune are cut off at the neck
-     and carry the wiki's own backgrounds, so he is drawn here instead:
-     a 48 x 80 sprite on the page's pixel grid, scaled up whole by CSS.
-     A television for a head, a red tuxedo, white gloves, yellow shoes.
-     His face is on the screen, so it changes with the show.
-
-     Every shape is drawn twice. Pass 0 paints it one pixel larger in
-     ink, pass 1 paints it in colour, so the whole figure gets a clean
-     outline without an outline being drawn for each part. */
-  var tcv = $('quizTenna');
-  var tg = tcv && tcv.getContext ? tcv.getContext('2d') : null;
-  var INK = '#12081E';
-  var PAL = {
-    tv: '#3A3550', tvHi: '#5D5684', tvLo: '#262038', scr: '#0B1630', scan: '#0F1E3E',
-    glow: '#9FF0FF', dim: '#3E8FB0', ant: '#8A8598',
-    red: '#C8203A', redHi: '#FF4D6A', white: '#F4F0FF', gold: '#FFD34E', goldLo: '#C8901E',
-    black: '#1A1426', blackHi: '#3A3252', tear: '#4FC3F7'
+  /* ── Tenna, from the game's own sheets ──────────────────────────
+     Each pose is a horizontal strip in NEU.sheets: [sheet, frames,
+     fps, hold]. He is drawn 1:1 into a 140 x 146 canvas with his feet
+     on the bottom row; CSS scales the canvas by whole stage units.
+     The face on his own screen is part of every pose sprite, so the
+     expression (look.face) is shown as a head portrait in the box. */
+  var POSES = {
+    idle:  ['tvTenPodium', [0], 0, 0],
+    point: ['tvTenPoint',  [0], 0, 0],
+    cheer: ['tvTenCheer',  [0, 1, 2, 3], 8, 3],
+    shrug: ['tvTenShrug',  [0], 0, 0],
+    shock: ['tvTenShock',  [0], 0, 0],
+    bow:   ['tvTenBow',    [0, 1, 2], 7, 2]
   };
-  /* shoulder, elbow, hand: left arm then right arm, per pose */
-  var ARMS = {
-    idle:  [12, 38, 10, 45, 10, 52,  36, 38, 38, 45, 38, 52],
-    point: [12, 38, 10, 45, 10, 52,  36, 38, 41, 34, 45, 30],
-    cheer: [12, 38,  7, 31,  6, 22,  36, 38, 41, 31, 42, 22],
-    shrug: [12, 38,  5, 42,  4, 35,  36, 38, 43, 42, 44, 35],
-    shock: [12, 38,  6, 34,  8, 25,  36, 38, 42, 34, 40, 25],
-    bow:   [12, 41, 15, 48, 21, 51,  36, 41, 33, 48, 27, 51]
-  };
-  var look = { pose: 'idle', face: 'grin' };
-  function pose(p, f) { look.pose = p; if (f) look.face = f; }
-
-  var pass = 1;
-  function R(x, y, w, h, c) {
-    if (!pass) { tg.fillRect(x - 1, y - 1, w + 2, h + 2); return; }
-    tg.fillStyle = c; tg.fillRect(x, y, w, h);
+  var FACES = { grin: 0, smug: 1, wink: 2, happy: 3, stars: 4, shock: 5, sad: 6, off: 7 };
+  var tcv = $('quizTenna'), fcv2 = $('quizFace');
+  /* Sprites are plain elements whose sheet comes from a CSS rule on
+     [data-s], placed in percentages of their 140x146 (or 72x56) box. */
+  function mk(host) {
+    if (!host) return null;
+    var e = document.createElement('i');
+    e.style.cssText = 'position:absolute;display:none;background-repeat:no-repeat;image-rendering:pixelated';
+    e.__k = '';
+    host.appendChild(e);
+    return e;
   }
-  function seg(x0, y0, x1, y1, c) {
-    var n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1;
-    for (var k = 0; k <= n; k++) {
-      R(Math.round(x0 + (x1 - x0) * k / n) - 1, Math.round(y0 + (y1 - y0) * k / n) - 1, 3, 3, c);
-    }
-  }
-  /* face pixels: colour only, inside the screen */
-  function F(x, y, w, h, c) { tg.fillStyle = c || PAL.glow; tg.fillRect(x, y, w, h); }
-  function ring(x, y, w, h) { F(x, y, w, 1); F(x, y + h - 1, w, 1); F(x, y, 1, h); F(x + w - 1, y, 1, h); }
-  function star(x, y) { F(x - 2, y, 5, 1, PAL.gold); F(x, y - 2, 1, 5, PAL.gold); F(x - 1, y - 1, 3, 3, PAL.gold); }
+  var tSpr = mk(tcv), fSpr = mk(fcv2), fSt = mk(fcv2);
+  var look = { pose: 'idle', face: 'grin' }, poseAt = 0;
+  function pose(p, f) { if (p !== look.pose) poseAt = clock; look.pose = p; if (f) look.face = f; paint(); }
 
-  function drawFace(f, x, y, clock) {
-    /* the screen is 20 x 16; eyes at x+4 and x+14, mouth across x+4..15 */
-    F(x, y, 20, 16, PAL.scr);
-    for (var k = 0; k < 16; k += 2) F(x, y + k, 20, 1, PAL.scan);
-    if (f === 'off') return;
-    if (f === 'static') {
-      for (k = 0; k < 70; k++) {
-        F(x + ((Math.random() * 20) | 0), y + ((Math.random() * 16) | 0), 1, 1,
-          Math.random() < 0.5 ? PAL.glow : PAL.dim);
-      }
-      return;
-    }
-    var a = x + 4, b = x + 14, ey = y + 4, my = y + 11;
-    var blink = !reduced && clock % 3.7 < 0.12 && (f === 'grin' || f === 'smug' || f === 'wink');
-    if (blink)                { F(a - 1, ey + 2, 4, 1); F(b - 1, ey + 2, 4, 1); }
-    else if (f === 'stars')   { star(a + 1, ey + 2); star(b + 1, ey + 2); }
-    else if (f === 'shock')   { ring(a - 1, ey - 1, 4, 5); ring(b - 1, ey - 1, 4, 5); }
-    else if (f === 'happy')   { F(a - 1, ey + 2, 1, 1); F(a, ey + 1, 2, 1); F(a + 2, ey + 2, 1, 1);
-                                F(b - 1, ey + 2, 1, 1); F(b, ey + 1, 2, 1); F(b + 2, ey + 2, 1, 1); }
-    else if (f === 'smug')    { F(a - 1, ey + 2, 4, 1); F(b - 1, ey + 2, 4, 1);
-                                F(a, ey + 3, 2, 1, PAL.dim); F(b, ey + 3, 2, 1, PAL.dim); }
-    else if (f === 'sad')     { F(a - 1, ey + 1, 1, 1); F(a, ey + 2, 3, 1); F(b + 2, ey + 1, 1, 1);
-                                F(b - 1, ey + 2, 3, 1); F(a - 1, ey + 4, 1, 2, PAL.tear); }
-    else if (f === 'wink')    { F(a - 1, ey + 2, 4, 1); F(b, ey, 2, 4); }
-    else                      { F(a, ey, 2, 4); F(b, ey, 2, 4); }
-    if (f === 'shock')        ring(x + 8, my - 2, 4, 4);
-    else if (f === 'sad')     { F(x + 5, my + 1, 10, 1); F(x + 4, my + 2, 1, 1); F(x + 15, my + 2, 1, 1); }
-    else if (f === 'smug')    { F(x + 7, my, 7, 1); F(x + 14, my - 1, 2, 1); }
-    else if (f === 'happy' || f === 'stars') { F(x + 4, my - 1, 12, 2); F(x + 6, my + 1, 8, 1, PAL.dim); }
-    else                      { F(x + 4, my, 12, 1); F(x + 3, my - 1, 1, 1); F(x + 16, my - 1, 1, 1);
-                                F(x + 5, my + 1, 10, 1, PAL.dim); }
+  /* sheet cell fr at (dx, dy) in a W x H box; only touches the DOM on change */
+  function put(e, key, fr, dx, dy, W, H) {
+    var sh = NEU.sheets[key];
+    if (!e || !sh) return;
+    var k = key + fr + '@' + dx + ',' + dy;
+    if (e.__k === k) return;
+    e.__k = k;
+    var cols = sh.cols || 1, st = e.style;
+    st.display = 'block';
+    e.setAttribute('data-s', key);
+    st.left = (dx / W * 100) + '%'; st.top = (dy / H * 100) + '%';
+    st.width = (sh.fw / W * 100) + '%'; st.height = (sh.fh / H * 100) + '%';
+    st.backgroundSize = (cols * 100) + '% 100%';
+    st.backgroundPosition = (cols > 1 ? fr / (cols - 1) * 100 : 0) + '% 0';
+  }
+  function paint() { paintPose(clock); drawFace(clock); }
+  function hide(e) { if (e && e.__k) { e.__k = ''; e.style.display = 'none'; } }
+
+  function paintPose(clock) {
+    var P = POSES[look.pose] || POSES.idle, sh = NEU.sheets[P[0]];
+    var k = P[3];
+    if (!reduced && P[2]) k = Math.min(P[1].length - 1, Math.floor((clock - poseAt) * P[2]));
+    var bob = reduced ? 0 : Math.floor(clock * 2.5) % 2;
+    /* the point pose stands 1 px further right, as in the game */
+    put(tSpr, P[0], P[1][k], 70 + (look.pose === 'point' ? 1 : 0) - sh.ax, 146 - sh.ay - bob, 140, 146);
   }
 
-  function drawTenna(clock) {
-    if (!tg) return;
-    tg.clearRect(0, 0, 48, 80);
-    var p = look.pose, a = ARMS[p] || ARMS.idle;
-    /* a one-pixel bob, two when he is cheering; nothing under reduced motion */
-    var by = reduced ? 0 : (p === 'cheer' ? (Math.floor(clock * 6) % 2) * 2 : Math.floor(clock * 2.5) % 2);
-    var hy = by + (p === 'bow' ? 6 : 0);
-    var wig = reduced ? 0 : Math.round(Math.sin(clock * 5));
-    var droop = p === 'bow' ? 3 : 0;
-    for (pass = 0; pass < 2; pass++) {
-      if (!pass) tg.fillStyle = INK;
-      /* legs and shoes stay planted */
-      R(17, 56, 6, 16, PAL.black); R(26, 56, 6, 16, PAL.black);
-      R(13, 71, 10, 4, PAL.gold);  R(26, 71, 10, 4, PAL.gold);
-      /* the jacket, its tails, the shirt and the bow tie */
-      R(13, 36 + by, 23, 21, PAL.red); R(11, 37 + by, 27, 4, PAL.red);
-      R(13, 56, 4, 3, PAL.red); R(32, 56, 4, 3, PAL.red);
-      /* the arms, then the gloves */
-      seg(a[0], a[1] + by, a[2], a[3] + by, PAL.red);  seg(a[2], a[3] + by, a[4], a[5] + by, PAL.red);
-      seg(a[6], a[7] + by, a[8], a[9] + by, PAL.red);  seg(a[8], a[9] + by, a[10], a[11] + by, PAL.red);
-      R(a[4] - 2, a[5] + by - 2, 5, 5, PAL.white);     R(a[10] - 2, a[11] + by - 2, 5, 5, PAL.white);
-      /* the neck, the television, its antennae */
-      R(22, 31 + hy, 5, 6, PAL.tvLo);
-      R(9, 9 + hy, 31, 23, PAL.tv);
-      seg(17, 9 + hy, 13 + wig, 3 + hy + droop, PAL.ant); seg(31, 9 + hy, 35 - wig, 3 + hy + droop, PAL.ant);
-      R(11 + wig, hy + droop, 3, 3, PAL.redHi); R(34 - wig, hy + droop, 3, 3, PAL.gold);
+  function drawFace(clock) {
+    if (look.face === 'static') {
+      put(fSpr, 'tvFaces', 7, 0, 0, 72, 56);
+      put(fSt, 'tvStatic', reduced ? 0 : Math.floor(clock * 12) % 7, 18, 28, 72, 56);
+    } else {
+      put(fSpr, 'tvFaces', FACES[look.face] || 0, 0, 0, 72, 56);
+      hide(fSt);
     }
-    /* colour-only detail, no outline */
-    F(18, 57, 1, 13, PAL.blackHi); F(27, 57, 1, 13, PAL.blackHi);
-    F(13, 74, 10, 1, PAL.goldLo); F(26, 74, 10, 1, PAL.goldLo);
-    F(15, 40 + by, 2, 14, PAL.redHi);
-    F(22, 36 + by, 5, 8, PAL.white); F(23, 44 + by, 3, 3, PAL.white);
-    F(19, 36 + by, 4, 3, PAL.gold); F(26, 36 + by, 4, 3, PAL.gold); F(23, 37 + by, 3, 2, PAL.goldLo);
-    F(24, 48 + by, 1, 1, INK); F(24, 52 + by, 1, 1, INK);
-    F(10, 10 + hy, 29, 1, PAL.tvHi); F(10, 30 + hy, 29, 1, PAL.tvLo);
-    F(34, 14 + hy, 3, 3, PAL.tvHi); F(34, 20 + hy, 3, 3, PAL.tvHi);
-    F(34, 26 + hy, 3, 1, PAL.tvLo); F(34, 28 + hy, 3, 1, PAL.tvLo);
-    drawFace(look.face, 12, 12 + hy, clock);
   }
 
   /* ── confetti ───────────────────────────────────────────────────
@@ -402,7 +349,7 @@
     lastNow = now;
     if (!(dt > 0) || dt > 0.05) dt = 0.016;
     clock += dt;
-    drawTenna(clock);
+    paint();
     stepFx(dt);
   }
   function startLoop() {
@@ -441,7 +388,7 @@
     document.body.classList.add('is-playing');
     if (NEU.quest) { NEU.quest.lock(true); NEU.quest.mark('a4_tenna'); }
     sizeFx();
-    startLoop();
+    paint(); startLoop();
     begin();
   }
 
@@ -541,6 +488,11 @@
         b.className = 'quiz__o';
         b.innerHTML = '<b>' + 'ABCD'[n] + '</b>' + opt;
         b.addEventListener('click', function () { answer(n); });
+        b.addEventListener('focus', function () {
+          var all = elOpts.children, k;
+          for (k = 0; k < all.length; k++) all[k].classList.remove('is-sel');
+          b.classList.add('is-sel');
+        });
         elOpts.appendChild(b);
       });
       /* Put the caret on option A each question. Without it, Tab from
@@ -753,6 +705,32 @@
   var phase = null, phaseLoop = null, dodged = false, shot = false;
   var DT = 0.033;
 
+  /* The minigames keep their 480x240 logic (speeds, hit tests, timers)
+     but draw on the game's own 320x160 canvas through a 2/3 transform,
+     so a native sprite lands on whole pixels and CSS doubles it.
+     MINI: x, y in the tvMini atlas, frame w, h, origin ox, oy. */
+  var MINI = {
+    shock:  [0, 0, 64, 64, 32, 32],    window: [192, 0, 50, 53, 25, 26],
+    aim:    [0, 64, 34, 52, 22, 26],   cowboy: [34, 64, 24, 41, 12, 12],
+    hit:    [58, 64, 41, 40, 20, 20],  cross:  [324, 64, 32, 32, 16, 16],
+    soul:   [0, 116, 20, 20, 10, 10],  fire:   [180, 116, 14, 14, 7, 14]
+  };
+  function spr(key, fr, x, y) {
+    var a = MINI[key], im = NEU.sheetReady(NEU.sheets.tvMini);
+    if (!a || !im) return false;
+    cx.save();
+    cx.setTransform(1, 0, 0, 1, 0, 0);
+    cx.imageSmoothingEnabled = false;
+    cx.drawImage(im, a[0] + fr * a[2], a[1], a[2], a[3],
+                 Math.round(x * 2 / 3 - a[4]), Math.round(y * 2 / 3 - a[5]), a[2], a[3]);
+    cx.restore();
+    return true;
+  }
+  function mini(on) {
+    if (cx) { cx.setTransform(2 / 3, 0, 0, 2 / 3, 0, 0); cx.imageSmoothingEnabled = false; }
+    wrap.classList.toggle('is-mini', !!on);
+  }
+
   /* Held arrows, not keydown counts. A step per keydown meant the soul
      moved once, waited out the keyboard's repeat delay, then lurched —
      and on a phone it moved once and stopped, because the touch stick
@@ -768,13 +746,16 @@
     phase = null;
     held = {};
     if (cv) cv.hidden = true;
+    wrap.classList.remove('is-mini');
   }
 
-  function stageFloor() {
-    cx.fillStyle = '#0E0820'; cx.fillRect(0, 0, 480, 240);
-    cx.fillStyle = '#1B1036';
-    for (var g = 0; g < 480; g += 32) cx.fillRect(g, 0, 1, 240);
-    for (g = 0; g < 240; g += 32) cx.fillRect(0, g, 480, 1);
+  /* dodge: the battle's black arena with its white frame; shoot: the
+     desert and the train car */
+  function stageFloor(bg) {
+    cx.fillStyle = '#000'; cx.fillRect(0, 0, 480, 240);
+    var im = bg && NEU.sheetReady(NEU.sheets.tvShootBg);
+    if (im) { cx.drawImage(im, 0, 0, 480, 240); return; }
+    cx.strokeStyle = '#FFF'; cx.lineWidth = 3; cx.strokeRect(1.5, 1.5, 477, 237);
   }
   /* The rounds are not scored (the twenty questions are), but a hit you
      cannot see is a round you cannot read: a time bar along the top,
@@ -783,8 +764,9 @@
   function hud(left, label, col) {
     cx.fillStyle = '#2A1747'; cx.fillRect(0, 0, 480, 4);
     cx.fillStyle = '#FFD34E'; cx.fillRect(0, 0, Math.max(0, left / roundLen) * 480, 4);
-    cx.font = '16px "Determination Mono", monospace';
-    cx.fillStyle = col; cx.fillText(label, 10, 24);
+    cx.font = '24px "Determination Mono", monospace';
+    cx.fillStyle = '#000'; cx.fillText(label, 11, 31);
+    cx.fillStyle = col; cx.fillText(label, 10, 30);
   }
   /* A hit has to read at a glance, not only in the counter: Tenna
      reacts for a moment and goes back to the round's pose, and a hit
@@ -797,6 +779,7 @@
     if (shake && cv && !reduced) { cv.classList.remove('is-hit'); void cv.offsetWidth; cv.classList.add('is-hit'); }
   }
   function soulAt(x, y) {
+    if (spr('soul', hurt > 0 && Math.floor(hurt * 20) % 2 ? 1 : 0, x, y)) return;
     x = Math.round(x); y = Math.round(y);
     cx.fillStyle = hurt > 0 && Math.floor(hurt * 20) % 2 ? '#FFFFFF' : '#FF2030';
     cx.fillRect(x - 4, y - 3, 3, 2); cx.fillRect(x + 1, y - 3, 3, 2);
@@ -809,6 +792,7 @@
     state = 'dodge';
     soul = { x: 240, y: 210 }; dodgeTime = duration; dodgeHits = 0; fires = [];
     roundLen = duration; hurt = 0;
+    mini(true);
     cv.hidden = false;
     if (elOpts) elOpts.innerHTML = '';
     if (elQ) elQ.textContent = '';
@@ -825,13 +809,15 @@
     soul.y = clamp(soul.y + axis('ArrowUp', 'ArrowDown') * SOUL_SPEED * DT, 8, 232);
     if (Math.random() < 0.4)
       fires.push({ x: Math.random() * 480, y: 0, vy: 80 + Math.random() * 80 });
-    stageFloor();
+    stageFloor(false);
     for (var f = fires.length - 1; f >= 0; f--) {
       fires[f].y += fires[f].vy * DT;
       if (fires[f].y > 240) { fires.splice(f, 1); continue; }
       var fx = Math.round(fires[f].x), fy = Math.round(fires[f].y);
-      cx.fillStyle = '#FF6B2A'; cx.fillRect(fx, fy, 8, 12);
-      cx.fillStyle = '#FFD34E'; cx.fillRect(fx + 2, fy + 5, 4, 6);
+      if (!spr('fire', (fy >> 3) % 3, fx + 4, fy + 12)) {
+        cx.fillStyle = '#FF6B2A'; cx.fillRect(fx, fy, 8, 12);
+        cx.fillStyle = '#FFD34E'; cx.fillRect(fx + 2, fy + 5, 4, 6);
+      }
       if (Math.abs(fires[f].x - soul.x) < 10 && Math.abs(fires[f].y - soul.y) < 10) {
         dodgeHits++; fires.splice(f, 1);
         hurt = 0.4;
@@ -841,6 +827,7 @@
     }
     if (hurt > 0) {
       hurt -= DT;
+      spr('hit', Math.min(3, Math.floor((0.4 - hurt) * 10)), soul.x, soul.y);
       cx.fillStyle = 'rgba(255, 32, 48, ' + (Math.max(0, hurt) * 0.6).toFixed(2) + ')';
       cx.fillRect(0, 0, 480, 240);
       cx.strokeStyle = '#FF2030'; cx.lineWidth = 4; cx.strokeRect(2, 2, 476, 236);
@@ -877,6 +864,7 @@
     shootTime = duration; shootHits = 0; shootMisses = 0; targets = [];
     crosshair = { x: 240, y: 120 };
     roundLen = duration; pops = [];
+    mini(true);
     cv.hidden = false;
     if (elOpts) elOpts.innerHTML = '';
     if (elQ) elQ.textContent = '';
@@ -893,12 +881,13 @@
     crosshair.y = clamp(crosshair.y + axis('ArrowUp', 'ArrowDown') * AIM_SPEED * DT, 12, 228);
     if (Math.random() < 0.3)
       targets.push({ x: 20 + Math.random() * 440, y: 20 + Math.random() * 180, timer: 2 + Math.random() * 2 });
-    stageFloor();
+    stageFloor(true);
     for (var n = targets.length - 1; n >= 0; n--) {
       targets[n].timer -= DT;
       if (targets[n].timer <= 0) { shootMisses++; targets.splice(n, 1); continue; }
       /* a little television with his face on it; red when it is about to fire */
       var tx = Math.round(targets[n].x), ty = Math.round(targets[n].y);
+      if (spr('window', 3, tx, ty) && spr(targets[n].timer < 1 ? 'aim' : 'cowboy', 0, tx, ty)) continue;
       cx.fillStyle = targets[n].timer < 1 ? '#FF2030' : '#FFD34E';
       cx.fillRect(tx - 8, ty - 8, 16, 16);
       cx.fillStyle = '#0B1630'; cx.fillRect(tx - 6, ty - 6, 12, 9);
@@ -909,12 +898,14 @@
     for (n = pops.length - 1; n >= 0; n--) {
       pops[n].t -= DT;
       if (pops[n].t <= 0) { pops.splice(n, 1); continue; }
+      if (spr('shock', Math.min(2, Math.floor((0.3 - pops[n].t) * 10)), pops[n].x, pops[n].y)) continue;
       var pr = 22 - pops[n].t * 50;
       if (pops[n].t > 0.2) { cx.fillStyle = '#FFFFFF'; cx.fillRect(pops[n].x - 10, pops[n].y - 10, 20, 20); }
       cx.strokeStyle = '#FFFFFF'; cx.lineWidth = 2;
       cx.strokeRect(pops[n].x - pr, pops[n].y - pr, pr * 2, pr * 2);
     }
     hud(shootTime, 'HITS ' + shootHits, '#7BE38A');
+    if (spr('cross', 0, crosshair.x, crosshair.y)) { if (shootTime <= 0) shootDone(); return; }
     cx.strokeStyle = '#7BE38A'; cx.lineWidth = 2;
     cx.strokeRect(crosshair.x - 12, crosshair.y - 12, 24, 24);
     cx.beginPath();

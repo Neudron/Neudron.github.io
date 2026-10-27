@@ -214,20 +214,22 @@
 <div class="quiz" id="quiz" hidden role="dialog" aria-modal="true" aria-label="the show">
   <div class="quiz__tv" id="quizTv">
     <i class="quiz__beam quiz__beam--l" hidden></i><i class="quiz__beam quiz__beam--r" hidden></i>
-    <div class="quiz__marquee" aria-hidden="true"><b>TV TIME!</b></div>
     <div class="quiz__stage">
-      <div class="quiz__set" aria-hidden="true"></div>
-      <canvas class="quiz__tenna" id="quizTenna" width="48" height="80" aria-hidden="true"></canvas>
       <div class="quiz__main">
         <div class="quiz__top">
           <span class="quiz__cat" id="quizCat"></span>
           <span class="quiz__num" id="quizNum"></span>
         </div>
-        <div class="quiz__board" id="quizBoard" aria-label="rank thresholds"></div>
-        <div class="quiz__round" id="quizRound" hidden></div>
-        <canvas class="quiz__canvas" id="quizCanvas" width="480" height="240" hidden></canvas>
-        <div class="quiz__end" id="quizEnd" hidden></div>
+        <div class="quiz__set">
+          <i class="quiz__pod" aria-hidden="true"></i><i class="quiz__pod" aria-hidden="true"></i><i class="quiz__pod" aria-hidden="true"></i>
+          <div class="quiz__tenna" id="quizTenna" aria-hidden="true"></div>
+          <div class="quiz__board" id="quizBoard" aria-label="rank thresholds"></div>
+          <div class="quiz__round" id="quizRound" hidden></div>
+          <canvas class="quiz__canvas" id="quizCanvas" width="320" height="160" hidden></canvas>
+          <div class="quiz__end" id="quizEnd" hidden></div>
+        </div>
         <div class="quiz__box">
+          <div class="quiz__face" id="quizFace" aria-hidden="true"></div>
           <p class="quiz__host" id="quizSay" aria-live="polite"></p>
           <h2 class="quiz__q" id="quizQ"></h2>
           <div class="quiz__opts" id="quizOpts"></div>
