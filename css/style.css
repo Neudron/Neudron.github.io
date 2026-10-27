@@ -1200,15 +1200,12 @@ body.is-blackout::before {
   background: #000 url(../img/act4/deltarune/tvtime/stage-bg.png) 0 0 / 100% 100% no-repeat;
   image-rendering: pixelated;
 }
-/* name podiums: 12-frame strip, one frame each */
+/* the one contestant podium: YOU, where the party stood */
 .quiz__pod {
-  position: absolute; bottom: 8.125%; width: 10.625%; height: 27.5%;
-  background: url(../img/act4/deltarune/tvtime/podium.png) 0 0 / 1200% 100% no-repeat;
+  position: absolute; bottom: 8.125%; left: 23.75%; width: 10.625%; height: 27.5%;
+  background: url(../img/act4/deltarune/tvtime/podium.png) 0 0 / 100% 100% no-repeat;
   image-rendering: pixelated;
 }
-.quiz__pod:nth-of-type(1) { left: 10.625%; background-position: 0 0; }
-.quiz__pod:nth-of-type(2) { left: 23.75%; background-position: 36.364% 0; }
-.quiz__pod:nth-of-type(3) { left: 36.875%; background-position: 72.727% 0; }
 /* crowd band behind the dialog box: 3 frames, 4.5 fps */
 .quiz__set::after {
   content: ''; position: absolute; left: 0; width: 100%; top: 100%; height: 12.5%;
