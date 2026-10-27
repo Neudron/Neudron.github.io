@@ -3,27 +3,21 @@
    He will not sell you the axe. He will, however, accept a challenge,
    because he is that kind of person.
 
-   THE ONE THING THAT MATTERS TECHNICALLY:
-   TIMING COMES FROM AudioContext.currentTime, NEVER from accumulated
-   requestAnimationFrame deltas. rAF drift is small per frame and
-   ruinous over a minute — a chart that starts in time is a quarter of
-   a beat late by the second verse, and the player correctly concludes
-   the game is broken. The audio clock is the only clock.
+   Gameplay timing and scoring ported from Friday Night Funkin' (FunkinCrew/Funkin @a87711a, Apache-2.0).
+
+   TIMING COMES FROM AudioContext.currentTime, NEVER from rAF deltas or
+   timers. One songPos (seconds since beat 0) drives the countdown, the
+   taunt switch, his notes, your notes and hold gains. rAF drift is small
+   per frame and ruinous over a minute, so a chart that starts in time
+   stays in time.
 
    WHAT MAKES IT FAIR:
-
-   1. THE HIT WINDOW IS GENEROUS AND SHOWN. ±140ms, and every judgement
-      is named on screen the moment it happens.
-
-   2. THE CHART IS CALL AND RESPONSE. He plays four bars, then you play
-      the same four bars back. You are never asked to sightread — you
-      are asked to repeat, which is what a rap battle IS.
-
-   3. THREE ROUNDS, EACH SHORTER THAN THE LAST, EACH FASTER. Failing
-      restarts the round, not the battle.
-
-   4. YOU CANNOT LOSE PERMANENTLY. Losing sends you back to the room
-      with the axe still on the counter, and he gets a better line. */
+   1. PBOT1 judgement windows, named on screen: SICK!! ≤45ms, GOOD ≤90,
+      BAD ≤135, SHIT ≤160. Past 160 is a miss.
+   2. CALL AND RESPONSE. His notes and yours share one song. Yours sit
+      four beats after his, so you are asked to repeat, not sightread.
+   3. YOU CANNOT LOSE PERMANENTLY. Health runs out, the round restarts,
+      and he gets a better line. A press in an empty lane costs nothing. */
 
 (function () {
   'use strict';
@@ -41,18 +35,26 @@
   var ARROW = { left: '◀', down: '▼', up: '▲', right: '▶' };
   var LANECOL = ['#C24AE0', '#4AC2E0', '#7BE38A', '#E04A6B'];
 
-  var WINDOW = 0.14;        // seconds either side. generous on purpose.
-  var SCROLL = 320;         // px per second the notes travel
+  var WINDOW_MS = 160;                // PBOT1 shit edge. Past it, a miss.
+  var PIXELS_PER_MS = 0.45;           // Funkin Constants.PIXELS_PER_MS, times the round's speed
+  var SPEED = [1.6, 1.9, 2.2];
+  var DROP_AFTER = 0.16;              // a hold released with more than this still owed loses score
 
-  /* Three rounds. Each is a list of [beat, lane]; the call is his and
-     the response is yours, so the chart is written once and played
-     twice with a bar offset. */
+  /* Judgement table, in PBOT1 order: sick, good, bad, shit, miss. */
+  var NAMES = ['SICK!!', 'GOOD', 'BAD', 'SHIT', 'MISS'];
+  var EDGE = [45, 90, 135, 160];
+  var HEALTH = [0.03, 0.015, 0, -0.02, -0.08];
+  var BREAK = [false, false, true, true, true];
+  var HEALTH_MAX = 2;
+
+  /* Three rounds. Each is a list of [beat, lane, holdBeats?]; his notes
+     play on their beats and yours on the same beats four bars later. */
   var BPM = [104, 122, 140];
   var CHARTS = [
-    [[0,0],[1,1],[2,2],[3,3],[4,0],[5,0],[6,2],[7,3]],
-    [[0,3],[0.5,2],[1,1],[2,0],[2.5,0],[3,2],[4,3],[4.5,3],[5,1],[6,2],[7,0]],
+    [[0,0],[1,1],[2,2],[3,3],[4,0,2],[6,1],[6,2],[7,3]],
+    [[0,3],[0.5,2],[1,1],[2,0,1],[2.5,3],[3,2],[4,3],[4.5,3],[5,1],[6,2],[7,0]],
     [[0,0],[0.5,1],[1,2],[1.5,3],[2,3],[2.5,2],[3,1],[3.5,0],
-     [4,0],[4.5,2],[5,1],[5.5,3],[6,2],[6.5,0],[7,3],[7.5,1]]
+     [4,0],[4.5,2],[5,1],[5.5,3],[6,2],[6.5,0,1.5],[7,3],[7.5,1]]
   ];
 
   var TAUNT = [
@@ -62,12 +64,10 @@
   ];
 
   var actx = null;
-  var running = false, round = 0, notes = [], t0 = 0;
-  var phaseTimer = 0;         /* call→response switch — cleared on close/restart so a stale
-                                 timer can't concat its chart onto the next round */
-  var hp = 0.5, judged = '', judgedT = 0, misses = 0;
-  var phase = 'call';        // call | response
+  var running = false, round = 0, notes = [], t0 = 0, lastSp = 0, phase = -1;
+  var judgedT = 0;
   var keys = {};
+  var S = { score: 0, combo: 0, health: 1, judgement: '', countdown: '', round: 0 };
 
   function audio() {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
@@ -75,38 +75,32 @@
     return actx;
   }
   function now() { return audio().currentTime; }
-
+  function songPos() { return now() - t0; }
   function beatLen() { return 60 / BPM[round]; }
+  function ms(d) { return Math.floor(d * 1000 + 1e-6); }
 
   function build(forYou) {
-    var bl = beatLen();
-    /* His bars run first; yours start one bar (4 beats) later. Same
-       chart, shifted — that is what makes it call-and-response rather
-       than two unrelated songs. */
-    var off = forYou ? 4 * bl : 0;
+    var bl = beatLen(), off = forYou ? 4 : 0;
     return CHARTS[round].map(function (n) {
-      return { t: t0 + off + n[0] * bl, lane: n[1], hit: false, mine: forYou };
+      var t = (off + n[0]) * bl;
+      return { t: t, end: t + (n[2] || 0) * bl, lane: n[1], mine: forYou, hit: false, done: false };
     });
   }
 
   function startRound() {
-    if (phaseTimer) { clearTimeout(phaseTimer); phaseTimer = 0; }
-    phase = 'call';
-    t0 = now() + 1.4;
-    notes = build(false);
-    misses = 0;
-    say(TAUNT[round][0] || '');
-    /* His bar plays itself; yours arrives a bar later. */
-    phaseTimer = setTimeout(function () {
-      phaseTimer = 0;
-      if (!running) return;
-      phase = 'response';
-      notes = notes.concat(build(true));
-      say(TAUNT[round][1] || 'go.');
-    }, 1400 + 4 * beatLen() * 1000);
+    t0 = now() + 4 * beatLen();           // four beats of 3-2-1-GO before beat 0
+    notes = build(false).concat(build(true));
+    lastSp = 0; phase = 0; S.round = round; S.judgement = '';
+    say(TAUNT[round][0]);
   }
 
-  function say(s) { judged = ''; if (msg) { msg.hidden = false; msg.textContent = s; } }
+  function countLabel(sp) {
+    if (sp >= 0) return '';
+    var i = Math.floor((sp + 4 * beatLen()) / beatLen());
+    return ['3', '2', '1', 'GO!'][i] || '';
+  }
+
+  function say(s) { if (msg) { msg.hidden = false; msg.textContent = s; } }
 
   function blip(lane, mine) {
     if (NEU.settings && NEU.settings.muted) return;       /* the Sound switch; timing still runs on the clock */
@@ -122,59 +116,92 @@
     } catch (e) {}
   }
 
+  function addHealth(d) { S.health = Math.min(HEALTH_MAX, Math.max(0, S.health + d)); }
+
+  /* r: 0 sick, 1 good, 2 bad, 3 shit, 4 miss. ms: the timing error. */
+  function judge(r, m) {
+    /* PBOT1 score curve: flat 500 inside 5 ms, then a sigmoid that floors at 9 */
+    var curve = m < 5 ? 500 : Math.floor(500 * (1 - 1 / (1 + Math.exp(-0.08 * (m - 54.99)))) + 9);
+    S.score += r === 4 ? -100 : curve;
+    addHealth(HEALTH[r]);
+    S.combo = BREAK[r] ? 0 : S.combo + 1;
+    S.judgement = NAMES[r];
+    judgedT = now();
+  }
+
+  /* Hold gains for the stretch since the last tick, while the key is down. */
+  function tick(sp) {
+    for (var i = 0; i < notes.length; i++) {
+      var n = notes[i];
+      if (!n.mine || !n.hit || n.done || !keys[LANES[n.lane]]) continue;
+      var d = Math.min(sp, n.end) - Math.max(lastSp, n.t);
+      if (d > 0) { addHealth(0.12 * d); S.score += 250 * d; }
+    }
+    lastSp = sp;
+  }
+
   function press(lane) {
-    if (!running || phase !== 'response') return;
-    var tn = now(), best = null, bd = 9;
+    if (!running) return;
+    var sp = songPos(), best = null, bm = WINDOW_MS + 1;
+    tick(sp);
     for (var i = 0; i < notes.length; i++) {
       var n = notes[i];
       if (!n.mine || n.hit || n.lane !== lane) continue;
-      var d = Math.abs(n.t - tn);
-      if (d < bd) { bd = d; best = n; }
+      var m = ms(Math.abs(n.t - sp));
+      if (m <= WINDOW_MS && m < bm) { bm = m; best = n; }
     }
-    if (best && bd <= WINDOW) {
-      best.hit = true;
-      hp = Math.min(1, hp + 0.045);
-      judged = bd < 0.05 ? 'PERFECT' : bd < 0.09 ? 'GOOD' : 'OK';
-      judgedT = tn;
-      blip(lane, true);
-    } else {
-      hp = Math.max(0, hp - 0.03);
-      judged = 'MISS'; judgedT = tn;
-      if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
-    }
+    if (!best) return;                  /* ghost tap: forgiven, no penalty */
+    best.hit = true;
+    if (best.end === best.t) best.done = true;
+    judge(bm <= EDGE[0] ? 0 : bm <= EDGE[1] ? 1 : bm <= EDGE[2] ? 2 : 3, bm);
+    blip(lane, true);
+  }
+
+  /* Key up: a hold released early loses 125 per second still owed past 160 ms. */
+  function release(lane) {
+    if (!running) return;
+    var sp = songPos();
+    tick(sp);
+    notes.forEach(function (n) {
+      if (!n.mine || n.lane !== lane || !n.hit || n.done) return;
+      n.done = true;
+      var rem = n.end - sp;
+      if (rem > DROP_AFTER) S.score -= 125 * rem;
+    });
   }
 
   function step() {
     if (!running) return;
     requestAnimationFrame(step);
-    var tn = now();
-    /* Leave prompt up: hold the frame. Notes that pass meanwhile are judged on resume. ponytail: audio clock keeps running, so pause the judging, not the song. */
-    if (NEU.juice && NEU.juice.frozen()) { draw(tn); return; }
+    var sp = songPos();
+    S.countdown = countLabel(sp);
+    /* Leave prompt up: hold the frame. Notes that pass meanwhile are judged on resume. */
+    if (NEU.juice && NEU.juice.frozen()) { lastSp = sp; draw(sp); return; }
+
+    var ph = ms(sp - 4 * beatLen()) >= 0 ? 1 : 0;
+    if (ph !== phase) { phase = ph; say(TAUNT[round][ph] || 'go.'); }
+    tick(sp);
 
     for (var i = 0; i < notes.length; i++) {
       var n = notes[i];
-      if (n.hit) continue;
-      if (!n.mine && tn >= n.t) { n.hit = true; blip(n.lane, false); continue; }
-      if (n.mine && tn > n.t + WINDOW) {
-        n.hit = true; misses++;
-        hp = Math.max(0, hp - 0.055);
-        judged = 'MISS'; judgedT = tn;
+      if (n.done) continue;
+      if (!n.mine) {
+        if (sp >= n.t) { n.hit = n.done = true; blip(n.lane, false); }
+      } else if (!n.hit && ms(sp - n.t) > WINDOW_MS) {
+        n.done = true; judge(4, 0);
+      } else if (n.hit && sp >= n.end) {
+        n.done = true;
       }
     }
 
-    if (hp <= 0) { lose(); return; }
-
-    var mine = notes.filter(function (n) { return n.mine; });
-    if (phase === 'response' && mine.length && mine.every(function (n) { return n.hit; })) {
-      if (tn > mine[mine.length - 1].t + 0.5) nextRound();
-    }
-    draw(tn);
+    if (S.health <= 0) { lose(); return; }
+    if (notes.every(function (n) { return n.done; })) { nextRound(); return; }
+    draw(sp);
   }
 
   function nextRound() {
     round++;
     if (round >= CHARTS.length) { win(); return; }
-    hp = Math.min(1, hp + 0.15);
     startRound();
   }
 
@@ -188,7 +215,7 @@
       msg.innerHTML = '<b>he hands you the axe.</b><br>' +
         '"that was rude and i respect it."<br><small>esc to leave</small>';
     }
-    draw(now());
+    draw(songPos());
   }
 
   function lose() {
@@ -198,7 +225,7 @@
       msg.innerHTML = '<b>he stops, mid-bar.</b><br>' +
         '"no."<br><small>enter to go again &middot; esc to leave</small>';
     }
-    draw(now());
+    draw(songPos());
   }
 
   /* ── draw ───────────────────────────────────────────────────────*/
@@ -211,7 +238,7 @@
   }
   addEventListener('resize', function () { if (running) layout(); });
 
-  function draw(tn) {
+  function draw(sp) {
     var w = innerWidth, h = innerHeight;
     ctx.fillStyle = '#120A1E'; ctx.fillRect(0, 0, w, h);
 
@@ -220,6 +247,7 @@
     var mineX = w / 2 + 60;
     var hisX  = w / 2 - 60 - totalW;
     var hitY = h - 150;
+    var K = 1000 * PIXELS_PER_MS * SPEED[round];
 
     [hisX, mineX].forEach(function (x0, side) {
       for (var l = 0; l < 4; l++) {
@@ -240,31 +268,40 @@
 
     for (var i = 0; i < notes.length; i++) {
       var n = notes[i];
-      if (n.hit) continue;
-      var dy = (n.t - tn) * SCROLL;
-      var y = hitY - dy;
-      if (y < 40 || y > hitY + 40) continue;
+      if (n.done) continue;
+      var y = Math.round(hitY - (n.t - sp) * K);
+      var top = Math.round(hitY - (n.end - sp) * K);
+      var lo = Math.min(y, top), hi = Math.max(y, top);
+      if (hi < 40 || lo > hitY + 40) continue;
       var x0 = n.mine ? mineX : hisX;
       var x = x0 + n.lane * (laneW + gap);
       ctx.fillStyle = n.mine ? LANECOL[n.lane] : '#4A3C62';
+      if (n.end > n.t) ctx.fillRect(x + 24, top, laneW - 48, y - top);
       ctx.fillRect(x + 6, y - 8, laneW - 12, 16);
     }
 
-    /* tug of war */
+    /* the countdown, then the tug of war */
+    if (S.countdown) {
+      ctx.fillStyle = '#EDE7DE';
+      ctx.font = '32px "Determination Sans","Pixelify Sans",monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(S.countdown, w / 2, h / 2);
+    }
     var bw = Math.min(560, w - 80), bx = (w - bw) / 2;
     ctx.fillStyle = '#E04A6B'; ctx.fillRect(bx, 20, bw, 16);
-    ctx.fillStyle = '#7BE38A'; ctx.fillRect(bx, 20, (bw * hp) | 0, 16);
+    ctx.fillStyle = '#7BE38A'; ctx.fillRect(bx, 20, (bw * S.health / HEALTH_MAX) | 0, 16);
     ctx.fillStyle = '#EDE7DE';
     ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText('round ' + Math.min(round + 1, CHARTS.length) + ' / ' + CHARTS.length, bx, 44);
+    ctx.fillText('round ' + Math.min(round + 1, CHARTS.length) + ' / ' + CHARTS.length +
+                 '   score ' + Math.floor(S.score) + '   combo ' + S.combo, bx, 44);
 
-    if (judged && tn - judgedT < 0.6) {
+    if (S.judgement && now() - judgedT < 0.6) {
       ctx.textAlign = 'center';
-      ctx.fillStyle = judged === 'MISS' ? '#E04A6B'
-                    : judged === 'PERFECT' ? '#FFD34E' : '#7BE38A';
+      ctx.fillStyle = S.judgement === 'MISS' ? '#E04A6B'
+                    : S.judgement === 'SICK!!' ? '#FFD34E' : '#7BE38A';
       ctx.font = '32px "Determination Sans","Pixelify Sans",monospace';
-      ctx.fillText(judged, w / 2, hitY - 90);
+      ctx.fillText(S.judgement, w / 2, hitY - 90);
     }
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
@@ -293,7 +330,7 @@
   });
   addEventListener('keyup', function (e) {
     var l = laneOf(e);
-    if (l >= 0) keys[LANES[l]] = false;
+    if (l >= 0) { release(l); keys[LANES[l]] = false; }
   });
 
   function retry() {
@@ -302,7 +339,7 @@
     if (NEU.quest) NEU.quest.lock(true);
     if (msg) msg.hidden = true;
     layout();
-    hp = 0.5; keys = {}; judged = '';
+    S.health = 1; S.combo = 0; keys = {};
     running = true;
     startRound();
     requestAnimationFrame(step);
@@ -314,7 +351,7 @@
     if (NEU.quest) NEU.quest.lock(true);
     if (msg) msg.hidden = true;
     layout();
-    round = 0; hp = 0.5; keys = {}; judged = '';
+    round = 0; S.score = 0; S.combo = 0; S.health = 1; keys = {};
     running = true;
     startRound();
     requestAnimationFrame(step);
@@ -329,7 +366,6 @@
 
   function close() {
     running = false;
-    if (phaseTimer) { clearTimeout(phaseTimer); phaseTimer = 0; }
     /* release the input claim before handing control back to the room */
     if (NEU.activeMinigame === 'rhythm') NEU.activeMinigame = null;
     wrap.hidden = true;
@@ -348,7 +384,6 @@
 
   NEU.rhythm = { open: open, close: close, win: win,
                  get running() { return running; },
-                 get round() { return round; },
-                 get hp() { return hp; },
-                 charts: CHARTS, bpm: BPM, WINDOW: WINDOW };
+                 state: S,
+                 charts: CHARTS, bpm: BPM, WINDOW: WINDOW_MS / 1000 };
 })();
