@@ -46,7 +46,7 @@
                   swing: function (a, b) { setTimeout(a || function () {}, 200);
                                            setTimeout(b || function () {}, 400); },
                   breakApart: function (cb) { setTimeout(cb, 400); },
-                  show: function () {}, hide: function () {} };
+                  setHilt: function () {}, show: function () {}, hide: function () {} };
     return;
   }
 
@@ -187,6 +187,13 @@
     setPose: function (name) {
       pose = POSE[name] || POSE.hidden;
       if (name !== 'fly') spun = 0;
+    },
+    /* After the TV asks for it, the sword is only its hilt: the hilt IS
+       the key, so it is drawn with the key art. */
+    setHilt: function (on) {
+      var src = on ? 'img/sword-key.svg' : 'img/sword.svg';
+      art.setAttribute('src', src);
+      for (var i = 0; i < ghosts.length; i++) ghosts[i].setAttribute('src', src);
     },
     /* onImpact fires on the blow; onDone when the follow-through has
        finished. Two callbacks, because the interesting thing happens

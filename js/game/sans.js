@@ -671,6 +671,7 @@
      what makes it sit still at the top of the page while you scroll
      past it. */
   var state = 'away';
+  var hilt = false;                // the broken sword is back, for the TV only
   var px = 0, py = 0;              // current screen position
   var fx = 0, fy = 0, ft = 0;      // flight: target + start time
   var FLY_MS = 620;
@@ -680,6 +681,8 @@
     return { x: innerWidth * 0.78, y: innerHeight * 0.30 };
   }
   function homeScreen() {
+    /* A hilt lies under the television while that is on screen. */
+    if (hilt) { var tv = tvScreenPos(); if (tv) return { x: tv.x, y: tv.y + tv.r + 24 }; }
     var h = homeDoc();
     return { x: h.x, y: h.y - scrollY };
   }
@@ -719,6 +722,8 @@
        by the time it exists the sword is gone, and it has to keep
        falling whether or not sans is on screen. */
     if (kstate !== 'off' && kel) keyStep(now);
+
+    if ((state === 'away' || state === 'broken') && !hilt && NEU.tvBreakable()) raiseHilt();
 
     if (state === 'away' || state === 'here' || state === 'broken') return;
 
@@ -808,6 +813,20 @@
     NEU.sword && NEU.sword.setPose('fly');
   }
 
+  /* The hilt, once he has told you to put it through the TV. It lands
+     in the stuck state, so pickup, carry and fly-home are the sword's
+     own. hideHilt puts it away again when the TV breaks. */
+  function raiseHilt() {
+    hilt = true; state = 'stuck';
+    if (NEU.sword) { NEU.sword.setHilt(true); NEU.sword.setPose('stuck'); NEU.sword.show(); }
+  }
+  function hideHilt() {
+    if (!hilt) return;
+    hilt = false; state = 'broken';
+    uncarrySword();
+    NEU.sword && NEU.sword.hide();
+  }
+
   /* ── he comes and goes with the scroll ──────────────────────────
      This used to be gated on state, which was the bug: the moment you
      picked the sword up the observer stopped hiding him, so he stayed
@@ -873,7 +892,7 @@
       NEU.sword && NEU.sword.materialise();
       NEU.sword && NEU.sword.setPose('spawn');
       state = 'spawn'; spawnT0 = performance.now();
-    } else if (state === 'stuck' || state === 'fly') {
+    } else if (!hilt && (state === 'stuck' || state === 'fly')) {
       say(["it's up at the top. i'm not going to get it for you."]);
     }
   });
@@ -1056,8 +1075,9 @@
      which are the ones the player is most sure they got right.
      Targets report SCREEN positions while the key lives in document
      space, hence t.y + scrollY. */
-  function sweptInto(fromX, fromY, t) {
-    return segDist(fromX, fromY, kx, ky, t.x, t.y + scrollY) <= t.r + 20;
+  function sweptInto(fromX, fromY, t, toX, toY) {
+    if (toX === undefined) { toX = kx; toY = ky; }
+    return segDist(fromX, fromY, toX, toY, t.x, t.y + scrollY) <= t.r + 20;
   }
 
   /* Everything a landed blow shares across targets: the speed gate,
@@ -1237,6 +1257,12 @@
   function attempt(x, y) {
     if (state !== 'held') return;
     uncarrySword();
+    if (hilt) {                                // the hilt has one target
+      var tv = tvScreenPos();
+      if (tv && sweptInto(px, py + scrollY, tv, x, y + scrollY)) NEU.breakTV();
+      else flyHome();
+      return;
+    }
     if (!overSans(x, y)) { flyHome(); return; }
 
     state = 'swing';
@@ -1431,6 +1457,7 @@
     if (NEU.quest) { NEU.quest.mark('sans'); NEU.quest.mark('break'); }
     swings = LINES.length;
     state = 'broken';
+    hilt = false;
     hasKey = true; NEU.hasKey = true;
     if (NEU.sword) NEU.sword.hide();
     if (NEU.doorGlow) NEU.doorGlow(true);
@@ -1792,6 +1819,7 @@
   NEU.breakTV = function () {
     if (!NEU.tvBreakable()) return false;
     tvBroken = true;
+    hideHilt();
     if (NEU.save) NEU.save.flag('tv_broken', 1);
     if (tvEl) { tvEl.classList.add('is-broke'); tvEl.classList.remove('is-live'); }
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
