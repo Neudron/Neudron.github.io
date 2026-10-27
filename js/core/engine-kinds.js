@@ -350,6 +350,20 @@
     width: function (e, S) { return e.sheet ? sheetWidth(e, S) : 9; }
   });
 
+  /* ── decor ────────────────────────────────────────────────────────
+     Set dressing: a prop (`look`) or a sheet, never pressed, never
+     solid, so it can stand anywhere without changing a room's puzzle
+     or its reachability. A wall torch or a street lamp still glows. */
+  kind('decor', {
+    interactive: function () { return false; },
+    draw: K['default'].draw,
+    width: K['default'].width,
+    light: function (e) {
+      if (e.look === 'torch') return { r: 18, col: '#FFB347', glow: 0.3, flicker: true };
+      if (e.look === 'lamp') return { r: 30, col: '#FFE6A0', glow: 0.18 };
+      return null;
+    }
+  });
   /* ── queries the engine asks ──────────────────────────────────────── */
   /* What `fire` can actually DO something with. */
   function interactive(e) {

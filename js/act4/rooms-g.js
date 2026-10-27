@@ -29,6 +29,9 @@
   var NEU = window.NEU = window.NEU || {};
   if (!NEU.engine || !NEU.engine.register) return;
   var E = NEU.engine;
+  /* set dressing: never pressed, never solid (engine-kinds `decor`).
+     A stand-in engine without decor (the reach proof) gets none. */
+  var D = E.decor || function () { return []; };
 
   E.tileset('prize', {
     /* Texture from the real Deltarune atlases, PALETTE from this site.
@@ -93,7 +96,11 @@
                    lines: ['a door marked ' + r + '.',
                            'you did not score high enough for this one. yet.'] });
       });
-      return out;
+      out.push({ t: 'sign', x: 13, y: 5,
+                 lines: ['PRIZE CORRIDOR. one door per rank.',
+                         'complaints go in the bin. there is no bin.'] });
+      return out.concat(D('plant', [4, 6, 10, 6, 16, 6, 22, 6]),
+                        D('banner', [3, 0, 9, 0, 15, 0, 21, 0, 27, 0], { colour: '#B892FF' }));
     })(),
     onEnter: function (c) {
       if (c.flagged('g0_seen')) return;
@@ -147,7 +154,8 @@
       entities: [
         { t: 'npc', x: 6, y: 3, colour: '#B892FF', lines: [p[1], p[2]] },
         { t: 'exit', x: 12, y: 4, to: 'g0_hall', spawn: 'back' }
-      ].concat(last ? [{ t: 'exit', x: 2, y: 4, to: 'h1_storm', spawn: 'top' }] : []),
+      ].concat(last ? [{ t: 'exit', x: 2, y: 4, to: 'h1_storm', spawn: 'top' }] : [],
+               D('plant', [1, 1, 12, 1]), D('poster', [4, 0, 9, 0]), D('vase', [1, 5, 10, 5])),
       onEnter: function (c) {
         if (NEU.quest) NEU.quest.bump('a4_prizes', n + 1);
         if (last && !c.flagged('g_last_seen')) {
@@ -180,7 +188,7 @@
          h3_trip, which nothing else leads to. */
       { t: 'npc', x: 8, y: 4, colour: '#7FA8FF', look: 'bigdoor', run: function (c) { c.go('h2_machine', 'door'); } },
       { t: 'exit', x: 2, y: 6, to: 'g_8', spawn: 'default' }
-    ],
+    ].concat(D('stone', [1, 1, 6, 1, 13, 1, 18, 1, 15, 6, 18, 5])),
     onEnter: function (c) {
       if (c.flagged('h1_seen')) return;
       c.flag('h1_seen', 1);
@@ -204,8 +212,10 @@
     spawns: { door: { x: 13, y: 4, face: 'left' } },
     entities: [
       { t: 'npc', x: 6, y: 3, colour: '#E4C46A', look: 'vending', run: function (c) { punch(c); } },
-      { t: 'exit', x: 14, y: 4, to: 'h1_storm', spawn: 'top' }
-    ],
+      { t: 'exit', x: 14, y: 4, to: 'h1_storm', spawn: 'top' },
+      { t: 'sign', x: 11, y: 2,
+        lines: ['OUT OF ORDER.', 'the sign is not on the machine. it is on the room.'] }
+    ].concat(D('bin', [1, 1, 14, 1]), D('crate', [1, 5]), D('lamp', [4, 5, 11, 5])),
     onEnter: function (c) {
       /* The trip is committed on the fifth punch, so a reload before the
          eat has played lands here tripping: carry on to h3 from here. A
@@ -280,7 +290,7 @@
                 'it wants mushroom soup. you are certain of this in a way you cannot defend.'],
         run: function (c) { pot(c); } },
       { t: 'exit', x: 19, y: 4, to: 'd1_street', spawn: 'east' }
-    ],
+    ].concat(D('plant', [1, 1, 18, 1, 18, 7]), D('vase', [7, 1, 13, 1]), D('poster', [16, 6])),
     onEnter: function (c) {
       if (c.flagged('h3_seen')) return;
       c.flag('h3_seen', 1);

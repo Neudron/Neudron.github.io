@@ -573,7 +573,22 @@
     torch: { pal: { w: '#6B4F2F', f: '#FFB347', F: '#FFE6A0', r: '#E4602A', k: '#1A100A' }, rows: [
       '...F...', '..FfF..', '..fFf..', '.rfFfr.', '..rfr..', '..kwk..', '..kwk..', '..kwk..', '..kkk..'] },
     socket: { pal: { m: '#4A4458', M: '#6A6478', k: '#14121A' }, rows: [
-      '.kkkkk.', 'kMmmmMk', 'kmkkkmk', 'kMmmmMk', '.kkkkk.', '..kmk..', '..kkk..'] }
+      '.kkkkk.', 'kMmmmMk', 'kmkkkmk', 'kMmmmMk', '.kkkkk.', '..kmk..', '..kkk..'] },
+    /* set dressing (t: 'decor') — woods, street, castle walls */
+    bush: { pal: { g: '#2E4A3A', G: '#4A6E52', l: '#7A9E6A', k: '#0E1610' }, rows: [
+      '...kkkk.....', '..kGGGGkkk..', '.kGlGGGGGGk.', 'kGGGgGlGGGGk', 'kGgggGGGgGGk', 'kgggggggggk.', '.kkkkkkkkk..'] },
+    grass: { pal: { g: '#3E5E46', G: '#6E9A6A' }, rows: [
+      '.G...G.', '.g.G.g.', 'Gg.g.gG', 'gggggg.'] },
+    lamp: { pal: { m: '#3A3448', M: '#5E567A', y: '#FFE6A0', Y: '#E4C46A', k: '#0E0C14' }, rows: [
+      '.kkk.', 'kMMMk', 'kyYyk', 'kyyyk', '.kMk.', '..m..', '..m..', '..m..', '..m..', '..m..',
+      '..m..', '..m..', '..m..', '.kmk.', 'kkkkk'] },
+    crate: { pal: { w: '#6B4F2F', W: '#8A6A42', d: '#4A3420', k: '#1A100A' }, rows: [
+      'kkkkkkkkkk', 'kWWWWWWWWk', 'kwdwwwwdwk', 'kwwdwwdwwk', 'kwwwddwwwk', 'kwwdwwdwwk', 'kwdwwwwdwk', 'kwwwwwwwwk', 'kkkkkkkkkk'] },
+    bin: { pal: { m: '#4A5060', M: '#6A7288', d: '#2E3240', k: '#0E1018' }, rows: [
+      '.kkkkkk.', 'kMMMMMMk', 'kkkkkkkk', '.kmdmdk.', '.kmdmdk.', '.kmdmdk.', '.kmdmdk.', '.kmdmdk.', '.kkkkkk.'] },
+    banner: { pal: { g: '#C8A04A' }, rows: [
+      'gggggggg', 'kCCCCCCk', 'kCccccCk', 'kcCggCck', 'kccggcck', 'kcccccck', 'kcCddCck', 'kcddddck',
+      '.kcddck.', '..kddk..', '...kk...'] }
   };
   /* "vending" row 3 had a typo'd space; normalise every sprite once so a
      stray character can never shift a row. */

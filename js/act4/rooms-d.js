@@ -29,6 +29,9 @@
   var NEU = window.NEU = window.NEU || {};
   if (!NEU.engine || !NEU.engine.register) return;
   var E = NEU.engine;
+  /* set dressing: never pressed, never solid (engine-kinds `decor`).
+     A stand-in engine without decor (the reach proof) gets none. */
+  var D = E.decor || function () { return []; };
 
   E.tileset('city', {
     /* Texture from the real Deltarune atlases, PALETTE from this site.
@@ -95,8 +98,12 @@
         lines: ['an axe, on the counter, behind the till.',
                 'it is not on the board with the prices.'] },
       { t: 'exit', x: 23, y: 4, to: 'd2_alley', spawn: 'west' },
-      { t: 'exit', x: 1, y: 4, to: 'b7_altar', spawn: 'east' }
-    ],
+      { t: 'exit', x: 1, y: 4, to: 'b7_altar', spawn: 'east' },
+      { t: 'sign', x: 18, y: 6,
+        lines: ['BUS STOP.',
+                'the timetable is a drawing of a bus. someone has coloured it in, carefully.'] }
+    ].concat(D('lamp', [6, 3, 14, 3, 21, 3]), D('crate', [6, 6, 6, 7]), D('bench', [16, 8]),
+             D('bin', [21, 7]), D('poster', [9, 0, 17, 0]), D('plant', [1, 8])),
     onEnter: function (c) {
       if (c.flagged('d1_seen')) return;
       c.flag('d1_seen', 1);
@@ -174,7 +181,8 @@
         run: function (c) { NEU.chop && NEU.chop(c, 'mush5'); } },
       { t: 'exit', x: 17, y: 4, to: 'd3_square', spawn: 'west' },
       { t: 'exit', x: 0, y: 4, to: 'd1_street', spawn: 'east' }
-    ]
+    ].concat(D('bin', [3, 3, 16, 1, 10, 7]), D('crate', [3, 5, 4, 5]), D('lamp', [8, 1, 16, 7]),
+             D('poster', [3, 2]), D('grass', [7, 7, 9, 1]))
   });
 
   E.register('d3_square', {
@@ -207,8 +215,12 @@
       { t: 'npc', x: 15, y: 8, colour: '#C4705F', mush: 'mush4', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush4'); } },
       { t: 'npc', x: 4, y: 8, colour: '#B892FF', sheet: 'recall', run: function (c) { drink(c); } },
-      { t: 'exit', x: 0, y: 5, to: 'd2_alley', spawn: 'east' }
-    ],
+      { t: 'exit', x: 0, y: 5, to: 'd2_alley', spawn: 'east' },
+      { t: 'sign', x: 17, y: 6,
+        lines: ['PLEASE DO NOT FEED THE BIRDS.',
+                'there are no birds. the sign seems to think that is its doing.'] }
+    ].concat(D('bench', [16, 3, 2, 9]), D('lamp', [8, 1, 11, 1, 8, 9, 11, 9]),
+             D('plant', [1, 1, 18, 1, 18, 9]), D('bin', [12, 7])),
     onEnter: function (c) {
       if (c.flagged('d3_seen')) return;
       c.flag('d3_seen', 1);
@@ -239,7 +251,7 @@
   /* ══ E — New Home ════════════════════════════════════════════════
      Three corridors that are almost the same corridor. The details
      that differ are small and wrong, and nobody points at them. */
-  function corridor(id, next, prev, note, look) {
+  function corridor(id, next, prev, note, look, odd) {
     E.register(id, {
       tileset: 'home',
       tiles: [
@@ -256,21 +268,23 @@
         { t: 'exit', x: 23, y: 3, to: next, spawn: 'south' },
         { t: 'exit', x: 0, y: 3, to: prev, spawn: 'north' },
         { t: 'npc', x: 12, y: 1, colour: '#2E2E36', lines: note, look: look }
-      ],
+      ].concat(D('plant', [3, 1, 20, 1, 7, 5, 16, 5]), odd),
       onEnter: function (c) { if (id === 'e1_hall') homeIn(c); }
     });
   }
 
   corridor('e1_hall', 'e2_hall', 'd3_square',
-           ['a picture frame with nothing in it.', 'the nail is still in the wall.']);
+           ['a picture frame with nothing in it.', 'the nail is still in the wall.'],
+           undefined, D('shelf', [6, 1]));
   corridor('e2_hall', 'e3_hall', 'e1_hall', function (s) {
              return s.flagged('tv_breakable')
                ? ['a vase. it has been swept up and put back together at least once.',
                   'there is a new crack in the glaze. you know the feeling.']
                : ['a vase. it has been swept up and put back together at least once.'];
-           }, 'vase');
+           }, 'vase', D('chair', [17, 1]));
   corridor('e3_hall', 'e4_corridor', 'e2_hall',
-           ['a door you do not have a key for. you do not want one.']);
+           ['a door you do not have a key for. you do not want one.'],
+           undefined, D('plant', [12, 5]));
 
   function homeIn(c) {
     if (c.flagged('home_seen')) return;
@@ -300,7 +314,7 @@
       { t: 'save', x: 3, y: 5 },
       { t: 'npc', x: 18, y: 3, colour: '#EDE7DE', look: 'sans', run: function (c) { lastTalk(c); } },
       { t: 'exit', x: 0, y: 3, to: 'e3_hall', spawn: 'north' }
-    ],
+    ].concat(D('plant', [1, 1, 22, 1, 22, 5]), D('frame', [7, 0, 11, 0, 15, 0])),
     onEnter: function (c) {
       say(c, ['golden light from nowhere in particular.',
               'somebody is standing at the far end, not blocking it.']);

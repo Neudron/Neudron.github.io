@@ -109,6 +109,20 @@
     return def;
   }
 
+  /* decor('tree', [x, y, x, y, ...], extra) — a row of one prop or
+     sheet as set dressing (engine-kinds `decor`), so a room lists its
+     dressing in one line per kind. Data only, like register. */
+  function decor(look, xy, extra) {
+    var out = [];
+    for (var i = 0; i + 1 < xy.length; i += 2) {
+      var e = { t: 'decor', x: xy[i], y: xy[i + 1] };
+      if (NEU.sheets && NEU.sheets[look]) e.sheet = look; else e.look = look;
+      for (var k in extra || {}) e[k] = extra[k];
+      out.push(e);
+    }
+    return out;
+  }
+
   function at(cx, cy) {
     if (!room) return '#';
     if (cx < 0 || cy < 0 || cy >= room.h) return '#';
@@ -994,7 +1008,7 @@
   }
 
   NEU.engine = {
-    register: register, tileset: tileset, enter: enter, leave: leave, go: go,
+    register: register, tileset: tileset, decor: decor, enter: enter, leave: leave, go: go,
     confirmExit: confirmExit,
     where: function () { return room ? { room: room.id, spawn: room.__spawn } : null; },
     get running() { return running; },

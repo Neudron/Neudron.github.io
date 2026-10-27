@@ -38,6 +38,10 @@
   if (!NEU.engine || !NEU.engine.register) return;
 
   var E = NEU.engine;
+  /* set dressing: never pressed, never solid (engine-kinds `decor`).
+     A stand-in engine without decor (the reach proof) gets none. */
+  var D = E.decor || function () { return []; };
+  var PURPLE = { colour: '#7E3E78' };
 
   /* ── tilesets ─────────────────────────────────────────────────────
      Palette only for now. Every colour here is from the site's own
@@ -120,7 +124,8 @@
         lines: ['a signpost. the writing has run.',
                 'you can make out one word. "ahead".'] },
       { t: 'exit', x: 13, y: 8, to: 'a2_path', spawn: 'west' }
-    ],
+    ].concat(D('tree', [1, 1, 5, 1, 10, 1, 14, 1, 18, 2, 17, 4, 3, 6, 10, 7, 16, 6]),
+             D('bush', [2, 9, 17, 9, 9, 6]), D('grass', [3, 4, 15, 2, 8, 9]), D('stone', [18, 8])),
     onEnter: function (c) {
       if (c.flagged('a1_seen')) return;
       c.flag('a1_seen', 1);
@@ -170,7 +175,8 @@
                 'there is no north here.'] },
       { t: 'exit', x: 25, y: 7, to: 'a3_fork', spawn: 'west' },
       { t: 'exit', x: 0, y: 3, to: 'a1_clearing', spawn: 'default' }
-    ]
+    ].concat(D('tree', [2, 1, 7, 1, 13, 1, 20, 1, 24, 1, 4, 5, 11, 5, 18, 5, 5, 8, 15, 8, 22, 8]),
+             D('bush', [3, 4, 22, 4, 19, 6]), D('grass', [16, 4, 3, 6, 10, 4]))
   });
 
   /* ══ A3 — the fork ═══════════════════════════════════════════════
@@ -207,7 +213,8 @@
             : ['two ways. the left one has been swept.',
                'the right one has not been swept in a long time.'];
         } }
-    ],
+    ].concat(D('tree', [2, 1, 9, 1, 16, 1, 19, 2, 3, 3, 10, 4, 17, 4, 2, 7, 8, 6, 13, 7, 19, 7]),
+             D('bush', [7, 3, 11, 3]), D('stone', [12, 6, 4, 7])),
     onEnter: function (c) {
       if (c.flagged('a3_seen')) return;
       c.flag('a3_seen', 1);
@@ -249,7 +256,8 @@
         lines: ['...'],
         run: function (c) { witchTalk(c); } },
       { t: 'exit', x: 20, y: 4, to: 'b2_blocks', spawn: 'west', locked: 'witch_met' }
-    ],
+    ].concat(D('banner', [4, 0, 8, 0, 13, 0, 17, 0], PURPLE), D('torch', [6, 0, 15, 0]),
+             D('vase', [1, 1, 20, 1, 1, 9, 20, 9])),
     onEnter: function (c) {
       if (c.flagged('witch_met')) return;
       say(c, ['the room is much too big for one person.']);
@@ -345,7 +353,8 @@
                 'the bowl wants what the fire leaves.'] },
       { t: 'exit', x: 15, y: 4, to: 'b3_braziers', spawn: 'west', locked: 'solved:b2_blocks' },
       { t: 'exit', x: 0, y: 4, to: 'b1_throne', spawn: 'north' }
-    ],
+    ].concat(D('banner', [5, 0, 10, 0], PURPLE), D('torch', [3, 0, 12, 0]),
+             D('vase', [1, 7, 14, 7, 14, 1])),
     onEnter: function (c) {
       b2picked = c.flagged('solved:b2_blocks') ? 'ash' : '';
       if (c.flagged('b2_seen')) return;
@@ -396,7 +405,7 @@
                 'the plaque is on the east wall. read it before you touch the braziers.'] },
       { t: 'exit', x: 17, y: 5, to: 'b4_ice', spawn: 'west', locked: 'solved:b3_braziers' },
       { t: 'exit', x: 0, y: 5, to: 'b2_blocks', spawn: 'west' }
-    ],
+    ].concat(D('banner', [4, 0, 8, 0, 13, 0], PURPLE), D('vase', [16, 1, 1, 7, 16, 7])),
     onEnter: function (c) {
       b3seq = [];
       if (c.flagged('b3_seen')) return;
@@ -477,7 +486,8 @@
                 'let it carry you onto the plates. three slides.'] },
       { t: 'exit', x: 14, y: 5, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice' },
       { t: 'exit', x: 0, y: 5, to: 'b3_braziers', spawn: 'west' }
-    ],
+    ].concat(D('banner', [5, 0, 10, 0], PURPLE), D('torch', [2, 0, 13, 0]),
+             D('vase', [1, 1, 1, 8, 14, 8])),
     onEnter: function (c) {
       if (c.flagged('b4_seen')) return;
       c.flag('b4_seen', 1);
@@ -544,7 +554,8 @@
                 'stand where it looks.'] },
       { t: 'exit', x: 17, y: 5, to: 'b6_dark', spawn: 'west', locked: 'solved:b5_two' },
       { t: 'exit', x: 0, y: 5, to: 'b4_ice', spawn: 'west' }
-    ],
+    ].concat(D('banner', [2, 0, 13, 0, 16, 0], PURPLE), D('torch', [11, 0]),
+             D('vase', [1, 1, 16, 1, 2, 6, 16, 6])),
     /* One plate under the mirror's gaze, and you standing where it
        looks. The mirror turns with e; the room counts what it looks
        at as held. */
@@ -626,7 +637,8 @@
         run: function (c) { placeTorch(c); } },
       { t: 'exit', x: 19, y: 5, to: 'b7_altar', spawn: 'north', locked: 'solved:b6_dark' },
       { t: 'exit', x: 0, y: 5, to: 'b5_two', spawn: 'west' }
-    ],
+    /* no wall torches here: the dark is the puzzle */
+    ].concat(D('banner', [3, 0, 9, 0, 16, 0], PURPLE), D('vase', [1, 1, 18, 1, 1, 8, 18, 8])),
     onEnter: function (c) {
       b6carry = false;
       b6lit = !!c.flagged('solved:b6_dark');
@@ -680,7 +692,8 @@
       { t: 'exit', x: 8, y: 8, to: 'd1_street', spawn: 'fire', locked: 'firedoor',
         sheet: 'firedoor',
         lines: ['the east wall is a wall.'] }
-    ]
+    ].concat(D('banner', [4, 0, 11, 0], PURPLE), D('torch', [2, 0, 13, 0, 5, 2, 10, 2]),
+             D('vase', [1, 1, 14, 1, 1, 8, 14, 8]))
   });
 
   /* ══ B8 — the door at the back ═══════════════════════════════════
@@ -712,7 +725,8 @@
          itself now, which is also what the room has been calling it. */
       { t: 'npc', x: 5, y: 4, colour: '#C2405F', look: 'gate', run: function (c) { enterArena(c); } },
       { t: 'exit', x: 0, y: 4, to: 'b7_altar', spawn: 'north' }
-    ],
+    ].concat(D('banner', [3, 0, 10, 0], { colour: '#7A2A3A' }), D('torch', [4, 2, 9, 2]),
+             D('vase', [1, 1, 12, 1, 12, 6]), D('stone', [11, 4])),
     onEnter: function (c) {
       if (c.flagged('scal_dead')) return;
       say(c, ['a door with nothing written on it.',

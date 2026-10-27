@@ -363,7 +363,10 @@
     tvShootBg:   { src: TV + 'shoot-bg.png',    w: 320, h: 160, frames: 1, fw: 320, fh: 160, fps: 0 },
     firedoor:  { src: IMG + 'undertale/firedoor.png',    w: 55, h: 70,  frames: 1, fw: 55, fh: 70,  fps: 0 },
     armchair:  { src: IMG + 'undertale/armchair.png',    w: 45, h: 83,  frames: 1, fw: 45, fh: 83,  fps: 0 },
-    corridor:  { src: IMG + 'undertale/newhome-corridor.png', w: 743, h: 76, frames: 1, fw: 743, fh: 76, fps: 0 }
+    corridor:  { src: IMG + 'undertale/newhome-corridor.png', w: 743, h: 76, frames: 1, fw: 743, fh: 76, fps: 0 },
+    /* room dressing (t: 'decor'): spr_plant_dark, spr_npc_bench */
+    plant:     { src: IMG + 'undertale/plant.png',  w: 16, h: 34, frames: 1, fw: 16, fh: 34, fps: 0 },
+    bench:     { src: IMG + 'deltarune/bench.png',  w: 39, h: 25, frames: 1, fw: 39, fh: 25, fps: 0 }
   };
 
   /* ── ONE blitter, and one image cache ──────────────────────────────
