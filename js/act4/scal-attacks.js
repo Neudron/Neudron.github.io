@@ -43,6 +43,7 @@
   function later(n, fn) { G.ev.push({ f: G.fr + n, fn: fn }); }
   /* n darts on a full ring from (x, y) at sp arena px/s, first one at a0 */
   function ring(x, y, n, sp, a0, tag) {
+    A.boom(x, y);                 /* every ring is a DemonicExplosion */
     for (var i = 0; i < n; i++) {
       var a = a0 + i * TAU / n;
       A.shot(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0, { tag: tag || 'burst' });
@@ -111,7 +112,7 @@
       var cap = V(24);
       var ang = st.aim + st.dir * spread * (t - 0.5);
       A.shot(A.bx, A.by, Math.cos(ang) * Math.min(sp, cap), Math.sin(ang) * Math.min(sp, cap), 0,
-             { tag: 'brim', fuse: 80 / 60 });
+             { tag: 'brim', look: 'arrow', fuse: 80 / 60 });
     }
     return false;
   };
@@ -190,8 +191,9 @@
      frame (AcceleratingDarkMagicFlame.cs:26-39). Bomb waves: 13 telegraph
      points, one every 7 f, within 900 px (1050 at phase 3+) of the soul, each
      dropping a bomb 45 f later that fuses 135-185 f (DemonicTelegraphLine
-     OnKill). ceiling: telegraph lines are not drawn; the bomb is the telegraph,
-     and the flame ring is clipped to the arena. */
+     OnKill). Each telegraph is a red line through the drop point, along
+     the line from her (DemonicTelegraphLine.PreDraw). ceiling: the flame
+     ring is clipped to the arena. */
   ATK.DarkMagicBombWalls = function (st) {
     var f = st.f, L = G.lvl;
     move(A.AX + A.AW / 2, A.AY + A.AH * 0.15, 0.05);
@@ -210,6 +212,7 @@
     if (local >= 0 && local < 3 * 167 && local % 167 < 91 && (local % 167) % 7 === 0) {
       var off = D(L >= 3 ? 1050 : 900);
       var tx = hx(A.px + rnd(-off, off)), ty = hy(A.py + rnd(-off, off));
+      G.tele.push({ x: tx, y: ty, a: Math.atan2(ty - A.by, tx - A.bx), at: G.fr, life: 45 });
       later(45, (function (bx, by) {
         return function () { bomb(bx, by, 0, 0, rnd(135, 185), 12, V(6)); };
       }(tx, ty)));
@@ -540,7 +543,7 @@
 
   function fresh() {
     return { fr: 0, ev: [], cyc: 0, last: '', forced: null, lvl: 0, berserk: false,
-             beam: null, strips: [], sub: -1, desp: false };
+             beam: null, strips: [], sub: -1, desp: false, tele: [] };
   }
 
   function begin(name) {
@@ -580,6 +583,7 @@
     var due = [], keep = [], i;
     for (i = 0; i < G.ev.length; i++) (G.ev[i].f <= G.fr ? due : keep).push(G.ev[i]);
     G.ev = keep;
+    G.tele = G.tele.filter(function (t) { return G.fr - t.at < t.life; });
     for (i = 0; i < due.length; i++) due[i].fn();
     hurtCheck();
     if (!cur) return;
@@ -637,26 +641,63 @@
     /* the beam and the live strips, for hurtCheck and draw */
     beam: function () { return G ? G.beam : null; },
     strips: function () { return G ? G.strips : []; },
+    teles: function () { return G ? G.tele : []; },
+    frame: function () { return G ? G.fr : 0; },
     berserk: function () { return G ? G.berserk : false; },
-    /* drawn over the field, under the bullets: the sweep and the strips */
+    /* drawn over the field, under the bullets: the strips, the
+       telegraphs and the sweep */
     draw: function (ctx) {
       if (!G) return;
-      var i, s;
+      var i, s, t, L = beamLen();
       for (i = 0; i < G.strips.length; i++) {
         s = G.strips[i];
         ctx.fillStyle = G.fr < s.at ? 'rgba(255,74,42,0.16)' : 'rgba(255,74,42,0.5)';
         ctx.fillRect((s.x - s.half) | 0, A.AY, s.half * 2, A.AH);
       }
-      var b = G.beam;
-      if (b) {
-        var ex = b.x + Math.cos(b.a) * b.len, ey = b.y + Math.sin(b.a) * b.len;
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = 'rgba(255,196,106,0.45)'; ctx.lineWidth = 10;
-        ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(ex, ey); ctx.stroke();
-        ctx.strokeStyle = 'rgba(255,74,42,0.95)'; ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(ex, ey); ctx.stroke();
-        ctx.lineWidth = 1;
+      /* lines and the beam stop at the forcefield */
+      ctx.save();
+      ctx.beginPath(); ctx.rect(A.AX, A.AY, A.AW, A.AH); ctx.clip();
+      /* DemonicTelegraphLine.PreDraw: Color.Red, width lerp(0.3, 3) over
+         a 0-1-0 bump, opacity three times the bump, capped at 1 */
+      for (i = 0; i < G.tele.length; i++) {
+        t = G.tele[i];
+        var k = Math.sin(Math.PI * (G.fr - t.at) / t.life), c = Math.cos(t.a), sn = Math.sin(t.a);
+        line(ctx, t.x - c * L, t.y - sn * L, t.x + c * L, t.y + sn * L,
+             'rgba(255,0,0,' + Math.min(1, k * 3).toFixed(2) + ')', Math.max(1, Math.round(lerp(0.3, 3, k))));
       }
+      if (G.beam) beam(ctx, G.beam);
+      ctx.restore();
     }
   };
+
+  function line(ctx, x0, y0, x1, y1, col, w) {
+    ctx.strokeStyle = col; ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  }
+
+  /* The BrimstoneLaserbeam: three additive glow steps (the source's
+     red-to-white primitive, stepped), then BrimstoneRayMid tiled down the
+     beam at half size with BrimstoneRayEnd at the tip. The 13 px core
+     matches the 12 px hit band in hurtCheck. */
+  function beam(ctx, b) {
+    var ex = b.x + Math.cos(b.a) * b.len, ey = b.y + Math.sin(b.a) * b.len;
+    var op = ctx.globalCompositeOperation;
+    ctx.lineCap = 'butt';
+    ctx.globalCompositeOperation = 'lighter';
+    line(ctx, b.x, b.y, ex, ey, 'rgba(160,20,30,0.35)', 34);
+    line(ctx, b.x, b.y, ex, ey, 'rgba(255,60,40,0.45)', 20);
+    line(ctx, b.x, b.y, ex, ey, 'rgba(255,170,110,0.6)', 8);
+    if (NEU.danmaku && NEU.danmaku.glow) NEU.danmaku.glow(ctx, b.x, b.y, 40, '#FF4A2A', 0.9);
+    ctx.globalCompositeOperation = op;
+    var mid = NEU.sheetReady && NEU.sheetReady(NEU.sheets.scalRay);
+    var end = NEU.sheetReady && NEU.sheetReady(NEU.sheets.scalRayEnd);
+    if (mid) {
+      ctx.save();
+      ctx.translate(b.x | 0, b.y | 0); ctx.rotate(b.a - Math.PI / 2);
+      for (var y = 0; y < b.len; y += 15) ctx.drawImage(mid, 0, 0, 26, 30, -6, y, 13, 15);
+      if (end) ctx.drawImage(end, 0, 0, 26, 22, -6, b.len | 0, 13, 11);
+      ctx.restore();
+    } else line(ctx, b.x, b.y, ex, ey, 'rgba(255,74,42,0.95)', 4);
+    ctx.lineWidth = 1;
+  }
 }());

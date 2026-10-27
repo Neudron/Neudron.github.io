@@ -114,6 +114,31 @@
                  from: 'Projectiles/Boss/SCalBrimstoneGigablast.cs',
                  w: 52,  h: 492,  frames: 6,  fw: 52,  fh: 82, fps: 12,
                  hitTerraria: { w: 50, h: 50 } },
+    /* W3c: the Infernum port's own projectiles (InfernumMode @399342f,
+       BossAIs/SupremeCalamitas/). DemonicBomb.png is byte-identical to
+       the gigablast above, so bombs reuse that sheet. Frame counts are
+       each .cs file's Main.projFrames. */
+    scalArrow: { src: IMG + 'calamity/CondemnationArrowSCal.png',
+                 from: 'Infernum CondemnationArrowSCal.cs',
+                 w: 26,  h: 90,   frames: 1,  fw: 26,  fh: 90, fps: 0 },
+    scalFlame: { src: IMG + 'calamity/AcceleratingDarkMagicFlame.png',
+                 from: 'Infernum AcceleratingDarkMagicFlame.cs:15',
+                 w: 64,  h: 330,  frames: 5,  fw: 64,  fh: 66, fps: 12 },
+    scalDemon: { src: IMG + 'calamity/SuicideBomberDemonHostile.png',
+                 from: 'Infernum SuicideBomberDemonHostile.cs:41',
+                 w: 72,  h: 744,  frames: 12, fw: 72,  fh: 62, fps: 12 },
+    scalSoul:  { src: IMG + 'calamity/RedirectingDarkSoul.png',
+                 from: 'Infernum RedirectingDarkSoul.cs:16',
+                 w: 80,  h: 232,  frames: 4,  fw: 80,  fh: 58, fps: 12 },
+    scalBoom:  { src: IMG + 'calamity/SuicideBomberDemonExplosion.png',
+                 from: 'Infernum SuicideBomberDemonExplosion.cs:13',
+                 w: 54,  h: 448,  frames: 8,  fw: 54,  fh: 56, fps: 10 },
+    scalRay:   { src: IMG + 'calamity/BrimstoneRayMid.png',
+                 from: 'ExtraTextures/Lasers/BrimstoneRayMid.png',
+                 w: 26,  h: 30,   frames: 1,  fw: 26,  fh: 30, fps: 0 },
+    scalRayEnd:{ src: IMG + 'calamity/BrimstoneRayEnd.png',
+                 from: 'ExtraTextures/Lasers/BrimstoneRayEnd.png',
+                 w: 26,  h: 22,   frames: 1,  fw: 26,  fh: 22, fps: 0 },
 
     /* the brothers — real NPC bodies, not their thrown attacks.
        NPCs/SupremeCalamitas/SupremeCataclysm.cs:61 — frameCount 9;

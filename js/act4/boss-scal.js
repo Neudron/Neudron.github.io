@@ -31,7 +31,7 @@
   var msg = document.getElementById('bhMsg');
 
   var dm = NEU.danmaku || {};
-  var COL = { bone: '#EDE7DE', soul: '#E23B55', dim: '#8A8598', void_: '#08080B',
+  var COL = { bone: '#EDE7DE', soul: '#E23B55', dim: '#8A8598', void_: '#0C0306',
               brim: '#FF4A2A', brimHi: '#FFC46A', dark: '#8C2F4A' };
 
   var PLAYER_R = (dm.soul && dm.soul.R) || 6, IFRAMES = dm.IFRAMES || 1.1;
@@ -162,6 +162,53 @@
   }
 
   function say(s) { line = s; lineT = performance.now(); }
+
+  /* ── the look (W3c) ─────────────────────────────────────────────
+     Infernum dresses this fight in a dark-red void with brimstone cinders
+     drifting up, every projectile on an additive bloom, and a red flash
+     on each phase change. All of it is drawn here, under the HUD. */
+  function rm() { return !!(NEU.juice && NEU.juice.reduced); }
+  /* A bullet's look: its own `look`, else its tag. spin is how the
+     source's PreDraw turns the art: +PI/2 for art that points up, 0 for
+     art that points right, null for art that never turns. */
+  var LOOK = {
+    arrow: { key: 'scalArrow', sc: 0.6, spin: Math.PI / 2, glow: '#FF2A1A' },
+    flame: { key: 'scalFlame', sc: 0.5, spin: null, glow: '#FF4A8A' },
+    demon: { key: 'scalDemon', sc: 0.6, spin: 0, glow: '#FF3A2A' },
+    soul:  { key: 'scalSoul',  sc: 0.5, spin: 0, glow: '#D0203A' }
+  };
+  var embers = [];
+  function seedEmbers() {
+    embers = [];
+    for (var i = 0; i < 40; i++)
+      embers.push({ x: Math.random(), y: Math.random(), s: 1 + (i % 3), v: 0.03 + Math.random() * 0.05, ph: Math.random() * 6 });
+  }
+  seedEmbers();
+  function driftEmbers(dt) {
+    if (rm()) return;
+    for (var i = 0; i < embers.length; i++) {
+      var e = embers[i];
+      e.y -= e.v * dt; e.ph += dt;
+      if (e.y < -0.02) { e.y = 1.02; e.x = Math.random(); }
+    }
+  }
+  /* DemonicExplosion: an eight-frame SuicideBomberDemonExplosion and a
+     bloom, wherever a ring of darts bursts */
+  var booms = [];
+  function boom(x, y) {
+    if (booms.length >= 24) booms.shift();
+    booms.push({ x: x, y: y, t: 0 });
+  }
+  /* the phase flash: one per gate, never closer than 0.34 s (3 Hz), and
+     a fifth as bright under reduced motion or the no-flash setting */
+  var flashAt = -9, FLASH_LEN = 0.35;
+  function phaseFlash() { if (t - flashAt >= 0.34) flashAt = t; }
+  function flashAlpha() {
+    var a = t - flashAt;
+    if (a < 0 || a >= FLASH_LEN) return 0;
+    var peak = (rm() || (NEU.juice && NEU.juice.noFlash)) ? 0.2 : 0.55;
+    return peak * (1 - a / FLASH_LEN);
+  }
 
   function layout() {
     var dpr = Math.min(devicePixelRatio || 1, 2);
@@ -307,6 +354,8 @@
 
   function update(dt) {
     t += dt;
+    driftEmbers(dt);
+    for (var bi = booms.length - 1; bi >= 0; bi--) if ((booms[bi].t += dt) >= 0.8) booms.splice(bi, 1);
 
     /* Rage: PROXIMITY fills the bar (RipperUI's rage is earned by
        staying in the fight, so fastest point-blank ~10s, slowest at
@@ -781,11 +830,35 @@
   }
 
   /* ── draw ───────────────────────────────────────────────────────*/
+  function rect(c, x, y, w, h, d) {
+    ctx.fillStyle = c;
+    ctx.fillRect(x - d, y - d, w + d * 2, d); ctx.fillRect(x - d, y + h, w + d * 2, d);
+    ctx.fillRect(x - d, y, d, h); ctx.fillRect(x + w, y, d, h);
+  }
+  /* The void: four stepped red bands towards the arena, the field, then
+     the forcefield border, a dark rim, a brimstone line and a hot inner
+     edge, breathing at 0.3 Hz (still under reduced motion). */
   function frame() {
-    ctx.fillStyle = '#12080C'; ctx.fillRect(AX, AY, AW, AH);
-    ctx.fillStyle = COL.bone;
-    ctx.fillRect(AX - 3, AY - 3, AW + 6, 3); ctx.fillRect(AX - 3, AY + AH, AW + 6, 3);
-    ctx.fillRect(AX - 3, AY, 3, AH); ctx.fillRect(AX + AW, AY, 3, AH);
+    var w = innerWidth, h = innerHeight;
+    for (var i = 0; i < 4; i++) {
+      var g = 40 + i * 28;
+      ctx.fillStyle = 'rgba(110,12,22,0.14)';
+      ctx.fillRect((AX - g * 1.6) | 0, (AY - g) | 0, (AW + g * 3.2) | 0, (AH + g * 2) | 0);
+    }
+    ctx.fillStyle = '#14050A'; ctx.fillRect(AX, AY, AW, AH);
+    for (var e = 0; e < embers.length; e++) {
+      var m = embers[e], ex = (m.x * w + Math.sin(m.ph) * 6) | 0, ey = (m.y * h) | 0;
+      ctx.fillStyle = m.s === 3 ? '#FFB050' : '#FF5A2A';
+      ctx.globalAlpha = 0.35 + 0.4 * (1 - m.y);
+      ctx.fillRect(ex, ey, m.s, m.s);
+    }
+    ctx.globalAlpha = 1;
+    var br = rm() ? 0.5 : 0.5 + 0.5 * Math.sin(t * 1.9);
+    ctx.globalAlpha = 0.1 + 0.1 * br; rect('#FF3A2A', AX - 6, AY - 6, AW + 12, AH + 12, 8);
+    ctx.globalAlpha = 0.2 + 0.15 * br; rect('#FF3A2A', AX - 3, AY - 3, AW + 6, AH + 6, 3);
+    ctx.globalAlpha = 1;
+    rect('#FF3A2A', AX, AY, AW, AH, 3);
+    rect('#FFB070', AX, AY, AW, AH, 1);
   }
 
   function draw(now) {
@@ -890,11 +963,46 @@
          to a single angle for every homing blast's entire wind-up and
          burst pause, since both spawn and pause at vx:vy:0. */
       var brot = b.rot || 0;
+      var lk = LOOK[b.look || b.tag];
+      var gc = lk ? lk.glow : b.k === 2 ? '#C03070' : '#FF4A2A';
+      if (lk) {
+        key = lk.key; sc = lk.sc;
+        var va = Math.atan2(b.vy, b.vx);
+        if (lk.spin === null) brot = 0;
+        else if (b.vx || b.vy) brot = lk.key === 'scalDemon'
+          ? Math.atan(b.vy / (b.vx || 1e-6)) : va + lk.spin;
+      }
+      /* CondemnationArrowSCal.PreDraw: a red line ahead of a fresh
+         arrow for its first 20 f, swelling 0.3 -> 3 -> 0.3 */
+      if (b.look === 'arrow' && b.age < 1 / 3) {
+        var ak = Math.sin(Math.PI * b.age * 3), aa = Math.atan2(b.vy, b.vx);
+        ctx.save(); ctx.beginPath(); ctx.rect(AX, AY, AW, AH); ctx.clip();
+        ctx.strokeStyle = 'rgba(255,0,0,0.8)'; ctx.lineWidth = Math.max(1, Math.round(0.3 + 2.7 * ak));
+        ctx.beginPath(); ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x + Math.cos(aa) * 1200, b.y + Math.sin(aa) * 1200); ctx.stroke();
+        ctx.restore();
+      }
+      /* DemonicBomb.PreDraw: a hollow circle the size of the burst,
+         purple pulsing to red over the last stretch of its fuse */
+      if (b.tag === 'bomb' && b.fuse !== undefined && b.fuse < 1.6) {
+        var bk = Math.min(1, (1.6 - b.fuse) / 0.4), hot = b.fuse < 0.6;
+        ctx.strokeStyle = hot && Math.sin(t * 6.3) > 0 ? 'rgba(255,40,40,' + bk.toFixed(2) + ')'
+                                                       : 'rgba(160,40,200,' + bk.toFixed(2) + ')';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(b.x | 0, b.y | 0, 56, 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = 1;
+      }
+      if (dm.glow) dm.glow(ctx, b.x, b.y, Math.max(10, b.r * 3) | 0, gc, 0.55);
       if (!sprite(key, b.x, b.y, sc, brot)) {
         ctx.fillStyle = b.c;
         ctx.fillRect((b.x - b.r) | 0, (b.y - b.r) | 0, sz, sz);
         if (b.k === 2) { ctx.fillStyle = COL.brimHi; ctx.fillRect((b.x - 3) | 0, (b.y - 3) | 0, 6, 6); }
       }
+    }
+    for (var bm = 0; bm < booms.length; bm++) {
+      var o = booms[bm];
+      if (dm.glow) dm.glow(ctx, o.x, o.y, 56, '#FF5A2A', 1 - o.t / 0.8);
+      sprite('scalBoom', o.x, o.y, 1.2, 0, false, 0, Math.min(7, (o.t / 0.1) | 0));
     }
     /* The player's homing shots (V5 phase 2). */
     for (var ms = 0; ms < myShots.length; ms++) {
@@ -982,11 +1090,15 @@
     if (NEU.juice) NEU.juice.end(ctx, shook);
     if (NEU.juice) NEU.juice.overlay(ctx, w, h);
 
+    var fa = flashAlpha();
+    if (fa > 0) { ctx.fillStyle = 'rgba(255,70,50,' + fa.toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); }
+
     /* The shared HUD, outside the shake. Her bar DOES move — that is
        the difference between this fight and the one on the television.
        Ticks sit at every phase gate in damageTarget. */
     dm.hud(ctx, F, { w: w, h: h, AY: AY, AH: AH,
-                     name: invuln ? 'calamitas — shielded' : 'calamitas',
+                     /* her Infernum title; a phone's 230 px bar holds only her name */
+                     name: (w < 560 ? 'Calamitas' : 'Supreme Witch, Calamitas') + (invuln ? ' — shielded' : ''),
                      hp: bossHP, max: bossMax, invuln: invuln,
                      ticks: [0.75, 0.45, 0.25],
                      php: hp, pmax: MAXHP, phase: phase,
@@ -1125,7 +1237,8 @@
     clearTag: function (tag) { bullets = bullets.filter(function (b) { return b.tag !== tag; }); },
     setBoss: function (x, y) { bx = x; by = y; },
     setHP: function (n) { bossHP = n; },
-    level: function (n) { phase = n >= 2 ? 2 : 1; },
+    level: function (n) { phase = n >= 2 ? 2 : 1; phaseFlash(); },
+    boom: boom,
     anim: function (s) { scalAnimState = s; },
     willCharge: function (v) { willCharge = v; },
     invuln: function (v) { invuln = v; },
@@ -1175,7 +1288,7 @@
       keysEl.innerHTML = 'arrows / wasd &middot; shift focus &middot; f to strike (hold to charge) &middot; c dash &middot; v adrenaline &middot; z for rage &middot; x to shield &middot; esc to leave';
     }
     layout();
-    t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {};
+    t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; booms = []; flashAt = -9;
     rage = 0; tp = 0; shieldT = 0;
     rageMode = 0; rageModeT = 0;
     rageShown = 0; tpShown = 0; grazeT = 0;
@@ -1269,6 +1382,9 @@
                get running() { return running; },
                get active() { return active; },
                get hp() { return bossHP; },
+               get booms() { return booms.length; },
+               get embers() { return embers; },
+               get flashA() { return flashAlpha(); },
                get phase() { return phase; },
                get mode() { return mode; },
                get hearts() { return hearts.length; },
