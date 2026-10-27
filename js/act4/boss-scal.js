@@ -43,8 +43,7 @@
   var COL = { bone: '#EDE7DE', soul: '#E23B55', dim: '#8A8598', void_: '#08080B',
               brim: '#FF4A2A', brimHi: '#FFC46A', dark: '#8C2F4A' };
 
-  var PLAYER_R = (dm.soul && dm.soul.R) || 6, SPEED = dm.SPEED || 250,
-      FOCUS = dm.FOCUS || 108, IFRAMES = dm.IFRAMES || 1.1;
+  var PLAYER_R = (dm.soul && dm.soul.R) || 6, IFRAMES = dm.IFRAMES || 1.1;
   var MAXHP = 5;
 
   /* Fair hitboxes: every enemy projectile's collision radius, derived
@@ -103,9 +102,9 @@
      you for doing what the fight already asked you to do. */
   var rage = 0, tp = 0, shieldT = 0;
   var rageMode = 0, rageModeT = 0;
-  /* Full-bar flourish timers: 0 starts the one-shot animation, >=1
-     means it has finished playing (or was never triggered). */
-  var rageAnimT = 9, tpAnimT = 9, rageFullPrev = 0, tpFullPrev = 0;
+  /* The shared fight feel (core/danmaku.js): dash, adrenaline, damage
+     numbers, the HUD. Her rage and tp stay her own; the HUD shows them. */
+  var F = dm.fight(0, 0);
   /* What the meters DRAW. A bar that snaps to its value reads as a
      counter; one that sweeps toward it reads as charging, which is the
      whole point of RipperUI's presentation. */
@@ -116,10 +115,6 @@
      They latch here; moveBullets' single end-of-frame call is the only
      place grazeT advances or resets. */
   var grazedByBody = false;
-  /* RipperUI.cs:24-27 — rage is 10 frames at a 6-frame delay, adrenaline
-     10 at a 5-frame delay. This file used to run both off one 1.0s
-     window, so tp's flourish was 20% too slow. */
-  var RAGE_ANIM_S = 10 * 6 / 60, TP_ANIM_S = 10 * 5 / 60;
   var AX = 0, AY = 0, AW = 0, AH = 0;
   var bullets = [], step_ = 0, stepT = 0, phase = 1;
   var bossHP = 1, bossMax = 1, invuln = false;
@@ -208,23 +203,9 @@
     }
     px = Math.min(Math.max(px, AX + 12), AX + AW - 12);
     py = Math.min(Math.max(py, AY + 12), AY + AH - 12);
-    meterRects = meterSlots(AX, AY, AW, AH);
     /* keep the worm's arena in step with resizes */
     if (NEU.scalWorm && scalWormReady) NEU.scalWorm.setArena(AX, AY, AW, AH);
     if (NEU.scalSeekers && seekersReady) NEU.scalSeekers.setArena(AX, AY, AW, AH);
-  }
-
-  /* The meters live OUTSIDE the fight box: a left gutter column when
-     the viewport leaves room (AX >= 118), otherwise a horizontal row
-     under the HP line. Pure so tests can probe both branches. */
-  var meterRects = [];
-  function meterSlots(ax, ay, aw, ah) {
-    if (ax >= 118) {
-      return [{ x: ax - 100, y: ay + 20, w: 80, h: 36 },
-              { x: ax - 100, y: ay + 66, w: 80, h: 36 }];
-    }
-    return [{ x: ax, y: ay + ah + 30, w: 80, h: 36 },
-            { x: ax + 160, y: ay + ah + 30, w: 80, h: 36 }];
   }
   addEventListener('resize', function () { if (running) layout(); });
 
@@ -579,19 +560,8 @@
        gunning bolts. */
     if (charging) chargeF = Math.min(1, chargeF + dt);
     if (shotCd > 0) shotCd -= dt;
-    /* Full-bar flourish plays ONCE per fill (RipperUI.cs plays its
-       animation with a fixed frame delay and stops — it is a flourish,
-       not a screensaver). */
-    if (rage >= 1) {
-      if (rageFullPrev < 1) rageAnimT = 0;
-      if (rageAnimT < RAGE_ANIM_S) rageAnimT += dt;
-    }
-    rageFullPrev = rage;
-    if (tp >= 1) {
-      if (tpFullPrev < 1) tpAnimT = 0;
-      if (tpAnimT < TP_ANIM_S) tpAnimT += dt;
-    }
-    tpFullPrev = tp;
+    /* null: her rage is her own, the shared bar stays out of it */
+    dm.tick(F, dt, null);
     /* The sweep. Six per second converges in about half a second —
        fast enough to feel responsive, slow enough to read as charging. */
     var ease = Math.min(1, dt * 6);
@@ -606,19 +576,15 @@
     else if (mode === 'brothers') brothersTick(dt);
     else if (mode === 'fight') fightTick(dt);
 
-    moveBullets(dt);
+    moveBullets(dt * dm.slow(F));
     moveMyShots(dt);
-    updatePops(dt);
     draw(now);
   }
 
   function movePlayer(dt) {
-    var vx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    var vy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
-    if (vx && vy) { vx *= 0.7071; vy *= 0.7071; }
-    var sp = keys.focus ? FOCUS : SPEED;
-    px = Math.min(Math.max(px + vx * sp * dt, AX + 7), AX + AW - 7);
-    py = Math.min(Math.max(py + vy * sp * dt, AY + 7), AY + AH - 7);
+    F.x = px; F.y = py;
+    dm.move(F, keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH });
+    px = F.x; py = F.y;
   }
 
   function fightTick(dt) {
@@ -875,6 +841,7 @@
      barrier eats the hit instead of you — one hit, then it is gone,
      and it does not hand you invulnerability for free. */
   function hitPlayer() {
+    if (F.dashI > 0) return false;          /* a dash passes through */
     if (shieldT > 0) {
       shieldT = 0;
       inv = IFRAMES;
@@ -883,6 +850,7 @@
       return false;
     }
     hp--; inv = IFRAMES;
+    dm.hurt(F, px, py - 12);
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     /* Taking a hit is a MEDIUM event. The player needs to feel it
        without the screen becoming unreadable mid-pattern. */
@@ -1182,7 +1150,7 @@
       var hi = hearts.indexOf(ref);
       if (hi < 0) return;
       ref.hp -= eff;
-      spawnPop(ref.x, ref.y, eff);
+      dm.pop(F, ref.x, ref.y, eff);
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
       if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(ref.x, ref.y, 4, COL.brimHi); }
       if (ref.hp > 0) return;              /* cracked, not broken */
@@ -1195,7 +1163,7 @@
       if (bros.indexOf(ref) < 0) return;
       /* the number shows the strike, not the 25% DR split: the brother's
          own bar still moves by the real amount */
-      spawnPop(ref.x, ref.y, eff);
+      dm.pop(F, ref.x, ref.y, eff);
       /* 25% DR while both brothers alive */
       var dmg = (bros.length === 2 ? 0.75 : 1) * eff;
       ref.dmgAccum = (ref.dmgAccum || 0) + dmg;
@@ -1211,7 +1179,7 @@
     }
     if (invuln || mode !== 'fight') return;
     bossHP -= eff;
-    spawnPop(bx, by, eff);
+    dm.bossHit(F, bx, by, eff);
     if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
     /* Landing one is SMALL — it happens often, and shaking hard on
        every strike would drown out the phase transitions. */
@@ -1279,55 +1247,6 @@
       return;
     }
     requestAnimationFrame(deathStep);
-  }
-
-  /* ── damage numbers ─────────────────────────────────────────────
-     Every landed hit pops its damage as a small number that drifts up
-     and fades. The strike sparks already say a hit landed; the number
-     says how hard, which is what a player who is busy dodging can still
-     read off the fight's pace.
-     Drawn in the fight's own 16px face, and every position is rounded
-     to a whole pixel, so the glyphs do not shimmer as the shake moves
-     them. At most twelve are alive: a fast volley can land more in a
-     second, and the oldest number is the one nobody is reading any more.
-     Reduce particles skips them outright. It is the same switch that
-     silences impact debris, and the number is decoration on top of the
-     health bar. Reduced motion keeps the number and holds it still: the
-     drift is the motion the switch is for, while the number carries the
-     information, so dropping it would leave reduced-motion players as the
-     only ones who cannot see how hard they hit.                      */
-  var pops = [];
-  var POP_MAX = 12, POP_LIFE = 0.7, POP_RISE = 24;
-  function spawnPop(x, y, amount) {
-    if (NEU.settings && NEU.settings.particles) return;
-    if (pops.length >= POP_MAX) pops.shift();
-    pops.push({ x: x, y0: y, y: y, n: Math.max(1, Math.round(amount)), age: 0 });
-  }
-  function updatePops(dt) {
-    var still = !!(NEU.settings && NEU.settings.reduced);
-    for (var i = pops.length - 1; i >= 0; i--) {
-      var p = pops[i];
-      p.age += dt;
-      if (p.age >= POP_LIFE) { pops.splice(i, 1); continue; }
-      if (!still) {
-        /* ease-out: it leaves the hit quickly and settles near the top */
-        var k = p.age / POP_LIFE;
-        p.y = p.y0 - POP_RISE * (1 - (1 - k) * (1 - k));
-      }
-    }
-  }
-  function drawPops() {
-    if (!pops.length) return;
-    ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillStyle = COL.brimHi;
-    for (var i = 0; i < pops.length; i++) {
-      var p = pops[i];
-      ctx.globalAlpha = Math.max(0, 1 - p.age / POP_LIFE);
-      ctx.fillText(String(p.n), Math.round(p.x), Math.round(p.y));
-    }
-    ctx.globalAlpha = 1;
-    ctx.textAlign = 'left';
   }
 
   /* ── draw ───────────────────────────────────────────────────────*/
@@ -1515,8 +1434,8 @@
       }
     }
 
-    if (mode !== 'won' && dm.soul && dm.soul.draw)
-      dm.soul.draw(ctx, px, py, inv, COL.soul);
+    dm.drawFlash(ctx, F, bx, by, 64);
+    if (mode !== 'won') dm.drawFX(ctx, F, inv);
 
     /* rage: the soul burns gold while it is up */
     if (rageMode > 0) {
@@ -1537,48 +1456,21 @@
       ctx.lineWidth = 1;
     }
 
-    /* her bar. It DOES move — that is the difference between this
-       fight and the one on the television, and the contrast only
-       lands because that one refused to. */
-    /* Her bar clears her sprite rather than cutting across it. She
-       hovers centred on AY-24 and is 120 tall at scale 2, so she owns
-       AY-84 upward; the bar used to sit at AY-44, straight through her
-       chest. Moving HER instead would change the fight: the player is
-       clamped to AY+7 and a strike needs to be within 34, so her
-       resting height is load-bearing. Floored at 40 so a short viewport
-       keeps the bar on screen. */
-    var bw = 260, bx2 = ((w - bw) / 2) | 0, by2 = Math.max(40, AY - 128);
-    ctx.fillStyle = '#22222E'; ctx.fillRect(bx2, by2, bw, 8);
-    ctx.fillStyle = invuln ? '#4A4560' : COL.dark;
-    ctx.fillRect(bx2, by2, (bw * Math.max(0, bossHP / bossMax)) | 0, 8);
-    ctx.fillStyle = COL.bone;
-    ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-    ctx.textBaseline = 'top'; ctx.textAlign = 'center';
-    ctx.fillText(invuln ? 'calamitas — shielded' : 'calamitas', w / 2, by2 - 20);
-    ctx.textAlign = 'left';
-
-    ctx.fillStyle = COL.bone;
-    ctx.fillText('HP ' + Math.max(0, hp) + '/' + MAXHP, AX, AY + AH + 12);
-    ctx.fillStyle = COL.dim;
-    ctx.fillText('shift to focus  ·  f near her to strike', AX + 120, AY + AH + 12);
-
-    /* inside the shake, so the numbers move with the hit they belong to */
-    drawPops();
     if (NEU.juice) NEU.juice.drawParts(ctx, 1 / 60);
     if (NEU.juice) NEU.juice.end(ctx, shook);
     if (NEU.juice) NEU.juice.overlay(ctx, w, h);
 
-    /* U1/U2 meters — OUTSIDE the box (gutter or row-below per
-       layout()), drawn after juice.end so screen shake never moves
-       them. Rage on top, TP below it. */
-    var mR = meterRects[0], mT = meterRects[1];
-    if (mR && mT) {
-      drawMeter('rage', rageShown, mR.x, mR.y, mR.w, mR.h, rageMode > 0);
-      drawMeter('tp',   tpShown,   mT.x, mT.y, mT.w, mT.h, shieldT > 0);
-    }
+    /* The shared HUD, outside the shake. Her bar DOES move — that is
+       the difference between this fight and the one on the television.
+       Ticks sit at every phase gate in damageTarget. */
+    dm.hud(ctx, F, { w: w, h: h, AY: AY, AH: AH,
+                     name: invuln ? 'calamitas — shielded' : 'calamitas',
+                     hp: bossHP, max: bossMax, invuln: invuln,
+                     ticks: [0.75, 0.5, 0.35, 0.28, 0.2, 0.12, 0.08],
+                     php: hp, pmax: MAXHP, phase: phase,
+                     tp: tpShown, rage: rageShown, rageOn: rageMode > 0 });
 
-    var dialY = AY + AH + 40;
-    if (AX < 118) dialY = AY + AH + 76;   /* clear the row-below meters */
+    var dialY = AY + AH + 80;
     if (line && now - lineT < 5200) {
       ctx.fillStyle = COL.bone;
       ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
@@ -1638,75 +1530,7 @@
       now: performance.now()
     });
   }
-
-  /* The rage / tp meters, in the mod's own style: an empty track under
-     everything so the level reads before the art loads, the fill sheet
-     cropped IN WIDTH by the filled ratio (that is how
-     UI/Rippers/RipperUI.cs draws it), a border whose tp strip is
-     itself a fill animation — its cell tracks the VALUE, not the
-     clock — and the full-bar flourish playing exactly once per fill.
-     Labels sit to the right of the border. */
-  function drawMeter(key, ratio, x, y, w, h, active) {
-    var fill = key === 'rage' ? 'rageBar' : 'tpBar';
-    var border = key === 'rage' ? 'rageBorder' : 'tpBorder';
-    var anim = key === 'rage' ? 'rageAnim' : 'tpAnim';
-    var animT = key === 'rage' ? rageAnimT : tpAnimT;
-    var animS = key === 'rage' ? RAGE_ANIM_S : TP_ANIM_S;
-    /* RipperUI.GetShakeOffset() — the meter shakes while its mode is
-       active. This is the METER's own shake: these are drawn after
-       juice.end precisely so screen shake never moves them, and this
-       must not leak back into that. */
-    var meterShake = active ? 1 : 0;
-    if (meterShake) {
-      x += (Math.random() * 2 - 1) * meterShake;
-      y += (Math.random() * 2 - 1) * meterShake;
-    }
-    ratio = Math.min(1, Math.max(0, ratio));
-    /* empty track first */
-    ctx.fillStyle = '#22222E'; ctx.fillRect(x, y, w, h);
-    var sh = NEU.sheets && NEU.sheets[fill];
-    var im = NEU.sheetReady ? NEU.sheetReady(sh) : null;
-    if (im && sh) {
-      var fw = w * ratio;
-      if (fw > 0) ctx.drawImage(im, 0, 0, fw, sh.fh, x, y, fw, h);
-    } else {
-      ctx.fillStyle = key === 'rage' ? '#E4C46A' : '#7BE38A';
-      if (ratio > 0) ctx.fillRect(x, y, w * ratio, h);
-    }
-    var bsh = NEU.sheets && NEU.sheets[border];
-    var frames = bsh ? (bsh.frames || 1) : 1;
-    var bFrame = key === 'tp' ? Math.round(ratio * (frames - 1)) : 0;
-    if (!sprite(border, x + w / 2, y + h / 2, 1, 0, false, null, bFrame)) {
-      ctx.fillStyle = '#4A4560'; ctx.strokeStyle = '#22222E';
-      ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
-    }
-    /* one-shot flourish: only while its timer is still running */
-    if (animT < animS) {
-      var ash = NEU.sheets && NEU.sheets[anim];
-      var frames = (ash && ash.frames) || 10;
-      var af = Math.min(frames - 1, (animT / animS * frames) | 0);
-      if (!sprite(anim, x + w / 2, y + h / 2, 1, 0, false, null, af)) {
-        ctx.fillStyle = 'rgba(228,196,106,0.25)';
-        ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-      }
-    }
-    ctx.fillStyle = COL.dim;
-    ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-    ctx.fillText(key, x + w + 12, y + h / 2);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  }
-
   /* ── input ──────────────────────────────────────────────────────*/
-  function keyName(e) {
-    var k = e.key;
-    if (k === 'ArrowLeft'  || k === 'a' || k === 'A') return 'left';
-    if (k === 'ArrowRight' || k === 'd' || k === 'D') return 'right';
-    if (k === 'ArrowUp'    || k === 'w' || k === 'W') return 'up';
-    if (k === 'ArrowDown'  || k === 's' || k === 'S') return 'down';
-    if (k === 'Shift') return 'focus';
-    return null;
-  }
   addEventListener('keydown', function (e) {
     if (wrap.hidden || !NEU.scal.active || NEU.activeMinigame !== 'scal') return;
     if (e.key === 'F3') { showHitboxes = !showHitboxes; return; }
@@ -1726,7 +1550,10 @@
       e.preventDefault(); e.stopPropagation();
       open(); return;
     }
-    if (e.key === 'z' || e.key === 'Z') {
+    /* c dash, v (or shift+z) adrenaline, b rage: the shared keys */
+    var act = running && mode !== 'intro' ? dm.key(F, e) : '';
+    if (act === 'dash' || act === 'adren') { e.preventDefault(); return; }
+    if (e.key === 'z' || e.key === 'Z' || act === 'rage') {
       /* U1: rage. A full bar buys eight seconds of doubled strikes —
          and only that. z never strikes; f is the strike key. */
       e.preventDefault();
@@ -1752,14 +1579,14 @@
       say('* the barrier blooms. it will take one hit.');
       return;
     }
-    var n = keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
+    var n = dm.keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
   });
   addEventListener('keyup', function (e) {
     /* Same three-condition guard as keydown — the old one checked only
        wrap.hidden, so a release could fire while another minigame held
        the input lock. */
     if (wrap.hidden || !NEU.scal.active || NEU.activeMinigame !== 'scal') return;
-    var n = keyName(e); if (n) keys[n] = false;
+    var n = dm.keyName(e); if (n) keys[n] = false;
     if (e.key === 'f' || e.key === 'F') { e.preventDefault(); tryHit(); return; }
   });
 
@@ -1778,16 +1605,14 @@
     var keysEl = document.querySelector('#bh .bh__keys');
     if (keysEl) {
       if (keysOrig === null) keysOrig = keysEl.innerHTML;
-      keysEl.innerHTML = 'arrows / wasd &nbsp;&middot;&nbsp; shift to focus &nbsp;&middot;&nbsp; f to strike &nbsp;&middot;&nbsp; hold f to charge &nbsp;&middot;&nbsp; z for rage &nbsp;&middot;&nbsp; x to shield &nbsp;&middot;&nbsp; esc to leave';
+      keysEl.innerHTML = 'arrows / wasd &middot; shift focus &middot; f to strike (hold to charge) &middot; c dash &middot; v adrenaline &middot; z for rage &middot; x to shield &middot; esc to leave';
     }
     layout();
     t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; marks = {};
     rage = 0; tp = 0; shieldT = 0;
     rageMode = 0; rageModeT = 0;
-    rageAnimT = 9; tpAnimT = 9; rageFullPrev = 0; tpFullPrev = 0;
     rageShown = 0; tpShown = 0; grazeT = 0;
     myShots = []; charging = false; chargeF = 0; shotCd = 0;
-    pops = [];
     /* charge state too — dying mid multi-charge used to carry a live
        telegraph/dash into the retry and softlock her at the early-return */
     chargeT = 0; chargeTelegraph = 0; chargeBurst = 0; chargeBurstMax = 0; chargeGap = 0;
@@ -1824,6 +1649,7 @@
     preloadSfx();
     mode = 'intro';
     px = AX + AW / 2; py = AY + AH - 60;
+    F = dm.fight(px, py);
     bx = AX + AW / 2; by = AY - 24;
     say('* the small one was not small.');
     running = true; last = performance.now();
@@ -1831,7 +1657,7 @@
   }
   function close() {
     active = false; running = false; dying = 0;
-    pops = [];
+    F.pops = [];
     clearSched();
     scalWormReady = false;
     seekersReady = false;
@@ -1916,12 +1742,12 @@
                get seekerDarts() { return NEU.scalSeekers ? NEU.scalSeekers.darts() : []; },
                get broPos() { return bros.map(function (b) { return { x: b.x, y: b.y }; }); },
                 get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy }; }); },
-                get meters() { return meterRects.map(function (m) { return { x: m.x, y: m.y, w: m.w, h: m.h }; }); },
                 get myShots() { return myShots.map(function (s) { return { x: s.x, y: s.y, vx: s.vx, vy: s.vy, k: s.k }; }); },
                 /* test-only read (same class as wormSegs): the damage
                    numbers in flight, copied so a caller cannot write into
                    the live list */
-                get _pops() { return pops.map(function (p) { return { x: p.x, y: p.y, y0: p.y0, n: p.n, age: p.age }; }); },
-                meterSlots: meterSlots,
+                get _pops() { return F.pops.map(function (p) { return { x: p.x, y: p.y, y0: p.y0, n: p.n, age: p.age, c: p.c }; }); },
+                /* the shared feel state (core/danmaku.js), for tests */
+                get feel() { return F; },
                 cycle: CYCLE };
 })();

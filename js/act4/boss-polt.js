@@ -40,8 +40,9 @@
   var COL = { bone: '#EDE7DE', soul: '#E23B55', dim: '#8A8598',
               ecto: '#7FE3C4', ectoHi: '#C4FFF0', red: '#E04A6B', void_: '#04060A' };
 
-  var PLAYER_R = (dm.soul && dm.soul.R) || 3.2, SPEED = dm.SPEED || 250,
-      FOCUS = dm.FOCUS || 110, IFRAMES = dm.IFRAMES || 1.1, MAXHP = 6;
+  var PLAYER_R = (dm.soul && dm.soul.R) || 3.2, IFRAMES = dm.IFRAMES || 1.1, MAXHP = 6;
+  /* the shared fight feel: dash, adrenaline, rage, numbers, the HUD */
+  var F = dm.fight(0, 0);
 
   var running = false, last = 0, t = 0, dying = 0;
   var AX = 0, AY = 0, AW = 0, AH = 0;
@@ -129,13 +130,11 @@
     t += dt;
     if (inv > 0) inv -= dt;
 
-    /* player */
-    var vx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    var vy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
-    if (vx && vy) { vx *= 0.7071; vy *= 0.7071; }
-    var sp = keys.focus ? FOCUS : SPEED;
-    px = Math.min(Math.max(px + vx * sp * dt, AX + 8), AX + AW - 8);
-    py = Math.min(Math.max(py + vy * sp * dt, AY + 8), AY + AH - 8);
+    /* player; rage builds inside ~300px of his 40px strike reach */
+    F.x = px; F.y = py;
+    dm.move(F, keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH });
+    px = F.x; py = F.y;
+    dm.tick(F, dt, 1 - Math.min(1, Math.max(0, Math.hypot(px - bx, py - by) - 40) / 260));
 
     /* him — Plantera-like chase, faster each phase */
     var chase = [0, 1.0, 1.7, 2.6][phase];
@@ -194,6 +193,7 @@
     nextCharge -= dt;
     if (nextCharge <= 0 && charging <= 0) {
       glow = 0.9;
+      if (t < 6) say('* red means it is about to move.');   /* the first charge explains itself */
       nextCharge = [0, 5.5, 4.2, 3.4][phase];
       /* the telegraph has a sound as well as a glow: a tone that climbs
          for the 900 ms it takes to fire. The charge stops it (doCharge),
@@ -204,7 +204,7 @@
     }
     if (glow > 0) glow -= dt;
 
-    moveBullets(dt);
+    moveBullets(dt * dm.slow(F));
     draw(nowMs);
   }
 
@@ -241,22 +241,23 @@
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.x < AX - 50 || b.x > AX + AW + 50 || b.y < AY - 50 || b.y > AY + AH + 50) continue;
       keep.push(b);
-      if (inv <= 0) {
-        var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
-        if (dx * dx + dy * dy < rr * rr) {
-          hp--; inv = IFRAMES;
-          if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
-          if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
-          if (hp <= 0) { startDeath(); return; }
-        }
-      }
+      var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
+      if (dx * dx + dy * dy < rr * rr && hurt()) return;
     }
     bullets = keep;
     /* contact damage while charging */
-    if (charging > 0 && inv <= 0 && Math.hypot(px - bx, py - by) < 26) {
-      hp--; inv = IFRAMES;
-      if (hp <= 0) startDeath();
-    }
+    if (charging > 0 && Math.hypot(px - bx, py - by) < 26) hurt();
+  }
+
+  /* One damage path; a dash or the i-frames pass through. True = dead. */
+  function hurt() {
+    if (inv > 0 || F.dashI > 0) return false;
+    hp--; inv = IFRAMES;
+    dm.hurt(F, px, py - 12);
+    if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
+    if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
+    if (hp <= 0) { startDeath(); return true; }
+    return false;
   }
 
   function tryHit() {
@@ -270,7 +271,9 @@
       return;
     }
     if (Math.hypot(px - bx, py - by) > 40) return;
-    bossHP--;
+    var dmg = dm.mul(F);
+    bossHP -= dmg;
+    dm.bossHit(F, bx, by, dmg);
     if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
     if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(bx, by, 7, COL.ectoHi); }
     var pct = bossHP / bossMax;
@@ -434,6 +437,7 @@
       /* Potent shots in later phases; the plain ones in P1. Falls back
          to a square, which is what the whole fight was until now. */
       var key = bl.k === 1 ? 'potentShot' : 'pShot';
+      dm.glow(ctx, bl.x, bl.y, bl.r * 4, bl.c, 0.45);
       /* Rotated to face the way it is travelling, like the dart in the
          other fight — a spiked shot drawn straight reads as a blob. */
       if (!drawSheet(key, bl.x, bl.y, 1, null, Math.atan2(bl.vy, bl.vx))) {
@@ -442,41 +446,24 @@
       }
     }
 
-    if (mode !== 'won' && dm.soul && dm.soul.draw)
-      dm.soul.draw(ctx, px, py, inv, COL.soul);
-
-    var bw = 300, bx2 = ((innerWidth - bw) / 2) | 0, by2 = AY - 40;
-    ctx.fillStyle = '#152028'; ctx.fillRect(bx2, by2, bw, 8);
-    ctx.fillStyle = COL.ecto; ctx.fillRect(bx2, by2, (bw * Math.max(0, bossHP / bossMax)) | 0, 8);
-    ctx.fillStyle = COL.bone;
-    ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-    ctx.textBaseline = 'top'; ctx.textAlign = 'center';
-    ctx.fillText('polterghast — phase ' + phase, innerWidth / 2, by2 - 20);
-    ctx.textAlign = 'left';
-    ctx.fillText('HP ' + Math.max(0, hp) + '/' + MAXHP, AX, AY + AH + 12);
-    ctx.fillStyle = COL.dim;
-    ctx.fillText('shift to focus  ·  z to strike  ·  red means it is about to move',
-                 AX + 120, AY + AH + 12);
+    var bp = proj(bx, by, bz);
+    dm.drawFlash(ctx, F, bp.x, bp.y, 48);
+    if (mode !== 'won') dm.drawFX(ctx, F, inv);
     if (NEU.juice) NEU.juice.drawParts(ctx, 1 / 60);
     if (NEU.juice) NEU.juice.end(ctx, shook);
     if (NEU.juice) NEU.juice.overlay(ctx, innerWidth, innerHeight);
 
+    dm.hud(ctx, F, { w: innerWidth, h: innerHeight, AY: AY, AH: AH, name: 'polterghast',
+                     hp: bossHP, max: bossMax, ticks: [0.5, 0.2],
+                     php: hp, pmax: MAXHP, phase: phase });
+
     if (line && nowMs - lineT < 5000) {
       ctx.fillStyle = COL.bone;
       ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
-      ctx.fillText(line, AX, AY + AH + 38);
+      ctx.fillText(line, AX, AY + AH + 80);
     }
   }
 
-  function keyName(e) {
-    var k = e.key;
-    if (k === 'ArrowLeft'  || k === 'a' || k === 'A') return 'left';
-    if (k === 'ArrowRight' || k === 'd' || k === 'D') return 'right';
-    if (k === 'ArrowUp'    || k === 'w' || k === 'W') return 'up';
-    if (k === 'ArrowDown'  || k === 's' || k === 'S') return 'down';
-    if (k === 'Shift') return 'focus';
-    return null;
-  }
   addEventListener('keydown', function (e) {
     if (wrap.hidden) return;
     if (e.key === 'Escape') {
@@ -487,11 +474,13 @@
       return;
     }
     if (!running && !dying && e.key === 'Enter') { e.preventDefault(); open(); return; }
+    /* c dash, v (or shift+z) adrenaline, b rage: the shared keys */
+    if (running && dm.key(F, e)) { e.preventDefault(); return; }
     if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); tryHit(); return; }
-    var n = keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
+    var n = dm.keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
   });
   addEventListener('keyup', function (e) {
-    var n = keyName(e); if (n) keys[n] = false;
+    var n = dm.keyName(e); if (n) keys[n] = false;
   });
 
   function open() {
@@ -504,6 +493,7 @@
     t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; dying = 0;
     bossMax = 30; bossHP = bossMax; phase = 1; clone = null; mode = 'fight';
     px = AX + AW / 2; py = AY + AH - 70;
+    F = dm.fight(px, py);
     bx = AX + AW / 2; by = AY + 80; bz = 0;
     charging = 0; glow = 0; nextFire = 1.4; nextCharge = 5;
     resetHooks();
@@ -541,5 +531,7 @@
                get phase() { return phase; },
                get hp() { return bossHP; },
                get clone() { return !!clone; },
-               get hooks() { return hooks.length; } };
+               get hooks() { return hooks.length; },
+               /* the shared feel state (core/danmaku.js), for tests */
+               get feel() { return F; } };
 })();
