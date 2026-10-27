@@ -202,6 +202,7 @@
       if (i >= 0) { mem.items.splice(i, 1); write(true); }
     },
     has: function (item) { return mem.items.indexOf(item) >= 0; },
+    items: function () { return mem.items.slice(); },
 
     /* Endless-mode personal bests. Only ever moves up. */
     best: function (game, score) {

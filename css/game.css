@@ -1,0 +1,33 @@
+/* game.css — Act IV UI that came after style.css hit its size cap. */
+
+/* ITEM box (js/act4/inventory.js): Deltarune's black menu with the
+   white two-step pixel frame. z 76 like .quiz, below .tbox (96). */
+.inv {
+  position: fixed; z-index: 76;
+  left: 50%; top: 16px; transform: translateX(-50%);
+  width: min(512px, calc(100vw - 48px)); box-sizing: border-box;
+  padding: 16px 32px 24px;
+  background: #000; color: #fff;
+  border: 4px solid #fff;
+  /* the second step: a black gap, then a thin white line inside */
+  box-shadow: inset 0 0 0 4px #000, inset 0 0 0 6px #fff;
+  font: 400 32px/1.25 var(--font);
+  outline: none;
+}
+.inv__h { margin: 0 0 8px; color: #fff; font: inherit; }
+.inv__list { list-style: none; margin: 0; padding: 0; }
+.inv__list li {
+  position: relative; display: flex; align-items: center; gap: 16px;
+  padding: 0 0 0 48px; min-height: 48px;
+}
+.inv__list li.is-sel { color: #ff0; }
+.inv__list li.is-sel::before {
+  content: ''; position: absolute; left: 0; top: 50%;
+  width: 32px; height: 32px; margin-top: -16px;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
+  image-rendering: pixelated;
+}
+.inv__list img {
+  width: 32px; height: 32px; flex: none;
+  object-fit: contain; image-rendering: pixelated;
+}
