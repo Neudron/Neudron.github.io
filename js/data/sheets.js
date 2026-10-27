@@ -398,7 +398,16 @@
     sansIdle:  { src: 'img/act123/sans-idle.png',  w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
     sansShrug: { src: 'img/act123/sans-shrug.png', w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
     sansSleep: { src: 'img/act123/sans-sleep.png', w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
-    sansFace:  { src: 'img/act123/sans-face.png',  w: 36, h: 33, frames: 1, fw: 36, fh: 33, fps: 0 }
+    sansFace:  { src: 'img/act123/sans-face.png',  w: 36, h: 33, frames: 1, fw: 36, fh: 33, fps: 0 },
+    /* Act II (dark.js). YOU: Undertale spr_mainchara{d,u,l,r}, 20x30.
+       cols = down, up, left, right; rows = steps (l/r have 2 in the
+       game, repeated). Frame comes from distance walked, so fps 0. */
+    youWalk:    { src: 'img/act123/you-walk.png',    w: 80, h: 120, frames: 4, cols: 4, fw: 20, fh: 30, fps: 0 },
+    /* Deltarune ch1 bg_darkdoor_open floor (40x40 crop, tiles),
+       ch2 spr_shortcut_door, ch1 bg_darktiles1 hole + pebbles. */
+    darkFloor:  { src: 'img/act123/dark-floor.png',  w: 40, h: 40,  frames: 1, fw: 40, fh: 40, fps: 0 },
+    darkDoor:   { src: 'img/act123/dark-door.png',   w: 36, h: 52,  frames: 1, fw: 36, fh: 52, fps: 0 },
+    darkDebris: { src: 'img/act123/dark-debris.png', w: 40, h: 72,  frames: 2, fw: 40, fh: 36, fps: 0 }
   };
 
   /* ── ONE blitter, and one image cache ──────────────────────────────

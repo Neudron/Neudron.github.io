@@ -42,7 +42,7 @@
   if (!ctx) { NEU.dark = { open: function () {}, close: function () {} }; return; }
 
   var W = 2600, H = 1800;
-  var DOOR = { x: 2060, y: 1360, w: 74, h: 122 };
+  var DOOR = { x: 2060, y: 1360, w: 72, h: 104 };   /* darkDoor 36x52 at 2x */
   var LIGHT = 132;
 
   /* Two modes share this file because they share the character and its
@@ -54,24 +54,26 @@
   var running = false, last = 0;
   var px = 420, py = 380, keys = {};
   var talks = 0, through = false, fixed = false;
-  var msg = null, msgT = 0, found = false;
+  var found = false;
   var face = 'down', walked = 0, moving = false;
   var debris = [];
 
+  /* YOU is the youWalk sheet: one column per facing, one row per step,
+     and the step is picked by distance (16 px each), never the clock. */
+  var COL = { down: 0, up: 1, left: 2, right: 3 };
+  function walkFrame(dist, mov) { return mov ? ((dist / 16) | 0) % 4 : 0; }
   function drawPlayer(sx, sy) {
-    /* Frame from distance walked, not from the clock — engine owns the character sprite. */
-    if (NEU.engine && NEU.engine.drawPlayer) {
-      NEU.engine.drawPlayer(ctx, sx, sy, face, walked, moving, false, 2);
-    }
+    if (NEU.sheetDraw && NEU.sheetDraw(ctx, 'youWalk', sx, sy,
+        { frame: walkFrame(walked, moving), col: COL[face], scale: 2 })) return;
+    /* image still loading: the engine's figure stands in for a frame or two */
+    if (NEU.engine && NEU.engine.drawPlayer) NEU.engine.drawPlayer(ctx, sx, sy, face, walked, moving, false, 2);
   }
 
   (function seedDebris() {
     var s = 20250815;
     function rnd() { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }
     for (var i = 0; i < 90; i++) {
-      debris.push({ x: rnd() * W, y: rnd() * H,
-                    w: 12 + rnd() * 90, h: 8 + rnd() * 70,
-                    c: rnd() < 0.25 ? '#191a24' : '#121219' });
+      debris.push({ x: rnd() * W, y: rnd() * H, f: rnd() < 0.25 ? 0 : 1 });   /* 0 hole, 1 pebbles */
     }
   })();
 
@@ -82,7 +84,8 @@
     'the handle turns now. it was always going to.'
   ];
 
-  function say(s) { msg = s; msgT = performance.now(); }
+  /* the one textbox on the site, never a canvas copy of it */
+  function say(s) { if (NEU.talk) NEU.talk([s], 'narr'); }
 
   function layout() {
     var dpr = Math.min(devicePixelRatio || 1, 2);
@@ -179,14 +182,9 @@
     draw(now);
   }
 
-  function glow(ox, oy, ow, oh, col, dist) {
-    if (dist <= LIGHT * 0.6) return;
-    ctx.globalAlpha = Math.max(0, (0.10 + 0.045 * Math.sin(performance.now() / 420)) *
-                                  Math.min(1, 900 / dist));
-    ctx.fillStyle = col;
-    ctx.fillRect(ox - 8, oy - 8, ow + 16, oh + 16);
-    ctx.globalAlpha = 1;
-  }
+  /* Deltarune dark-world palette: indigo-black field, real tiles,
+     magenta door, cyan for anything you can act on. */
+  var INK = '#07061a', CYAN = '#5FF2FF', MAG = '#FF3FD0', TILE = 80;
 
   function draw(now) {
     var w = innerWidth, h = innerHeight;
@@ -208,38 +206,35 @@
         ctx.globalAlpha = 1;
       }
       drawPlayer(px | 0, py | 0);
-      if (onSwitch()) {
-        ctx.fillStyle = '#EDE7DE';
-        ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('press E', px | 0, (py - 30) | 0);
-        ctx.textAlign = 'left';
-      }
-      drawMsg(now);
+      if (onSwitch()) prompt(px | 0, (py - 40) | 0);
       return;
     }
 
     var camX = px - w / 2, camY = py - h / 2;
-    ctx.fillStyle = '#050507';
+    ctx.fillStyle = INK;
     ctx.fillRect(0, 0, w, h);
+
+    /* floor: the real tile, at a third strength so the torch still reads as
+       the only light in here */
+    var fl = NEU.sheetReady && NEU.sheetReady(NEU.sheets.darkFloor);
+    if (fl) {
+      ctx.globalAlpha = 0.35;
+      for (var ty = Math.max(0, Math.floor(camY / TILE) * TILE); ty < Math.min(H, camY + h); ty += TILE)
+        for (var tx = Math.max(0, Math.floor(camX / TILE) * TILE); tx < Math.min(W, camX + w); tx += TILE)
+          ctx.drawImage(fl, (tx - camX) | 0, (ty - camY) | 0, TILE, TILE);
+      ctx.globalAlpha = 1;
+    }
 
     for (var i = 0; i < debris.length; i++) {
       var d = debris[i];
-      ctx.fillStyle = d.c;
-      ctx.fillRect((d.x - camX) | 0, (d.y - camY) | 0, d.w | 0, d.h | 0);
+      NEU.sheetDraw(ctx, 'darkDebris', (d.x - camX) | 0, (d.y - camY) | 0, { frame: d.f, scale: 2 });
     }
 
     var dx = (DOOR.x - camX) | 0, dy = (DOOR.y - camY) | 0;
-    ctx.fillStyle = through ? '#3b3b48' : '#2a2a34';
-    ctx.fillRect(dx, dy, DOOR.w, DOOR.h);
-    ctx.fillStyle = '#4a4a5a';
-    ctx.fillRect(dx, dy, DOOR.w, 4); ctx.fillRect(dx, dy, 4, DOOR.h);
-    ctx.fillRect(dx + DOOR.w - 4, dy, 4, DOOR.h);
-    ctx.fillStyle = '#8A8598';
-    ctx.fillRect(dx + DOOR.w - 20, dy + ((DOOR.h / 2) | 0), 8, 8);
+    NEU.sheetDraw(ctx, 'darkDoor', dx + DOOR.w / 2, dy + DOOR.h / 2, { scale: 2 });
     if (!endless && talks >= LINES.length) {
-      ctx.fillStyle = '#B892FF';
-      ctx.fillRect(dx + 6, dy + 6, DOOR.w - 12, DOOR.h - 10);
+      ctx.fillStyle = CYAN;                       /* it answered: the doorway is lit */
+      ctx.fillRect(dx + 12, dy + 12, DOOR.w - 24, DOOR.h - 18);
     }
 
     drawPlayer((px - camX) | 0, (py - camY) | 0);
@@ -265,32 +260,20 @@
     var gd = Math.hypot(px - (DOOR.x + DOOR.w / 2), py - (DOOR.y + DOOR.h / 2));
     if (gd > LIGHT * 0.6) {
       ctx.globalAlpha = Math.max(0, (0.10 + 0.045 * Math.sin(now / 420)) * Math.min(1, 900 / gd));
-      ctx.fillStyle = '#B892FF';
+      ctx.fillStyle = MAG;
       ctx.fillRect(dx - 8, dy - 8, DOOR.w + 16, DOOR.h + 16);
       ctx.globalAlpha = 1;
     }
 
-    if (near(DOOR)) {
-      ctx.fillStyle = '#EDE7DE';
-      ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('press E', w / 2, h / 2 - 46);
-      ctx.textAlign = 'left';
-    }
-    drawMsg(now);
+    if (near(DOOR)) prompt(w / 2, h / 2 - 56);
   }
 
-  function drawMsg(now) {
-    if (!msg || now - msgT > 6000) return;
-    var w = innerWidth, h = innerHeight;
-    var bw = Math.min(680, w - 48), bx = ((w - bw) / 2) | 0, by = h - 132;
-    ctx.fillStyle = '#000'; ctx.fillRect(bx, by, bw, 84);
-    ctx.fillStyle = '#EDE7DE';
-    ctx.fillRect(bx, by, bw, 3); ctx.fillRect(bx, by + 81, bw, 3);
-    ctx.fillRect(bx, by, 3, 84); ctx.fillRect(bx + bw - 3, by, 3, 84);
+  function prompt(x, y) {
+    ctx.fillStyle = CYAN;
     ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-    ctx.textBaseline = 'top';
-    ctx.fillText(msg, bx + 20, by + 30);
+    ctx.textAlign = 'center';
+    ctx.fillText('press E', x, y);
+    ctx.textAlign = 'left';
   }
 
   function name(e) {
@@ -371,7 +354,6 @@
     mode = 'dark';
     talks = 0; through = false; fixed = false; found = false;
     px = 420; py = 380; walked = 0; face = 'down';
-    msg = null;
     if (wrap) wrap.classList.remove('is-walk');
   }
 
@@ -386,7 +368,7 @@
       var r = swRect();
       if (r) { px = r.left + r.width / 2; py = r.top + r.height / 2; }
     },
-    interact: interact,
+    interact: interact, walkFrame: walkFrame,
     get running() { return running; },
     get endless() { return endless; },
     get talks() { return talks; },

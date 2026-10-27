@@ -1105,7 +1105,7 @@ body.is-blackout::before {
 }
 
 /* ── after the light ──────────────────────────────────────────────*/
-.dk { position: fixed; inset: 0; z-index: 70; background: #050507; }
+.dk { position: fixed; inset: 0; z-index: 70; background: #07061a; }
 /* Walk mode paints the character straight onto the page, so the layer
    itself must be see-through and must not eat clicks. */
 .dk.is-walk { background: transparent; pointer-events: none; }

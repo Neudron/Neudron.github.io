@@ -88,3 +88,11 @@
   .tbox__txt { padding-left: 24px; }
   .sans__btn img { width: 46px; }
 }
+
+/* Act II: the bullet room and the dark come in from black in three hard
+   steps (one transition, never a flash) instead of popping on. */
+@keyframes from-black { from { filter: brightness(0); } }
+.bh:not([hidden]), .dk:not([hidden]) { animation: from-black .48s steps(3) both; }
+@media (prefers-reduced-motion: reduce) {
+  .bh:not([hidden]), .dk:not([hidden]) { animation: none; }
+}
