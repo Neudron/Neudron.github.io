@@ -391,7 +391,14 @@
     corridor:  { src: IMG + 'undertale/newhome-corridor.png', w: 743, h: 76, frames: 1, fw: 743, fh: 76, fps: 0 },
     /* room dressing (t: 'decor'): spr_plant_dark, spr_npc_bench */
     plant:     { src: IMG + 'undertale/plant.png',  w: 16, h: 34, frames: 1, fw: 16, fh: 34, fps: 0 },
-    bench:     { src: IMG + 'deltarune/bench.png',  w: 39, h: 25, frames: 1, fw: 39, fh: 25, fps: 0 }
+    bench:     { src: IMG + 'deltarune/bench.png',  w: 39, h: 25, frames: 1, fw: 39, fh: 25, fps: 0 },
+    /* Act I (index.html <img>s, sans.js): Undertale spr_sans_d_0 /
+       spr_sans_shrug1_0 / spr_sans_sleep_0 trimmed 25x32 -> 23x30, and
+       spr_face_sans_0 trimmed 40x40 -> 36x33. img/act123 cap: 400 kB. */
+    sansIdle:  { src: 'img/act123/sans-idle.png',  w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
+    sansShrug: { src: 'img/act123/sans-shrug.png', w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
+    sansSleep: { src: 'img/act123/sans-sleep.png', w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
+    sansFace:  { src: 'img/act123/sans-face.png',  w: 36, h: 33, frames: 1, fw: 36, fh: 33, fps: 0 }
   };
 
   /* ── ONE blitter, and one image cache ──────────────────────────────

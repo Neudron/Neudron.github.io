@@ -53,3 +53,38 @@
 }
 /* the touch pad owns the bottom 200px on a phone */
 @media (pointer: coarse) { .fnf__msg { bottom: 216px; } }
+
+/* The one textbox (#tbox, sans.js say()), Deltarune style: black,
+   the same two-step white frame as .inv (box-shadow, never
+   border-image), left-aligned, a * per line drawn here (say() drops a
+   line's own "* "), and the speaker's portrait on the left. Only sans
+   and the Act IV cast have one; narr/dog/tv set it hidden. Sans talks
+   in comic sans, everyone else in the pixel face. Position and z-index
+   stay in style.css. */
+.tbox {
+  width: min(768px, calc(100vw - 32px)); box-sizing: border-box;
+  display: flex; align-items: flex-start; gap: 24px;
+  padding: 24px 32px;
+  background: #000; color: #fff; text-align: left;
+  border: 4px solid #fff;
+  box-shadow: inset 0 0 0 4px #000, inset 0 0 0 6px #fff;
+  font: 400 32px/1.5 var(--font);
+}
+.tbox[data-who="sans"] { font-family: var(--font-talk); }
+.tbox__face { flex: none; line-height: 0; }
+/* 36x33 crop at 3x; 2x on a phone */
+.tbox__face img { width: 108px; height: auto; image-rendering: pixelated; }
+.tbox__txt {
+  position: relative; flex: 1; margin: 0;
+  padding-left: 32px; min-height: 4.5em;
+  overflow-wrap: anywhere;
+}
+.tbox__txt::before { content: '*'; position: absolute; left: 0; top: 0; }
+/* Sans: a real 23x30 crop at integer scale. */
+.sans__btn img { width: 69px; height: auto; image-rendering: pixelated; }
+@media (max-width: 600px) {
+  .tbox { gap: 16px; padding: 16px; font-size: 16px; }
+  .tbox__face img { width: 72px; }
+  .tbox__txt { padding-left: 24px; }
+  .sans__btn img { width: 46px; }
+}

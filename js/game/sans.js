@@ -535,25 +535,28 @@
      region is emptied when the box closes. */
   var tboxSR = document.getElementById('tboxSR');
   function srSay(s) { if (tboxSR) tboxSR.textContent = s; }
-  var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/annoying-dog.gif', tv: 'img/tv.svg',
+  /* sheets.js crops; narr/dog/tv have no face */
+  var SH = NEU.sheets || {};
+  function shSrc(k) { return SH[k] ? SH[k].src : ''; }
+  var sansImg = btn.querySelector('img');
+  var FACE = { sans: shSrc('sansFace'),
                witch: 'img/act4/witch-face.png',
                /* real mod filenames — HoodlessHeadIcon/HoodedHeadIcon from
                   NPCs/SupremeCalamitas/, see js/data/sheets.js scalFace* */
                scal: 'img/act4/calamity/HoodlessHeadIcon.png',
                scalHood: 'img/act4/calamity/HoodedHeadIcon.png' };
 
-  /* Only the src is set here. Whether the portrait shows at all is a
-     css question, because hiding it also has to re-do the box's grid
-     columns — doing that from js would mean the layout rule lived in
-     two files. A speaker with no face in FACE hides the portrait: it
-     used to keep the PREVIOUS speaker's face, which is how narration
-     and the witch wore Sans's. */
+  /* No face in FACE hides the portrait; it used to keep the previous
+     speaker's, which is how narration and the witch wore Sans's. */
   function setFace(who) {
     var src = FACE[who];
     if (tface) tface.hidden = !src;
     if (src && tfaceImg && tfaceImg.getAttribute('src') !== src) {
       tfaceImg.setAttribute('src', src);
     }
+    /* shrug while talking; setFace() = closed */
+    var p = shSrc(who === 'sans' ? 'sansShrug' : 'sansIdle');
+    if (sansImg && p && sansImg.getAttribute('src') !== p) sansImg.setAttribute('src', p);
   }
   function say(lines, who) {
     queue = lines.slice();
@@ -568,12 +571,12 @@
     clearInterval(typing); clearTimeout(next.hold);
     if (!queue.length) {
       tbox.hidden = true;
-      srSay('');
+      srSay(''); setFace();
       /* the talk ended or was cut short — the watcher wants to know */
       if (watch) watch(-1, -1);
       return;
     }
-    var line = queue.shift(), i = 0;
+    var line = queue.shift().replace(/^\* /, ''), i = 0;
     srSay(line);
     curV = queueV.shift() || 'sans';
     curIdx++;
@@ -616,7 +619,7 @@
     clearInterval(typing); clearTimeout(next.hold);
     queue = [];
     if (tbox) tbox.hidden = true;
-    srSay('');
+    srSay(''); setFace();
     if (watch) watch(-1, -1);
   };
   NEU.hush = function () { shutUp(); };
@@ -633,7 +636,7 @@
   function shutUp() {
     clearInterval(typing); clearTimeout(next.hold);
     queue = []; queueV = []; ttxt.textContent = ''; tbox.hidden = true;
-    srSay('');
+    srSay(''); setFace();
     if (watch) watch(-1, -1);
   }
 
