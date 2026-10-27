@@ -240,7 +240,8 @@
     },
     width: function (e, S) { return e.sheet ? sheetWidth(e, S) : L().propWidth(L().lookFor(e)); },
     light: function (e, d) {
-      if (e.mush) return { r: 20, col: '#FF8AA0', glow: 0.16 };
+      /* the mushroom glow moves to the pot once you carry all five */
+      if (e.mush || (e.pot && NEU.mushrooms && NEU.mushrooms() >= 5)) return { r: 20, col: '#FF8AA0', glow: 0.16 };
       var look = L().lookFor(e);
       if (look === 'torch') return { r: 18, col: '#FFB347', glow: 0.3, flicker: true };
       if (look === 'socket' && d && d.api.solved(d.room.id)) return { r: 90, col: '#FFB347', glow: 0.26, flicker: true };

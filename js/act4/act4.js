@@ -38,6 +38,7 @@
     { id: 'a4_trip',  text: 'regret it' },
     { id: 'a4_axe',   text: 'win the argument' },
     { id: 'a4_mush',  text: 'cut all five', count: 5 },
+    { id: 'a4_pot',   text: 'bring the mushrooms to the pot' },
     { id: 'a4_soup',  text: 'make the soup' },
     { id: 'a4_wake',  text: 'wake up' },
     { id: 'a4_chair', text: 'let him sit down' },

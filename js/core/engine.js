@@ -403,8 +403,14 @@
     if (reduced) { fade = 1; }              // no iris, just the cut
   }
 
+  /* An entity taken for good (NEU.take). Keyed by its mushroom id, else
+     its tile, so two things in one room cannot share a flag. */
+  function goneKey(r, e) { return 'gone:' + r.id + ':' + (e.mush || e.x + ',' + e.y); }
+
   function spawnEnts(r) {
-    return (r.entities || []).map(function (e) {
+    return (r.entities || []).filter(function (e) {
+      return !(NEU.save && NEU.save.flagged(goneKey(r, e)));
+    }).map(function (e) {
       var c = {}; for (var k in e) c[k] = e[k];
       /* Pickups already taken and one-shot triggers already fired stay
          gone across a reload — otherwise the save file hands out
@@ -416,6 +422,18 @@
       return c;
     });
   }
+
+  /* Taking an entity's item for good. The gone flag keeps spawnEnts from
+     putting it back on any later visit; the chime and burst match the
+     pickup kind so a taken thing feels the same whichever kind it is. */
+  NEU.take = function (e, item, lines) {
+    if (!room || !e) return;
+    e.dead = true;
+    if (NEU.save) { NEU.save.give(item); NEU.save.flag(goneKey(room, e), 1); }
+    if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+    if (NEU.juice) { NEU.juice.hit('small'); SYS.burst(e, 10, '#B892FF'); }
+    say(lines || ['* You got the ' + item.toUpperCase() + '.'], 'narr');
+  };
 
   /* Only reached by a room that declares no spawns at all. */
   function firstOpenCell() {

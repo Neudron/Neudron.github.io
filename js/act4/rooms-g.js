@@ -270,7 +270,7 @@
     spawns: { in: { x: 2, y: 4, face: 'right' } },
     entities: [
       { t: 'save', x: 4, y: 7 },
-      { t: 'npc', x: 10, y: 3, colour: '#FF6BD6',
+      { t: 'npc', x: 10, y: 3, colour: '#FF6BD6', pot: true,
         lines: ['a pot. an enormous pot. it is the only thing in focus.',
                 'it wants mushroom soup. you are certain of this in a way you cannot defend.'],
         run: function (c) { pot(c); } },
@@ -298,6 +298,7 @@
              'they are where they have always been: the path, the altar, the alley, the square.'], 'narr');
       return;
     }
+    if (NEU.quest) NEU.quest.mark('a4_pot');
     if (NEU.craft) { c.leave(); setTimeout(function () { NEU.craft.open(); }, 320); }
   }
 
@@ -324,10 +325,13 @@
       c.say(['a mushroom. you want it very badly. you have nothing sharp.'], 'narr');
       return;
     }
-    NEU.save.give(id);
+    var e = c.ents().filter(function (x) { return x.mush === id; })[0];
+    var n = mushrooms() + 1;
+    var lines = n < 5 ? ['you take the mushroom. ' + n + ' of five.']
+      : ['you take the mushroom. five of five.',
+         'bring them to the pot. it is in the trip room, the one the trip keeps dropping you in.'];
+    NEU.take(e, id, lines);
     if (NEU.quest) NEU.quest.bump('a4_mush', mushrooms());
-    if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
-    c.say(['you take the mushroom. ' + mushrooms() + ' of five.'], 'narr');
   };
 
   NEU.act4RoomsG = ['g0_hall','h1_storm','h2_machine','h3_trip']

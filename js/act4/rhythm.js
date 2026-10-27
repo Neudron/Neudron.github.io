@@ -35,6 +35,7 @@
   var ctx = cv && cv.getContext ? cv.getContext('2d') : null;
   if (!ctx) { NEU.rhythm = { open: function () {} }; return; }
   var msg = document.getElementById('fnfMsg');
+  var won = false;                    // set by win, cashed in by close
 
   var LANES = ['left', 'down', 'up', 'right'];
   var ARROW = { left: '◀', down: '▼', up: '▲', right: '▶' };
@@ -179,6 +180,7 @@
 
   function win() {
     running = false;
+    won = true;
     if (NEU.save) NEU.save.give('axe');
     if (NEU.quest) NEU.quest.mark('a4_axe');
     if (msg) {
@@ -317,6 +319,14 @@
     startRound();
     requestAnimationFrame(step);
   }
+  /* The counter axe leaves the room for good, and the line about it
+     waits until the overlay is gone (see close). */
+  function takeAxe() {
+    var api = NEU.engine && NEU.engine.api;
+    var axe = api && api.ents().filter(function (e) { return e.sheet === 'axe'; })[0];
+    if (axe && NEU.take) NEU.take(axe, 'axe');
+  }
+
   function close() {
     running = false;
     if (phaseTimer) { clearTimeout(phaseTimer); phaseTimer = 0; }
@@ -326,6 +336,7 @@
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
     if (NEU.engine) NEU.engine.enter('d1_street', 'fire');
+    if (won) { won = false; takeAxe(); }
   }
 
   var q = document.getElementById('fnfQuit');
@@ -335,7 +346,7 @@
     else close();
   });
 
-  NEU.rhythm = { open: open, close: close,
+  NEU.rhythm = { open: open, close: close, win: win,
                  get running() { return running; },
                  get round() { return round; },
                  get hp() { return hp; },
