@@ -1,29 +1,22 @@
 /* bullet.js — the room behind the door.
    ───────────────────────────────────────────────────────────────────
-   A twenty-second survival, Touhou by way of Undertale: you are a
-   small soul in a bounded box and several emitters are extremely
-   interested in where you are standing.
+   A twenty-second encounter, Undertale's box with Calamity's feel: the
+   thing at the far end is the clock, and its boss bar is the twenty
+   seconds draining. Three short phases, each announced in the box
+   before it fires:
 
-   Why a full-screen overlay and not a canvas inside the panel: a
-   bullet pattern needs room to be readable. Cramped into a 420px
-   sidebar the same pattern stops being a pattern and becomes noise,
-   and dodging turns into luck. The panel starts it; the game takes
-   the screen.
+     1  the voice      rings and aimed shots, red soul
+     2  blue           your soul turns BLUE (gravity): bones along the
+                       floor to jump, blasters from above to step out
+                       of, and the electric one — stay on the ground in
+                       its beam and it charges what you carry
+     3  the last six   a spiral, walls with one gap, blasters, aimed
 
-   Conventions borrowed on purpose, because they are load-bearing:
-
-     · SHIFT focuses — you move slower and your true hitbox is drawn.
-       Every danmaku game does this, and it is the difference between
-       "unfair" and "tight". The hitbox is much smaller than the
-       sprite, and you cannot dodge well without being shown that.
-     · Invulnerability frames after a hit, with the soul flashing.
-       Without them one bad frame costs all three HP in a row.
-     · Bullets spawn OUTSIDE the arena and are culled well beyond it,
-       so nothing ever pops into existence on top of you.
-
-   Everything is drawn with integer fillRect, matching the rest of the
-   page — this site is made of hard pixels and a smooth anti-aliased
-   circle would look like it came from a different website.          */
+   Movement, dash (C or a double-tap), adrenaline (V), the HUD and the
+   screen-reader line all come from danmaku.js, shared with the bosses.
+   Bullets spawn OUTSIDE the box and are culled well beyond it, so
+   nothing ever pops into existence on top of you. Shift focuses and
+   draws the true hitbox.                                             */
 
 (function () {
   'use strict';
@@ -36,55 +29,57 @@
   var ctx = cv.getContext ? cv.getContext('2d') : null;
   if (!ctx) { NEU.bullet = { open: function () {}, close: function () {} }; return; }
 
-  var hud  = document.getElementById('bhHud');
   var msg  = document.getElementById('bhMsg');
 
-  /* The HP is painted on the canvas, which a screen reader cannot read,
-     so the same number goes to a visually hidden polite line (#bhLive in
-     index.html) every time it changes. The line is written from here and
-     nowhere else, so the canvas and the spoken number cannot disagree. */
+  /* dm.hud keeps #bhLive on HP and phase; the death and the end lines
+     are written here, after it, so they are the last thing said. */
   var live = document.getElementById('bhLive');
   function announce(s) { if (live) live.textContent = s; }
 
-  var dm = NEU.danmaku || {};
+  var dm = NEU.danmaku;
   var SURVIVE   = 20;          // seconds
-  var PLAYER_R  = (dm.soul && dm.soul.R) || 6; // TRUE hitbox (matches scale 2 soul sprite ~60px visual, 6px radius)
-  var SPEED     = dm.SPEED || 258, FOCUS_SPEED = dm.FOCUS || 112;
+  var PLAYER_R  = dm.soul.R;   // the TRUE hitbox
   var MAX_B     = 700;
   var BL_HALF = 24; // was 17, matches visual beam width at game scale
+  var BORDER = 4;              // Undertale's white box edge
+  var TELE = 1.0;              // a phase's line shows this long before it fires
 
   var COL = { bone: '#EDE7DE', lilac: '#B892FF', blood: '#C2405F',
-              dim: '#8A8598', soul: '#E23B55', void_: '#08080B' };
+              dim: '#8A8598', soul: '#E23B55', void_: '#08080B', elec: '#4FC3F7' };
+  var FONT = '16px "Determination Mono","Pixelify Sans",monospace';
 
-  /* Blaster skull. '#' is bone, 'o' is socket. */
-  var SKULL = [
-    '..#####..',
-    '.#######.',
-    '#oo###oo#',
-    '#oo###oo#',
-    '#########',
-    '.#######.',
-    '..#####..',
-    '...#.#...'
+  /* Each phase: where it starts, the soul it wants, its line, and its
+     emitters [kind, every]. Emitters drift out of sync on purpose —
+     synchronised ones make corridors you can stand in forever. */
+  var PHASES = [
+    { at: 0,  mode: 'red',  line: '* twenty seconds. that\'s the whole ask.',
+      em: [['ring', 1.30], ['aimed', 0.95]] },
+    { at: 7,  mode: 'blue', line: '* your SOUL is blue now. stay on the ground.',
+      em: [['bone', 1.25], ['blaster', 2.2], ['elec', 2.6]] },
+    { at: 13, mode: 'red',  line: '* the last six. it is still aiming.',
+      em: [['spiral', 0.075], ['wall', 2.6], ['blaster', 3.1], ['aimed', 1.4]] }
   ];
-  function stamp(rows, cx, cy, s, on, off) {
-    if (dm.soul && dm.soul.stamp) {
-      dm.soul.stamp(ctx, rows, cx, cy, s, on, off);
-      return;
-    }
-    var h = rows.length, w = rows[0].length;
-    var x0 = (cx - w * s / 2) | 0, y0 = (cy - h * s / 2) | 0;
-    for (var r = 0; r < h; r++) for (var c = 0; c < w; c++) {
-      var ch = rows[r][c];
-      if (ch === '.') continue;
-      ctx.fillStyle = (ch === 'o') ? off : on;
-      ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
+
+  /* Undertale's blaster: 6 frames of 43x57, mouth down. 0 = charging,
+     1-3 = opening, 4/5 alternate while it fires. The electric one is a
+     blue-tinted copy made once the sheet loads, and keeps the bolt on
+     its brow so it reads without colour too. */
+  var GB_W = 43, GB_H = 57;
+  var gb = null, gbBlue = null;
+  function sheet() {
+    if (!gb) { gb = new Image(); gb.src = 'img/act4/undertale/gasterblaster.png'; }
+    if (!gbBlue && gb.complete && gb.naturalWidth) {
+      gbBlue = document.createElement('canvas');
+      gbBlue.width = gb.naturalWidth; gbBlue.height = gb.naturalHeight;
+      var g = gbBlue.getContext && gbBlue.getContext('2d');
+      if (g) {
+        g.drawImage(gb, 0, 0);
+        g.globalCompositeOperation = 'source-atop';
+        g.fillStyle = 'rgba(79,195,247,0.6)';
+        g.fillRect(0, 0, gbBlue.width, gbBlue.height);
+      }
     }
   }
-
-  /* Lightning glyph stamped on the electric blaster's brow, so the
-     blue one is distinguishable at a glance and not only by colour —
-     colour alone is the classic way to make a mechanic unreadable. */
   var BOLT = [
     '..##.',
     '.##..',
@@ -93,28 +88,20 @@
     '.#...'
   ];
 
-  var blasters = [];
+  var blasters = [], bones = [];
   var BL_CHARGE = 0.85, BL_FIRE = 0.42;
 
   /* ── the electric blaster ─────────────────────────────────────────
-     Its rule is INVERTED and that is the whole point: it hurts you if
-     you are moving and charges the console if you are not. Every other
-     thing in this room punishes standing still, so the correct play
-     here is the one the last twenty seconds trained out of you.
-
-     Charge survives between runs — asking someone to take both hits in
-     a single attempt would make a joke into a grind. */
-  var ELEC_EVERY = 4.4;
+     Its rule is INVERTED and that is the whole point: in the blue
+     section it hurts you in the air and charges the console if you are
+     on the ground. Charge survives between runs. */
   /* Read back from the save, so a full console is still full after a
      reload. A missing flag is undefined, and `| 0` makes that 0. */
   var charge = (NEU.save && NEU.save.flag('console_charge')) | 0, chargeFx = 0, emptyFx = 0;
   /* sans.js owns the console; this room only asks whether it is in
      your hands right now. */
   function carrying() { return !!(NEU.hasConsole && NEU.hasConsole()); }
-  /* Only a full charge is written, and only as it arrives. The blaster
-     stops accruing at 100, so this runs once, never per frame. Partial
-     charge is not saved: it is re-earned on the next visit, as it was
-     before this was saved at all. */
+  /* Only a full charge is written, and only as it arrives. */
   function keepCharge() {
     if (charge >= 100 && NEU.save) NEU.save.flag('console_charge', 100);
   }
@@ -130,15 +117,12 @@
 
   var running = false, won = false;
   var t = 0, hp = 3, inv = 0, last = 0;
-  var px = 0, py = 0, keys = {};
-  var bullets = [], emitters = [];
-  var AW = 0, AH = 0, AX = 0, AY = 0;     // arena rect, canvas space
+  var F = dm.fight(0, 0), keys = {};
+  var bullets = [], emitters = [], phase = 0, phaseAt = 0;
+  var AW = 0, AH = 0, AX = 0, AY = 0;     // box rect, canvas space
   var cheat = '';                          // the 69420 buffer
 
-  /* ── layout ───────────────────────────────────────────────────────
-     Fixed backing store at devicePixelRatio, arena derived from it.
-     Recomputed on resize because a mid-run resize otherwise leaves the
-     player outside the box. */
+  /* ── layout ─────────────────────────────────────────────────────── */
   function layout() {
     var dpr = Math.min(devicePixelRatio || 1, 2);
     var w = innerWidth, h = innerHeight;
@@ -146,52 +130,49 @@
     cv.style.width = w + 'px'; cv.style.height = h + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
-
-    var ar = dm.arena ? dm.arena(w, h, 760, 520, 22) : null;
-    if (ar) {
-      AW = ar.AW; AH = ar.AH; AX = ar.AX; AY = ar.AY;
-    } else {
-      AW = Math.min(760, w - 48);
-      AH = Math.min(520, h - 190);
-      AX = ((w - AW) / 2) | 0;
-      AY = ((h - AH) / 2 + 22) | 0;
-    }
-    px = Math.min(Math.max(px, AX + 12), AX + AW - 12);
-    py = Math.min(Math.max(py, AY + 12), AY + AH - 12);
+    var ar = dm.arena(w, h, 640, 360, 22);
+    AW = ar.AW; AH = ar.AH; AX = ar.AX; AY = ar.AY;
+    F.x = Math.min(Math.max(F.x, AX + 12), AX + AW - 12);
+    F.y = Math.min(Math.max(F.y, AY + 12), AY + AH - 12);
   }
   addEventListener('resize', function () { if (running) layout(); });
 
-  /* ── emitters ─────────────────────────────────────────────────────
-     Each has its own cadence and a phase, so they drift out of sync
-     rather than all firing on the same beat — synchronised emitters
-     produce corridors you can stand in forever. */
-  function resetEmitters() {
-    emitters = [
-      { kind: 'ring',   every: 1.30, next: 0.8, ang: 0 },
-      { kind: 'aimed',  every: 0.95, next: 1.6, ang: 0 },
-      { kind: 'spiral', every: 0.075, next: 5.0, ang: 0 },
-      { kind: 'wall',   every: 2.60, next: 10.0, ang: 0 },
-      { kind: 'blaster',every: 3.10, next: 7.5,  ang: 0 },
-      { kind: 'elec',   every: ELEC_EVERY, next: 4.2, ang: 0 }
-    ];
-    blasters = [];
-  }
+  function add(x, y, vx, vy, r, c) { dm.shot(bullets, x, y, vx, vy, r, c, 0, MAX_B); }
 
-  function add(x, y, vx, vy, r, c) {
-    if (dm.shot) {
-      dm.shot(bullets, x, y, vx, vy, r, c, 0, MAX_B);
-    } else {
-      if (bullets.length >= MAX_B) return;
-      bullets.push({ x: x, y: y, vx: vx, vy: vy, r: r, c: c });
-    }
-  }
-
-  /* Difficulty ramp: 0 at the start, 1 at the end. Everything scales
-     off this one number so the curve stays legible and tunable. */
-  /* Story mode caps at 1.0 because the run ends there. Endless keeps
-     going — the curve is the content once there is no finish line. */
+  /* Difficulty: 0 at the start, 1 at the end. Endless keeps climbing —
+     the curve is the content once there is no finish line. */
   function ramp() {
     return endless ? Math.min(2.4, t / SURVIVE) : Math.min(1, t / SURVIVE);
+  }
+
+  /* Endless loops the three phases every twenty seconds. */
+  function phaseFor() {
+    var lt = endless ? t % SURVIVE : t, p = 0;
+    for (var i = 0; i < PHASES.length; i++) if (lt >= PHASES[i].at) p = i;
+    return p + 1;
+  }
+  function enterPhase(n) {
+    var P = PHASES[n - 1];
+    phase = n; phaseAt = t;
+    dm.soulMode(F, P.mode);
+    emitters = [];
+    for (var i = 0; i < P.em.length; i++)
+      emitters.push({ kind: P.em[i][0], every: P.em[i][1], next: t + TELE + i * 0.3, ang: 0 });
+  }
+
+  /* A blaster lines up on an edge, offset from where you are RIGHT NOW,
+     so standing still is punished but the charge leaves time to move. */
+  function blaster(elec, horiz, spread) {
+    var bl = { horiz: horiz, t: 0, elec: elec, took: false };
+    var off = (Math.random() - 0.5) * spread;
+    if (horiz) {
+      bl.lane = Math.min(Math.max(F.y + off, AY + 34), AY + AH - 34);
+      bl.from = Math.random() < 0.5 ? 'l' : 'r';
+    } else {
+      bl.lane = Math.min(Math.max(F.x + off, AX + 34), AX + AW - 34);
+      bl.from = (F.mode === 'blue' || Math.random() < 0.5) ? 't' : 'b';
+    }
+    blasters.push(bl);
   }
 
   function fire(e) {
@@ -208,22 +189,20 @@
             Math.cos(a) * sp, Math.sin(a) * sp, 4, COL.lilac);
       }
     } else if (e.kind === 'aimed') {
-      /* Fired from a random edge point, spread around the player's
-         current position. Aimed shots are what stop you parking in a
-         corner; rings alone are dodgeable by standing still. */
+      /* From a random edge point, spread around you: what stops you
+         parking in a corner. */
       var side = (Math.random() * 4) | 0, sx, sy;
       if (side === 0) { sx = AX + Math.random() * AW; sy = AY - 16; }
       else if (side === 1) { sx = AX + AW + 16; sy = AY + Math.random() * AH; }
       else if (side === 2) { sx = AX + Math.random() * AW; sy = AY + AH + 16; }
       else { sx = AX - 16; sy = AY + Math.random() * AH; }
-      var base = Math.atan2(py - sy, px - sx);
+      var base = Math.atan2(F.y - sy, F.x - sx);
       var cnt = 3 + Math.round(k * 3), spd = 128 + k * 92;
       for (var j = 0; j < cnt; j++) {
-        var off = (j - (cnt - 1) / 2) * 0.17;
-        add(sx, sy, Math.cos(base + off) * spd, Math.sin(base + off) * spd, 4, COL.bone);
+        var o = (j - (cnt - 1) / 2) * 0.17;
+        add(sx, sy, Math.cos(base + o) * spd, Math.sin(base + o) * spd, 4, COL.bone);
       }
     } else if (e.kind === 'spiral') {
-      if (t < 5) return;
       e.ang += 0.42;
       var arms = 2 + Math.round(k * 2), s2 = 96 + k * 44;
       for (var m = 0; m < arms; m++) {
@@ -231,40 +210,18 @@
         add(cx, cy, Math.cos(a2) * s2, Math.sin(a2) * s2, 3, COL.blood);
       }
     } else if (e.kind === 'blaster') {
-      if (t < 7) return;
-      /* Axis-aligned, the way sans' own are: they line up on an edge
-         and fire straight across. It also keeps the beam an
-         axis-aligned rectangle, which makes the collision honest and
-         the pixels square.
-
-         The lane is offset from where you are RIGHT NOW rather than
-         aimed exactly, so standing still is punished but the shot is
-         still dodgeable during the charge — which is the entire job
-         of the charge. */
-      var horiz = Math.random() < 0.5, bl = { horiz: horiz, t: 0 };
-      if (horiz) {
-        bl.lane = Math.min(Math.max(py + (Math.random() - 0.5) * 110, AY + 34), AY + AH - 34);
-        bl.from = Math.random() < 0.5 ? 'l' : 'r';
-      } else {
-        bl.lane = Math.min(Math.max(px + (Math.random() - 0.5) * 110, AX + 34), AX + AW - 34);
-        bl.from = Math.random() < 0.5 ? 't' : 'b';
-      }
-      blasters.push(bl);
+      /* Blue: only from above, so the floor stays yours. */
+      blaster(false, F.mode !== 'blue' && Math.random() < 0.5, 110);
     } else if (e.kind === 'elec') {
       if (charge >= 100) return;          // nothing left to charge
-      var eh = Math.random() < 0.5, be = { horiz: eh, t: 0, elec: true, took: false };
-      if (eh) {
-        be.lane = Math.min(Math.max(py + (Math.random() - 0.5) * 80, AY + 34), AY + AH - 34);
-        be.from = Math.random() < 0.5 ? 'l' : 'r';
-      } else {
-        be.lane = Math.min(Math.max(px + (Math.random() - 0.5) * 80, AX + 34), AX + AW - 34);
-        be.from = Math.random() < 0.5 ? 't' : 'b';
-      }
-      blasters.push(be);
+      blaster(true, false, 80);
+    } else if (e.kind === 'bone') {
+      /* Undertale's blue-soul bone: slides along the floor, jump it. */
+      var left = (e.ang = 1 - e.ang) === 1;
+      bones.push({ x: left ? AX - 8 : AX + AW + 8, vx: (left ? 1 : -1) * (150 + k * 60),
+                   h: 18 + ((Math.random() * 12) | 0) });
     } else if (e.kind === 'wall') {
-      if (t < 10) return;
-      /* A line with one gap. The gap is the entire point — a wall with
-         no gap is not a pattern, it is a cutscene. */
+      /* A line with one gap. A wall with no gap is a cutscene. */
       var vertical = Math.random() < 0.5;
       var gap = 0.18 + Math.random() * 0.5;
       var cells = 16, sp3 = 104 + k * 46;
@@ -282,6 +239,19 @@
     }
   }
 
+  /* One hit, from anything. Dash i-frames count. Returns true on death. */
+  function hitPlayer(dx, dy) {
+    if (inv > 0 || F.dashI > 0) return false;
+    hp--; inv = dm.IFRAMES || 1.15;
+    dm.hurt(F, F.x, F.y - 12);
+    /* MEDIUM: felt, but never enough to make the pattern unreadable on
+       the frame you most need to read it. Leans the way the hit went. */
+    if (NEU.juice) { NEU.juice.hit('medium', { dx: dx, dy: dy }); NEU.juice.burst(F.x, F.y, 10, COL.soul); }
+    if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
+    if (hp <= 0) { startDeath(); return true; }
+    return false;
+  }
+
   /* ── loop ─────────────────────────────────────────────────────────*/
   /* frame time of the last heartbeat (sfx.heart). begin() puts it back to
      -Infinity, so a new run's first beat is not held up by the last one. */
@@ -290,109 +260,72 @@
     if (!running) return;
     requestAnimationFrame(step);
 
-    var dt = Math.min(0.033, (now - last) / 1000); last = now;
+    var dt = Math.max(0, Math.min(0.033, (now - last) / 1000)); last = now;
     if (NEU.juice && NEU.juice.frozen()) { draw(); return; }
     t += dt;
+    if (phaseFor() !== phase) enterPhase(phaseFor());
 
-    /* move */
-    var vx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    var vy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
-    if (vx && vy) { vx *= 0.7071; vy *= 0.7071; }      // no free diagonal speed
-    var sp = keys.focus ? FOCUS_SPEED : SPEED;
-    px += vx * sp * dt; py += vy * sp * dt;
-    px = Math.min(Math.max(px, AX + 7), AX + AW - 7);
-    py = Math.min(Math.max(py, AY + 7), AY + AH - 7);
+    dm.move(F, keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH });
+    dm.tick(F, dt, null);
+    var bdt = dt * dm.slow(F);           // adrenaline's first beat slows the room
 
-    /* fire */
     for (var i = 0; i < emitters.length; i++) {
       var e = emitters[i];
       if (t >= e.next) { e.next = t + e.every; fire(e); }
     }
 
-    /* advance + cull + collide */
     if (inv > 0) inv -= dt;
-    var keep = [];
-    for (var b, n = 0; n < bullets.length; n++) {
-      b = bullets[n];
-      b.x += b.vx * dt; b.y += b.vy * dt;
-      if (b.x < AX - 60 || b.x > AX + AW + 60 || b.y < AY - 60 || b.y > AY + AH + 60) continue;
-      keep.push(b);
-      if (inv <= 0) {
-        var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
-        if (dx * dx + dy * dy < rr * rr) {
-          hp--; inv = dm.IFRAMES || 1.15; hpLine();
-          /* MEDIUM: felt, but never enough to make the pattern
-             unreadable on the frame you most need to read it. The shake
-             leans the way the bullet was travelling (juice.js bias). */
-          if (NEU.juice) { NEU.juice.hit('medium', { dx: b.vx, dy: b.vy }); NEU.juice.burst(px, py, 10, COL.soul); }
-          if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
-          if (hp <= 0) { startDeath(); return; }
-        }
-      }
-    }
-    bullets = keep;
+    bullets = dm.step(bullets, bdt, { AX: AX, AY: AY, AW: AW, AH: AH });
+    var b = dm.hits(bullets, F.x, F.y, PLAYER_R);
+    if (b && hitPlayer(b.vx, b.vy)) return;
 
-    /* blasters */
+    var floor = AY + AH, kbo = [];
+    for (var n = 0; n < bones.length; n++) {
+      var bo = bones[n];
+      bo.x += bo.vx * bdt;
+      if (bo.x < AX - 20 || bo.x > AX + AW + 20) continue;
+      kbo.push(bo);
+      if (Math.abs(F.x - bo.x) < 4 + PLAYER_R && F.y + PLAYER_R > floor - bo.h &&
+          hitPlayer(bo.vx, 0)) return;
+    }
+    bones = kbo;
+
     var kb = [];
     for (var q = 0; q < blasters.length; q++) {
       var bl = blasters[q];
-      bl.t += dt;
+      bl.t += bdt;
       if (bl.t > BL_CHARGE + BL_FIRE) continue;
       kb.push(bl);
-      if (bl.t > BL_CHARGE) {
-        var off = bl.horiz ? Math.abs(py - bl.lane) : Math.abs(px - bl.lane);
-        var inBeam = off < BL_HALF + PLAYER_R;
-
-        if (bl.elec) {
-          /* Standing still is safe AND is what charges it. `held` is
-             true only while no movement key is down — checking speed
-             would let you cheese it by tapping between frames.
-
-             It only charges something you actually brought in with
-             you. Filling a battery you had never picked up made the
-             console decorative; now the beam has to have a target. */
-          var held = !(keys.left || keys.right || keys.up || keys.down);
-          if (inBeam && !bl.took) {
-            if (held && carrying()) {
-              bl.took = true;
-              charge = Math.min(100, charge + 50);
-              keepCharge();
-              chargeFx = performance.now();
-              if (NEU.juice) { NEU.juice.hit('large', { colour: '#4FC3F7' });
-                               NEU.juice.burst(px, py, 26, '#4FC3F7', 190); }
-              if (NEU.quest) NEU.quest.bump('charge', charge / 50);
-              if (NEU.tvState) NEU.tvState();
-            } else if (held) {
-              /* Safe, but nothing happens. Said out loud, because
-                 "stood still and got no charge" is otherwise
-                 indistinguishable from a bug. */
-              bl.took = true;
-              emptyFx = performance.now();
-            } else if (inv <= 0) {
-              bl.took = true;
-              hp--; inv = dm.IFRAMES || 1.15; hpLine();
-              /* MEDIUM: felt, but never enough to make the pattern
-                 unreadable on the frame you most need to read it. */
-              if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
-              if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
-              if (hp <= 0) { startDeath(); return; }
-            }
-          }
-        } else if (inv <= 0 && inBeam) {
-          hp--; inv = dm.IFRAMES || 1.15; hpLine();
-          /* MEDIUM: felt, but never enough to make the pattern
-             unreadable on the frame you most need to read it. */
-          if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
-          if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
-          if (hp <= 0) { startDeath(); return; }
-        }
+      if (bl.t <= BL_CHARGE) continue;
+      var off = bl.horiz ? Math.abs(F.y - bl.lane) : Math.abs(F.x - bl.lane);
+      if (off >= BL_HALF + PLAYER_R) continue;
+      if (!bl.elec) { if (hitPlayer(0, 0)) return; continue; }
+      if (bl.took) continue;
+      /* On the ground is safe AND is what charges it — but only what
+         you actually brought in with you. */
+      var held = F.ground;
+      if (held && carrying()) {
+        bl.took = true;
+        charge = Math.min(100, charge + 50);
+        keepCharge();
+        chargeFx = performance.now();
+        if (NEU.juice) { NEU.juice.hit('large', { colour: '#4FC3F7' });
+                         NEU.juice.burst(F.x, F.y, 26, COL.elec, 190); }
+        if (NEU.quest) NEU.quest.bump('charge', charge / 50);
+        if (NEU.tvState) NEU.tvState();
+      } else if (held) {
+        /* Safe, but nothing happens. Said out loud, because "stood on
+           the ground and got no charge" otherwise reads as a bug. */
+        bl.took = true;
+        emptyFx = performance.now();
+      } else if (inv <= 0 && F.dashI <= 0) {
+        bl.took = true;
+        if (hitPlayer(0, 0)) return;
       }
     }
     blasters = kb;
 
-    /* One hit from death, the soul beats about once a second of frame
-       time. Not at three HP or two. A death frame returns from startDeath
-       above, so it never reaches this line. */
+    /* One hit from death, the soul beats about once a second. */
     if (hp === 1 && t - beatAt >= 0.9) {
       beatAt = t;
       if (NEU.sfx && NEU.sfx.heart) NEU.sfx.heart();
@@ -401,157 +334,163 @@
     draw();
   }
 
+  /* ── drawing ──────────────────────────────────────────────────────*/
+  function box() {
+    ctx.fillStyle = 'rgba(8,8,11,0.92)';
+    ctx.fillRect(0, 0, innerWidth, innerHeight);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(AX - BORDER, AY - BORDER, AW + BORDER * 2, AH + BORDER * 2);
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(AX, AY, AW, AH);
+  }
+
+  /* What you brought in with you: a small handheld with its battery,
+     above the box's top-left corner where it cannot read as a bullet.
+     Drawn even at 0% — an empty battery is information. */
   function drawCarried() {
+    ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+    var x = AX, y = AY - BORDER - 34;
     if (!carrying()) {
       if (emptyFx && performance.now() - emptyFx < 2200) {
         ctx.fillStyle = COL.dim;
-        ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('nothing on you to charge', innerWidth / 2, AY + AH + 12);
-        ctx.textAlign = 'left';
+        ctx.fillText('nothing on you to charge', x, y + 6);
       }
       return;
     }
     var w = 74, h = 26;
-    var x = ((innerWidth - w) / 2) | 0, y = AY + AH + 10;
-
-    /* the handheld: body, screen, two grips */
     ctx.fillStyle = '#1B1B24'; ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = '#4FC3F7'; ctx.fillRect(x, y, w, 2);
+    ctx.fillStyle = COL.elec; ctx.fillRect(x, y, w, 2);
     ctx.fillStyle = '#0B0B10'; ctx.fillRect(x + 12, y + 5, w - 24, h - 10);
     ctx.fillStyle = '#2A2A38';
     ctx.fillRect(x + 2, y + 4, 8, h - 8);
     ctx.fillRect(x + w - 10, y + 4, 8, h - 8);
-
-    /* the battery inside the screen. Red under 50 because the dock
-       wants 100 and half is a fail state, not a warning. */
-    var iw = w - 28, ih = h - 14;
-    var ix = x + 14, iy = y + 7;
+    /* Red under 50: the dock wants 100 and half is a fail state. */
+    var iw = w - 28, ih = h - 14, ix = x + 14, iy = y + 7;
     ctx.fillStyle = '#22222E'; ctx.fillRect(ix, iy, iw, ih);
-    ctx.fillStyle = charge >= 100 ? '#7BE38A' : (charge >= 50 ? '#4FC3F7' : '#C2405F');
+    ctx.fillStyle = charge >= 100 ? '#7BE38A' : (charge >= 50 ? COL.elec : COL.blood);
     ctx.fillRect(ix, iy, (iw * charge / 100) | 0, ih);
-
     ctx.fillStyle = COL.bone;
-    ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(charge + '%', innerWidth / 2, y + h + 4);
-    if (charge < 100) {
-      ctx.fillStyle = COL.dim;
-      ctx.fillText('hold still in the blue one', innerWidth / 2, y + h + 24);
-    }
-    ctx.textAlign = 'left';
+    ctx.fillText(charge + '%' + (charge < 100 ? '  stay on the ground in the blue one' : ''),
+                 x + w + 8, y + 5, Math.max(40, AW - w - 8));
   }
 
+  function drawBlaster(bl) {
+    sheet();
+    var s = AY > 150 ? 2 : 1;
+    var reach = (GB_H * s / 2) | 0;
+    var charging = bl.t < BL_CHARGE;
+    /* slides in during the charge; held still under reduced motion */
+    var slide = charging && !(NEU.settings && NEU.settings.reduced) ? ((1 - bl.t / BL_CHARGE) * 24) | 0 : 0;
+    var x, y, rot;
+    if (bl.horiz) {
+      x = bl.from === 'l' ? AX - BORDER - reach - slide : AX + AW + BORDER + reach + slide;
+      y = bl.lane | 0; rot = bl.from === 'l' ? -Math.PI / 2 : Math.PI / 2;
+    } else {
+      x = bl.lane | 0; rot = bl.from === 't' ? 0 : Math.PI;
+      y = bl.from === 't' ? AY - BORDER - reach - slide : AY + AH + BORDER + reach + slide;
+    }
+    var ec = bl.elec ? COL.elec : '#FFFFFF';
+
+    if (charging) {
+      /* the telegraph line: an untelegraphed beam is unreadable */
+      ctx.fillStyle = bl.elec ? 'rgba(79,195,247,0.35)' : 'rgba(237,231,222,0.25)';
+      if (bl.horiz) ctx.fillRect(AX, (bl.lane - 1) | 0, AW, 2);
+      else          ctx.fillRect((bl.lane - 1) | 0, AY, 2, AH);
+    } else {
+      var f = 1 - (bl.t - BL_CHARGE) / BL_FIRE;      // beam narrows as it dies
+      var hh = (BL_HALF * f) | 0, core = Math.max(2, (hh / 1.5) | 0);
+      ctx.fillStyle = ec;
+      if (bl.horiz) ctx.fillRect(Math.min(x, AX), (bl.lane - hh) | 0, Math.max(x, AX + AW) - Math.min(x, AX), hh * 2);
+      else          ctx.fillRect((bl.lane - hh) | 0, Math.min(y, AY), hh * 2, Math.max(y, AY + AH) - Math.min(y, AY));
+      ctx.fillStyle = bl.elec ? '#CFF3FF' : '#FFFFFF';
+      if (bl.horiz) ctx.fillRect(AX, (bl.lane - core / 2) | 0, AW, core);
+      else          ctx.fillRect((bl.lane - core / 2) | 0, AY, core, AH);
+    }
+
+    var img = bl.elec ? gbBlue : gb;
+    if (img && (img.width || img.naturalWidth)) {
+      var ft = bl.t - BL_CHARGE;
+      var fr = charging ? 0 : ft < 0.12 ? 1 + ((ft / 0.04) | 0) : 4 + (((ft / 0.06) | 0) % 2);
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(rot);
+      ctx.drawImage(img, fr * GB_W, 0, GB_W, GB_H, (-GB_W * s / 2) | 0, -reach, GB_W * s, GB_H * s);
+      ctx.restore();
+    }
+    if (bl.elec) dm.soul.stamp(ctx, BOLT, x, y, 3, '#FFF06A');
+  }
 
   function draw() {
     var w = innerWidth, h = innerHeight;
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
-    ctx.fillStyle = 'rgba(8,8,11,0.92)';
-    ctx.fillRect(0, 0, w, h);
+    box();
 
-    /* arena */
-    ctx.fillStyle = COL.void_;
-    ctx.fillRect(AX, AY, AW, AH);
-    ctx.fillStyle = COL.bone;
-    ctx.fillRect(AX - 3, AY - 3, AW + 6, 3);
-    ctx.fillRect(AX - 3, AY + AH, AW + 6, 3);
-    ctx.fillRect(AX - 3, AY, 3, AH);
-    ctx.fillRect(AX + AW, AY, 3, AH);
+    var floor = AY + AH;
+    ctx.save();                          // bones and bullets stay inside the box
+    ctx.beginPath(); ctx.rect(AX, AY, AW, AH); ctx.clip();
+    ctx.fillStyle = '#FFFFFF';
+    for (var n = 0; n < bones.length; n++) {
+      var bo = bones[n], bx = bo.x | 0;
+      ctx.fillRect(bx - 3, floor - bo.h, 6, bo.h);
+      ctx.fillRect(bx - 5, floor - bo.h, 10, 4);
+    }
 
-    /* bullets — squares on integer coords, like everything else here */
+    /* bullets — squares on integer coords over a soft glow */
     for (var i = 0; i < bullets.length; i++) {
       var b = bullets[i], s = (b.r * 2) | 0;
+      dm.glow(ctx, b.x, b.y, b.r * 3, b.c, 0.35);
       ctx.fillStyle = b.c;
       ctx.fillRect((b.x - b.r) | 0, (b.y - b.r) | 0, s, s);
     }
+    ctx.restore();
 
-    /* blasters: a warning line while charging, a beam while firing.
-       The telegraph is not politeness — an untelegraphed instant beam
-       is unreadable and the death feels arbitrary. */
-    for (var q = 0; q < blasters.length; q++) {
-      var bl = blasters[q];
-      var charging = bl.t < BL_CHARGE;
-      var k = charging ? bl.t / BL_CHARGE : 1;
-      var sx2, sy2;
-      if (bl.horiz) { sx2 = bl.from === 'l' ? AX - 26 : AX + AW + 26; sy2 = bl.lane; }
-      else          { sx2 = bl.lane; sy2 = bl.from === 't' ? AY - 26 : AY + AH + 26; }
+    for (var q = 0; q < blasters.length; q++) drawBlaster(blasters[q]);
 
-      var ec = bl.elec ? '#4FC3F7' : COL.bone;
-      if (charging) {
-        if (((bl.t * 20) | 0) % 2 === 0) {
-          ctx.fillStyle = bl.elec ? 'rgba(79,195,247,0.30)' : 'rgba(237,231,222,0.22)';
-          if (bl.horiz) ctx.fillRect(AX, (bl.lane - 1) | 0, AW, 2);
-          else          ctx.fillRect((bl.lane - 1) | 0, AY, 2, AH);
-        }
-        stamp(SKULL, sx2, sy2, 2 + (k * 2) | 0, ec, COL.void_);
-        if (bl.elec) stamp(BOLT, sx2, sy2 - 20, 3, '#FFF06A', COL.void_);
-      } else {
-        var f = 1 - (bl.t - BL_CHARGE) / BL_FIRE;      // beam narrows as it dies
-        var hh = (BL_HALF * f) | 0;
-        ctx.fillStyle = ec;
-        if (bl.horiz) ctx.fillRect(AX, (bl.lane - hh) | 0, AW, hh * 2);
-        else          ctx.fillRect((bl.lane - hh) | 0, AY, hh * 2, AH);
-        ctx.fillStyle = bl.elec ? '#CFF3FF' : '#FFFFFF';
-        if (bl.horiz) ctx.fillRect(AX, (bl.lane - hh / 3) | 0, AW, Math.max(2, (hh / 1.5) | 0));
-        else          ctx.fillRect((bl.lane - hh / 3) | 0, AY, Math.max(2, (hh / 1.5) | 0), AH);
-        stamp(SKULL, sx2, sy2, 4, ec, COL.void_);
-        if (bl.elec) stamp(BOLT, sx2, sy2 - 26, 3, '#FFF06A', COL.void_);
-      }
-    }
-
-    /* the soul. flashes while invulnerable so the state is visible. */
-    if (dm.soul && dm.soul.draw) dm.soul.draw(ctx, px, py, inv, COL.soul);
+    dm.drawFX(ctx, F, inv);
     /* focus reveals the true hitbox — the whole reason focus exists */
     if (keys.focus) {
       ctx.fillStyle = COL.bone;
-      ctx.fillRect((px - PLAYER_R) | 0, (py - PLAYER_R) | 0, 3, 3);
+      ctx.fillRect((F.x - 1) | 0, (F.y - 1) | 0, 3, 3);
     }
 
-    /* hud: time bar + hp */
-    var bw = AW, bx = AX, by = AY - 22;
-    ctx.fillStyle = '#22222E'; ctx.fillRect(bx, by, bw, 6);
-    /* In endless the bar shows the difficulty ramp instead of progress
-       toward a finish that does not exist. */
-    ctx.fillStyle = endless ? '#C2405F' : COL.lilac;
-    ctx.fillRect(bx, by, (bw * Math.min(1, (endless ? ramp() / 2.4 : t / SURVIVE))) | 0, 6);
-    ctx.fillStyle = COL.bone;
-    ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
-    ctx.textBaseline = 'top';
-    ctx.fillText('HP ' + Math.max(0, hp) + '/3', AX, AY + AH + 12);
-    ctx.fillText(endless ? t.toFixed(1) + 's'
-                         : Math.max(0, SURVIVE - t).toFixed(1) + 's',
-                 AX + AW - 44, AY + AH + 12);
-    drawCarried();
+    /* the phase's line, Undertale-style, inside the box */
+    if (phase && t - phaseAt < TELE + 0.6) {
+      ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(PHASES[phase - 1].line, AX + 16, AY + 16, AW - 32);
+    }
+
     if (NEU.juice) { NEU.juice.drawParts(ctx, 1 / 60);
                      NEU.juice.end(ctx, shook);
                      NEU.juice.overlay(ctx, w, h); }
 
-    /* ── what you brought in with you ───────────────────────────────
-       The chip tray is a page element and this room covers the whole
-       page, so the console had no way to be visible in the one place
-       it exists to be used. It gets drawn into the arena hud instead:
-       a small handheld with a battery in it, bottom-centre, under the
-       arena floor where it cannot be confused for a bullet.
+    /* The clock is the boss: its bar is the time left. Endless has no
+       finish, so the bar drains with the difficulty and the name is
+       the clock counting up. */
+    dm.hud(ctx, F, { w: w, h: h, AY: AY, AH: AH,
+                     name: endless ? t.toFixed(1) + 's, endless' : 'twenty seconds',
+                     hp: endless ? 1 - ramp() / 2.4 : SURVIVE - t,
+                     max: endless ? 1 : SURVIVE,
+                     ticks: endless ? null : [1 - 7 / SURVIVE, 1 - 13 / SURVIVE],
+                     php: hp, pmax: 3, phase: phase, rage: 0, rageOn: false });
+    drawCarried();
 
-       Drawn even at 0% — an empty battery is information. Absent
-       entirely reads as "this room doesn't do that". */
     /* the charge cutscene: centre screen, unmissable, ~1.6s */
     if (chargeFx && performance.now() - chargeFx < 1600) {
       var e2 = (performance.now() - chargeFx) / 1600;
       var bw2 = 210, bh2 = 96;
-      var bx2 = ((innerWidth - bw2) / 2) | 0, by2 = ((innerHeight - bh2) / 2) | 0;
+      var bx2 = ((w - bw2) / 2) | 0, by2 = ((h - bh2) / 2) | 0;
       ctx.globalAlpha = e2 > 0.8 ? (1 - e2) / 0.2 : 1;
       ctx.fillStyle = COL.void_;  ctx.fillRect(bx2 - 10, by2 - 10, bw2 + 20, bh2 + 46);
-      ctx.fillStyle = '#4FC3F7';
+      ctx.fillStyle = COL.elec;
       ctx.fillRect(bx2 - 10, by2 - 10, bw2 + 20, 3);
       ctx.fillRect(bx2 - 10, by2 + bh2 + 33, bw2 + 20, 3);
       ctx.fillStyle = '#22222E'; ctx.fillRect(bx2, by2, bw2, bh2);
-      ctx.fillStyle = '#4FC3F7';
+      ctx.fillStyle = COL.elec;
       ctx.fillRect(bx2 + 6, by2 + 6, ((bw2 - 12) * (charge / 100) * Math.min(1, e2 * 3)) | 0, bh2 - 12);
       ctx.fillStyle = COL.bone;
-      ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
+      ctx.font = FONT; ctx.textBaseline = 'top';
       ctx.textAlign = 'center';
-      ctx.fillText('CHARGING  ' + charge + '%', innerWidth / 2, by2 + bh2 + 12);
+      ctx.fillText('CHARGING  ' + charge + '%', w / 2, by2 + bh2 + 12);
       ctx.textAlign = 'left';
       ctx.globalAlpha = 1;
     }
@@ -560,47 +499,30 @@
   /* ── start / finish ───────────────────────────────────────────────*/
   function begin() {
     dying = 0;                           /* a pending death animation is cancelled by restarting */
-    layout();
     t = 0; hp = 3; inv = 0; won = false; cheat = '';
     beatAt = -Infinity;
-    bullets = []; resetEmitters();
-    px = AX + AW / 2; py = AY + AH - 60;
+    F = dm.fight(0, 0);
+    layout();
+    F.x = AX + AW / 2; F.y = AY + AH - 60;
+    bullets = []; blasters = []; bones = [];
+    enterPhase(1);
     keys = {};
+    sheet();
     running = true; last = performance.now();
     if (msg) msg.hidden = true;
-    hpLine();
+    draw();
     requestAnimationFrame(step);
   }
 
-  /* Called right after each hit takes its point. The spoken line is set
-     from the same hp the canvas paints, so the two cannot disagree. A
-     death is announced by startDeath() on top of this, so the last line
-     a player hears after the final hit is the death line. */
-  function hpLine() { announce('HP ' + Math.max(0, hp) + '/3'); }
-
   /* ── death ────────────────────────────────────────────────────────
-     Undertale holds the cracked soul for a beat before it goes, and
-     that beat is the whole animation. Shatter it on the frame of the
-     hit and it reads as a rendering glitch; hold it for ~400ms with a
-     split down the middle and it reads as a death. */
+     Undertale holds the cracked soul for a beat before it goes. */
   function startDeath() {
     running = false;                 // stops the main loop's next frame
     announce('ouch. the soul broke.');
     dying = performance.now();
-    if (dm.resetDeath) dm.resetDeath();
+    dm.resetDeath();
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     requestAnimationFrame(deathStep);
-  }
-
-  function arena() {
-    ctx.fillStyle = 'rgba(8,8,11,0.92)';
-    ctx.fillRect(0, 0, innerWidth, innerHeight);
-    ctx.fillStyle = COL.void_; ctx.fillRect(AX, AY, AW, AH);
-    ctx.fillStyle = COL.bone;
-    ctx.fillRect(AX - 3, AY - 3, AW + 6, 3);
-    ctx.fillRect(AX - 3, AY + AH, AW + 6, 3);
-    ctx.fillRect(AX - 3, AY, 3, AH);
-    ctx.fillRect(AX + AW, AY, 3, AH);
   }
 
   function deathStep(now) {
@@ -608,10 +530,8 @@
        finish() — it would kill the fresh run behind it. */
     if (!dying || wrap.hidden) return;
     var ms = now - dying;
-    arena();
-
-    var playing = dm.death ? dm.death(ctx, px, py, ms, COL.soul) : (ms <= 1700);
-    if (!playing) { dying = 0; finish(false, true); return; }
+    box();
+    if (!dm.death(ctx, F.x, F.y, ms, F.mode === 'blue' ? '#3C6BFF' : COL.soul)) { dying = 0; finish(false, true); return; }
     requestAnimationFrame(deathStep);
   }
 
@@ -620,9 +540,7 @@
     if (!quiet) draw();
 
     if (endless) {
-      /* No win state out here, so the only number that matters is how
-         long you lasted. Recorded before the message so the message
-         can say whether it was a record. */
+      /* No win out here: the number is how long you lasted. */
       var secs = Math.round(t * 10) / 10;
       var prev = NEU.save ? NEU.save.best('twenty') : 0;
       var pb = secs > prev;
@@ -652,16 +570,6 @@
   }
 
   /* ── input ────────────────────────────────────────────────────────*/
-  function keyName(e) {
-    var k = e.key;
-    if (k === 'ArrowLeft'  || k === 'a' || k === 'A') return 'left';
-    if (k === 'ArrowRight' || k === 'd' || k === 'D') return 'right';
-    if (k === 'ArrowUp'    || k === 'w' || k === 'W') return 'up';
-    if (k === 'ArrowDown'  || k === 's' || k === 'S') return 'down';
-    if (k === 'Shift') return 'focus';
-    return null;
-  }
-
   addEventListener('keydown', function (e) {
     if (wrap.hidden || NEU.activeMinigame !== 'bullet') return;
     if (e.key === 'Escape') {
@@ -679,7 +587,8 @@
       begin(); return;
     }
 
-    var n = keyName(e);
+    if (running && dm.key(F, e)) { e.preventDefault(); return; }
+    var n = dm.keyName(e);
     if (n) { keys[n] = true; e.preventDefault(); }
 
     /* the code. buffered rather than matched per-key so it survives
@@ -691,19 +600,14 @@
   });
   addEventListener('keyup', function (e) {
     if (wrap.hidden) return;
-    var n = keyName(e);
+    var n = dm.keyName(e);
     if (n) keys[n] = false;
   });
 
   /* ── endless ──────────────────────────────────────────────────────
-     The story run is twenty seconds because twenty seconds is the ask.
-     Launched from the console's library it has no cap: the ramp keeps
-     climbing past 1.0, there is no win state, and the score is how
-     long you lasted. A library whose games end after twenty seconds
-     is not a library.
-
-     Same module, one flag. Forking it would mean two copies of every
-     emitter and the electric blaster's inverted rule. */
+     Launched from the console's library it has no cap: the phases loop,
+     the ramp keeps climbing past 1.0, there is no win state, and the
+     score is how long you lasted. Same module, one flag. */
   var endless = false;
   function open(opts) {
     if (running) return;                 /* already mid-run — never stack a second loop */
@@ -719,9 +623,7 @@
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
-    /* You came in here to charge the console; tell the dock about it
-       on the way out rather than making the label wait for the next
-       scroll to notice. */
+    /* You came in here to charge the console; tell the dock on the way out. */
     if (NEU.tvState) NEU.tvState();
     NEU.activeMinigame = null;
   }
@@ -739,5 +641,6 @@
   });
 
   NEU.bullet = { open: open, close: close, get endless() { return endless; }, get running() { return running; },
-                 get won() { return won; } };
+                 get won() { return won; }, get phase() { return phase; }, get soul() { return F; },
+                 set t(v) { t = +v || 0; } };   /* dev/screenshots: jump the clock */
 })();
