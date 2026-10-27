@@ -1,32 +1,23 @@
 /* boss-scal.js — Supreme Witch, Calamitas.
    ───────────────────────────────────────────────────────────────────
-   The thing that was making the noise.
+   The body, the soul, the HP and the drawing. HER ATTACKS are in
+   js/act4/scal-attacks.js.
 
-   HER CYCLE IS FIXED AND THAT IS THE DESIGN. Twenty steps, in order,
-   and it does not reset when she changes phase. The only randomness in
-   the whole fight is which dart bursts get swapped for a fireblast or
-   a gigablast. That is taken straight from the game and it is the
-   single most important thing to preserve: a fixed cycle is what makes
-   a wall of projectiles learnable instead of unfair. Randomise it and
-   you have made it easier to write and impossible to master.
+   Attack patterns ported from InfernumMode (InfernumTeam, @399342f, MIT).
+
+   She runs Infernum's attack machine: phase gates at 75%, 45% and 25% HP,
+   each with a transition (a shadow demon, the brothers, the seekers); a
+   quiet opening with the Sepulcher; and five desperation substates at the
+   end. Every attack is one function there, citing the Infernum file and
+   line it ports. The density, cadence and aim are the source's; only the
+   units are converted to this arena.
 
    WHAT MAKES IT FUN HERE:
-
-   1. YOU ALREADY KNOW HOW TO PLAY. Same soul, same i-frames, same
-      shift-to-focus as the room behind the cube. The fight is new; the
-      controls are two hours old.
-
-   2. THE INTERLUDES ARE REST, NOT DIFFICULTY. Each bullet-hell wall is
-      survivable by standing still in the right gap. They exist to mark
-      the phase boundaries so you can feel progress in a fight whose
-      health bar you are too busy to look at.
-
-   3. SHE IS INVINCIBLE AT PREDICTABLE TIMES, AND SAYS SO. Damage that
-      does nothing with no explanation is the most demoralising thing a
-      boss can do.
-
-   4. FIVE HP, AND DYING COSTS YOU THE FIGHT, NOT THE HOUR. The save
-      point is on the other side of one door.                        */
+   1. YOU ALREADY KNOW HOW TO PLAY. Same soul, the dash, the shift-to-focus.
+   2. SHE IS INVULNERABLE AT PREDICTABLE TIMES, AND SAYS SO. Transitions,
+      specials and the desperation phase all say so before they start.
+   3. EIGHT HP, ONE PER HIT. Dash i-frames get the soul out of a wall; a
+      fight takes several attempts, and each one teaches a new pattern.   */
 
 (function () {
   'use strict';
@@ -44,7 +35,7 @@
               brim: '#FF4A2A', brimHi: '#FFC46A', dark: '#8C2F4A' };
 
   var PLAYER_R = (dm.soul && dm.soul.R) || 6, IFRAMES = dm.IFRAMES || 1.1;
-  var MAXHP = 5;
+  var MAXHP = 8;
 
   /* Fair hitboxes: every enemy projectile's collision radius, derived
      from the REAL Terraria hitbox each `.cs` declares (sheets.js's
@@ -75,23 +66,7 @@
     broReach:  (NEU.hitRadius && NEU.hitRadius('cataclysm', 1))    || 28
   };
 
-  /* Her cycle — SupremeCalamitas.cs:2093-2175, all TWENTY-FOUR cases,
-     not the 20 this file used to carry. Its `phase` values map straight
-     onto these step codes:
-       0 shots above -> 'd'   1 charge      -> 'c'
-       3 hellblasts  -> 'h'   4 fireblasts  -> 'f'
-     Fireblast gets six slots of its own here. It used to exist only as
-     an 18% random substitution inside 'd', which made the rarest thing
-     in the fight out of one of its six scheduled attacks.
-     WILL_CHARGE is the source's willCharge flag (:582): the step BEFORE
-     each charge, during which she raises her forcefield. True at 2, 7,
-     13, 17 — and 3, 8, 14, 18 are all 'c'. */
-  var CYCLE = ['d','h','f','c','c','f','h','d','c','d','h','f',
-               'f','h','c','d','f','f','c','c','d','c','d','c'];
-  var WILL_CHARGE = { 2: 1, 7: 1, 13: 1, 17: 1 };
-  /* The wiki names gigablast volleys of 4 and 2 among the fireblast
-     slots; the rest fire a homing fireblast. */
-  var GIGA_AT = { 11: 4, 12: 4, 16: 2, 17: 2 };
+
 
   var running = false, last = 0, t = 0, lastDt = 1 / 60;
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
@@ -116,10 +91,13 @@
      place grazeT advances or resets. */
   var grazedByBody = false;
   var AX = 0, AY = 0, AW = 0, AH = 0;
-  var bullets = [], step_ = 0, stepT = 0, phase = 1;
+  var bullets = [], phase = 1;
+  /* test hook: NEU.scal.hold freezes the frame loop for a manual simulate() */
+  var held = false, shotsFired = 0;
+  /* test hook: NEU.scal.invincible(true) makes the soul untouchable */
+  var god = false;
   var bossHP = 1, bossMax = 1, invuln = false;
   var mode = 'intro';        // intro | fight | wall | brothers | dead | won
-  var wallT = 0, wallN = 0, walls = [];
   var hearts = [], sep = null, bros = [];
   /* scal-worm.js delegation flag: true between open()'s init and
      close()'s reset, so init runs once per fight, not once per frame. */
@@ -133,7 +111,6 @@
   var myShots = [], charging = false, chargeF = 0, shotCd = 0;
   var line = '', lineT = 0;
   var bx = 0, by = 0;        // her position
-  var orbA = Math.PI * 1.5;
   var dying = 0;
   var showHitboxes = false;  // F3 toggle
   /* Attack timers outlive the attack that scheduled them — a gigablast
@@ -221,244 +198,34 @@
       if (rows[r][c] === '#') ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
   }
 
-  function shot(x, y, vx, vy, r, c, kind) {
-    if (dm.shot) {
-      dm.shot(bullets, x, y, vx, vy, r, c, kind, 900);
-      return;
-    }
-    if (bullets.length > 900) return;
-    bullets.push({ x: x, y: y, vx: vx, vy: vy, r: r, c: c, k: kind || 0, age: 0 });
+  /* One bullet. k picks the sprite (the draw map) and its radius. o adds
+     optional fields: fuse (seconds), onEnd (runs when the bullet ends),
+     prox (ends it when the soul is this close), acc (speed multiplier per
+     second), vmax (speed cap), tag (for clearTag). The cap is dm.shot's. */
+  function spawn(x, y, vx, vy, k, o) {
+    var r = k === 2 ? HB.gigablast : (k === 3 || k === 5) ? HB.hellblast : HB.dart;
+    var c = k === 2 ? COL.dark : COL.brim;
+    var n = bullets.length;
+    if (dm.shot) dm.shot(bullets, x, y, vx, vy, r, c, k, 900);
+    else if (n < 900) bullets.push({ x: x, y: y, vx: vx, vy: vy, r: r, c: c, k: k, age: 0 });
+    if (bullets.length === n) return null;
+    var b = bullets[n];
+    for (var key in o) if (o.hasOwnProperty(key)) b[key] = o[key];
+    shotsFired++;
+    return b;
   }
 
-  /* ── her attacks ────────────────────────────────────────────────*/
-  function dartBurst() {
-    /* BrimstoneBarrage from above. Source: SupremeCalamitas.cs ai[1]==0:
-       SCal hovers 550px above the player (here: by, near the top), and
-       fires 8 darts in a ±20° spread toward the player every ~90 frames.
-       A burst may be randomly replaced by a fireblast or gigablast —
-       that randomness is the ONLY randomness in the cycle. The mod fires
-       3-4 bursts per attack slot, ~20 frames apart. */
-    /* SupremeCalamitas.cs ai[1]==0: FrameType = FasterUpwardDraft — the
-       SAME band the dash uses (confirmed in-file), not Casting. She
-       hovers 550 Terraria px above the player during this attack. */
-    scalAnimState = 'charging';
-    var bursts = 3 + (Math.random() * 2 | 0);
-    var span = AW * 0.7;
-    for (var b = 0; b < bursts; b++) {
-      later(function (k) {
-        return function () {
-          if (!running) return;
-          /* 8 darts, ±20° (ToRadians(20) — confirmed exact in
-             SupremeCalamitas.cs, numProj 8). The gap walks
-             deterministically between bursts so a player who found the
-             safe spot in burst 1 has to move for burst 2. */
-          var n = 8, rot = 0.35;
-          var hole = Math.floor(span / n * 1.5 * k) % n;
-          var baseA = Math.atan2(py - by, px - bx);
-          /* Per-burst sweep: offset the aim by up to ±0.18 rad so the
-             wall does not always land on the player's current spot. */
-          var sweep = (k % 3 - 1) * 0.18;
-          /* The source's fixed ±20° fan only stays dodgeable because SCal
-             hovers a constant 550 Terraria px away — that keeps the gap
-             between darts small no matter where the player stands. This
-             arena is smaller and she tracks the player's X, so the same
-             fixed ANGLE opens a gap that grows with distance: past ~260px
-             the darts are >26px apart, wider than a bullet-plus-soul
-             (10px), and a player who finds that gap can stand in it
-             through the whole burst. Cap the SPREAD IN PIXELS instead of
-             radians — same 8-dart fan, same hole, same sweep, but the
-             angle shrinks at range so neighbouring darts never open more
-             than a dodgeable gap. */
-          var dist = Math.max(60, Math.hypot(px - bx, py - by));
-          var maxGapPx = (4 + PLAYER_R) * 2 * 0.85;
-          var rotCapped = Math.min(rot, maxGapPx * (n - 1) / (2 * dist));
-          for (var j = 0; j < n; j++) {
-            if (j === hole) continue;
-            var t = n === 1 ? 0 : j / (n - 1);
-            var a = baseA + sweep + (t * 2 - 1) * rotCapped;
-            var sp = 150 + phase * 30;
-            shot(bx, by + 20, Math.cos(a) * sp, Math.sin(a) * sp, HB.dart, COL.brim, 0);
-          }
-        };
-      }(b), b * 340);
-    }
-  }
-
-  function fireblast() {
-    /* Homes to player continuously, bursts into 12 darts within 150px (real: 224 Terraria px).
-       Source: inertia 100, homeSpeed 9 (13 revenge), rotation = vel + PI/2.
-       Spawns with vx/vy both 0 (inertia 100 means velocity barely moves
-       for its first ~100 frames), so seed `rot` toward the player at
-       spawn — moveBullets only updates it once real velocity exists,
-       which used to leave atan2(0,0) picking a fixed, wrong angle for
-       the whole homing wind-up and again for the entire burst pause. */
-    sfxPlay('fireblast');
-    scalAnimState = 'casting';
-    var sy = by + 20;
-    var b = { x: bx, y: sy, vx: 0, vy: 0, r: HB.fireblast, c: COL.brimHi, k: 1, age: 0, burst: false,
-              rot: Math.atan2(py - sy, px - bx) + Math.PI / 2 };
-    bullets.push(b);
-  }
-
-  function gigablast(n) {
-    sfxPlay('giga');
-    scalAnimState = 'gigablast';
-    for (var i = 0; i < n; i++) {
-      later(function () {
-        if (!running) return;
-        var sy = by + 20;
-        bullets.push({ x: bx, y: sy, vx: 0, vy: 0, r: HB.gigablast, c: COL.dark,
-                       k: 2, age: 0, burst: false,
-                       rot: Math.atan2(py - sy, px - bx) + Math.PI / 2 });
-      }, i * 520);
-    }
-  }
-
-  function hellbarrage() {
-    /* From beside the player, horizontally. Source: SupremeCalamitas.cs
-       ai[1]==3: SCal moves to 600px left or right of the player at the
-       same Y (confirmed, line ~2399-2411), then fires a
-       BrimstoneHellblast at the player every 20 frames (NPC.ai[3] >= 20,
-       confirmed line ~2453). FrameType = OutwardHandCast (confirmed).
-       Real cadence is one shot per 20 frames (0.333s) for up to 480
-       frames (8s) — this fight compresses every cycle step into a
-       fraction of that, so the interval is kept source-accurate and the
-       COUNT is what's scaled down, to fit the step's own stepT budget
-       (see fightTick's 'h' branch) instead of an invented flat 7.
-
-       THE BUG THIS REPLACES: the loop below used to read
-         later(function () { return function () { ... }; }, i * 90)
-       — an extra `return function () {...}` with no invoking `(i)`,
-       identical in shape to dartBurst's factory EXCEPT dartBurst ends
-       `}(b)`. setTimeout called the outer wrapper, which returned the
-       real handler and threw the return value away: the wrapper's body
-       — the only place a hellblast was ever pushed — never ran. Proven
-       by direct reproduction: 7 scheduled calls, 0 bullets fired. 'h' is
-       4 of her 20 cycle steps, so this was 20% of the fight silently
-       idle the entire time, under a test (fixes13.mjs) that only
-       checked the string `sfxPlay('hellblast')` appears in the file. */
-    sfxPlay('hellblast');
-    scalAnimState = 'hellblast';
-    var left = px < AX + AW / 2;
-    var x = left ? AX - 20 : AX + AW + 20;
-    var interval = 0.333;                    /* 20 frames at 60fps, confirmed exact */
-    var count = Math.max(3, Math.round((1.5 * (phase === 2 ? 0.62 : 1)) / interval));
-    for (var i = 0; i < count; i++) {
-      later(function (k) {
-        return function () {
-          if (!running) return;
-          /* Purely horizontal, per source ("shoots the Hellblasts
-             horizontally"); the spawn Y tracks the player's position
-             at the moment each shot fires. */
-          shot(x, py + (Math.random() - 0.5) * 40, (left ? 1 : -1) * 90, 0, HB.hellblast, COL.brim, 3);
-        };
-      }(i), i * interval * 1000);
-    }
-  }
-
-  function charge() {
-    var a = Math.atan2(py - by, px - bx);
-    bxv = Math.cos(a) * 420; byv = Math.sin(a) * 420;
-    chargeT = 0.55;
-    chargeTelegraph = 0.5; // telegraph time before dash
-    teleJuiced = false;
-    scalAnimState = 'charge_telegraph';
-    scalAnimFrame = 0;
-    scalAnimTimer = 0;
-  }
-  var bxv = 0, byv = 0, chargeT = 0, chargeTelegraph = 0, chargeBurst = 0, chargeBurstMax = 0, chargeGap = 0;
-  /* SupremeCalamitas.cs:582 — true during the attack BEFORE a charge, so
-     her forcefield goes up as a telegraph. Set from WILL_CHARGE. */
   var willCharge = false;
-  /* one-shot latch so the telegraph's juice fires once per wind-up,
-     not every frame of its tail */
-  var teleJuiced = false;
   var scalAnimState = 'idle', scalAnimFrame = 0, scalAnimTimer = 0, scalAnimPrevState = 'idle';
 
-  /* ── the interludes ─────────────────────────────────────────────*/
-  /* The five bullet hells, each with its OWN direction sequence
-     (official wiki). wallTick used to index this by BEAT alone —
-     `[['d','r','l'], ['u','r'], ['d','l','r']][beat]` — so every wall
-     fired the identical three beats and the interludes read as one
-     repeated attack. */
-  var WALL_BEATS = [
-    [['d','r','l'], ['l','r'],   ['d','l','r']],   /* 0 — spawn */
-    [['u'],         ['r'],       ['l','r']],       /* 1 — 75% */
-    [['d'],         ['l'],       ['l','r']],       /* 2 — 50% */
-    [['u'],         ['r'],       ['l','r']],       /* 3 — 28% */
-    [['d'],         ['l','r'],   ['d','l','r']]    /* 4 — 12%, + skulls */
-  ];
-
-  function startWall(n) {
-    mode = 'wall'; wallT = 0; wallN = n; walls = []; bullets = [];
+  /* The opening: she is quiet for the Sepulcher's 270 f delay, then the
+     Sepulcher comes up (SupremeCalamitas.cs:341). Mode 'wall' is the name
+     this lead-in has always had; no walls are fired in it any more. */
+  function startLead() {
+    mode = 'wall'; invuln = true;
     clearSched();
-    invuln = true;
     sfxPlay('maelstrom');
-    say(n === 0 ? "* the room fills up."
-      : n === 1 ? "* it fills up faster."
-      : n === 2 ? "* and again, with something heavier."
-      : n === 3 ? "* she is not slowing down."
-                : "* the last one. it is all of them at once.");
-  }
-
-  function wallTick(dt) {
-    wallT += dt;
-    var beat = Math.floor(wallT / 1.35);
-    if (beat > walls.length - 1 && beat < 3) {
-      walls.push(beat);
-      /* down / right / left, then left+right, then down+left+right —
-         the order the game uses, so anyone who knows it is rewarded.
-         Beats 0 and 2 fire two horizontal walls at once; their holes
-         share ONE y so the two walls leave a single passable strip.
-         Independent random holes made the first attack a coin flip:
-         the walls reach you at the same instant, and surviving needed
-         both holes to overlap. */
-      var dirs = (WALL_BEATS[wallN] || WALL_BEATS[0])[beat] || ['d'];
-      var holeY = (beat === 0 || beat === 2) ? (AY + 70 + Math.random() * (AH - 140)) : null;
-      dirs.forEach(function (d, i) { later(function () { wallLine(d, holeY); }, i * 240); });
-      /* Wall 4 is the fifth bullet hell: it adds Brimstone Flame Skulls
-         on top of the dart rows (wiki). */
-      if (wallN === 4) later(function (bt) {
-        return function () { if (running) skullWave(bt % 2 === 0); };
-      }(beat), 500);
-    }
-    if (wallT > 4.6) {
-      bullets = []; invuln = false;
-      if (wallN === 0) spawnSepulcher(); else { mode = 'fight'; say(''); }
-    }
-  }
-
-  function wallLine(d, holeY) {
-    if (!running) return;
-    var gap = 60 + Math.random() * (AW - 160);
-    for (var i = 0; i < 22; i++) {
-      var p = i / 21;
-      if (d === 'd' || d === 'u') {
-        var x = AX + p * AW;
-        if (Math.abs(x - (AX + gap)) < 54) continue;
-        shot(x, d === 'd' ? AY - 20 : AY + AH + 20, 0, (d === 'd' ? 1 : -1) * 210, 6, COL.brim);
-      } else {
-        var y = AY + p * AH;
-        var gy = (holeY !== null && holeY !== undefined) ? holeY : (AY + gap * AH / AW);
-        if (Math.abs(y - gy) < 48) continue;
-        shot(d === 'r' ? AX - 20 : AX + AW + 20, y, (d === 'r' ? 1 : -1) * 210, 0, 6, COL.brim);
-      }
-    }
-  }
-
-  /* Brimstone Flame Skulls — the fifth bullet hell's addition (wiki):
-     skulls that cross the arena in a horizontal wave. No new art:
-     BrimstoneHellblast2.png IS a skull, so this is a motion change and
-     the draw switch below routes k5 to the same sheet as k3. */
-  function skullWave(fromLeft) {
-    if (!running) return;
-    for (var i = 0; i < 5; i++) {
-      var y = AY + 60 + i * (AH - 120) / 4;
-      bullets.push({ x: fromLeft ? AX - 20 : AX + AW + 20, y: y,
-                     vx: (fromLeft ? 1 : -1) * 150, vy: 0,
-                     r: HB.hellblast, c: COL.brim, k: 5, age: 0,
-                     baseY: y, phase_: i * 0.6 });
-    }
+    NEU.scalAtk.start();
   }
 
   function spawnSepulcher() {
@@ -490,8 +257,7 @@
         y: AY + 46 + idx * 28
       });
     }
-    say(flagged(7) ? "* she goes back behind it. again."
-                   : "* she is behind it. kill the hearts.");
+    say("* she is behind it. kill the hearts.");
   }
 
   /* ── the ring ───────────────────────────────────────────────────
@@ -529,11 +295,17 @@
   function stepFn(now) {
     if (!running) return;   /* startDeath() owns the death loop; handing off here started a second one */
     requestAnimationFrame(stepFn);
+    if (held) return;
     var dt = Math.min(0.033, (now - last) / 1000); last = now;
     lastDt = dt;
     /* Hit-stop: hold the frame, keep rendering. Skipping the render
        too would read as a dropped frame rather than a held one. */
     if (NEU.juice && NEU.juice.frozen()) { draw(now); return; }
+    update(dt);
+    draw(now);
+  }
+
+  function update(dt) {
     t += dt;
 
     /* Rage: PROXIMITY fills the bar (RipperUI's rage is earned by
@@ -571,14 +343,13 @@
     if (mode !== 'intro' && mode !== 'won') movePlayer(dt);
     if (inv > 0) inv -= dt;
 
-    if (mode === 'intro') { if (t > 2.6) startWall(0); }
-    else if (mode === 'wall') wallTick(dt);
+    if (mode === 'intro') { if (t > 2.6) startLead(); }
+    else if (mode === 'wall') NEU.scalAtk.tick(dt);
     else if (mode === 'brothers') brothersTick(dt);
     else if (mode === 'fight') fightTick(dt);
 
     moveBullets(dt * dm.slow(F));
     moveMyShots(dt);
-    draw(now);
   }
 
   function movePlayer(dt) {
@@ -587,36 +358,12 @@
     px = F.x; py = F.y;
   }
 
+  /* One frame of the fight proper. The seekers' ring and the Sepulcher hold
+     the attack clock; when they are down, the clock runs again. */
   function fightTick(dt) {
-    /* Contact damage: she hurts on touch only while telegraphing or
-       dashing; the dive sweep hurts while she is crossing. The
-       sepulcher hurts only while its head is charging at you —
-       its body segments never do (the mod zeroes body damage), so
-       standing in the body to break a heart costs nothing. */
-    if (inv <= 0) {
-      /* Sepulcher deals no contact damage — SepulcherHead.cs:45 sets
-         NPC.damage = 0 outright, confirmed directly in the source. It
-         used to hurt on touch while charging, which meant reaching a
-         heart (all of which used to ride its body) required trading a
-         hit to get there. The rewrite below moves the hearts off the
-         worm entirely, but this stays removed either way: it was never
-         source-accurate. */
-      var touching = false;
-      if ((chargeTelegraph > 0 || chargeT > 0) &&
-          Math.hypot(px - bx, py - by) < 34) touching = true;
-      if (touching && hitPlayer()) return;
-    }
-
     if (ringOn && NEU.scalSeekers) {
-      /* She holds still; the ring is the attack. This block sits ABOVE
-         the hover/charge chain on purpose: her idle branch orbits the
-         player, so letting that run first would drag her (and the ring,
-         which re-centres on her every tick) around the arena instead of
-         holding the park point startSeekers chose. Both callbacks are
-         the SAME ones the worm uses (the sep block below), so a graze
-         latches grazedByBody for moveBullets' one end-of-frame funnel
-         and a hit routes through hitPlayer with the shield and
-         i-frames behaving identically. */
+      /* She holds still; the ring is the attack. Both callbacks are the same
+         ones the worm uses, so a graze and a hit take the same paths. */
       NEU.scalSeekers.setPlayer(px, py);
       NEU.scalSeekers.tick(dt);
       NEU.scalSeekers.tickDarts(dt, px, py,
@@ -625,65 +372,12 @@
       if (!NEU.scalSeekers.alive()) {
         ringOn = false; invuln = false;
         say("* the eyes go out. she is exposed again.");
-        /* pause before she resumes the cycle — same interlude beat the
-           worm exit uses */
-        stepT = 1.2;
       }
       return;
     }
-
-    /* she hovers above you unless charging */
-    if (chargeTelegraph > 0) {
-      chargeTelegraph -= dt;
-      scalAnimState = 'charge_telegraph';
-      /* Telegraph: glow red, one small shake as the dash commits */
-      if (NEU.juice && !teleJuiced && chargeTelegraph < 0.1) {
-        teleJuiced = true;
-        NEU.juice.hit('small');
-      }
-    } else if (chargeT > 0) {
-      chargeT -= dt; bx += bxv * dt; by += byv * dt;
-      bx = Math.min(Math.max(bx, AX), AX + AW);
-      by = Math.min(Math.max(by, AY + 30), AY + AH - 30);
-      scalAnimState = 'charging';
-      /* Multi-charge burst: after dash ends, queue next if any left */
-      if (chargeT <= 0 && chargeBurst < chargeBurstMax - 1) {
-        chargeBurst++;
-        chargeGap = 0.45; // gap between dashes
-        var a = Math.atan2(py - by, px - bx);
-        bxv = Math.cos(a) * 420; byv = Math.sin(a) * 420;
-        chargeT = 0.55;
-        chargeTelegraph = 0.3; // shorter telegraph for subsequent dashes
-        teleJuiced = false;
-      }
-    } else if (chargeGap > 0) {
-      chargeGap -= dt;
-      scalAnimState = 'charge_recovery';
-    } else {
-      orbA += dt * 0.8;
-      var orbR = 125 + 15 * Math.sin(t * 0.6);
-      var cxp = Math.min(Math.max(px, AX + orbR + 20), AX + AW - orbR - 20);
-      var cyp = Math.min(Math.max(py, AY + orbR + 20), AY + AH - orbR - 20);
-      bx += ((cxp + Math.cos(orbA) * orbR) - bx) * Math.min(1, dt * 4);
-      by += ((cyp + Math.sin(orbA) * orbR) - by) * Math.min(1, dt * 4);
-      /* Idle or casting based on attack */
-      if (stepT < 0.3) {
-        scalAnimState = 'casting';
-      } else {
-        scalAnimState = phase === 2 ? 'idle_fast' : 'idle';
-      }
-    }
-
     if (sep) {
-      /* Delegated worm: js/act4/scal-worm.js owns movement, the trail,
-         the act machine, its darts and their drawing. This fight only
-         drives it and decides what its callbacks mean. Its body deals
-         NO contact damage (SepulcherHead.cs sets NPC.damage = 0) — the
-         darts are its only threat, and both callbacks route through the
-         SAME paths as hostile bullets: a graze latches grazedByBody for
-         moveBullets' one end-of-frame funnel (cap included), a hit
-         calls hitPlayer so shield / i-frames / death behave identically
-         to a dart-bullet contact. */
+      /* Delegated worm: js/act4/scal-worm.js owns its movement and darts.
+         Its body deals no contact damage (SepulcherHead.cs sets NPC.damage = 0). */
       if (NEU.scalWorm) {
         NEU.scalWorm.setPlayer(px, py);
         NEU.scalWorm.tick(dt);
@@ -691,66 +385,13 @@
           function () { grazedByBody = true; },
           function () { if (inv <= 0 && mode !== 'won') hitPlayer(); });
       }
-
       if (!hearts.length) {
         sep = null; invuln = false;
         say("* she steps out from behind it.");
-        /* pause before she resumes the cycle — the interlude should land */
-        stepT = 1.2;
       }
       return;
     }
-
-    /* Charge burst handling: don't advance cycle until burst complete.
-       The end condition is chargeBurst >= chargeBurstMax - 1: the last
-       dash leaves the counter one short of the max, and demanding a
-       full max here made every multi-charge softlock the fight. */
-    if (chargeBurstMax > 0) {
-      if (chargeBurst >= chargeBurstMax - 1 && chargeT <= 0 && chargeGap <= 0) {
-        chargeBurstMax = 0; // burst complete, allow next attack
-      } else {
-        return; // wait for burst to finish
-      }
-    }
-
-    stepT -= dt;
-    if (stepT > 0) return;
-    var posInCycle = step_ % CYCLE.length;
-    var k = CYCLE[posInCycle];
-    step_++;
-    willCharge = !!WILL_CHARGE[posInCycle];
-    var fast = phase === 2 ? 0.62 : 1;
-    if (k === 'd') {
-      /* Some bursts randomly become a blast. THE ONLY RANDOMNESS. */
-      var r = Math.random();
-      if (r < 0.18) fireblast();
-      else if (r < 0.28) gigablast(1);
-      else dartBurst();
-      stepT = 0.72 * fast;
-    } else if (k === 'h') { hellbarrage(); stepT = 1.5 * fast; }
-    else if (k === 'f') {
-      /* Source phase 4: she crosses to 750 Terraria px beside the player
-         and lobs blasts. The wiki names gigablast volleys of 4 and 2 at
-         four of these six slots; the other two are homing fireblasts. */
-      var g = GIGA_AT[posInCycle];
-      if (g) { gigablast(phase === 2 ? g - 1 : g); stepT = (g > 2 ? 2.2 : 1.5) * fast; }
-      else   { fireblast(); stepT = 1.5 * fast; }
-    }
-    else if (k === 'c') {
-      /* SupremeCalamitas.cs:2373 — willChargeAgain = ai[3] + 1 < 2, i.e.
-         EXACTLY two dashes per charge entry. The wiki's "4 charges" are
-         two ADJACENT 'c' entries (indices 3+4 and 18+19), not a per-slot
-         table. This replaces a posInCycle -> p1Bursts lookup that matched
-         six hardcoded positions of the old 20-step cycle. */
-      chargeBurstMax = phase === 2 ? 1 : 2;
-      chargeBurst = 0;
-      chargeGap = 0;
-      charge();
-      stepT = 0.55 + 0.5; // telegraph + first dash
-    }
-    /* CYCLE has no 'm' — the charge dash is her only melee, matching the
-       source, which has no dive attack at all. A dead 'm' branch used to
-       sit here for a swept-dive that no cycle entry could ever reach. */
+    NEU.scalAtk.tick(dt);
   }
 
   function brothersTick(dt) {
@@ -790,7 +431,7 @@
             /* Two fists from opposite sides */
             for (var s = -1; s <= 1; s += 2) {
               var aa = a + s * 0.25;
-              shot(b.x, b.y, Math.cos(aa) * 280, Math.sin(aa) * 280, 7, COL.brimHi);
+              spawn(b.x, b.y, Math.cos(aa) * 280, Math.sin(aa) * 280, 0);
             }
           } else {
             /* Slash: predictive lunge - aim ahead of player */
@@ -798,18 +439,18 @@
             var predX = px + pvx * 0.5, predY = py + pvy * 0.5;
             var aa = Math.atan2(predY - b.y, predX - b.x);
             for (var j = -1; j <= 1; j++)
-              shot(b.x, b.y, Math.cos(aa + j * 0.12) * 340, Math.sin(aa + j * 0.12) * 340, 5, COL.brim);
+              spawn(b.x, b.y, Math.cos(aa + j * 0.12) * 340, Math.sin(aa + j * 0.12) * 340, 0);
           }
         } else {
           /* Normal attack */
           if (b.kind === 'fist') {
-            shot(b.x, b.y, Math.cos(a) * 240, Math.sin(a) * 240, 7, COL.brimHi);
+            spawn(b.x, b.y, Math.cos(a) * 240, Math.sin(a) * 240, 0);
           } else {
             var spread = b.enraged ? 0.1 : 0.16;
             var count = b.enraged ? 1 : 3;
             var start = -(count - 1) / 2;
             for (var j = 0; j < count; j++)
-              shot(b.x, b.y, Math.cos(a + (start + j) * spread) * 300, Math.sin(a + (start + j) * spread) * 300, 5, COL.brim);
+              spawn(b.x, b.y, Math.cos(a + (start + j) * spread) * 300, Math.sin(a + (start + j) * spread) * 300, 0);
           }
         }
       }
@@ -829,9 +470,8 @@
     }
 
     if (!bros.length) {
-      invuln = false; phase = 2; mode = 'fight';
+      invuln = false; mode = 'fight';
       if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(2);
-      stepT = 1.0; /* the laugh is the interlude; let it land */
       say("* she laughs. that is the first noise she has made.");
       later(function () { if (running) say("* now she is trying."); }, 2200);
     }
@@ -841,7 +481,7 @@
      barrier eats the hit instead of you — one hit, then it is gone,
      and it does not hand you invulnerability for free. */
   function hitPlayer() {
-    if (F.dashI > 0) return false;          /* a dash passes through */
+    if (god || F.dashI > 0) return false;          /* a dash passes through */
     if (shieldT > 0) {
       shieldT = 0;
       inv = IFRAMES;
@@ -870,111 +510,28 @@
     tp = Math.min(1, tp + dt * (0.25 + 0.35 * Math.min(1, grazeT / 1.5)));
   }
 
+  /* Bullets move, graze and hit. A bullet with a fuse ends when the fuse runs
+     out, or at once when a proximity fuse reaches the soul. Its onEnd runs
+     after the list is rebuilt, so the ring it drops is not lost. */
   function moveBullets(dt) {
-    var keep = [];
+    var keep = [], fire = [];
     var grazedThisFrame = false;
     for (var i = 0; i < bullets.length; i++) {
       var b = bullets[i];
       b.age += dt;
-      if (b.k === 1 || b.k === 2) {
-        /* Distance-triggered burst. Source: SCalBrimstoneFireblast.cs and
-           SCalBrimstoneGigablast.cs. Both burst when within 224px of the
-           player (14 Terraria blocks) OR when timeLeft runs out. On burst:
-           the projectile sets timeLeft=60, multiplies velocity *= 0.9 each
-           frame (decelerating), fades out, then OnKill splits into a ring
-           of BrimstoneBarrage darts. Fireblast → 8 darts (normal mode),
-           gigablast → 20 darts (normal mode). The pause-then-explode is
-           the mechanic that makes them dodgeable. Game scale: 224 Terraria
-           px ≈ 150 game px. */
-        if (!b.burst) {
-          var dx = px - b.x, dy = py - b.y;
-          var dist = Math.hypot(dx, dy) || 1;
-          var reach = 150; /* 224px in Terraria ≈ 150 game px */
-          /* Fireblast pauses when it closes to range; gigablast bursts on
-             proximity. Both also time out after 4s. The pause is a full
-             stop, not a decelerate — the mod's velocity *= 0.9/frame reads
-             as the projectile slowing, which is worse than holding still
-             because a drifting burst point shifts the ring under you. */
-          if (b.k === 1) {
-            if (b.pauseT === undefined && (dist < reach || b.age > 4))
-              b.pauseT = 0.55 + Math.random() * 0.25;
-            if (b.pauseT) {
-              b.pauseT -= dt;
-              b.vx = 0; b.vy = 0;
-              if (b.pauseT <= 0) {
-                b.burst = true;
-                var nn = 8;
-                sfxPlay('fireblast-hit');
-                for (var qq = 0; qq < nn; qq++) {
-                  var aq = qq * Math.PI * 2 / nn;
-                  shot(b.x, b.y, Math.cos(aq) * 130, Math.sin(aq) * 130, HB.dart, COL.brim, 4);
-                }
-                if (NEU.juice) NEU.juice.burst(b.x, b.y, 10, COL.brim, 1.2);
-                continue;
-              }
-            } else {
-              /* Fireblast homing: inertia=100, homeSpeed=9 (mod normal mode).
-                 velocity = (velocity * (inertia-1) + dir * homeSpeed) / inertia
-                 Scaled to game px/s: homeSpeed 9 Terraria ≈ 140 game px/s. */
-              var sp = 140;
-              b.vx = (b.vx * 99 + dx / dist * sp) / 100;
-              b.vy = (b.vy * 99 + dy / dist * sp) / 100;
-            }
-          } else if (b.k === 2) {
-            /* Gigablast: homes like the fireblast but bursts into 20
-               darts (wiki normal mode) on proximity or after 4s.
-               The burst ring is larger than the fireblast's 8, so
-               it covers more of the arena and demands real movement. */
-            if (b.pauseT === undefined && (dist < reach || b.age > 4))
-              b.pauseT = 0.55 + Math.random() * 0.25;
-            if (b.pauseT) {
-              b.pauseT -= dt;
-              b.vx = 0; b.vy = 0;
-              if (b.pauseT <= 0) {
-                b.burst = true;
-                var gn = 20;
-                sfxPlay('giga-hit');
-                for (var qq = 0; qq < gn; qq++) {
-                  var aq = qq * Math.PI * 2 / gn;
-                  shot(b.x, b.y, Math.cos(aq) * 140, Math.sin(aq) * 140, HB.dart, COL.brim, 4);
-                }
-                if (NEU.juice) NEU.juice.burst(b.x, b.y, 14, COL.brimHi, 1.4);
-                continue;
-              }
-            } else {
-              var sp = 140;
-              b.vx = (b.vx * 99 + dx / dist * sp) / 100;
-              b.vy = (b.vy * 99 + dy / dist * sp) / 100;
-            }
-          } else {
-            /* Far gigablast: preserve speed, steer toward player.
-               velocity = (velocity * 24 + playerDir * speed) / 25 */
-            var sp = Math.hypot(b.vx, b.vy) || 130;
-            var tx = dx / dist * sp, ty = dy / dist * sp;
-            b.vx = (b.vx * 24 + tx) / 25;
-            b.vy = (b.vy * 24 + ty) / 25;
-          }
-        } else {
-          continue; /* already burst, don't keep */
-        }
+      if (b.fuse !== undefined) {
+        b.fuse -= dt;
+        var pdx = px - b.x, pdy = py - b.y;
+        var near = b.prox !== undefined && pdx * pdx + pdy * pdy < b.prox * b.prox;
+        if (b.fuse <= 0 || near) { b.fuse = 0; if (b.onEnd) fire.push(b); continue; }
       }
-      /* Acceleration per the C# source, converted from per-frame to per-second:
-         BrimstoneHellblast2: velocity *= 1.002/frame → 1.002^60 ≈ 1.127x/s.
-         BrimstoneBarrage: velocity *= 1.01/frame → 1.01^60 ≈ 1.82x/s. */
-      if (b.k === 3) { b.vx *= 1 + dt * 0.12; }   // hellblasts — gentle accel
-      if (b.k === 4) { var am = 1 + dt * 0.6; b.vx *= am; b.vy *= am; } // ring darts — BrimstoneBarrage 1.01x/frame
-      /* k5 flame skull: constant horizontal travel, sinusoidal vy. Set
-         the VELOCITY rather than y directly, so the graze/hit checks and
-         the facing rotation below all see real motion. */
-      if (b.k === 5) b.vy = Math.cos(b.age * 3.2 + b.phase_) * 90;
-      /* Facing tracks REAL travel, not a per-frame recompute of
-         atan2(vy,vx) — fireblast/gigablast spawn at vx:vy:0 and are
-         re-zeroed for their burst pause (above), so atan2(0,0) locked
-         the sprite to a single fixed angle at launch and again through
-         every pause. Below the epsilon the bullet just keeps facing
-         whichever way it was already drawn. */
-      var spd2 = b.vx * b.vx + b.vy * b.vy;
-      if (spd2 > 4) {
+      if (b.acc !== undefined) { var am = Math.pow(b.acc, dt); b.vx *= am; b.vy *= am; }
+      if (b.vmax !== undefined) {
+        var vs = Math.hypot(b.vx, b.vy);
+        if (vs > b.vmax) { b.vx *= b.vmax / vs; b.vy *= b.vmax / vs; }
+      }
+      /* sprites face their travel; the flat ones keep the angle they had */
+      if (b.vx * b.vx + b.vy * b.vy > 4) {
         b.rot = (b.k === 1 || b.k === 2 || b.k === 4)
           ? Math.atan2(b.vy, b.vx) + Math.PI / 2
           : Math.atan2(b.vy, b.vx);
@@ -984,22 +541,16 @@
       keep.push(b);
       if (inv <= 0 && mode !== 'won') {
         var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
-        /* Graze: a bullet within 26px of the soul feeds TP, whether
-           it hits or not. Same rule as the hit check — a near miss is
-           still contact with the pattern, and the pattern pays for
-           that. */
+        /* Graze: a bullet within 26px of the soul feeds TP, hit or not. */
         if (dx * dx + dy * dy < (b.r + 26) * (b.r + 26)) grazedThisFrame = true;
         if (dx * dx + dy * dy < rr * rr && hitPlayer()) return;
       }
     }
-    /* Body grazes latched during fightTick count as grazing here —
-       without them, every frame with no bullet in range would reset
-       the clock a ring/worm graze was building. This is still the ONLY
-       place grazeT advances or resets: bullet and body grazing share
-       one clock and one cap. */
+    /* Body grazes latched during fightTick count here too: one clock, one cap. */
     feedGraze(dt, grazedThisFrame || grazedByBody);
     grazedByBody = false;
     bullets = keep;
+    for (var f = 0; f < fire.length; f++) fire[f].onEnd(fire[f]);
   }
 
   /* ── hitting her ────────────────────────────────────────────────
@@ -1139,11 +690,9 @@
     }
   }
 
-  /* One damage funnel for all three target kinds; the phase ladder
-     moved here with it. The old ladder tested 50% twice — wall(2) and
-     the brothers both hung off `pct <= 0.50`, so the second wall fired
-     and the brothers never arrived. Now: wall at 75%, wall at 50%,
-     brothers at 35%. */
+  /* One damage funnel for all three target kinds. Her phase gates run
+     from here: each HP share she crosses calls NEU.scalAtk.gate, which
+     starts the transition (scal-attacks.js, GATE and AFTER_PT). */
   function damageTarget(kind, ref, amount) {
     var eff = amount * (rageMode ? 2 : 1);
     if (kind === 'heart') {
@@ -1184,27 +733,9 @@
     /* Landing one is SMALL — it happens often, and shaking hard on
        every strike would drown out the phase transitions. */
     if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(bx, by, 7, COL.brimHi); }
-    var pct = bossHP / bossMax;
-    if (pct <= 0)              { win(); }
-    else if (pct <= 0.75 && !flagged(1)) { mark(1); startWall(1); }
-    else if (pct <= 0.50 && !flagged(2)) { mark(2); startWall(2); }
-    else if (pct <= 0.35 && !flagged(3)) { mark(3); startBrothers(); }
-    else if (pct <= 0.28 && !flagged(4)) { mark(4); startWall(3); }
-    /* 20%: the Supreme Soul Seeker ring (official wiki; scal-seekers.js
-       holds the source cites for spawn and AI). She is invulnerable
-       behind it until the last seeker dies. */
-    else if (pct <= 0.20 && !flagged(5)) { mark(5); startSeekers(); }
-    else if (pct <= 0.12 && !flagged(6)) { mark(6); startWall(4); }
-    /* The wiki is explicit: below 10% she summons Sepulcher and ten
-       Brimstone Hearts again and is invulnerable until they die.
-       spawnSepulcher() already resets hearts/sep/invuln and re-spawns
-       the worm module (scal-worm.js spawn() re-seeds its whole state),
-       and fightTick's existing exit tears it down unchanged. */
-    else if (pct <= 0.08 && !flagged(7)) { mark(7); spawnSepulcher(); }
+    bossHP = Math.max(0, bossHP);
+    NEU.scalAtk.gate(bossHP / bossMax);
   }
-  var marks = {};
-  function flagged(n) { return !!marks[n]; }
-  function mark(n) { marks[n] = true; }
 
   function win() {
     mode = 'won'; running = false; bullets = [];
@@ -1336,26 +867,17 @@
       }
     }
 
-    /* her telegraph — the wind-up ring before a charge */
-    if (chargeTelegraph > 0 && mode === 'fight') {
-      ctx.strokeStyle = 'rgba(255,74,42,0.65)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(bx, by, 34 + (0.5 - chargeTelegraph) * 26, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.lineWidth = 1;
-    }
-
     /* her shield. The mod summons the forcefield bubble and the two
        arcs around the charge telegraph; here it also marks the whole
        "she cannot be touched" state — walls, brothers, the worm. */
-    if ((invuln || willCharge || chargeTelegraph > 0 || chargeT > 0) && mode !== 'intro') {
+    if ((invuln || willCharge) && mode !== 'intro') {
       var shk = Math.sin(now / 160) * 3;
       sprite('scalShield', bx, by, 1.35, 0, false, 0, 0, 0.55);
       sprite('scalShieldTop', bx, by - 6 + shk, 1.15, 0);
       sprite('scalShieldBot', bx, by + 30 - shk, 1.15, 0);
     }
 
+    NEU.scalAtk.draw(ctx);
     for (var i = 0; i < bullets.length; i++) {
       var b = bullets[i], sz = (b.r * 2) | 0;
       /* k picks the sheet; everything else is a brimstone dart. */
@@ -1466,7 +988,7 @@
     dm.hud(ctx, F, { w: w, h: h, AY: AY, AH: AH,
                      name: invuln ? 'calamitas — shielded' : 'calamitas',
                      hp: bossHP, max: bossMax, invuln: invuln,
-                     ticks: [0.75, 0.5, 0.35, 0.28, 0.2, 0.12, 0.08],
+                     ticks: [0.75, 0.45, 0.25],
                      php: hp, pmax: MAXHP, phase: phase,
                      tp: tpShown, rage: rageShown, rageOn: rageMode > 0 });
 
@@ -1590,6 +1112,51 @@
     if (e.key === 'f' || e.key === 'F') { e.preventDefault(); tryHit(); return; }
   });
 
+  /* ── the attack machine's hands (scal-attacks.js) ─────────────────
+     Everything she does reaches the fight through this object. The getters
+     are live, so the machine reads this frame's positions every frame. */
+  var ADAPT = {
+    get px() { return px; }, get py() { return py; },
+    get bx() { return bx; }, get by() { return by; },
+    get AX() { return AX; }, get AY() { return AY; },
+    get AW() { return AW; }, get AH() { return AH; },
+    shot: spawn,
+    clearAll: function () { bullets = []; },
+    clearTag: function (tag) { bullets = bullets.filter(function (b) { return b.tag !== tag; }); },
+    setBoss: function (x, y) { bx = x; by = y; },
+    setHP: function (n) { bossHP = n; },
+    level: function (n) { phase = n >= 2 ? 2 : 1; },
+    anim: function (s) { scalAnimState = s; },
+    willCharge: function (v) { willCharge = v; },
+    invuln: function (v) { invuln = v; },
+    shake: function (s) {
+      if (!NEU.juice) return;
+      if (s === 'medium') NEU.juice.hit('medium'); else NEU.juice.hit('small');
+    },
+    sfx: function (n) { sfxPlay(n); },
+    hit: function () { if (inv <= 0 && mode !== 'won') hitPlayer(); },
+    over: function () { return !running; },
+    win: function () { win(); },
+    special: function (kind) {
+      if (kind === 'worm') spawnSepulcher();
+      else if (kind === 'brothers') startBrothers();
+      else startSeekers();
+    },
+    specialDone: function (kind) {
+      if (kind === 'worm') return !sep;
+      if (kind === 'brothers') return mode === 'fight' && !bros.length;
+      return !ringOn;
+    }
+  };
+  NEU.scalAtk.attach(ADAPT);
+
+  /* debug hook: drop every special, then run one attack now */
+  function clearSpecials() {
+    sep = null; hearts = []; bros = []; ringOn = false; invuln = false;
+    if (NEU.scalSeekers) NEU.scalSeekers.clear();
+    if (mode !== 'won') mode = 'fight';
+  }
+
   /* ── open / close ───────────────────────────────────────────────*/
   var active = false;
   var keysOrig = null;
@@ -1608,17 +1175,12 @@
       keysEl.innerHTML = 'arrows / wasd &middot; shift focus &middot; f to strike (hold to charge) &middot; c dash &middot; v adrenaline &middot; z for rage &middot; x to shield &middot; esc to leave';
     }
     layout();
-    t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; marks = {};
+    t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {};
     rage = 0; tp = 0; shieldT = 0;
     rageMode = 0; rageModeT = 0;
     rageShown = 0; tpShown = 0; grazeT = 0;
     myShots = []; charging = false; chargeF = 0; shotCd = 0;
-    /* charge state too — dying mid multi-charge used to carry a live
-       telegraph/dash into the retry and softlock her at the early-return */
-    chargeT = 0; chargeTelegraph = 0; chargeBurst = 0; chargeBurstMax = 0; chargeGap = 0;
     willCharge = false;
-    teleJuiced = false;
-    orbA = Math.PI * 1.5;
     /* x10 (2026-08-24). A charged orb deals 9 — one on impact plus eight
        burst darts that spawn AT the impact point and all land the next
        frame — so 24 HP was three orbs, about three seconds, and at most
@@ -1626,7 +1188,7 @@
        fight and roughly one full lap of the cycle. Every phase gate in
        damageTarget is a FRACTION of bossMax, so they rescale for free,
        and core/music.js takes hpMax from the first reading per fight. */
-    bossMax = 240; bossHP = bossMax; phase = 1; step_ = 0; stepT = 1.2;
+    bossMax = 240; bossHP = bossMax; phase = 1; held = false; shotsFired = 0;
     hearts = []; sep = null; bros = []; invuln = true; dying = 0;
     ringOn = false;
     /* Hand the Sepulcher module its canvas + arena once per fight;
@@ -1661,6 +1223,7 @@
     clearSched();
     scalWormReady = false;
     seekersReady = false;
+    NEU.scalAtk.reset();
     /* Guarded, like every other minigame's close() — an unconditional
        clear here could null out a DIFFERENT minigame's lock if close()
        ever ran after something else had already claimed the input lock
@@ -1726,7 +1289,7 @@
                get shieldT() { return shieldT; },
                get bx() { return bx; },
                get by() { return by; },
-               get charging() { return chargeTelegraph > 0 || chargeT > 0; },
+               get charging() { return !!NEU.scalAtk.beam(); },
                get wormBusy() { return NEU.scalWorm ? NEU.scalWorm.busy() : false; },
                get wormPos() { return sep && NEU.scalWorm ? NEU.scalWorm.head() : null; },
                get wormVel() {
@@ -1749,5 +1312,19 @@
                 get _pops() { return F.pops.map(function (p) { return { x: p.x, y: p.y, y0: p.y0, n: p.n, age: p.age, c: p.c }; }); },
                 /* the shared feel state (core/danmaku.js), for tests */
                 get feel() { return F; },
-                cycle: CYCLE };
+                get level() { return NEU.scalAtk.level(); },
+                get attack() { return NEU.scalAtk.attack(); },
+                get lastAttack() { return NEU.scalAtk.last(); },
+                get sub() { return NEU.scalAtk.sub(); },
+                get invuln() { return invuln; },
+                get shots() { return shotsFired; },
+                get attacks() { return NEU.scalAtk.names(); },
+                force: function (name) { clearSpecials(); return NEU.scalAtk.force(name); },
+                hold: function (v) { held = !!v; },
+                invincible: function (v) { god = !!v; },
+                simulate: function (sec) {
+                  var n = Math.round(sec * 60);
+                  for (var i = 0; i < n && running; i++) update(1 / 60);
+                },
+                hurtBoss: function (n) { damageTarget('her', null, n); } };
 })();
