@@ -212,7 +212,11 @@
       var room = sys.room();
       var dk = 'd:' + room.id + ':' + e.x + ',' + e.y;
       var at = NEU.save ? (NEU.save.flag(dk) || 0) : 0;
-      var base = e.lines || ['...'];
+      /* lines may be a function of (save, quest): resolved here, at talk
+         time, so an npc can say what the player has already done. Give
+         such an npc an explicit `look`, since sprite inference reads the
+         first line of a plain array only. */
+      var base = typeof e.lines === 'function' ? e.lines(NEU.save, NEU.quest) : (e.lines || ['...']);
       var total = base.length;
       var who = e.who || 'narr';
       /* Picked up where they left off: resume from the line they were

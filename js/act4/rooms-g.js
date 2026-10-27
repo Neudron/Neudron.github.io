@@ -150,7 +150,10 @@
       ].concat(last ? [{ t: 'exit', x: 2, y: 4, to: 'h1_storm', spawn: 'top' }] : []),
       onEnter: function (c) {
         if (NEU.quest) NEU.quest.bump('a4_prizes', n + 1);
-        if (last) say(c, [p[1], 'the staircase goes down. of course it does.']);
+        if (last && !c.flagged('g_last_seen')) {
+          c.flag('g_last_seen', 1);
+          say(c, [p[1], 'the staircase goes down. of course it does.']);
+        }
       }
     });
   });
@@ -179,6 +182,8 @@
       { t: 'exit', x: 2, y: 6, to: 'g_8', spawn: 'default' }
     ],
     onEnter: function (c) {
+      if (c.flagged('h1_seen')) return;
+      c.flag('h1_seen', 1);
       say(c, ['a door the size of a house, with weather inside it.',
               'it is not locked. it has never needed to be.']);
     }
@@ -286,6 +291,10 @@
   });
 
   function pot(c) {
+    if (c.flagged('soup_made')) {
+      c.say(['the pot is empty and still warm.', 'you made the soup. it was your idea, apparently.'], 'narr');
+      return;
+    }
     var n = mushrooms();
     if (!c.has('axe')) {
       c.say(['the pot waits.',

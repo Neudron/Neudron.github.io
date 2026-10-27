@@ -219,6 +219,11 @@
 
   function drink(c) {
     if (!c.has('recall')) {
+      if (c.flagged('used_recall')) {
+        c.say(['the chalk is scuffed where you stood.',
+               'it did its job. it does not need you to do it again.'], 'narr');
+        return;
+      }
       c.say(['a chalk circle on the ground, drawn by someone in a hurry.',
              'it wants a potion. it is quite specific about which.'], 'narr');
       return;
@@ -234,7 +239,7 @@
   /* ══ E — New Home ════════════════════════════════════════════════
      Three corridors that are almost the same corridor. The details
      that differ are small and wrong, and nobody points at them. */
-  function corridor(id, next, prev, note) {
+  function corridor(id, next, prev, note, look) {
     E.register(id, {
       tileset: 'home',
       tiles: [
@@ -250,7 +255,7 @@
       entities: [
         { t: 'exit', x: 23, y: 3, to: next, spawn: 'south' },
         { t: 'exit', x: 0, y: 3, to: prev, spawn: 'north' },
-        { t: 'npc', x: 12, y: 1, colour: '#2E2E36', lines: note }
+        { t: 'npc', x: 12, y: 1, colour: '#2E2E36', lines: note, look: look }
       ],
       onEnter: function (c) { if (id === 'e1_hall') homeIn(c); }
     });
@@ -258,8 +263,12 @@
 
   corridor('e1_hall', 'e2_hall', 'd3_square',
            ['a picture frame with nothing in it.', 'the nail is still in the wall.']);
-  corridor('e2_hall', 'e3_hall', 'e1_hall',
-           ['a vase. it has been swept up and put back together at least once.']);
+  corridor('e2_hall', 'e3_hall', 'e1_hall', function (s) {
+             return s.flagged('tv_breakable')
+               ? ['a vase. it has been swept up and put back together at least once.',
+                  'there is a new crack in the glaze. you know the feeling.']
+               : ['a vase. it has been swept up and put back together at least once.'];
+           }, 'vase');
   corridor('e3_hall', 'e4_corridor', 'e2_hall',
            ['a door you do not have a key for. you do not want one.']);
 

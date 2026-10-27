@@ -199,9 +199,14 @@
       { t: 'exit', x: 5, y: 1, to: 'b1_throne', spawn: 'south' },
       { t: 'exit', x: 21, y: 5, to: 'b7_altar', spawn: 'east' },
       { t: 'exit', x: 0, y: 5, to: 'a2_path', spawn: 'east' },
-      { t: 'npc', x: 14, y: 5, colour: '#8A8598',
-        lines: ['two ways. the left one has been swept.',
-                'the right one has not been swept in a long time.'] }
+      { t: 'npc', x: 14, y: 5, colour: '#8A8598', look: 'signpost',
+        lines: function (s) {
+          return s.flagged('witch_met')
+            ? ['the left one goes up to her. you have been up it.',
+               'the right one is still waiting for somebody to care about it.']
+            : ['two ways. the left one has been swept.',
+               'the right one has not been swept in a long time.'];
+        } }
     ],
     onEnter: function (c) {
       if (c.flagged('a3_seen')) return;
@@ -232,9 +237,14 @@
     entities: [
       { t: 'exit', x: 10, y: 10, to: 'a3_fork', spawn: 'castle' },
       /* the second throne. never pointed at. */
-      { t: 'npc', x: 13, y: 3, colour: '#3A2140',
-        lines: ['a second throne, beside the first.',
-                'the dust on it has been disturbed recently.'] },
+      { t: 'npc', x: 13, y: 3, colour: '#3A2140', look: 'throne',
+        lines: function (s) {
+          return s.flagged('witch_met')
+            ? ['the second throne has been sat in. she is not a good guest.',
+               'the cushion has not been plumped since.']
+            : ['a second throne, beside the first.',
+               'the dust on it has been disturbed recently.'];
+        } },
       { t: 'npc', x: 9, y: 3, colour: '#C2405F', key: 'witch',
         lines: ['...'],
         run: function (c) { witchTalk(c); } },
@@ -318,10 +328,15 @@
         run: function (c) { pickStone(c, 'ash'); } },
       { t: 'npc', x: 10, y: 4, colour: '#564B66', solid: true, stone: 'please',
         run: function (c) { pickStone(c, 'please'); } },
-      { t: 'npc', x: 13, y: 2, colour: '#4A4560',
-        lines: ['a riddle, cut into the wall.',
-                'i am what the fire leaves, what the bowl wants,',
-                'and what her door is paid with. press the right stone.'] },
+      { t: 'npc', x: 13, y: 2, colour: '#4A4560', look: 'inscription',
+        lines: function (s) {
+          return s.flagged('solved:b2_blocks')
+            ? ['the riddle is answered. the ash went where it was paid to go.',
+               'the stone is sunk flush into the wall now. it has stopped pretending to be a word.']
+            : ['a riddle, cut into the wall.',
+               'i am what the fire leaves, what the bowl wants,',
+               'and what her door is paid with. press the right stone.'];
+        } },
       /* A hint the player asked for by walking up to it. Signs only
          repeat what the room already showed them; the castle's rooms
          tell you the rules once and expect you to walk them again. */
@@ -368,9 +383,14 @@
       { t: 'brazier', x: 6, y: 4, n: 1, run: function (c) { light(c, 1); } },
       { t: 'brazier', x: 9, y: 4, n: 2, run: function (c) { light(c, 2); } },
       { t: 'brazier', x: 12, y: 4, n: 3, run: function (c) { light(c, 3); } },
-      { t: 'npc', x: 15, y: 2, colour: '#4A4560',
-        lines: ['a plaque. four notches, worn in a particular order.',
-                'third. first. fourth. second.'] },
+      { t: 'npc', x: 15, y: 2, colour: '#4A4560', look: 'inscription',
+        lines: function (s) {
+          return s.flagged('solved:b3_braziers')
+            ? ['a plaque. four notches, worn in a particular order.',
+               'all four are still lit. you read it, and then you did it.']
+            : ['a plaque. four notches, worn in a particular order.',
+               'third. first. fourth. second.'];
+        } },
       { t: 'sign', x: 2, y: 2,
         lines: ['four braziers and one order.',
                 'the plaque is on the east wall. read it before you touch the braziers.'] },
@@ -494,6 +514,7 @@
      room now. */
   var b5face = 0;   /* 0 = turned away, 1 = looks at the east plate, 2 = looks at the west plate */
   function mirrorTurn(c) {
+    if (c.solved('b5_two')) { c.say(['the mirror is done with you. it looks at the wall now.'], 'narr'); return; }
     b5face = (b5face + 1) % 3;
     if (b5face === 0) c.say(['the mirror turns away from the room.'], 'narr');
     else if (b5face === 1) c.say(['the mirror looks east. whatever stands over the east plate stands on the west one too.'], 'narr');
@@ -575,6 +596,7 @@
     c.say(['you take the torch. the light walks with you.'], 'narr');
   }
   function placeTorch(c) {
+    if (c.solved('b6_dark')) { c.say(['the socket is lit. it has been lit since you were last here.'], 'narr'); return; }
     if (!b6carry) { c.say(['a socket in the wall, empty.', 'it is waiting for a light.'], 'narr'); return; }
     b6carry = false; b6lit = true;
     c.markSolved('b6_dark');
@@ -608,6 +630,8 @@
     onEnter: function (c) {
       b6carry = false;
       b6lit = !!c.flagged('solved:b6_dark');
+      /* the torch went into the socket for good; it does not hang on the wall again */
+      if (b6lit) { var es = c.ents(); for (var i = 0; i < es.length; i++) if (es[i].torch) es[i].dead = true; }
       if (c.flagged('b6_seen')) return;
       c.flag('b6_seen', 1);
       say(c, ['the lights here have been out for some time.',
@@ -690,6 +714,7 @@
       { t: 'exit', x: 0, y: 4, to: 'b7_altar', spawn: 'north' }
     ],
     onEnter: function (c) {
+      if (c.flagged('scal_dead')) return;
       say(c, ['a door with nothing written on it.',
               'whatever has been making the noise is on the other side.',
               'you can still go back. the save point is right there.']);
@@ -697,6 +722,8 @@
   });
 
   function enterArena(c) {
+    /* She is dead. The door stays a door, and nothing comes through it. */
+    if (c.flagged('scal_dead')) { c.say(['the door is open now. behind it there is a draft and a stage nobody is using.'], 'narr'); return; }
     if (NEU.scal && NEU.scal.open) {
       c.leave();
       setTimeout(function () {
