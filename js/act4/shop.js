@@ -175,7 +175,7 @@
     if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
       sel = (sel + 1) % STOCK.length; render(); e.preventDefault(); return;
     }
-    if (e.key === 'Enter') { select(); e.preventDefault(); return; }
+    if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z') { select(); e.preventDefault(); return; }
   });
 
   /* quit button */

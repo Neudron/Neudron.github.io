@@ -1,7 +1,7 @@
 /* inventory.js — Deltarune's ITEM box for Act IV.
    I opens it while the engine is running and nothing else owns the
    page. Arrows move the soul, Enter/Z reads the item through NEU.talk
-   (the one textbox), Esc/I/X close. It listens on window in the capture
+   (the one textbox), Esc/C/X close. It listens on window in the capture
    phase and stops every key it sees, so the engine (and its ESC) never
    hears a press meant for the box. Items are save.js's array; the
    mushrooms are five ids (mush1..mush5) folded into one counted row. */
@@ -87,7 +87,7 @@
   addEventListener('keydown', function (e) {
     var k = e.key, isOpen = box && !box.hidden;
     if (!isOpen) {
-      if ((k !== 'i' && k !== 'I') || !NEU.engine || !NEU.engine.running || NEU.activeMinigame ||
+      if ((k !== 'c' && k !== 'C') || !NEU.engine || !NEU.engine.running || NEU.activeMinigame ||
           (NEU.tboxOpen && NEU.tboxOpen()) || (NEU.settings && NEU.settings.open_) ||
           /^(INPUT|TEXTAREA)$/.test(e.target && e.target.tagName) || document.getElementById('confirmExit')) return;
       e.preventDefault(); e.stopImmediatePropagation(); open(); return;
@@ -104,7 +104,7 @@
     if (k === 'ArrowUp' || k === 'w' || k === 'W') pick(sel - 1);
     else if (k === 'ArrowDown' || k === 's' || k === 'S') pick(sel + 1);
     else if ((k === 'Enter' || k === 'z' || k === 'Z') && rows[sel] && NEU.talk) NEU.talk(rows[sel].say, 'narr');
-    else if (/^(Escape|i|I|x|X)$/.test(k)) close();
+    else if (/^(Escape|c|C|x|X)$/.test(k)) close();
     /* Tab: focus stays on the box, the trap is the box itself */
   }, true);
 })();

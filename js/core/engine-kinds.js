@@ -9,7 +9,7 @@
 
    A kind is:
      interactive(e)    can e be PRESSED (fire() does something)
-     promptable(e)     does it get the "press e" cap above it
+     promptable(e)     does it get the "press z" cap above it
      fire(e, sys)      what pressing e does       (sim; verbatim from v1)
      draw(g, e, d)     what it looks like         (look; d = draw context)
      light(e, d)       what it emits, or null     (look)

@@ -77,19 +77,34 @@
      you for doing what the fight already asked you to do. */
   var rage = 0, tp = 0, shieldT = 0;
   var rageMode = 0, rageModeT = 0;
+  /* A2 combat state. stripOpen: the C menu (time runs at STRIP_SCALE).
+     healCd: seconds of fight time until HEAL is ready again. defendT:
+     the DEFEND window. hurtAcc: damage banked under DEFEND (a hit is
+     50% under it, so every second hit lands). meleeCd: the slash cooldown. */
+  var stripOpen = false, stripSel = 0, healCd = 0, healToast = 0;
+  var defendT = 0, hurtAcc = 0, meleeCd = 0, grazeAt = -9;
+  var STRIP_SCALE = 0.2, MELEE_DMG = 6, MELEE_R = 56, FIRE_DMG = 1.5, BUSTER_DMG = 40;
+  var MELEE_CD = 0.3, FIRE_CD = 1.2, FIRE_HOLD = 0.45, HEAL_CD = 30;
+  /* TP, Deltarune's numbers (maps/tp.md). The wiki's scale is 0..250
+     and reads as 0..100 %; tp here is 0..1. Each bullet grazed gives
+     GRAZE_PTS once on first entry, then GRAZE_PTS per second while it
+     stays in range (the wiki's points/30 per frame at its 30 fps). The
+     points value is not on the wiki, so 8/250 (3.2 %) is ours [D]. */
+  var TP_UNIT = 1 / 250, GRAZE_PTS = 8 * TP_UNIT, GRAZE_PAD = 8;
   /* The shared fight feel (core/danmaku.js): dash, adrenaline, damage
      numbers, the HUD. Her rage and tp stay her own; the HUD shows them. */
   var F = dm.fight(0, 0);
   /* What the meters DRAW. A bar that snaps to its value reads as a
      counter; one that sweeps toward it reads as charging, which is the
      whole point of RipperUI's presentation. */
-  var rageShown = 0, tpShown = 0, grazeT = 0;
-  /* Body grazes cannot feed the funnel directly: fightTick runs BEFORE
-     moveBullets every frame, so a direct feed is erased by that same
-     frame's no-bullet-in-range reset before it accumulates anything.
-     They latch here; moveBullets' single end-of-frame call is the only
-     place grazeT advances or resets. */
+  var rageShown = 0, tpShown = 0;
+  /* Body grazes (worm and seeker darts) have no bullet record to hold
+     a first-graze flag, so they latch here and moveBullets' single
+     end-of-frame pass pays them the continued trickle. */
   var grazedByBody = false;
+  /* the soul's velocity (screen px/s), measured each frame: the attacks lead
+     their aim by it (NEU.scalAtk predict()) */
+  var pvx = 0, pvy = 0;
   var AX = 0, AY = 0, AW = 0, AH = 0;
   var bullets = [], phase = 1;
   /* test hook: NEU.scal.hold freezes the frame loop for a manual simulate() */
@@ -210,20 +225,367 @@
     return peak * (1 - a / FLASH_LEN);
   }
 
+  /* ── the look, track V (2026-10-28) ────────────────────────────────
+     Calamity's bar: additive glows stacked on cached sprites (dm.glow),
+     afterimages, shake through juice, colour flashes never past 3 Hz.
+     Reduced motion keeps every telegraph and drops the motion: no view
+     split, no storm drift, no shake (juice gates that). */
+  /* the brothers: drawn BRO_H tall from their real sheets */
+  var BRO_H = 168;
+  var BRO_NAME = { slash: 'Supreme Catastrophe', fist: 'Supreme Cataclysm' };
+  var BRO_COL = { fist:  { aura: '#FF4A14', hot: '#FFB040', bar: '#FF6A2A', ink: '#FFC890' },
+                  slash: { aura: '#7A5CFF', hot: '#C8D4FF', bar: '#9A86FF', ink: '#D8D0FF' } };
+  function broW(kind) {
+    var sh = NEU.sheets && NEU.sheets[kind === 'fist' ? 'cataclysm' : 'catastrophe'];
+    return sh ? Math.round(sh.fw * BRO_H / sh.fh) : BRO_H;
+  }
+  /* Where a brother stands against a wall: half his drawn width in, so
+     the sprite never hangs past the arena edge (or under the TP meter).
+     On a narrow screen the 8 px breathing room gives way first, and the
+     half-width is the floor: a sprite wider than the arena overlaps, it
+     does not hang out. */
+  function broX(kind, side) {
+    var half = broW(kind) / 2;
+    var inset = Math.max(half, Math.min(half + 8, AW / 2));
+    return side < 0 ? AX + inset : AX + AW - inset;
+  }
+  /* The next volley, read off the same clock brothersTick fires on, so
+     the wind-up pose is a true telegraph of what comes. */
+  function broNext() {
+    if (mode !== 'brothers' || !bros.length || broT > 0.45) return null;
+    var k = 1 - Math.max(0, broT) / 0.45, nx = broStep + 1, out = [];
+    if (bros.length === 2 && nx % 3 === 0) {
+      for (var i = 0; i < 2; i++) out.push({ b: bros[i], pat: bros[i].kind === 'fist' ? 'rocket' : 'crescent', k: k });
+    } else {
+      var b = bros[nx % bros.length];
+      out.push({ b: b, pat: BRO_PATS[b.kind][b.n % 3], k: k });
+    }
+    return out;
+  }
+  function drawBro(br, pose) {
+    var c = BRO_COL[br.kind], rot = Math.atan2(py - br.y, px - br.x), k = pose ? pose.k : 0;
+    var bw = broW(br.kind), still = rm();
+    /* the trail: where he was over the last few frames (dashes smear) */
+    br.vt = br.vt || [];
+    br.vt.push({ x: br.x, y: br.y });
+    if (br.vt.length > 7) br.vt.shift();
+    var lift = pose && pose.pat === 'pound' ? -14 * k : 0;
+    var aura = 0.4 + 0.15 * (still ? 0 : Math.sin(t * 3 + br.side)) + 0.4 * k + (br.enraged ? 0.2 : 0);
+    if (dm.glow) {
+      dm.glow(ctx, br.x, br.y + lift, 120, c.aura, Math.min(1, aura));
+      dm.glow(ctx, br.x, br.y + lift, 60, c.hot, 0.25 + 0.4 * k);
+    }
+    var bKey = br.kind === 'fist' ? 'cataclysm' : 'catastrophe';
+    var bSh = NEU.sheets && NEU.sheets[bKey];
+    var bSc = bSh ? BRO_H / bSh.fh : 1;
+    for (var i = 0; i < br.vt.length - 1; i++) {
+      var g = br.vt[i];
+      if (Math.abs(g.x - br.x) + Math.abs(g.y - br.y) < 6) continue;
+      sprite(bKey, g.x, g.y + lift, bSc, rot, false, undefined, undefined, 0.08 * (i + 1));
+      if (dm.glow) dm.glow(ctx, g.x, g.y, 40, c.aura, 0.12 * (i + 1));
+    }
+    var glowK = [br.kind === 'fist' ? 'cataclysmGlow' : 'catastropheGlow'];
+    if (!sprite(bKey, br.x, br.y + lift, bSc, rot, k > 0.6, undefined, undefined, undefined, glowK)) {
+      ctx.fillStyle = br.kind === 'fist' ? '#5A1A0A' : '#241A40';
+      ctx.fillRect((br.x - bw / 2) | 0, (br.y + lift - BRO_H / 2) | 0, bw, BRO_H);
+      ctx.fillStyle = c.bar;
+      ctx.fillRect((br.x - bw / 2) | 0, (br.y + lift - BRO_H / 2) | 0, bw, 4);
+    }
+    /* the weapon: Cataclysm's fist burns at the front of him, the
+       Catastrophe's blade leaves a cold edge */
+    if (br.kind === 'fist' && dm.glow) {
+      var fx = br.x + Math.cos(rot) * bw * 0.36, fy = br.y + lift + Math.sin(rot) * bw * 0.36;
+      dm.glow(ctx, fx, fy, 34, c.hot, 0.5 + 0.5 * k);
+    } else if (dm.glow && br.dash > 0) {
+      /* the blade's cold wake while he dashes */
+      dm.glow(ctx, br.x, br.y, 90, '#C8D4FF', 0.5);
+    }
+    if (pose) broTelegraph(br, pose, rot, c);
+  }
+  /* the wind-up for each A1 volley, drawn over the brother, readable
+     before the volley lands (k runs 0 -> 1 across the last 0.45 s) */
+  function broTelegraph(br, pose, rot, c) {
+    var k = pose.k, i, a, op = ctx.globalCompositeOperation;
+    ctx.save();
+    ctx.lineWidth = 1 + Math.round(2 * k);
+    ctx.strokeStyle = 'rgba(' + (br.kind === 'fist' ? '255,120,40' : '170,150,255') + ',' + (0.35 + 0.5 * k).toFixed(2) + ')';
+    if (pose.pat === 'pound') {
+      ctx.beginPath(); ctx.arc(br.x, br.y, 30 + 90 * k, 0, Math.PI * 2); ctx.stroke();
+    } else if (pose.pat === 'rocket' || pose.pat === 'crescent') {
+      ctx.beginPath(); ctx.moveTo(br.x, br.y);
+      ctx.lineTo(br.x + Math.cos(rot) * 900, br.y + Math.sin(rot) * 900); ctx.stroke();
+      if (pose.pat === 'crescent') {
+        ctx.beginPath(); ctx.arc(br.x, br.y, 70, rot - 0.45, rot + 0.45); ctx.stroke();
+      }
+    } else if (pose.pat === 'uppercut') {
+      var gx = px + pvx * 0.5;
+      ctx.fillStyle = 'rgba(255,90,30,' + (0.12 + 0.25 * k).toFixed(2) + ')';
+      ctx.fillRect((gx - 10) | 0, AY, 20, AH);
+    } else if (pose.pat === 'dash') {
+      var to = broX(br.kind, br.x < AX + AW / 2 ? 1 : -1);
+      ctx.beginPath(); ctx.moveTo(br.x, br.y); ctx.lineTo(to, br.y); ctx.stroke();
+    } else if (pose.pat === 'ring') {
+      for (i = 0; i < 10; i++) {
+        a = i * Math.PI / 5 + t * 0.5;
+        ctx.beginPath(); ctx.arc(br.x + Math.cos(a) * 150, br.y + Math.sin(a) * 150, 4 + 4 * k, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    ctx.globalCompositeOperation = op;
+    ctx.restore();
+  }
+  /* their own bars, under hers: name, HP, enraged tag */
+  function drawBroBars(w) {
+    if (mode !== 'brothers' || !bros.length) return;
+    var bw = Math.min(480, w - 160) | 0, x0 = ((w - bw) / 2) | 0, half = ((bw - 16) / 2) | 0;
+    ctx.font = FONT_UI; ctx.textBaseline = 'top';
+    var order = ['slash', 'fist'];
+    for (var i = 0; i < 2; i++) {
+      var br = null;
+      for (var j = 0; j < bros.length; j++) if (bros[j].kind === order[i]) br = bros[j];
+      var x = x0 + i * (half + 16), y = 76, c = BRO_COL[order[i]];
+      ctx.textAlign = 'left';
+      ctx.fillStyle = br ? c.ink : '#6A6480';
+      ctx.fillText(w < 560 ? BRO_NAME[order[i]].split(' ')[1] : BRO_NAME[order[i]], x, y - 20);
+      ctx.fillStyle = '#05050A'; ctx.fillRect(x - 2, y - 2, half + 4, 12);
+      ctx.fillStyle = '#1A0A0E'; ctx.fillRect(x, y, half, 8);
+      if (br) {
+        ctx.fillStyle = c.bar; ctx.fillRect(x, y, Math.round(half * Math.max(0, br.hp) / 90), 8);
+        ctx.fillStyle = c.hot; ctx.fillRect(x, y, Math.round(half * Math.max(0, br.hp) / 90), 2);
+        if (br.enraged) { ctx.textAlign = 'right'; ctx.fillStyle = c.hot; ctx.fillText('ENRAGED', x + half, y - 20); }
+      }
+    }
+    ctx.textAlign = 'left';
+  }
+
+  /* The soul's shots: cyan-white soul fire, never SCal's sheets. A
+     white core in a diamond, a cyan trail of particles behind it, a
+     cyan ring where it lands. */
+  var rings = [];
+  function shotRing(x, y, big) { if (rings.length > 16) rings.shift(); rings.push({ x: x, y: y, t: 0, big: big }); }
+  function drawSoulShot(s) {
+    var big = s.kind === 'buster', r = big ? 14 : 8;
+    var a = Math.atan2(s.vy, s.vx), ca = Math.cos(a), sa = Math.sin(a);
+    s.vt = s.vt || [];
+    s.vt.push({ x: s.x, y: s.y });
+    if (s.vt.length > (big ? 10 : 7)) s.vt.shift();
+    for (var i = 0; i < s.vt.length - 1; i++) {
+      var p = s.vt[i], k = (i + 1) / s.vt.length;
+      if (dm.glow) dm.glow(ctx, p.x, p.y, (r * 1.4 * k) | 0, '#2AB8FF', 0.45 * k);
+      ctx.fillStyle = 'rgba(160,240,255,' + (0.6 * k).toFixed(2) + ')';
+      var j = (i * 7) % 5 - 2;
+      ctx.fillRect((p.x - sa * j) | 0, (p.y + ca * j) | 0, 2, 2);
+    }
+    if (dm.glow) { dm.glow(ctx, s.x, s.y, r * 3, '#1A6AFF', 0.5); dm.glow(ctx, s.x, s.y, r * 2, '#7FE6FF', 0.8); }
+    /* the diamond: long along travel, a white core */
+    ctx.fillStyle = '#7FE6FF';
+    ctx.beginPath();
+    ctx.moveTo(s.x + ca * r * 1.6, s.y + sa * r * 1.6);
+    ctx.lineTo(s.x - sa * r * 0.8, s.y + ca * r * 0.8);
+    ctx.lineTo(s.x - ca * r, s.y - sa * r);
+    ctx.lineTo(s.x + sa * r * 0.8, s.y - ca * r * 0.8);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.moveTo(s.x + ca * r * 0.9, s.y + sa * r * 0.9);
+    ctx.lineTo(s.x - sa * r * 0.4, s.y + ca * r * 0.4);
+    ctx.lineTo(s.x - ca * r * 0.5, s.y - sa * r * 0.5);
+    ctx.lineTo(s.x + sa * r * 0.4, s.y - ca * r * 0.4);
+    ctx.closePath(); ctx.fill();
+  }
+  function drawRings(dt) {
+    for (var i = rings.length - 1; i >= 0; i--) {
+      var o = rings[i];
+      o.t += dt;
+      var u = o.t / 0.3;
+      if (u >= 1) { rings.splice(i, 1); continue; }
+      ctx.strokeStyle = 'rgba(127,230,255,' + (1 - u).toFixed(2) + ')';
+      ctx.lineWidth = o.big ? 4 : 2;
+      ctx.beginPath(); ctx.arc(o.x, o.y, (o.big ? 14 : 6) + u * (o.big ? 40 : 22), 0, Math.PI * 2); ctx.stroke();
+      if (dm.glow && u < 0.4) dm.glow(ctx, o.x, o.y, o.big ? 40 : 22, '#B8F4FF', 1 - u / 0.4);
+    }
+    ctx.lineWidth = 1;
+  }
+
+  /* The slash: a wide crescent, three additive layers (deep blue, cyan,
+     white core) on the live edge and an 8-step smear behind it. Hit
+     sparks are straight cyan-white streaks thrown off the target. */
+  var sparks = [];
+  function slashSparks(x, y, ang) {
+    for (var i = 0; i < 8; i++) {
+      var a = ang + (i - 3.5) * 0.35;
+      sparks.push({ x: x, y: y, vx: Math.cos(a) * (180 + i * 22), vy: Math.sin(a) * (180 + i * 22), t: 0 });
+    }
+    if (sparks.length > 48) sparks.splice(0, sparks.length - 48);
+  }
+  function drawSwing(sw) {
+    var p = Math.min(1, sw.t / sw.dur), SPAN = 1.15, R = MELEE_R * 0.9;
+    var lead = sw.ang - SPAN + 2 * SPAN * Math.min(1, p * 1.6);
+    var fade = p < 0.6 ? 1 : 1 - (p - 0.6) / 0.4;
+    var op = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    var LAY = [['30,70,255', 16, 0.35], ['64,224,255', 9, 0.6], ['255,255,255', 3, 0.95]];
+    for (var s = 7; s >= 0; s--) {
+      var a1 = lead - s * 0.16, a0 = Math.max(sw.ang - SPAN, a1 - 0.5);
+      if (a1 <= a0) continue;
+      var k = fade * (1 - s / 8);
+      for (var l = 0; l < LAY.length; l++) {
+        ctx.strokeStyle = 'rgba(' + LAY[l][0] + ',' + (LAY[l][2] * k).toFixed(2) + ')';
+        ctx.lineWidth = LAY[l][1] * (s === 0 ? 1 : 0.7);
+        ctx.beginPath(); ctx.arc(sw.x, sw.y, R - s * 1.5, a0, a1); ctx.stroke();
+      }
+    }
+    ctx.lineCap = 'butt'; ctx.lineWidth = 1;
+    ctx.globalCompositeOperation = op;
+  }
+  function drawSparks(dt) {
+    ctx.strokeStyle = '#C8F6FF'; ctx.lineWidth = 2;
+    for (var i = sparks.length - 1; i >= 0; i--) {
+      var s = sparks[i];
+      s.t += dt; s.x += s.vx * dt; s.y += s.vy * dt; s.vx *= 0.86; s.vy *= 0.86;
+      if (s.t > 0.22) { sparks.splice(i, 1); continue; }
+      ctx.globalAlpha = 1 - s.t / 0.22;
+      ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * 0.03, s.y - s.vy * 0.03); ctx.stroke();
+    }
+    ctx.globalAlpha = 1; ctx.lineWidth = 1;
+  }
+
+  /* Brimstone, hers: a dark core and a smoke trail behind the big ones */
+  function smoke(b) {
+    if (b.k !== 2 && b.k !== 3 && b.k !== 5) return;
+    var sp = Math.hypot(b.vx, b.vy);
+    if (sp < 1) return;
+    var ux = b.vx / sp, uy = b.vy / sp;
+    for (var i = 1; i <= 4; i++) {
+      ctx.fillStyle = 'rgba(30,6,8,' + (0.32 - i * 0.06).toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(b.x - ux * i * b.r * 0.9, b.y - uy * i * b.r * 0.9, b.r * (0.8 + i * 0.15), 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  /* Calamitous Rend's view split: the frame is cut along the rift and
+     the halves slide apart 8 px for its first 0.15 s, closing by 0.25 s.
+     Off under reduced motion (the rift's glow still fades in and out). */
+  function splitOffset(age, reduced) {
+    if (reduced || age < 0 || age >= 0.25) return 0;
+    return age < 0.15 ? 8 : 8 * (0.25 - age) / 0.1;
+  }
+  var splitBuf = null;
+  function splitView(r, off) {
+    if (!splitBuf) splitBuf = document.createElement('canvas');
+    if (splitBuf.width !== cv.width || splitBuf.height !== cv.height) {
+      splitBuf.width = cv.width; splitBuf.height = cv.height;
+    }
+    var b = splitBuf.getContext && splitBuf.getContext('2d');
+    if (!b) return;
+    b.setTransform(1, 0, 0, 1, 0, 0);
+    b.clearRect(0, 0, splitBuf.width, splitBuf.height);
+    b.drawImage(cv, 0, 0);
+    var ca = Math.cos(r.ang), sa = Math.sin(r.ang), nx = -sa, ny = ca, L = (VW + VH) * 2;
+    ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, VW, VH);
+    for (var side = -1; side <= 1; side += 2) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(r.cx - ca * L, r.cy - sa * L);
+      ctx.lineTo(r.cx + ca * L, r.cy + sa * L);
+      ctx.lineTo(r.cx + ca * L + nx * L * side, r.cy + sa * L + ny * L * side);
+      ctx.lineTo(r.cx - ca * L + nx * L * side, r.cy - sa * L + ny * L * side);
+      ctx.closePath(); ctx.clip();
+      ctx.drawImage(splitBuf, 0, 0, splitBuf.width, splitBuf.height, nx * off * side, ny * off * side, VW, VH);
+      ctx.restore();
+    }
+    /* the seam itself, white-hot */
+    var op = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = 'rgba(255,90,40,0.6)'; ctx.lineWidth = off * 2 + 6;
+    ctx.beginPath(); ctx.moveTo(r.cx - ca * L, r.cy - sa * L); ctx.lineTo(r.cx + ca * L, r.cy + sa * L); ctx.stroke();
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = Math.max(2, off);
+    ctx.stroke();
+    ctx.globalCompositeOperation = op; ctx.lineWidth = 1;
+  }
+
+  /* Desperation (A1's stage chain): each stage tightens the vignette,
+     shifts the field toward brimstone, thickens the storm behind the
+     arena and lights her up in flame. */
+  var DESP = ['lightning', 'rend', 'gravity', 'final'];
+  function despLevel() {
+    var s = NEU.scalAtk && NEU.scalAtk.stage ? NEU.scalAtk.stage() : '';
+    return s ? DESP.indexOf(s) + 1 : 0;
+  }
+  function drawStorm(w, h, lv) {
+    /* streaks of brimstone rain outside the arena, falling at a slant */
+    var n = 18 + lv * 10, op = ctx.globalCompositeOperation, still = rm();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = 'rgba(255,70,30,' + (0.12 + lv * 0.05).toFixed(2) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (var i = 0; i < n; i++) {
+      var sx = ((i * 0.6180339) % 1) * (w + 200) - 100;
+      var sy = (((i * 0.4142) % 1) * h + (still ? 0 : t * (260 + (i % 4) * 60))) % (h + 80) - 40;
+      ctx.moveTo(sx, sy); ctx.lineTo(sx - 14, sy + 34);
+    }
+    ctx.stroke();
+    ctx.globalCompositeOperation = op; ctx.lineWidth = 1;
+  }
+  function drawVignette(w, h, lv) {
+    var r0 = Math.max(w, h) * (0.62 - lv * 0.07);
+    var g = ctx.createRadialGradient(w / 2, h / 2, r0 * 0.45, w / 2, h / 2, r0);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(20,0,2,' + (0.45 + lv * 0.1).toFixed(2) + ')');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  }
+  function drawAura(lv) {
+    if (!dm.glow) return;
+    var p = rm() ? 0 : Math.sin(t * 5.1) * 0.5 + 0.5;
+    dm.glow(ctx, bx, by, 70 + lv * 12, '#FF3A1A', 0.45 + 0.1 * lv);
+    dm.glow(ctx, bx, by - 20, 44 + 8 * p, '#FFB040', 0.3 + 0.08 * lv);
+    /* flame tongues: six rising teardrops round her, slow under rm */
+    ctx.fillStyle = 'rgba(255,120,40,' + (0.35 + 0.08 * lv).toFixed(2) + ')';
+    for (var i = 0; i < 6; i++) {
+      var a = i * Math.PI / 3 + (rm() ? 0 : t * 0.8);
+      var fx = bx + Math.cos(a) * 46, fy = by + Math.sin(a) * 52 - (((rm() ? 0 : t * 60) + i * 13) % 26);
+      ctx.beginPath(); ctx.moveTo(fx - 5, fy + 8); ctx.lineTo(fx, fy - 12 - lv * 2); ctx.lineTo(fx + 5, fy + 8); ctx.closePath(); ctx.fill();
+    }
+  }
+
+  /* The view scale (V). The fight is laid out in logical px (VW x VH)
+     and drawn VS times larger. VS is the largest quarter step in DEVICE
+     px that still fits the 700x460 arena plus its HUD (860x660), so
+     ctrl- does not shrink the fight and ctrl+ never clips it: when even
+     1x does not fit, VS stays 1 and dm.arena shrinks the arena as it
+     always did. Pixel art is drawn with smoothing off, so a quarter
+     step only ever doubles a pixel column now and then. */
+  var VS = 1, VW = 800, VH = 600, NEED_W = 860, NEED_H = 660;
+  function scaleFor(vw, vh, dpr) {
+    var d = Math.min(dpr || 1, 2), raw = Math.min(vw / NEED_W, vh / NEED_H);
+    if (raw <= 1) return 1;
+    return Math.max(1, Math.floor(raw * d * 4) / 4 / d);
+  }
+  var dprMq = null;
+  function watchDpr() {
+    /* a zoom or a monitor move changes devicePixelRatio, sometimes with
+       no resize; one resolution query per ratio, swapped on each change */
+    if (!window.matchMedia) return;
+    if (dprMq && dprMq.removeEventListener) dprMq.removeEventListener('change', onDpr);
+    dprMq = matchMedia('(resolution: ' + (devicePixelRatio || 1) + 'dppx)');
+    if (dprMq && dprMq.addEventListener) dprMq.addEventListener('change', onDpr);
+  }
+  function onDpr() { watchDpr(); if (running) layout(); }
   function layout() {
     var dpr = Math.min(devicePixelRatio || 1, 2);
+    VS = scaleFor(innerWidth, innerHeight, devicePixelRatio || 1);
+    VW = innerWidth / VS; VH = innerHeight / VS;
     cv.width = (innerWidth * dpr) | 0; cv.height = (innerHeight * dpr) | 0;
     cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(dpr * VS, 0, 0, dpr * VS, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    var ar = dm.arena ? dm.arena(innerWidth, innerHeight, 700, 460, 24) : null;
+    var ar = dm.arena ? dm.arena(VW, VH, 700, 460, 24) : null;
     if (ar) {
       AW = ar.AW; AH = ar.AH; AX = ar.AX; AY = ar.AY;
     } else {
-      AW = Math.min(700, innerWidth - 60);
-      AH = Math.min(460, innerHeight - 190);
-      AX = ((innerWidth - AW) / 2) | 0;
-      AY = ((innerHeight - AH) / 2 + 24) | 0;
+      AW = Math.min(700, VW - 60);
+      AH = Math.min(460, VH - 190);
+      AX = ((VW - AW) / 2) | 0;
+      AY = ((VH - AH) / 2 + 24) | 0;
     }
     px = Math.min(Math.max(px, AX + 12), AX + AW - 12);
     py = Math.min(Math.max(py, AY + 12), AY + AH - 12);
@@ -232,6 +594,7 @@
     if (NEU.scalSeekers && seekersReady) NEU.scalSeekers.setArena(AX, AY, AW, AH);
   }
   addEventListener('resize', function () { if (running) layout(); });
+  watchDpr();
 
   function stamp(rows, cx, cy, s, col) {
     if (dm.soul && dm.soul.stamp) {
@@ -273,6 +636,12 @@
     clearSched();
     sfxPlay('maelstrom');
     NEU.scalAtk.start();
+    /* dev `skip` to a phase: start in it, not four transitions short of it
+       (and not behind the opening worm either) */
+    if (skipFrac && NEU.scalAtk.setLevel) {
+      clearSpecials();
+      NEU.scalAtk.setLevel(NEU.scalAtk.levelFor(skipFrac));
+    }
   }
 
   function spawnSepulcher() {
@@ -295,11 +664,10 @@
     for (var i = 0; i < 10; i++) {
       var left = i < 5, idx = i % 5;
       hearts.push({
-        /* Three bolts each. The heart pool IS the length of the worm
-           phase — the Sepulcher's own 6-step SCRIPT (scal-worm.js:49-56)
-           runs about 25s a lap, and one-shot hearts ended the phase
-           before a single lap finished. */
-        hp: 3,
+        /* Eighteen HP: three melee slashes (6 each), which is the 3
+           bolts the heart pool was sized for. One-shot hearts ended the
+           phase before a single lap of the Sepulcher's script finished. */
+        hp: 18,
         x: (left ? AX + 44 : AX + AW - 44) + (idx % 2 ? (left ? 18 : -18) : 0),
         y: AY + 46 + idx * 28
       });
@@ -328,13 +696,18 @@
   }
 
   /* ── the brothers ───────────────────────────────────────────────*/
+  /* 90 HP each (SCal rework; was 8). The volley clock and the step count. */
+  var broT = 0, broStep = 0;
+  /* the dev `skip` share this fight opened at (0 = a normal fight) */
+  var skipFrac = 0;
   function startBrothers() {
     mode = 'brothers'; invuln = true; bullets = [];
     clearSched();
     bros = [
-      { side: -1, x: AX + 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'slash', attackCount: 0, enraged: false, volley: 0, barrageCd: 0 },
-      { side:  1, x: AX + AW - 60, y: AY + AH / 2, hp: 8, t: 0, kind: 'fist', attackCount: 0, enraged: false, volley: 0, barrageCd: 0 }
+      { side: -1, x: broX('slash', -1), y: AY + AH / 2, hp: 90, t: 0, kind: 'slash', n: 0, dash: 0, dashTo: 0, enraged: false },
+      { side:  1, x: broX('fist', 1), y: AY + AH / 2, hp: 90, t: 0, kind: 'fist', n: 0, dash: 0, dashTo: 0, enraged: false }
     ];
+    broT = 1.0; broStep = 0;
     say("* she calls her brothers. she does not fight while they do.");
   }
 
@@ -353,8 +726,19 @@
   }
 
   function update(dt) {
+    /* The C strip slows the whole fight to a fifth. Cooldowns below run
+       on this same scaled clock, so HEAL's 30 s is fight time. */
+    if (stripOpen) dt *= STRIP_SCALE;
     t += dt;
     driftEmbers(dt);
+    if (meleeCd > 0) meleeCd -= dt;
+    if (shotCd > 0) shotCd -= dt;
+    if (defendT > 0) defendT -= dt;
+    if (healCd > 0) {
+      healCd -= dt;
+      if (healCd <= 0) { healCd = 0; healToast = 1.6; if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick(); }
+    }
+    if (healToast > 0) healToast -= dt;
     for (var bi = booms.length - 1; bi >= 0; bi--) if ((booms[bi].t += dt) >= 0.8) booms.splice(bi, 1);
 
     /* Rage: PROXIMITY fills the bar (RipperUI's rage is earned by
@@ -375,12 +759,11 @@
       rageModeT -= dt;
       if (rageModeT <= 0) { rageMode = 0; say('* the rage burns out. it wants to be earned again.'); }
     }
+    /* the barrier is up until it takes a hit; the 30 s is a backstop */
     if (shieldT > 0) shieldT -= dt;
-    /* Charging the shot: f held accumulates power over ~0.9s (capped),
-       released by keyup → tryHit(). shotCd keeps taps from machine-
-       gunning bolts. */
-    if (charging) chargeF = Math.min(1, chargeF + dt);
-    if (shotCd > 0) shotCd -= dt;
+    /* Z held counts toward the fireball's hold (FIRE_HOLD); the release
+       in keyup decides slash or fireball. */
+    if (charging) chargeF += dt;
     /* null: her rage is her own, the shared bar stays out of it */
     dm.tick(F, dt, null);
     /* The sweep. Six per second converges in about half a second —
@@ -389,7 +772,12 @@
     rageShown += (rage - rageShown) * ease;
     tpShown   += (tp   - tpShown)   * ease;
 
-    if (mode !== 'intro' && mode !== 'won') movePlayer(dt);
+    /* the C strip holds the soul still: arrows drive the menu instead */
+    if (mode !== 'intro' && mode !== 'won' && !stripOpen) {
+      var ox = px, oy = py;
+      movePlayer(dt);
+      if (dt > 0) { pvx = (px - ox) / dt; pvy = (py - oy) / dt; }
+    }
     if (inv > 0) inv -= dt;
 
     if (mode === 'intro') { if (t > 2.6) startLead(); }
@@ -401,19 +789,22 @@
     moveMyShots(dt);
   }
 
+  /* Blue soul is gravity: dm.move runs it when F.mode is 'blue', with
+     the optional platforms a pattern sets on NEU.scalSoul. */
   function movePlayer(dt) {
     F.x = px; F.y = py;
-    dm.move(F, keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH });
+    dm.move(F, keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH }, NEU.scalSoul.platforms);
     px = F.x; py = F.y;
   }
 
-  /* One frame of the fight proper. The seekers' ring and the Sepulcher hold
-     the attack clock; when they are down, the clock runs again. */
+  /* One frame of the fight proper. The seekers' ring holds the attack clock;
+     the Sepulcher does not: she orbits the soul while the worm is up, so the
+     clock runs and her worm attack (scal-attacks.js) steps with it. */
   function fightTick(dt) {
     if (ringOn && NEU.scalSeekers) {
       /* She holds still; the ring is the attack. Both callbacks are the same
          ones the worm uses, so a graze and a hit take the same paths. */
-      NEU.scalSeekers.setPlayer(px, py);
+      NEU.scalSeekers.setPlayer(px, py, pvx, pvy);
       NEU.scalSeekers.tick(dt);
       NEU.scalSeekers.tickDarts(dt, px, py,
         function () { grazedByBody = true; },
@@ -438,82 +829,94 @@
         sep = null; invuln = false;
         say("* she steps out from behind it.");
       }
-      return;
     }
+    /* the attack clock runs in every state that is not a body's own (the
+       ring above). The worm's attack is the one stepping here while sep is up. */
     NEU.scalAtk.tick(dt);
   }
 
-  function brothersTick(dt) {
-    /* Both alive: 25% DR (handled in tryHit). Fire in barrages with
-       pauses — every 0.83s (50 frames) while active, then a hold while
-       they swap sides. Every 7th volley = big attack. When one dies,
-       the survivor enrages: faster volleys, shorter pauses. */
-    for (var i = 0; i < bros.length; i++) {
-      var b = bros[i];
-      if (b.hp <= 0) continue; // dead, will be cleaned up below
-
-      var interval = b.enraged ? 0.7 : 0.83; // enraged = faster
-      b.t -= dt;
-      b.y += Math.sin(t * 1.6 + i) * 22 * dt;
-      if (b.barrageCd > 0) {
-        b.barrageCd -= dt;
-        if (b.barrageCd <= 0) {
-          b.side *= -1;
-          b.x = b.side < 0 ? AX + 60 : AX + AW - 60;
-          if (NEU.juice) NEU.juice.hit('small');
-        }
+  /* ── the brothers' patterns ──────────────────────────────────────────
+     Cataclysm is the fist (the brawler) and Catastrophe the slash (the
+     blade). Each takes its three patterns in turn. The volleys alternate
+     between them, and every third volley both fire together: a pincer from
+     the two walls. */
+  var BRO_PATS = { fist: ['pound', 'rocket', 'uppercut'], slash: ['crescent', 'dash', 'ring'] };
+  function ringBurst(x, y, n, sp, a0) {
+    for (var i = 0; i < n; i++) {
+      var a = a0 + i * Math.PI * 2 / n;
+      spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0);
+    }
+  }
+  /* the crescent turns back once, from where its fuse ended */
+  function boomerang(b) { spawn(b.x, b.y, -b.vx * 0.9, -b.vy * 0.9, 0, { fuse: 0.8 }); }
+  function broAttack(b, pat) {
+    var a = Math.atan2(py - b.y, px - b.x), i, k, q, gx;
+    if (pat === 'pound') {
+      /* ground pound: a ring of darts, then a slower one behind it */
+      ringBurst(b.x, b.y, 14, 220, 0);
+      later(function () { ringBurst(b.x, b.y, 8, 130, Math.PI / 8); }, 400);
+    } else if (pat === 'rocket') {
+      /* rocket fist: one fast bolt that bounces off the arena walls */
+      spawn(b.x, b.y, Math.cos(a) * 340, Math.sin(a) * 340, 0, { bounce: 3, fuse: 6 });
+    } else if (pat === 'uppercut') {
+      /* flame pillars: a column of darts rising where the soul is going */
+      gx = px + pvx * 0.5;
+      for (i = 0; i < 5; i++) spawn(gx, AY + AH - 10 - i * 36, 0, -120, 0, { fuse: 1.1 });
+    } else if (pat === 'crescent') {
+      /* crescent wave: seven slashes in an arc; each comes back once */
+      for (k = -3; k <= 3; k++)
+        spawn(b.x, b.y, Math.cos(a + k * 0.14) * 260, Math.sin(a + k * 0.14) * 260, 0,
+              { fuse: 0.8, onEnd: boomerang });
+    } else if (pat === 'dash') {
+      /* blade dash across to the far wall; then a cross-cut of darts along
+         the soul's row, with a gap where the soul was */
+      b.dashTo = broX(b.kind, b.x < AX + AW / 2 ? 1 : -1);
+      b.dash = 0.35;
+      gx = px; q = py;
+      later(function () {
+        for (var x = AX + 10; x < AX + AW - 10; x += 26)
+          if (Math.abs(x - gx) > 40) spawn(x, q, 0, 0, 0, { fuse: 0.7 });
+      }, 450);
+    } else if (pat === 'ring') {
+      /* spinning swords: ten on a circle about the brother, closing in over 2.6 s */
+      for (i = 0; i < 10; i++) {
+        q = i * Math.PI * 2 / 10;
+        spawn(b.x + Math.cos(q) * 150, b.y + Math.sin(q) * 150, 0, 0, 0,
+              { fuse: 2.6, orb: { cx: b.x, cy: b.y, a0: q, r0: 150, r1: 30, w: 2.2, T: 2.6 } });
       }
-      if (b.t <= 0 && b.barrageCd <= 0) {
-        b.t = interval;
-        b.attackCount++;
-        b.volley = (b.volley || 0) + 1;
-        if (b.volley >= (b.enraged ? 2 : 5)) {
-          b.volley = 0;
-          b.barrageCd = b.enraged ? 0.9 : 1.2;
-        }
-        var isBigAttack = (b.attackCount % 7 === 0);
-        var a = Math.atan2(py - b.y, px - b.x);
-
-        if (isBigAttack) {
-          /* Big attack every 7th: fist = 2 fists, slash = predictive lunge (3 slashes ahead) */
-          if (b.kind === 'fist') {
-            /* Two fists from opposite sides */
-            for (var s = -1; s <= 1; s += 2) {
-              var aa = a + s * 0.25;
-              spawn(b.x, b.y, Math.cos(aa) * 280, Math.sin(aa) * 280, 0);
-            }
-          } else {
-            /* Slash: predictive lunge - aim ahead of player */
-            var pvx = 0, pvy = 0; // could track player velocity
-            var predX = px + pvx * 0.5, predY = py + pvy * 0.5;
-            var aa = Math.atan2(predY - b.y, predX - b.x);
-            for (var j = -1; j <= 1; j++)
-              spawn(b.x, b.y, Math.cos(aa + j * 0.12) * 340, Math.sin(aa + j * 0.12) * 340, 0);
-          }
-        } else {
-          /* Normal attack */
-          if (b.kind === 'fist') {
-            spawn(b.x, b.y, Math.cos(a) * 240, Math.sin(a) * 240, 0);
-          } else {
-            var spread = b.enraged ? 0.1 : 0.16;
-            var count = b.enraged ? 1 : 3;
-            var start = -(count - 1) / 2;
-            for (var j = 0; j < count; j++)
-              spawn(b.x, b.y, Math.cos(a + (start + j) * spread) * 300, Math.sin(a + (start + j) * spread) * 300, 0);
-          }
-        }
+    }
+  }
+  function brothersTick(dt) {
+    var i, b;
+    /* the hover bob, and the blade's dash toward the far wall */
+    for (i = 0; i < bros.length; i++) {
+      b = bros[i];
+      b.y += Math.sin(t * 1.6 + i) * 22 * dt;
+      if (b.dash > 0) { b.dash -= dt; b.x += (b.dashTo - b.x) * Math.min(1, dt * 8); }
+    }
+    /* the volleys: one brother a turn every 1.1 s (0.7 s for a survivor, who
+       also has the whole clock), and every third volley both at once */
+    broT -= dt;
+    if (broT <= 0 && bros.length) {
+      broT = bros.length === 1 ? 0.7 : 1.1;
+      broStep++;
+      if (bros.length === 2 && broStep % 3 === 0) {
+        for (i = 0; i < 2; i++) broAttack(bros[i], bros[i].kind === 'fist' ? 'rocket' : 'crescent');
+      } else {
+        b = bros[broStep % bros.length];
+        broAttack(b, BRO_PATS[b.kind][b.n++ % 3]);
       }
     }
 
     /* Remove dead brothers */
-    for (var i = bros.length - 1; i >= 0; i--) {
+    for (i = bros.length - 1; i >= 0; i--) {
       if (bros[i].hp <= 0) {
         var dead = bros.splice(i, 1)[0];
         if (NEU.juice) NEU.juice.burst(dead.x, dead.y, 15, dead.kind === 'fist' ? COL.brimHi : COL.brim, 1.5);
         /* Survivor enrages */
         if (bros.length === 1) {
           bros[0].enraged = true;
-          say(dead.kind === 'fist' ? "* the swordsman falls. the mage rages." : "* the mage falls. the swordsman rages.");
+          say(dead.kind === 'fist' ? "* the brawler falls. the blade rages." : "* the blade falls. the brawler rages.");
         }
       }
     }
@@ -530,7 +933,7 @@
      barrier eats the hit instead of you — one hit, then it is gone,
      and it does not hand you invulnerability for free. */
   function hitPlayer() {
-    if (god || F.dashI > 0) return false;          /* a dash passes through */
+    if (god || (NEU.cheat && NEU.cheat.god) || F.dashI > 0) return false;   /* a dash passes through; dev `god` (dev.js) */
     if (shieldT > 0) {
       shieldT = 0;
       inv = IFRAMES;
@@ -538,7 +941,16 @@
       if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(px, py, 12, '#B8E6FF'); }
       return false;
     }
-    hp--; inv = IFRAMES;
+    /* DEFEND halves each hit. HP is whole, so the half is banked and the
+       second hit under DEFEND is the one that costs a heart. */
+    inv = IFRAMES;
+    hurtAcc += defendT > 0 ? 0.5 : 1;
+    if (hurtAcc < 1) {
+      if (NEU.juice) NEU.juice.hit('small');
+      return false;
+    }
+    hurtAcc -= 1;
+    hp--;
     dm.hurt(F, px, py - 12);
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     /* Taking a hit is a MEDIUM event. The player needs to feel it
@@ -548,15 +960,17 @@
     return false;
   }
 
-  /* Deltarune's rule, from the wiki: "More TP is earned as the SOUL
-     continues to graze bullets for longer." This used to be a flat
-     `tp += dt * 0.4` written out TWICE — once in moveBullets and once in
-     the worm's graze callback — which is two copies of a rule free to
-     drift apart. One funnel; every hostile body calls it. */
-  function feedGraze(dt, grazing) {
-    if (!grazing) { grazeT = 0; return; }
-    grazeT += dt;
-    tp = Math.min(1, tp + dt * (0.25 + 0.35 * Math.min(1, grazeT / 1.5)));
+  /* One funnel for every TP gain, so the caps and the MAX state agree. */
+  function addTp(v) { tp = Math.min(1, tp + v); }
+  /* A new graze: the outline flash (never faster than 3 Hz), a tick,
+     and the point for the view to draw. */
+  function grazeFlash(x, y) {
+    if (t - grazeAt < 0.34) return;
+    grazeAt = t;
+    F.grazeFlashT = 0.12;
+    F.grazes.push({ x: x, y: y, t: t });
+    if (F.grazes.length > 12) F.grazes.shift();
+    if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
   }
 
   /* Bullets move, graze and hit. A bullet with a fuse ends when the fuse runs
@@ -564,7 +978,6 @@
      after the list is rebuilt, so the ring it drops is not lost. */
   function moveBullets(dt) {
     var keep = [], fire = [];
-    var grazedThisFrame = false;
     for (var i = 0; i < bullets.length; i++) {
       var b = bullets[i];
       b.age += dt;
@@ -585,103 +998,148 @@
           ? Math.atan2(b.vy, b.vx) + Math.PI / 2
           : Math.atan2(b.vy, b.vx);
       }
-      b.x += b.vx * dt; b.y += b.vy * dt;
+      if (b.orb) {
+        /* a spinning sword: on a circle about its brother, its radius
+           closing from r0 to r1 over its fuse (the Catastrophe ring) */
+        var ou = Math.min(1, b.age / b.orb.T), oa = b.orb.a0 + b.orb.w * b.age;
+        var orr = b.orb.r0 + (b.orb.r1 - b.orb.r0) * ou;
+        b.x = b.orb.cx + Math.cos(oa) * orr; b.y = b.orb.cy + Math.sin(oa) * orr;
+      } else { b.x += b.vx * dt; b.y += b.vy * dt; }
+      /* a bouncing bolt (the Cataclysm rocket) turns off each wall it meets,
+         for as many bounces as it has */
+      if (b.bounce > 0 && (b.x < AX || b.x > AX + AW || b.y < AY || b.y > AY + AH)) {
+        if (b.x < AX || b.x > AX + AW) { b.vx = -b.vx; b.x = Math.min(AX + AW, Math.max(AX, b.x)); }
+        if (b.y < AY || b.y > AY + AH) { b.vy = -b.vy; b.y = Math.min(AY + AH, Math.max(AY, b.y)); }
+        b.bounce--;
+      }
       if (b.x < AX - 60 || b.x > AX + AW + 60 || b.y < AY - 60 || b.y > AY + AH + 60) continue;
       keep.push(b);
       if (inv <= 0 && mode !== 'won') {
         var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
-        /* Graze: a bullet within 26px of the soul feeds TP, hit or not. */
-        if (dx * dx + dy * dy < (b.r + 26) * (b.r + 26)) grazedThisFrame = true;
+        /* Graze region: the bullet's edge within 8 px of the soul's
+           contact distance. The first entry pays GRAZE_PTS once per
+           bullet (b.grazed is the per-bullet cooldown); staying in the
+           region pays the per-second trickle every frame. */
+        var gz = rr + GRAZE_PAD;
+        if (dx * dx + dy * dy < gz * gz) {
+          if (!b.grazed) { b.grazed = true; addTp(GRAZE_PTS); grazeFlash(b.x, b.y); }
+          addTp(GRAZE_PTS * dt);
+        }
         if (dx * dx + dy * dy < rr * rr && hitPlayer()) return;
       }
     }
-    /* Body grazes latched during fightTick count here too: one clock, one cap. */
-    feedGraze(dt, grazedThisFrame || grazedByBody);
+    /* Body grazes latched during fightTick: continued trickle only. */
+    if (grazedByBody) addTp(GRAZE_PTS * dt);
     grazedByBody = false;
     bullets = keep;
     for (var f = 0; f < fire.length; f++) fire[f].onEnd(fire[f]);
   }
 
   /* ── hitting her ────────────────────────────────────────────────
-     You DO have a weapon now (V5 phase 2): hold f to charge, release
-     to fire a homing shot. A tap is a weak bolt; a full ~0.9s charge
-     is an orb that bursts into eight darts on impact. The soul still
-     shatters hearts on touch? No — everything goes through the gun
-     now, which is what makes the brothers beatable and melee-vs-strike-
-     ring geometry problem moot. */
+     Two strikes, both on Z. A tap (released before FIRE_HOLD) is the
+     melee slash: 6 damage, reach MELEE_R toward the nearest target.
+     Holding Z to FIRE_HOLD and releasing throws a fireball: 1.5 damage,
+     homing, FIRE_CD cooldown. Brimstone Buster is in the C strip. */
 
   function startCharge() {
     if (charging || dying || mode === 'intro' || mode === 'won') return;
     charging = true; chargeF = 0;
   }
 
+  /* Z released: a slash if it was a tap, a fireball if it was held. */
+  function release() {
+    if (!charging) return;
+    charging = false;
+    var held = chargeF;
+    chargeF = 0;
+    if (held < FIRE_HOLD) melee(); else fireball();
+  }
+
   /* Target selection mirrors the old tryHit branch order exactly:
      the ring while it stands, hearts while the sepulcher stands, then
      the brothers, then her. */
   function resolveTarget() {
+    var best = null, bd = Infinity;
+    function pick(kind, ref, x, y, r) {
+      var d = Math.hypot(px - x, py - y);
+      if (d < bd) { bd = d; best = { kind: kind, ref: ref, x: x, y: y, r: r }; }
+    }
     if (ringOn && NEU.scalSeekers && NEU.scalSeekers.alive()) {
-      var ss = NEU.scalSeekers.seekers(), bs = null, bsd = Infinity;
-      for (var s = 0; s < ss.length; s++) {
-        var sd = Math.hypot(px - ss[s].x, py - ss[s].y);
-        if (sd < bsd) { bsd = sd; bs = ss[s]; }
-      }
-      if (bs) return { x: bs.x, y: bs.y };
+      var ss = NEU.scalSeekers.seekers();
+      for (var s = 0; s < ss.length; s++) pick('seeker', ss[s], ss[s].x, ss[s].y, 12);
+      if (best) return best;
     }
     if (sep && hearts.length) {
-      var bh = null, bd = Infinity;
-      for (var i = 0; i < hearts.length; i++) {
-        var d = Math.hypot(px - hearts[i].x, py - hearts[i].y);
-        if (d < bd) { bd = d; bh = hearts[i]; }
-      }
-      if (bh) return { x: bh.x, y: bh.y };
+      for (var i = 0; i < hearts.length; i++) pick('heart', hearts[i], hearts[i].x, hearts[i].y, 18);
+      if (best) return best;
     }
     if (mode === 'brothers' && bros.length) {
-      var bb = null, bdd = Infinity;
-      for (var j = 0; j < bros.length; j++) {
-        var dd = Math.hypot(px - bros[j].x, py - bros[j].y);
-        if (dd < bdd) { bdd = dd; bb = bros[j]; }
-      }
-      if (bb) return { x: bb.x, y: bb.y };
+      for (var j = 0; j < bros.length; j++) pick('bro', bros[j], bros[j].x, bros[j].y, HB.broReach);
+      return best;
     }
-    if (mode === 'fight' && !invuln) return { x: bx, y: by };
+    if (mode === 'fight' && !invuln) return { kind: 'her', ref: null, x: bx, y: by, r: 40 };
     return null;
   }
 
-  /* keyup: release the charge as a homing shot. */
-  function tryHit() {
-    if (!charging) return;
-    charging = false;
-    var power = Math.min(1, chargeF / 0.9);
-    chargeF = 0;
-    if (shotCd > 0 || dying || mode === 'intro' || mode === 'won') return;
-    shotCd = 0.3;
+  function facingAng() { return (F.fx || F.fy) ? Math.atan2(F.fy, F.fx) : -Math.PI / 2; }
+
+  /* The slash. Reach is MELEE_R from the soul to the target's edge; the
+     arc is drawn toward the nearest target, or where you face. A landed
+     slash gives +1 % TP. Cooldown MELEE_CD. */
+  function melee() {
+    if (meleeCd > 0 || dying || mode === 'intro' || mode === 'won') return;
+    meleeCd = MELEE_CD;
     var tg = resolveTarget();
-    var ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    var iy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
-    var ang = tg ? Math.atan2(tg.y - py, tg.x - px)
-                 : ((ix || iy) ? Math.atan2(iy, ix) : -Math.PI / 2);
-    var heavy = power >= 0.35;
-    var sp = heavy ? 300 : 260;
-    myShots.push({ x: px, y: py, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
-                   r: heavy ? 12 : 5, k: heavy ? 'orb' : 'bolt', age: 0 });
+    var ang = tg ? Math.atan2(tg.y - py, tg.x - px) : facingAng();
+    var sw = { x: px, y: py, ang: ang, t: 0, dur: 0.15, hit: false };
+    F.swings.push(sw);
+    var n0 = F.pops[F.pops.length - 1];   /* the newest pop before the hit */
+    if (tg && Math.hypot(tg.x - px, tg.y - py) <= MELEE_R + tg.r &&
+        damageTarget(tg.kind, tg.ref, MELEE_DMG)) {
+      sw.hit = true;
+      addTp(0.01);
+      /* V: the true-melee feel. Sparks, a 3-frame hit-stop with a small
+         shake leaning along the cut, and a big number (danmaku p.big). */
+      slashSparks(tg.x, tg.y, ang);
+      if (NEU.juice) NEU.juice.hit('medium', { shake: 0.16, dx: Math.cos(ang), dy: Math.sin(ang) });
+      /* only a pop this hit pushed (a seeker hit pushes none) */
+      /* a pop is new when the newest one is not the one we saw before (a full
+         list shifts, so the length alone cannot tell) */
+      var lp = F.pops[F.pops.length - 1];
+      if (lp === n0) lp = null;
+      if (lp) { lp.big = true; lp.c = '#E8FBFF'; }
+    }
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
   }
 
-  /* An orb that lands bursts into eight darts — each one homes too,
-     so the burst total is deterministic against a stationary target. */
-  function burstShots(x, y) {
-    for (var i = 0; i < 8; i++) {
-      var a = i * Math.PI / 4;
-      myShots.push({ x: x, y: y, vx: Math.cos(a) * 220, vy: Math.sin(a) * 220,
-                     r: 4, k: 'burst', age: 0 });
-    }
+  /* The fireball: a homing soul-fire shot. Cooldown FIRE_CD. */
+  function fireball() {
+    if (shotCd > 0 || dying || mode === 'intro' || mode === 'won') return;
+    shotCd = FIRE_CD;
+    var tg = resolveTarget();
+    var ang = tg ? Math.atan2(tg.y - py, tg.x - px) : facingAng();
+    myShots.push({ owner: 'soul', kind: 'fireball', x: px, y: py,
+                   vx: Math.cos(ang) * 260, vy: Math.sin(ang) * 260,
+                   r: 9, dmg: FIRE_DMG, age: 0, hitRefs: [] });
+    if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+  }
+
+  /* The buster: 40 damage, piercing, owner 'soul'. Called from the strip,
+     which has already checked and paid for it. */
+  function buster() {
+    var tg = resolveTarget();
+    var ang = tg ? Math.atan2(tg.y - py, tg.x - px) : facingAng();
+    myShots.push({ owner: 'soul', kind: 'buster', x: px, y: py,
+                   vx: Math.cos(ang) * 420, vy: Math.sin(ang) * 420,
+                   r: 16, dmg: BUSTER_DMG, pierce: true, age: 0, hitRefs: [] });
+    if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
   }
 
   function moveMyShots(dt) {
     for (var i = myShots.length - 1; i >= 0; i--) {
       var s = myShots[i];
       s.age += dt;
-      var dead = s.age > (s.k === 'burst' ? 1.2 : 4);
+      var dead = s.age > 4;
       /* dt-correct version of moveBullets' speed-preserving steering
          kernel: rotate velocity toward the target without changing its
          magnitude, so homing curves instead of snapping. */
@@ -701,41 +1159,40 @@
         if (s.x < AX - 40 || s.x > AX + AW + 40 ||
             s.y < AY - 80 || s.y > AY + AH + 60) dead = true;
       }
-      /* Collisions mirror the old tryHit gating: whatever the melee
-         could touch, the shot can reach. The ring branch comes first:
-         while she is invulnerable behind the seekers, every shot that
-         touches one kills it (orbs burst into their eight darts right
-         there — how the phase is played through). */
+      /* Collisions mirror the melee gating: whatever a slash can touch,
+         a shot can reach. The ring first: while she is shielded behind
+         the seekers, a shot that touches one takes it. A buster passes
+         through, hitting each target once (hitRefs). Any other shot
+         stops at the first target it hits. */
       if (!dead) {
         if (ringOn && NEU.scalSeekers) {
-          if (NEU.scalSeekers.hit(s.x, s.y, s.r)) {
-            if (s.k === 'orb') burstShots(s.x, s.y);
-            dead = true;
-          }
+          if (NEU.scalSeekers.hit(s.x, s.y, s.r)) dead = true;
         } else if (sep) {
-          for (var q = 0; q < hearts.length; q++) {
+          for (var q = 0; q < hearts.length && !dead; q++) {
+            if (s.hitRefs.indexOf(hearts[q]) >= 0) continue;
             if (Math.hypot(hearts[q].x - s.x, hearts[q].y - s.y) < 18 + s.r) {
-              damageTarget('heart', hearts[q], 1);
-              if (s.k === 'orb') burstShots(s.x, s.y);
-              dead = true; break;
+              s.hitRefs.push(hearts[q]);
+              damageTarget('heart', hearts[q], s.dmg);
+              dead = !s.pierce;
             }
           }
         } else if (mode === 'brothers') {
-          for (var w = 0; w < bros.length; w++) {
+          for (var w = 0; w < bros.length && !dead; w++) {
+            if (s.hitRefs.indexOf(bros[w]) >= 0) continue;
             if (Math.hypot(bros[w].x - s.x, bros[w].y - s.y) < HB.broReach + s.r) {
-              damageTarget('bro', bros[w], 1);
-              if (s.k === 'orb') burstShots(s.x, s.y);
-              dead = true; break;
+              s.hitRefs.push(bros[w]);
+              damageTarget('bro', bros[w], s.dmg);
+              dead = !s.pierce;
             }
           }
-        } else if (mode === 'fight' && !invuln &&
+        } else if (mode === 'fight' && !invuln && s.hitRefs.indexOf('her') < 0 &&
                    Math.hypot(bx - s.x, by - s.y) < 40 + s.r) {
-          damageTarget('her', null, 1);
-          if (s.k === 'orb') burstShots(s.x, s.y);
-          dead = true;
+          s.hitRefs.push('her');
+          damageTarget('her', null, s.dmg);
+          dead = !s.pierce;
         }
       }
-      if (dead) myShots.splice(i, 1);
+      if (dead) { if (s.hitRefs.length || !s.pierce) shotRing(s.x, s.y, s.kind === 'buster'); myShots.splice(i, 1); }
     }
   }
 
@@ -743,22 +1200,30 @@
      from here: each HP share she crosses calls NEU.scalAtk.gate, which
      starts the transition (scal-attacks.js, GATE and AFTER_PT). */
   function damageTarget(kind, ref, amount) {
-    var eff = amount * (rageMode ? 2 : 1);
+    /* Returns true when the strike landed (a melee's +1 % TP needs it). */
+    /* dev `dmg` multiplier (dev.js); absent or 1 is the normal fight */
+    var eff = amount * (rageMode ? 2 : 1) * ((NEU.cheat && NEU.cheat.dmgMul) || 1);
+    if (kind === 'seeker') {
+      if (!NEU.scalSeekers || !NEU.scalSeekers.hit(ref.x, ref.y, 0)) return false;
+      if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+      if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(ref.x, ref.y, 4, COL.brimHi); }
+      return true;
+    }
     if (kind === 'heart') {
       var hi = hearts.indexOf(ref);
-      if (hi < 0) return;
+      if (hi < 0) return false;
       ref.hp -= eff;
       dm.pop(F, ref.x, ref.y, eff);
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
       if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(ref.x, ref.y, 4, COL.brimHi); }
-      if (ref.hp > 0) return;              /* cracked, not broken */
+      if (ref.hp > 0) return true;         /* cracked, not broken */
       var hx = ref.x, hy = ref.y;
       hearts.splice(hi, 1);
       if (NEU.juice) NEU.juice.burst(hx, hy, 8, COL.brimHi);
-      return;
+      return true;
     }
     if (kind === 'bro') {
-      if (bros.indexOf(ref) < 0) return;
+      if (bros.indexOf(ref) < 0) return false;
       /* the number shows the strike, not the 25% DR split: the brother's
          own bar still moves by the real amount */
       dm.pop(F, ref.x, ref.y, eff);
@@ -773,9 +1238,9 @@
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
       if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(ref.x, ref.y, 8, COL.brimHi); }
       /* Death handled in brothersTick */
-      return;
+      return true;
     }
-    if (invuln || mode !== 'fight') return;
+    if (invuln || mode !== 'fight') return false;
     bossHP -= eff;
     dm.bossHit(F, bx, by, eff);
     if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
@@ -784,10 +1249,11 @@
     if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(bx, by, 7, COL.brimHi); }
     bossHP = Math.max(0, bossHP);
     NEU.scalAtk.gate(bossHP / bossMax);
+    return true;
   }
 
   function win() {
-    mode = 'won'; running = false; bullets = [];
+    mode = 'won'; running = false; bullets = []; stripOpen = false;
     /* the ring cannot outlive her: drop it so nothing ticks or draws
        into the victory lap */
     if (NEU.scalSeekers) NEU.scalSeekers.clear();
@@ -796,7 +1262,7 @@
     if (NEU.juice) { NEU.juice.hit('huge', { colour: '#FF6B4A' });
                      NEU.juice.burst(bx, by, 60, COL.brim, 260); }
     if (NEU.save) { NEU.save.give('ashes'); NEU.save.flag('scal_dead', 1); }
-    if (NEU.quest) NEU.quest.mark('a4_scal');
+    if (NEU.quest) { NEU.quest.mark('a4_scal'); NEU.quest.mark('a4_ashes'); }
     if (msg) {
       msg.hidden = false;
       msg.innerHTML = '<b>she sits back down.</b><br>' +
@@ -808,7 +1274,7 @@
   }
 
   function startDeath() {
-    running = false; dying = performance.now();
+    running = false; dying = performance.now(); stripOpen = false;
     clearSched();
     if (dm.resetDeath) dm.resetDeath();
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
@@ -817,13 +1283,13 @@
 
   function deathStep(now) {
     var ms = now - dying;
-    ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, innerWidth, innerHeight);
+    ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, VW, VH);
     frame();
     var playing = dm.death ? dm.death(ctx, px, py, ms, COL.soul) : (ms <= 1700);
     if (!playing) {
       dying = 0;
       if (msg) { msg.hidden = false;
-        msg.innerHTML = '<b>she waits.</b><br>enter to try again &middot; esc to leave'; }
+        msg.innerHTML = '<b>she waits.</b><br>press Z to try again &middot; esc to leave'; }
       return;
     }
     requestAnimationFrame(deathStep);
@@ -839,7 +1305,7 @@
      the forcefield border, a dark rim, a brimstone line and a hot inner
      edge, breathing at 0.3 Hz (still under reduced motion). */
   function frame() {
-    var w = innerWidth, h = innerHeight;
+    var w = VW, h = VH;
     for (var i = 0; i < 4; i++) {
       var g = 40 + i * 28;
       ctx.fillStyle = 'rgba(110,12,22,0.14)';
@@ -862,13 +1328,16 @@
   }
 
   function draw(now) {
-    var w = innerWidth, h = innerHeight;
+    var w = VW, h = VH;
     ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, w, h);
     /* Everything between begin/end is shaken as one image. The draw
        code below has no idea it is happening, which is what keeps the
        shake off the simulation. */
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
+    var lv = despLevel();
+    if (lv) drawStorm(w, h, lv);
     frame();
+    if (lv) { ctx.fillStyle = 'rgba(120,18,0,' + (0.05 * lv).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH); }
 
     /* Frame mapping from the mod source (SupremeCalamitas.cs): the
        sheet is 21 rows x 2 columns and frame.Y = frameCounter(0-5) +
@@ -928,6 +1397,7 @@
     if (mode !== 'won') {
       var bodyKey = mode === 'intro' ? 'scalHood' : 'scal';
       var anim = (mode === 'intro') ? { frame: 0, col: 0 } : getScalAnim();
+      if (lv) drawAura(lv);
       if (!sprite(bodyKey, bx, by, 2, 0, phase === 2, anim.col, anim.frame)) {
         ctx.fillStyle = '#FF00A0';
         ctx.fillRect((bx - 20) | 0, (by - 26) | 0, 40, 52);
@@ -992,6 +1462,7 @@
         ctx.beginPath(); ctx.arc(b.x | 0, b.y | 0, 56, 0, Math.PI * 2); ctx.stroke();
         ctx.lineWidth = 1;
       }
+      smoke(b);
       if (dm.glow) dm.glow(ctx, b.x, b.y, Math.max(10, b.r * 3) | 0, gc, 0.55);
       if (!sprite(key, b.x, b.y, sc, brot)) {
         ctx.fillStyle = b.c;
@@ -1006,22 +1477,9 @@
     }
     /* The player's homing shots (V5 phase 2). */
     for (var ms = 0; ms < myShots.length; ms++) {
-      var s = myShots[ms];
-      var sang = Math.atan2(s.vy, s.vx);
-      if (s.k === 'orb') {
-        var osc = 1 + 0.15 * Math.sin(now / 90);
-        if (!sprite('gigablast', s.x, s.y, osc, sang, true)) {
-          ctx.fillStyle = '#B48CFF';
-          ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
-        }
-      } else {
-        var ssc = s.k === 'burst' ? 0.35 : 0.5;
-        if (!sprite('dart', s.x, s.y, ssc, sang)) {
-          ctx.fillStyle = '#E4C46A';
-          ctx.fillRect((s.x - s.r) | 0, (s.y - s.r) | 0, s.r * 2, s.r * 2);
-        }
-      }
+      drawSoulShot(myShots[ms]);    /* soul fire: never SCal's own sheets */
     }
+    drawRings(lastDt);
     if (sep && NEU.scalWorm) {
       /* The worm draws itself — segments, arms, tail, head, the dash
          telegraph line and ITS OWN DARTS (scal-worm.js draw() renders
@@ -1052,20 +1510,19 @@
        manifest under cataclysmFist/catastropheSlash for the projectile
        switch below, correctly used there. Glow masks stack the same way
        Polterghast's already do (glowKeys, additive). */
+    /* the brothers, BRO_H tall, aura, trail and the wind-up pose of
+       the volley about to fire (broNext) */
+    var poses = broNext() || [];
     for (var r = 0; r < bros.length; r++) {
-      var br = bros[r], rot = Math.atan2(py - br.y, px - br.x);
-      var bKey = br.kind === 'fist' ? 'cataclysm' : 'catastrophe';
-      var bGlow = br.kind === 'fist' ? ['cataclysmGlow'] : ['catastropheGlow'];
-      var bSh = NEU.sheets[bKey];
-      var bSc = bSh ? 80 / bSh.fw : 0.4;
-      if (!sprite(bKey, br.x, br.y, bSc, rot, false, undefined, undefined, undefined, bGlow)) {
-        ctx.fillStyle = br.kind === 'fist' ? COL.brimHi : COL.brim;
-        ctx.fillRect((br.x - 14) | 0, (br.y - 14) | 0, 28, 28);
-      }
+      var pz = null;
+      for (var pq = 0; pq < poses.length; pq++) if (poses[pq].b === bros[r]) pz = poses[pq];
+      drawBro(bros[r], pz);
     }
 
     dm.drawFlash(ctx, F, bx, by, 64);
     if (mode !== 'won') dm.drawFX(ctx, F, inv);
+    for (var sw = 0; sw < F.swings.length; sw++) drawSwing(F.swings[sw]);
+    drawSparks(lastDt);
 
     /* rage: the soul burns gold while it is up */
     if (rageMode > 0) {
@@ -1086,8 +1543,21 @@
       ctx.lineWidth = 1;
     }
 
+    /* the fireball's charge: a ring that closes as Z is held */
+    if (charging && chargeF > 0.05) {
+      var fr = Math.min(1, chargeF / FIRE_HOLD);
+      ctx.strokeStyle = fr >= 1 ? '#E8FBFF' : '#7FE6FF'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, py, 12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fr);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
     if (NEU.juice) NEU.juice.drawParts(ctx, 1 / 60);
     if (NEU.juice) NEU.juice.end(ctx, shook);
+    var rift = NEU.scalAtk.rift ? NEU.scalAtk.rift() : null;
+    var off = rift ? splitOffset(rift.t / 60, rm()) : 0;
+    if (off > 0) splitView(rift, off);
+    if (lv) drawVignette(w, h, lv);
     if (NEU.juice) NEU.juice.overlay(ctx, w, h);
 
     var fa = flashAlpha();
@@ -1102,10 +1572,23 @@
                      hp: bossHP, max: bossMax, invuln: invuln,
                      ticks: [0.75, 0.45, 0.25],
                      php: hp, pmax: MAXHP, phase: phase,
-                     tp: tpShown, rage: rageShown, rageOn: rageMode > 0 });
+                     tp: tpShown, rage: rageShown, rageOn: rageMode > 0, AX: AX });
+    drawBroBars(w);
+    if (stripOpen) drawStrip(ctx);
+    if (healToast > 0) {
+      ctx.font = FONT_UI; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillStyle = '#B8FFD0';
+      ctx.fillText('HEAL READY', AX + AW / 2, AY - 56);
+      ctx.textAlign = 'left';
+    }
 
     var dialY = AY + AH + 80;
-    if (line && now - lineT < 5200) {
+    /* the key hint (#bhMsg) sits on the same line; it steps aside while
+       she is talking so the two never print over each other */
+    var talking = !!(line && now - lineT < 5200);
+    var kh = document.querySelector('#bh .bh__keys');
+    if (kh && kh.__v !== talking) { kh.__v = talking; kh.style.visibility = talking ? 'hidden' : ''; }
+    if (talking) {
       ctx.fillStyle = COL.bone;
       ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
       ctx.fillText(line, AX, dialY);
@@ -1165,6 +1648,118 @@
     });
   }
   /* ── input ──────────────────────────────────────────────────────*/
+  /* ── the C strip ───────────────────────────────────────────────
+     Deltarune's TP menu. Time runs at STRIP_SCALE while it is open and
+     the soul stands still. HEAL: +1 HP, no TP, 30 s of fight time
+     between uses, and it stays on cooldown when the strip is reopened.
+     DEFEND: +16 % TP and half of each hit for 1.5 s. BRIMSTONE BUSTER:
+     50 % TP for a 40-damage piercing shot. SOUL SHIELD: 32 % TP for a
+     barrier that takes one hit. RAGE: free once the bar is full. Using
+     any option closes the strip. */
+  var FONT_UI = '16px "Determination Mono","Pixelify Sans",monospace';
+  var STRIP = [
+    { name: 'HEAL', ok: function () { return hp < MAXHP && healCd <= 0; },
+      tag: function () { return healCd > 0 ? Math.ceil(healCd) + 's' : hp >= MAXHP ? 'full' : 'free'; } },
+    { name: 'DEFEND', ok: function () { return true; }, tag: function () { return '+16%'; } },
+    { name: 'BRIMSTONE BUSTER', ok: function () { return tp >= 0.5; }, tag: function () { return '50%'; } },
+    { name: 'SOUL SHIELD', ok: function () { return tp >= 0.32 && shieldT <= 0; }, tag: function () { return '32%'; } },
+    { name: 'RAGE', ok: function () { return rage >= 1 && rageMode === 0; }, tag: function () { return rage >= 1 ? 'free' : Math.floor(rage * 100) + '%'; } }
+  ];
+  function arrowName(e) {
+    var k = e.key;
+    if (k === 'ArrowLeft') return 'left';
+    if (k === 'ArrowRight') return 'right';
+    if (k === 'ArrowUp') return 'up';
+    if (k === 'ArrowDown') return 'down';
+    return null;
+  }
+  function useStrip(i) {
+    var o = STRIP[i];
+    if (!o.ok()) { say(i === 0 && hp >= MAXHP ? '* you are already whole.' : '* not now.'); return; }
+    if (i === 0) {
+      hp += 1; healCd = HEAL_CD;
+      if (NEU.juice) NEU.juice.burst(px, py, 10, '#B8FFD0');
+      say('* a little warmth. one heart back.');
+    } else if (i === 1) {
+      addTp(0.16); defendT = 1.5;
+      say('* she braces. the next hits sting less.');
+    } else if (i === 2) {
+      tp = Math.max(0, tp - 0.5); buster();
+      say('* brimstone, from your own soul.');
+    } else if (i === 3) {
+      tp = Math.max(0, tp - 0.32); shieldT = 30;
+      say('* the barrier blooms. it will take one hit.');
+    } else {
+      rage = 0; rageMode = 1; rageModeT = 8;
+      sfxPlay('giga-hit');
+      if (NEU.juice) NEU.juice.burst(px, py, 14, '#E4C46A', 1.2);
+      say('* rage. everything strikes twice.');
+    }
+    stripOpen = false;
+  }
+  function stripKey(e) {
+    var k = e.key;
+    if (k === 'ArrowUp' || k === 'ArrowLeft') stripSel = (stripSel + STRIP.length - 1) % STRIP.length;
+    else if (k === 'ArrowDown' || k === 'ArrowRight') stripSel = (stripSel + 1) % STRIP.length;
+    else if (k === 'z' || k === 'Z') useStrip(stripSel);
+    else if (k === 'x' || k === 'X' || k === 'c' || k === 'C') stripOpen = false;
+  }
+  /* Deltarune's battle box: black, a white rim with a soul-red inner
+     line, names left, costs right in TP orange, the red soul as the
+     cursor, greyed rows for what cannot be used. HEAL's cooldown is a
+     shrinking bar and the seconds, so it reads at a glance. */
+  function drawStrip(ctx) {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(AX, AY, AW, AH);
+    var bw = Math.min(AW - 40, 432) | 0, bx = (AX + (AW - bw) / 2) | 0, by = (AY + 32) | 0;
+    var bh = 32 * STRIP.length + 80;
+    ctx.fillStyle = '#000000'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(bx, by, bw, 3); ctx.fillRect(bx, by + bh - 3, bw, 3);
+    ctx.fillRect(bx, by, 3, bh); ctx.fillRect(bx + bw - 3, by, 3, bh);
+    ctx.strokeStyle = '#5A1020'; ctx.lineWidth = 1; ctx.strokeRect(bx + 5.5, by + 5.5, bw - 11, bh - 11);
+    ctx.font = FONT_UI; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+    for (var i = 0; i < STRIP.length; i++) {
+      var o = STRIP[i], y = by + 20 + i * 32, can = o.ok();
+      if (i === stripSel) {
+        ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(bx + 8, y - 6, bw - 16, 28);
+        stamp(['.##.##.', '#######', '#######', '#######', '.#####.', '..###..', '...#...'],
+              bx + 24, y + 8, 2, COL.soul);
+      }
+      ctx.fillStyle = can ? (i === stripSel ? '#FFFF00' : '#FFFFFF') : '#5A5668';
+      ctx.fillText(o.name, bx + 44, y);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = can ? '#FF9E30' : '#6A6480';
+      ctx.fillText(o.tag(), bx + bw - 20, y);
+      ctx.textAlign = 'left';
+      if (i === 0 && healCd > 0) {
+        ctx.fillStyle = '#1A3A24'; ctx.fillRect(bx + 44, y + 19, 120, 3);
+        ctx.fillStyle = '#5CF08C'; ctx.fillRect(bx + 44, y + 19, Math.round(120 * (1 - healCd / HEAL_CD)), 3);
+      }
+    }
+    ctx.fillStyle = '#C0BCC8';
+    ctx.fillText('HP ' + Math.max(0, hp) + '/' + MAXHP, bx + 20, by + bh - 56);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#FF9E30';
+    ctx.fillText('TP ' + Math.floor(tp * 100) + '%', bx + bw - 20, by + bh - 56);
+    ctx.textAlign = 'left'; ctx.fillStyle = COL.dim;
+    ctx.fillText('arrows pick · z use · x/c close', bx + 20, by + bh - 32);
+  }
+  /* X: a dash along the held arrows, or the way you face. */
+  function dashKey() {
+    if (dying || mode === 'intro' || mode === 'won') return;
+    var ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    var iy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+    if (ix || iy) dm.dash(F, ix, iy); else dm.dash(F);
+  }
+
+  /* The blue soul, for the attacks. setMode('blue') turns on gravity,
+     Up jumps (letting go early cuts the jump), and platforms is an
+     optional array of { x, y, w } the soul can land on. */
+  NEU.scalSoul = {
+    setMode: function (m) { dm.soulMode(F, m); },
+    mode: function () { return F.mode; },
+    platforms: null
+  };
+
   addEventListener('keydown', function (e) {
     if (wrap.hidden || !NEU.scal.active || NEU.activeMinigame !== 'scal') return;
     if (e.key === 'F3') { showHitboxes = !showHitboxes; return; }
@@ -1178,50 +1773,32 @@
       } else { close(); }
       return;
     }
-    if (!running && !dying && e.key === 'Enter') {
+    if (!running && !dying && !e.repeat &&
+        (e.key === 'z' || e.key === 'Z' || e.key === 'Enter')) {
       /* The document-level retry of the bullet minigame used to hear
          this too and restarted its own timer over the death screen. */
       e.preventDefault(); e.stopPropagation();
       open(); return;
     }
-    /* c dash, v (or shift+z) adrenaline, b rage: the shared keys */
-    var act = running && mode !== 'intro' ? dm.key(F, e) : '';
-    if (act === 'dash' || act === 'adren') { e.preventDefault(); return; }
-    if (e.key === 'z' || e.key === 'Z' || act === 'rage') {
-      /* U1: rage. A full bar buys eight seconds of doubled strikes —
-         and only that. z never strikes; f is the strike key. */
+    if (!running || mode === 'intro') return;
+    /* The C strip owns the keys while it is open. */
+    if (stripOpen) { e.preventDefault(); stripKey(e); return; }
+    var d = arrowName(e);
+    if (d) { keys[d] = true; e.preventDefault(); return; }
+    if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); if (!e.repeat) startCharge(); return; }
+    if (e.key === 'x' || e.key === 'X') { e.preventDefault(); if (!e.repeat) dashKey(); return; }
+    if (e.key === 'c' || e.key === 'C') {
       e.preventDefault();
-      if (rageMode > 0) { say('* the rage is still burning.'); return; }
-      if (rage < 1) { say('* the rage wants a full bar. miss hearts to fill it.'); return; }
-      rage = 0; rageMode = 1; rageModeT = 8;
-      sfxPlay('giga-hit');
-      if (NEU.juice) NEU.juice.burst(px, py, 14, '#E4C46A', 1.2);
-      say('* rage. everything strikes twice.');
-      return;
+      if (!e.repeat && !dying) { stripOpen = true; stripSel = 0; keys = {}; }
     }
-    /* f is still the strike key — but striking is now charge-and-
-       release: keydown starts the charge (guarded against OS repeat
-       autofire), keyup releases it as tryHit(). */
-    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); if (!e.repeat) startCharge(); return; }
-    if (e.key === 'x' || e.key === 'X') {
-      /* U2: the barrier. Full tp spends itself as one held hit. */
-      e.preventDefault();
-      if (shieldT > 0) { say('* the barrier is already up.'); return; }
-      if (tp < 1) { say('* the barrier wants full tp. graze to fill it.'); return; }
-      tp = 0; shieldT = 2.5;
-      if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
-      say('* the barrier blooms. it will take one hit.');
-      return;
-    }
-    var n = dm.keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
   });
   addEventListener('keyup', function (e) {
     /* Same three-condition guard as keydown — the old one checked only
        wrap.hidden, so a release could fire while another minigame held
        the input lock. */
     if (wrap.hidden || !NEU.scal.active || NEU.activeMinigame !== 'scal') return;
-    var n = dm.keyName(e); if (n) keys[n] = false;
-    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); tryHit(); return; }
+    var d = arrowName(e); if (d) keys[d] = false;
+    if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); release(); }
   });
 
   /* ── the attack machine's hands (scal-attacks.js) ─────────────────
@@ -1230,6 +1807,7 @@
   var ADAPT = {
     get px() { return px; }, get py() { return py; },
     get bx() { return bx; }, get by() { return by; },
+    get pvx() { return pvx; }, get pvy() { return pvy; },
     get AX() { return AX; }, get AY() { return AY; },
     get AW() { return AW; }, get AH() { return AH; },
     shot: spawn,
@@ -1285,23 +1863,31 @@
     var keysEl = document.querySelector('#bh .bh__keys');
     if (keysEl) {
       if (keysOrig === null) keysOrig = keysEl.innerHTML;
-      keysEl.innerHTML = 'arrows / wasd &middot; shift focus &middot; f to strike (hold to charge) &middot; c dash &middot; v adrenaline &middot; z for rage &middot; x to shield &middot; esc to leave';
+      keysEl.innerHTML = 'arrows move &middot; z slash (tap) / fireball (hold) &middot; x dash &middot; c menu &middot; esc to leave';
     }
     layout();
     t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; booms = []; flashAt = -9;
     rage = 0; tp = 0; shieldT = 0;
     rageMode = 0; rageModeT = 0;
-    rageShown = 0; tpShown = 0; grazeT = 0;
+    rageShown = 0; tpShown = 0;
+    stripOpen = false; stripSel = 0; healCd = 0; healToast = 0;
+    defendT = 0; hurtAcc = 0; meleeCd = 0; grazeAt = -9;
     myShots = []; charging = false; chargeF = 0; shotCd = 0;
     willCharge = false;
-    /* x10 (2026-08-24). A charged orb deals 9 — one on impact plus eight
-       burst darts that spawn AT the impact point and all land the next
-       frame — so 24 HP was three orbs, about three seconds, and at most
-       3 of her 24 cycle steps ever played. 240 is ~27 orbs: a 70-90s
-       fight and roughly one full lap of the cycle. Every phase gate in
-       damageTarget is a FRACTION of bossMax, so they rescale for free,
-       and core/music.js takes hpMax from the first reading per fight. */
-    bossMax = 240; bossHP = bossMax; phase = 1; held = false; shotsFired = 0;
+    /* 720 (x3 the old 240, the SCal rework). The fight runs 5-7 minutes
+       before desperation, with the attack pool, the bags and the combos
+       filling it. Every phase gate in damageTarget is a FRACTION of bossMax,
+       so they rescale for free, and core/music.js takes hpMax from the first
+       reading per fight. */
+    bossMax = 720; bossHP = bossMax; phase = 1; held = false; shotsFired = 0;
+    pvx = 0; pvy = 0;
+    /* dev `skip` to a phase (dev.js): start the boss at a share of its HP,
+       once, so the next fight starts full again */
+    skipFrac = 0;
+    if (NEU.cheat && NEU.cheat.startFrac) {
+      skipFrac = NEU.cheat.startFrac;
+      bossHP = bossMax * skipFrac; NEU.cheat.startFrac = 0;
+    }
     hearts = []; sep = null; bros = []; invuln = true; dying = 0;
     ringOn = false;
     /* Hand the Sepulcher module its canvas + arena once per fight;
@@ -1324,15 +1910,17 @@
     preloadSfx();
     mode = 'intro';
     px = AX + AW / 2; py = AY + AH - 60;
-    F = dm.fight(px, py);
+    F = dm.fight(px, py, { dashCd: 0.8 });
     bx = AX + AW / 2; by = AY - 24;
     say('* the small one was not small.');
     running = true; last = performance.now();
     requestAnimationFrame(stepFn);
   }
   function close() {
-    active = false; running = false; dying = 0;
+    active = false; running = false; dying = 0; stripOpen = false;
     F.pops = [];
+    var kh = document.querySelector('#bh .bh__keys');
+    if (kh) { kh.__v = false; kh.style.visibility = ''; }
     clearSched();
     scalWormReady = false;
     seekersReady = false;
@@ -1420,8 +2008,31 @@
                get seekerPos() { return NEU.scalSeekers ? NEU.scalSeekers.seekers() : []; },
                get seekerDarts() { return NEU.scalSeekers ? NEU.scalSeekers.darts() : []; },
                get broPos() { return bros.map(function (b) { return { x: b.x, y: b.y }; }); },
+               get broHp() { return bros.map(function (b) { return b.hp; }); },
                 get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy }; }); },
-                get myShots() { return myShots.map(function (s) { return { x: s.x, y: s.y, vx: s.vx, vy: s.vy, k: s.k }; }); },
+                get myShots() { return myShots.map(function (s) { return { x: s.x, y: s.y, vx: s.vx, vy: s.vy, owner: s.owner, kind: s.kind, dmg: s.dmg, pierce: !!s.pierce }; }); },
+               /* A2 hooks: the strip, heal, defend, the blue soul and the
+                  melee arcs, for the tests and the view. */
+               get stripOpen() { return stripOpen; },
+               get stripSel() { return stripSel; },
+               get healCd() { return healCd; },
+               get defendT() { return defendT; },
+               get meleeCd() { return meleeCd; },
+               get swings() { return F.swings.map(function (s) { return { x: s.x, y: s.y, ang: s.ang, t: s.t, dur: s.dur, hit: s.hit }; }); },
+               get grazes() { return F.grazes.slice(); },
+               get soulY() { return py; },
+               get floorY() { return AY + AH - 7; },
+               /* test-only: place the soul and her, and make the fight
+                  strikeable (mode 'fight', not invulnerable) */
+               arm: function (sx, sy, bx2, by2) {
+                 mode = 'fight'; invuln = false; sep = null; hearts = []; bros = []; ringOn = false;
+                 px = sx; py = sy; bx = bx2; by = by2; F.x = px; F.y = py;
+               },
+               bossMax: function () { return bossMax; },
+               /* test-only: one hit on the soul (the caller owns god) and
+                  one stationary bullet at (x, y) */
+               hurtSoul: function () { return hitPlayer(); },
+               shotAt: function (x, y, r) { bullets.push({ x: x, y: y, vx: 0, vy: 0, r: r, c: COL.brim, k: 0, age: 0 }); },
                 /* test-only read (same class as wormSegs): the damage
                    numbers in flight, copied so a caller cannot write into
                    the live list */
@@ -1442,5 +2053,18 @@
                   var n = Math.round(sec * 60);
                   for (var i = 0; i < n && running; i++) update(1 / 60);
                 },
-                hurtBoss: function (n) { damageTarget('her', null, n); } };
+                hurtBoss: function (n) { damageTarget('her', null, n); },
+                /* test-only: put the soul where a test needs it */
+                placeSoul: function (x, y) { px = x; py = y; },
+                /* dev console (dev.js): set the soul's HP, its TP, or top it up */
+                setHp: function (n) { hp = Math.max(0, Math.min(MAXHP, n | 0)); },
+                setTp: function (n) { tp = Math.max(0, Math.min(100, +n || 0)) / 100; },
+                heal: function () { hp = MAXHP; },
+                /* V: test-only, one frame drawn now; the view scale */
+                drawFrame: function () { draw(performance.now()); },
+                scaleFor: scaleFor,
+                splitOffset: splitOffset,
+                get view() { return { s: VS, w: VW, h: VH }; },
+                broDrawH: BRO_H,
+                get broLabels() { return bros.map(function (b) { return BRO_NAME[b.kind]; }); } };
 })();

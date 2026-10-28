@@ -287,7 +287,7 @@
   addEventListener('keydown', function (e) {
     if (wrap.hidden) return;
     if (e.key === 'Escape') { close(); return; }
-    if (e.key === 'e' || e.key === 'E' || e.key === ' ') { e.preventDefault(); interact(); return; }
+    if (e.key === 'z' || e.key === 'Z' || e.key === 'e' || e.key === 'E') { e.preventDefault(); interact(); return; }
     var n = name(e); if (n) { keys[n] = true; e.preventDefault(); }
   });
   addEventListener('keyup', function (e) {

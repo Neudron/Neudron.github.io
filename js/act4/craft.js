@@ -201,12 +201,12 @@
       focusCell();
       return;
     }
-    if (e.key === ' ' || (e.key === 'Enter' && !matches())) {
+    if (e.key === ' ' || ((e.key === 'Enter' || e.key === 'z' || e.key === 'Z') && !matches())) {
       e.preventDefault();
       click(focusIdx);
       return;
     }
-    if (e.key === 'Enter') { e.preventDefault(); take(); }
+    if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z') { e.preventDefault(); take(); }
   });
 
   NEU.craft = { open: open, close: close,

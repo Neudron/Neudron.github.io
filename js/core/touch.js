@@ -47,10 +47,8 @@
      `aHold` on the primary means A stays down while the thumb is down
      (charge-and-release: the fight reads keyup as the strike release).
 
-     `xLong` on an extra means a quick tap fires `x`, but holding past a
-     short threshold fires `xLong` instead (released immediately, as a
-     single press-release pair). The Calamitas fight uses it: tap = rage,
-     hold = barrier.
+     `c` is an optional fourth button (top-left cell): the scene's key
+     for it, with `cLabel` as its text. SCal uses it for the TP strip.
 
      `repeat` means the stick auto-repeats while held, the way a
      keyboard does. Menus need it — without it, holding left in the
@@ -69,8 +67,8 @@
       a: 'Enter', aLabel: 'take',   b: 'Escape', stick: true, repeat: true },
 
     { id: 'scal',   on: function () { return NEU.scal && NEU.scal.running; },
-      a: 'f',     aLabel: 'strike', aHold: true, b: 'Escape',
-      x: 'z',     xLabel: 'rage',   xLong: 'x', stick: true },
+      a: 'z',     aLabel: 'strike', aHold: true, b: 'Escape',
+      x: 'x',     xLabel: 'dash',   c: 'c', cLabel: 'TP', stick: true },
 
     { id: 'polt',   on: function () { return NEU.polt && NEU.polt.running; },
       a: 'Enter', aLabel: 'ok',     b: 'Escape',
@@ -81,7 +79,7 @@
       x: 'Shift', xLabel: 'focus',  xHold: true, stick: true },
 
     { id: 'dark',   on: function () { return NEU.dark && NEU.dark.running; },
-      a: 'e',     aLabel: 'use',    b: 'Escape', stick: true },
+      a: 'z',     aLabel: 'use',    b: 'Escape', stick: true },
 
     { id: 'rhythm', on: function () { return NEU.rhythm && NEU.rhythm.running; },
       a: 'Enter', aLabel: 'start',  b: 'Escape', stick: true },
@@ -97,7 +95,7 @@
 
     /* the fallback world — see the note at the top of the list */
     { id: 'engine', on: function () { return NEU.engine && NEU.engine.running; },
-      a: 'e',     aLabel: 'talk',   b: 'Escape',
+      a: 'z',     aLabel: 'talk',   b: 'Escape',
       x: 'r',     xLabel: 'reset',  stick: true }
   ];
 
@@ -154,16 +152,14 @@
   var killRepeat = function () {};
   var clearStick = function () {};
 
-  var killLong = function () {};
   function releaseAll() {
     killRepeat();
     clearStick();
-    killLong();
     for (var k in held) if (held[k]) send(k, false);
   }
 
   /* ── the DOM ───────────────────────────────────────────────────── */
-  var pad = null, stick = null, nub = null, btnA = null, btnB = null, btnX = null;
+  var pad = null, stick = null, nub = null, btnA = null, btnB = null, btnX = null, btnC = null;
   var built = false, cur = null;
 
   function mk(tag, cls, parent) {
@@ -188,9 +184,11 @@
     btnX = mk('button', 'tpad__b tpad__b--x', acts);
     btnB = mk('button', 'tpad__b tpad__b--b', acts);
     btnA = mk('button', 'tpad__b tpad__b--a', acts);
+    btnC = mk('button', 'tpad__b', acts);
+    btnC.style.gridColumn = '1'; btnC.style.gridRow = '1';   /* the empty top-left cell */
     btnB.textContent = 'back';
 
-    [btnA, btnB, btnX].forEach(function (b) {
+    [btnA, btnB, btnX, btnC].forEach(function (b) {
       b.type = 'button';
       b.tabIndex = -1;                     /* never in the tab order */
     });
@@ -200,6 +198,7 @@
     wireButton(btnA, function () { return cur && cur.a; }, false);
     wireButton(btnB, function () { return cur && cur.b; }, true);
     wireButton(btnX, function () { return cur && cur.x; }, false);
+    wireButton(btnC, function () { return cur && cur.c; }, false);
   }
 
   /* ── buttons ───────────────────────────────────────────────────── */
@@ -208,30 +207,12 @@
      is what focus mode needs. */
   function wireButton(el, keyOf, tap) {
     var id = null;
-    /* long-press (xLong): tap fires x, a held press past LONG_MS
-       fires xLong instead. The swap is mid-press: release x first,
-       then send xLong as a clean down/up pair. */
-    var longTimer = null, longFired = false;
-    var LONG_MS = 480;
-    function clearLong() { if (longTimer) { clearTimeout(longTimer); longTimer = null; } }
     el.addEventListener('pointerdown', function (e) {
       var k = keyOf(); if (!k) return;
       e.preventDefault();
       id = e.pointerId;
       if (el.setPointerCapture) { try { el.setPointerCapture(id); } catch (x) {} }
       el.classList.add('is-down');
-      longFired = false;
-      /* If this button has an xLong alternate, arm the timer. If it
-         fires while still held, swap x -> xLong in place. */
-      if (cur && cur.xLong) {
-        longTimer = setTimeout(function () {
-          longTimer = null; longFired = true;
-          send(k, false);
-          var L = cur.xLong;
-          send(L, true);
-          requestAnimationFrame(function () { send(L, false); });
-        }, LONG_MS);
-      }
       send(k, true);
       /* A confirm is a press, not a hold. Release on the next frame so
          the keydown lands first and anything watching keyup still sees
@@ -244,18 +225,11 @@
       if (id !== null && e && e.pointerId !== id) return;
       id = null;
       el.classList.remove('is-down');
-      clearLong();
-      /* If the long-press already swapped to xLong, x is already up
-         and xLong fired as a self-contained pair — do not re-send x. */
-      if (longFired) { longFired = false; return; }
       var k = keyOf(); if (k) send(k, false);
     }
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);
     el.addEventListener('pointerleave', up);
-    /* releaseAll() must cancel a pending long-press so a backgrounded
-       tab cannot leave the timer latched. */
-    if (el === btnX) killLong = clearLong;
   }
 
   /* ── the stick ─────────────────────────────────────────────────── */
@@ -415,6 +389,8 @@
       btnA.textContent = p.aLabel || 'ok';
       btnX.hidden = !p.x;
       if (p.x) btnX.textContent = p.xLabel || '';
+      btnC.hidden = !p.c;
+      if (p.c) btnC.textContent = p.cLabel || '';
       stick.hidden = !p.stick;
       pad.setAttribute('data-scene', p.id);
     }

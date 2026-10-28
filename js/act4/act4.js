@@ -143,7 +143,7 @@
   }
 
   NEU.act4 = {
-    open: open, wake: wake, settle: settle, ending: ending,
+    open: open, wake: wake, settle: settle, ending: ending, install: install,
     get start() { return START; },
     get done() { return !!(NEU.save && NEU.save.flagged('act4_done')); },
     steps: STEPS

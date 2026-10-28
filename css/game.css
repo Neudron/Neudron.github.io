@@ -126,3 +126,12 @@
   background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
   image-rendering: pixelated;
 }
+
+/* Summoning hall overlay (js/act4/summon.js): embers, the vignette and
+   the summoning itself, over the room canvas and inside #eng, so it
+   sits under the textbox (96) and every dialog. Never takes a click. */
+.eng canvas.summon {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  max-width: none; max-height: none;
+  pointer-events: none; image-rendering: pixelated;
+}

@@ -32,6 +32,106 @@
     out.scrollTop = out.scrollHeight;
   }
 
+  /* ── admin: cheats and the skip chain ────────────────────────────
+     Only ever run when someone types them here. The cheats are read by
+     the fight (boss-scal.js) and by nothing else; NEU.cheat starts neutral
+     and is never set on its own. */
+  NEU.cheat = { god: false, dmgMul: 1, startFrac: 0 };
+
+  /* One ordered table, in the order the objectives tab reads it. Each
+     stage lists what is true AFTER it: quest marks, counts, save flags,
+     items. `skip <stage>` clears everything the table owns, then applies
+     every stage up to and including the target, so nothing a later stage
+     depends on can be missing. `scene` is where the target drops you;
+     `frac` is the SCal HP share the fight starts at (phases). Keep this
+     in step with quest.js and act4.js when a step is added. */
+  var SOLVED = ['b2_blocks', 'b3_braziers', 'b4_ice', 'b5_two', 'b6_dark'];
+  var CHAIN = [
+    { id: 'act1 start', marks: [] },
+    { id: 'sword', marks: ['sans'] },
+    { id: 'key', marks: ['break'] },
+    { id: 'act2 bullet', marks: ['door', 'survive', 'dog'] },
+    { id: 'act2 dark', marks: ['hammer', 'smash', 'greydoor', 'clicker', 'fixed'],
+      counts: { answers: 4 } },
+    { id: 'act3 sleep', marks: ['sleep', 'console'] },
+    { id: 'tv', marks: ['docked'], counts: { charge: 2 }, flags: { console_charge: 100 } },
+    { id: 'deck', marks: ['deck'] },
+    { id: 'act4 start', marks: ['a4_in', 'a4_witch'], flags: { witch_met: 1 },
+      scene: { room: 'a1_clearing', spawn: 'default' } },
+    { id: 'scal room', counts: { a4_rooms: 5 },
+      flags: { 'solved:b2_blocks': 1, 'solved:b3_braziers': 1, 'solved:b4_ice': 1,
+               'solved:b5_two': 1, 'solved:b6_dark': 1 },
+      scene: { room: 'b6_dark', spawn: 'default' } },
+    { id: 'scal fight', scene: { room: 'b8_arena', spawn: 'west' } },
+    { id: 'scal p1', scene: { room: 'b8_arena', spawn: 'west' }, frac: 0.6 },
+    { id: 'scal p2', scene: { room: 'b8_arena', spawn: 'west' }, frac: 0.3 },
+    { id: 'scal p3', scene: { room: 'b8_arena', spawn: 'west' }, frac: 0.1 },
+    { id: 'scal desp', scene: { room: 'b8_arena', spawn: 'west' }, frac: 0.01 },
+    { id: 'quiz', marks: ['a4_scal', 'a4_ashes', 'a4_recall', 'a4_home', 'a4_told',
+                         'a4_smash', 'a4_tenna', 'a4_rank'],
+      flags: { scal_dead: 1, home_seen: 1, tv_breakable: 1, tv_broken: 1, quiz_rank: 'A',
+               'rank:A': 1, 'rank:A–': 1, 'rank:B': 1, 'rank:B–': 1,
+               'rank:C': 1, 'rank:C–': 1, 'rank:Z': 1 },
+      items: ['ashes'], scene: { room: 'a1_clearing', spawn: 'default' } },
+    { id: 'axe', marks: ['a4_nutz', 'a4_trip', 'a4_axe'], counts: { a4_prizes: 9 },
+      items: ['axe'], scene: { room: 'a1_clearing', spawn: 'default' } },
+    { id: 'mushrooms', marks: ['a4_pot', 'a4_soup'], counts: { a4_mush: 5 },
+      flags: { soup_made: 1 }, items: ['soup'], scene: { room: 'a1_clearing', spawn: 'default' } },
+    { id: 'polterghast', marks: ['a4_wake', 'a4_chair', 'a4_crack'],
+      flags: { dog_gone: 1, sans_sits: 1, crack_armed: 1 } },
+    { id: 'end', marks: ['a4_polt', 'a4_end'], flags: { polt_dead: 1, act4_done: 1 },
+      scene: { room: 'a1_clearing', spawn: 'default' } }
+  ];
+  var SKIP_KEY = 'neu.skip';
+
+  function stageOf(name) {
+    for (var i = 0; i < CHAIN.length; i++) if (CHAIN[i].id === name) return i;
+    return -1;
+  }
+
+  function skipTo(name) {
+    var idx = stageOf(name);
+    if (idx < 0) return false;
+    /* Counted Act IV steps only exist in the quest list once installed, and
+       quest.bump ignores a step it cannot find. */
+    if (NEU.act4 && NEU.act4.install) NEU.act4.install();
+    /* Clear everything the table owns, so the target is exact rather than
+       "whatever was already done plus this". */
+    var ids = [], flags = [], items = [], i, j, st;
+    for (i = 0; i < CHAIN.length; i++) {
+      st = CHAIN[i];
+      (st.marks || []).forEach(function (m) { ids.push(m); });
+      Object.keys(st.counts || {}).forEach(function (c) { ids.push(c); });
+      Object.keys(st.flags || {}).forEach(function (f) { if (flags.indexOf(f) < 0) flags.push(f); });
+      (st.items || []).forEach(function (it) { if (items.indexOf(it) < 0) items.push(it); });
+    }
+    NEU.quest.replay(ids);
+    flags.forEach(function (f) { NEU.save.flag(f, 0); });
+    items.forEach(function (it) { NEU.save.take(it); });
+    for (i = 0; i <= idx; i++) {
+      st = CHAIN[i];
+      (st.marks || []).forEach(function (m) { NEU.quest.mark(m); });
+      Object.keys(st.counts || {}).forEach(function (c) { NEU.quest.bump(c, st.counts[c]); });
+      Object.keys(st.flags || {}).forEach(function (f) { NEU.save.flag(f, st.flags[f]); });
+      (st.items || []).forEach(function (it) { NEU.save.give(it); });
+    }
+    /* Where the target drops you. The save file holds the room, so the
+       reload below and act4.open() both read the same answer. */
+    NEU.save.capture();
+    var sc = CHAIN[idx].scene;
+    NEU.save.data.room = sc ? sc.room : null;
+    NEU.save.data.spawn = sc ? sc.spawn : null;
+    NEU.save.flush();
+    try {
+      sessionStorage.setItem(SKIP_KEY, JSON.stringify({ id: name, frac: CHAIN[idx].frac || 0 }));
+    } catch (e) {}
+    return true;
+  }
+
+  function reloadPage() { try { location.reload(); } catch (e) {} }
+
+  function sectionNames() { return CHAIN.map(function (s) { return s.id; }); }
+
   var CMDS = {
     help: function () {
       log('sans   skip the whole sword errand, hand over the key');
@@ -54,6 +154,13 @@
       log('save   write the save file and show it');
       log('wipe   delete the save file');
       log('reset  back to the start');
+      log('state  dump quest steps, flags, items, room');
+      log('skip   skip <section> applies every earlier step, then goes there');
+      log('god    toggle infinite soul hp (the fight)');
+      log('dmg    dmg <mult|inf|off> multiplies the fight\'s damage');
+      log('hp     hp <n> sets the soul\'s hp (in the fight)');
+      log('heal   soul back to full (in the fight)');
+      log('tp     tp <0-100> sets the soul\'s tp (in the fight)');
       log('close  esc also works');
     },
     sans: function () {
@@ -109,6 +216,64 @@
       else log('nope');
     },
     close: function () { hide(); },
+
+    /* ── cheats: read by the fight (boss-scal.js), nothing else ───── */
+    god: function () {
+      NEU.cheat.god = !NEU.cheat.god;
+      log('god ' + (NEU.cheat.god ? 'on. the soul cannot be hurt.' : 'off.'));
+    },
+    dmg: function (arg) {
+      var a = String(arg || '').toLowerCase();
+      if (!a) { log('damage x' + NEU.cheat.dmgMul + '. usage: dmg <mult|inf|off>'); return; }
+      var m = (a === 'inf' || a === 'infinite') ? 1e9 : (a === 'off' ? 1 : parseFloat(a));
+      if (!(m > 0)) { log('usage: dmg <mult|inf|off>'); return; }
+      NEU.cheat.dmgMul = m;
+      log(m >= 1e9 ? 'damage infinite.' : 'damage x' + m + '.');
+    },
+    hp: function (arg) {
+      if (!NEU.scal || !NEU.scal.active) { log('the soul is not on screen. go into the fight first.'); return; }
+      var n = parseInt(arg, 10);
+      if (isNaN(n)) { log('usage: hp <n>'); return; }
+      NEU.scal.setHp(n);
+      log('soul hp ' + NEU.scal.soulHP + '.');
+    },
+    heal: function () {
+      if (!NEU.scal || !NEU.scal.active) { log('the soul is not on screen. go into the fight first.'); return; }
+      NEU.scal.heal();
+      log('soul healed to full.');
+    },
+    tp: function (arg) {
+      if (!NEU.scal || !NEU.scal.active) { log('the soul is not on screen. go into the fight first.'); return; }
+      var n = parseInt(arg, 10);
+      if (isNaN(n)) { log('usage: tp <0-100>'); return; }
+      NEU.scal.setTp(n);
+      log('tp ' + Math.round(NEU.scal.tp * 100) + '%.');
+    },
+
+    /* ── skip: apply every earlier stage, then drop into the target ── */
+    skip: function (arg) {
+      /* "scal-room" and "scal room" both name the stage */
+      var name = String(arg || '').trim().toLowerCase().replace(/-/g, ' ');
+      if (!name) {
+        log('skip <section>. in order:');
+        log('  ' + sectionNames().join(' · '));
+        return;
+      }
+      if (!NEU.save || !NEU.quest) { log('save.js or quest.js not loaded'); return; }
+      if (!skipTo(name)) { log('no section "' + name + '". try: skip'); return; }
+      log('skipped to ' + name + '. reloading.');
+      reloadPage();
+    },
+    /* Dumps what the game remembers, for reading back a skip or a bug. */
+    state: function () {
+      if (!NEU.save || !NEU.quest) { log('save.js or quest.js not loaded'); return; }
+      var d = NEU.save.data, done = NEU.quest.snapshot().done;
+      var qs = Object.keys(done).filter(function (k) { return done[k]; });
+      log('quest: ' + (qs.join(' ') || '(none)'));
+      var fl = d.flags, ks = Object.keys(fl).filter(function (k) { return fl[k]; }).sort();
+      log('flags: ' + (ks.map(function (k) { return k + '=' + fl[k]; }).join(' ') || '(none)'));
+      log('items: ' + (d.items.join(' ') || '(none)') + '   room: ' + (d.room || '(page)'));
+    },
 
     /* ── the sprite inspector ───────────────────────────────────────
        Terraria keeps frame counts in the mod's C#, not in the PNG, so
@@ -270,5 +435,26 @@
   if (go) go.addEventListener('click', function () { run(input.value); input.value = ''; });
 
   log('dev console. type help.');
+  /* A skip that asked for a reload lands here. Only the console writes the
+     key, so a plain visit never runs this. The reload is what makes the
+     restore path (sans, console, key) do the work it would do for a real
+     return visit. */
+  (function pendingSkip() {
+    var raw = null;
+    try { raw = sessionStorage.getItem(SKIP_KEY); sessionStorage.removeItem(SKIP_KEY); } catch (e) {}
+    if (!raw) return;
+    var p;
+    try { p = JSON.parse(raw); } catch (e) { return; }
+    var idx = stageOf(p.id);
+    if (idx < 0) return;
+    NEU.cheat.startFrac = p.frac || 0;
+    /* a scene is an act-four room, which act4.open resumes from the save */
+    if (CHAIN[idx].scene) setTimeout(function () {
+      if (NEU.act4) NEU.act4.open();
+      log('skipped to ' + p.id + '.');
+    }, 400);
+    else log('skipped to ' + p.id + '.');
+  })();
+
   NEU.dev = { show: show, hide: hide, run: run };
 })();

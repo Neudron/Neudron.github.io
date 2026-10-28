@@ -347,7 +347,7 @@
       }
       return;
     }
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z' || e.key === ' ') {
       /* Enter on the quit button means "close", and the native click
          already handles that. Stealing it to launch would start a
          game the player just tried to leave. */

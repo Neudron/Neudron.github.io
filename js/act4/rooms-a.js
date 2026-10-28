@@ -702,37 +702,95 @@
      warning at all. */
   E.register('b8_arena', {
     tileset: 'castle',
+    /* Reworked 2026-10 as a summoning hall (js/act4/summon.js draws and
+       runs it). The altar stands on the solid '+' block in the middle and
+       the lit path runs from the door to the one cell in front of it
+       (10,7), so the room says where to go without a word. The old
+       trigger once sat sealed inside its own frame (reach.mjs
+       untouchable); everything here is reachable and nothing blocks the
+       path. */
     tiles: [
-      '##############',
-      '#............#',
-      '#....++++....#',
-      '#....+..+....#',
-      '#,,,,+..+....#',
-      '#....++++....#',
-      '#............#',
-      '##############'
+      '#####################',
+      '#...................#',
+      '#..|.............|..#',
+      '#...................#',
+      '#...................#',
+      '#........+++........#',
+      '#........+++........#',
+      '#,,,,,,,,,,.........#',
+      '#...................#',
+      '#...................#',
+      '#..|.............|..#',
+      '#...................#',
+      '#####################'
     ].join('\n'),
-    spawns: { west: { x: 1, y: 4, face: 'right' } },
+    spawns: { west: { x: 1, y: 7, face: 'right' } },
     entities: [
-      { t: 'save', x: 3, y: 6 },
-      /* ON the doorframe at (5,4), where the swept corridor runs into it.
-         This sat at (6,3), inside the 2x2 the frame encloses, and the
-         frame is solid: there was no cell in the room you could stand in
-         and still be within REACH of it, so the fight could not be
-         started. Everything downstream of her — the ashes, the altar,
-         the fire door, every zone after the castle — was unreachable
-         because of one entity two cells too far in. It is the door
-         itself now, which is also what the room has been calling it. */
-      { t: 'npc', x: 5, y: 4, colour: '#C2405F', look: 'gate', run: function (c) { enterArena(c); } },
-      { t: 'exit', x: 0, y: 4, to: 'b7_altar', spawn: 'north' }
-    ].concat(D('banner', [3, 0, 10, 0], { colour: '#7A2A3A' }), D('torch', [4, 2, 9, 2]),
-             D('vase', [1, 1, 12, 1, 12, 6]), D('stone', [11, 4])),
+      { t: 'save', x: 2, y: 9 },
+      /* floor paint first: the hex circle and the bloodstone cracks */
+      { t: 'scalfloor', v: 'circle', x: 10, y: 6 },
+      { t: 'scalfloor', v: 'cracks', x: 6, y: 10 },
+      { t: 'scalfloor', v: 'cracks', x: 15, y: 6 },
+      { t: 'scalfloor', v: 'cracks', x: 13, y: 10 },
+      { t: 'scalfloor', v: 'cracks', x: 4, y: 5 },
+      /* The altar. Pressing it is the summoning (NEU.summon); without
+         the summon module it falls back to the old door-into-the-fight. */
+      { t: 'scalprop', v: 'altar', summon: true, x: 10, y: 6, colour: '#C2405F',
+        run: function (c) { if (NEU.summon) NEU.summon.start(c); else enterArena(c); } },
+      /* six vents on the circle's points: the brimstone pillars */
+      { t: 'scalprop', v: 'vent', n: 0, x: 10, y: 2 },
+      { t: 'scalprop', v: 'vent', n: 1, x: 14, y: 4 },
+      { t: 'scalprop', v: 'vent', n: 2, x: 14, y: 8 },
+      { t: 'scalprop', v: 'vent', n: 3, x: 10, y: 10 },
+      { t: 'scalprop', v: 'vent', n: 4, x: 6, y: 8 },
+      { t: 'scalprop', v: 'vent', n: 5, x: 6, y: 4 },
+      /* broken columns, standing on the '|' tiles */
+      { t: 'scalprop', v: 'pillar', x: 3, y: 2, h: 34 },
+      { t: 'scalprop', v: 'pillar', x: 17, y: 2, h: 22 },
+      { t: 'scalprop', v: 'pillar', x: 3, y: 10, h: 18 },
+      { t: 'scalprop', v: 'pillar', x: 17, y: 10, h: 30 },
+      { t: 'scalprop', v: 'brazier', x: 6, y: 2, solid: true },
+      { t: 'scalprop', v: 'brazier', x: 14, y: 2, solid: true },
+      { t: 'scalprop', v: 'brazier', x: 5, y: 11, solid: true },
+      { t: 'scalprop', v: 'brazier', x: 15, y: 11, solid: true },
+      { t: 'scalprop', v: 'chain', x: 8, y: 1, len: 30 },
+      { t: 'scalprop', v: 'chain', x: 12, y: 1, len: 38 },
+      { t: 'scalprop', v: 'chain', x: 1, y: 1, len: 22 },
+      { t: 'scalprop', v: 'chain', x: 19, y: 1, len: 26 },
+      { t: 'scalprop', v: 'skulls', x: 1, y: 11 },
+      { t: 'scalprop', v: 'skulls', x: 19, y: 11 },
+      { t: 'scalprop', v: 'skulls', x: 19, y: 5 },
+      { t: 'scalprop', v: 'skulls', x: 9, y: 11 },
+      { t: 'scalprop', v: 'skulls', x: 2, y: 3 },
+      /* the lore, on the north wall either side of the altar */
+      { t: 'npc', x: 7, y: 0, look: 'inscription', who: 'narr',
+        lines: ['a brass plaque, warm to the touch.',
+                '"here the witch was bound, and here she was not."',
+                '"do not light the circle. she does not need the help."'] },
+      { t: 'npc', x: 13, y: 0, look: 'inscription', who: 'narr',
+        lines: ['someone has scratched under the plaque with a knife.',
+                '"everyone who came down here was the strongest person they knew."',
+                'there are a lot of skulls in this room.'] },
+      { t: 'exit', x: 0, y: 7, to: 'b7_altar', spawn: 'north' }
+    ].concat(D('banner', [4, 0, 10, 0, 16, 0], { colour: '#7A2A3A' }), D('torch', [2, 0, 18, 0])),
+    /* the hall is lit by its own fire; the summoning puts that out too */
+    dark: function () { return NEU.summon ? NEU.summon.dark() : 0; },
+    light: function () { return NEU.summon ? NEU.summon.light() : null; },
     onEnter: function (c) {
-      if (c.flagged('scal_dead')) return;
-      say(c, ['a door with nothing written on it.',
-              'whatever has been making the noise is on the other side.',
+      if (NEU.summon) NEU.summon.enter(c);
+      if (c.flagged('scal_dead')) {
+        if (c.flagged('b8_after')) return;
+        c.flag('b8_after', 1);
+        say(c, ['the circle is cracked straight through.',
+                'everything in here that was burning has stopped.',
+                'even the dark feels lighter.']);
+        return;
+      }
+      say(c, ['the air in here tastes like struck matches.',
+              'something under the floor has a heartbeat. it is not yours.',
               'you can still go back. the save point is right there.']);
-    }
+    },
+    onExit: function () { if (NEU.summon) NEU.summon.exit(); }
   });
 
   function enterArena(c) {

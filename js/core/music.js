@@ -552,7 +552,8 @@
   }
 
   function sync() {
-    duck(talking());
+    /* NEU.duckHold: a scene asking for quiet (summon.js, the altar) */
+    duck(talking() || !!NEU.duckHold);
     var want = pick();
     if (want !== curId) play(want);
   }

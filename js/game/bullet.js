@@ -101,7 +101,10 @@
   /* sans.js owns the console; this room only asks whether it is in
      your hands right now. */
   function carrying() { return !!(NEU.hasConsole && NEU.hasConsole()); }
-  /* Only a full charge is written, and only as it arrives. */
+  /* Only a full charge is written, and only as it arrives. A half charge
+     is not kept: the console re-earns its battery on the next visit (the
+     rule sans.js describes), and the objective's count is never lost, only
+     reaching 100 writes the flag. fixes34 F5 pins this. */
   function keepCharge() {
     if (charge >= 100 && NEU.save) NEU.save.flag('console_charge', 100);
   }
@@ -578,7 +581,7 @@
       } else { close(); }
       return;
     }
-    if (!running && e.key === 'Enter') {
+    if (!running && (e.key === 'Enter' || e.key === 'z' || e.key === 'Z')) {
       /* This fights SC's death screen for the Enter key: her handler
          owns the key while her fight is up, and the room's restart
          must not hear the retry meant for her. */

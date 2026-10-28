@@ -804,7 +804,7 @@
   /* ── the prompt ──────────────────────────────────────────────────────
      A small key cap above whatever you can use — the letter on a
      keyboard, three dots on a phone. It eases in and bobs. */
-  var GLYPH_E = ['111', '100', '110', '100', '111'];
+  var GLYPH_Z = ['111', '001', '010', '100', '111'];
   function drawPrompt(ctx, cx, cy, s, t, touch) {
     var u = Math.max(2, Math.round(s * 0.75));
     var bob = reduced ? 0 : Math.round(Math.sin(t * 5) * u * 0.6);
@@ -817,7 +817,7 @@
       ctx.fillRect(x + 2 * u, y + 4 * u, u, u); ctx.fillRect(x + 4 * u, y + 4 * u, u, u); ctx.fillRect(x + 6 * u, y + 4 * u, u, u);
     } else {
       for (var r = 0; r < 5; r++) for (var c = 0; c < 3; c++)
-        if (GLYPH_E[r][c] === '1') ctx.fillRect(x + (3 + c) * u, y + (1 + r) * u, u, u);
+        if (GLYPH_Z[r][c] === '1') ctx.fillRect(x + (3 + c) * u, y + (1 + r) * u, u, u);
     }
     /* the tail, pointing at the thing */
     ctx.fillStyle = OUT; ctx.fillRect(x + 3 * u, y + h, 3 * u, u);

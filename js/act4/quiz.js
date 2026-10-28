@@ -950,7 +950,7 @@
   function phaseKey(e) {
     if (!phase) return false;
     if (ARROWS[e.key]) { held[e.key] = true; return true; }
-    if (phase === 'shoot' && (e.key === ' ' || e.key === 'Enter')) {
+    if (phase === 'shoot' && (e.key === ' ' || e.key === 'Enter' || e.key === 'z' || e.key === 'Z')) {
       if (!e.repeat) shootFire();
       return true;
     }
@@ -979,7 +979,7 @@
       os[to].focus();
       return true;
     }
-    if (e.key === 'Enter' && at >= 0) { answer(at); return true; }
+    if ((e.key === 'Enter' || e.key === 'z' || e.key === 'Z') && at >= 0) { answer(at); return true; }
     return false;
   }
 
@@ -1008,7 +1008,7 @@
     if (ended) {
       /* The show is finished and the score is saved, so there is
          nothing to leave: Enter, Space and Escape all mean "go on". */
-      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { e.preventDefault(); skip(); }
+      if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z' || e.key === ' ' || e.key === 'Escape') { e.preventDefault(); skip(); }
       return;
     }
     if (e.key === 'Escape') { e.preventDefault(); leave(); return; }

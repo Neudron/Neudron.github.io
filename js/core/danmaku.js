@@ -217,11 +217,15 @@
   var POP_MAX = 12, POP_LIFE = 0.7;
   var FONT = '16px "Determination Mono","Pixelify Sans",monospace';
 
-  function fight(x, y) {
+  /* o.dashCd: this fight's dash cooldown (default DASH_CD). swings and
+     grazes are the view's event lists: melee arcs and graze points. */
+  function fight(x, y, o) {
     return { x: x, y: y, vy: 0, mode: 'red', modeT: 0, ground: false,
              fx: 0, fy: -1, dvx: 0, dvy: 0, dashT: 0, dashI: 0, dashCd: 0,
+             dashCdMax: (o && o.dashCd) || DASH_CD,
              trail: [], tapK: '', tapAt: -9, clock: 0,
              adren: 0, adrenT: 0, rage: 0, rageT: 0, rageFull: 0,
+             swings: [], grazes: [], grazeFlashT: 0,
              pops: [], chip: 1, hitAt: -9, hudAt: 0, flashT: 0, flashAt: -9, live: '' };
   }
 
@@ -236,7 +240,7 @@
     if (F.mode === 'blue') { iy = 0; ix = ix || F.fx || 1; }
     var l = Math.sqrt(ix * ix + iy * iy) || 1;
     F.dvx = ix / l * DASH_V; F.dvy = iy / l * DASH_V;
-    F.dashT = DASH_T; F.dashI = DASH_I; F.dashCd = DASH_CD;
+    F.dashT = DASH_T; F.dashI = DASH_I; F.dashCd = F.dashCdMax || DASH_CD;
     if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
     return true;
   }
@@ -339,6 +343,9 @@
       if (F.rage >= 1 && (F.rageFull += dt) > 3) rage(F);
     }
     if (F.flashT > 0) F.flashT -= dt;
+    if (F.grazeFlashT > 0) F.grazeFlashT -= dt;
+    for (var sw = F.swings.length - 1; sw >= 0; sw--)
+      if ((F.swings[sw].t += dt) >= F.swings[sw].dur) F.swings.splice(sw, 1);
     /* Terraria's arc: up out of the hit, then falling away. Reduced
        motion holds the number still. */
     var still = !!(NEU.settings && NEU.settings.reduced);
@@ -404,17 +411,36 @@
     if (F.adrenT > 0) glow(ctx, F.x, F.y, 44, COL_ADREN, 0.7);
     if (F.rageT > 0) glow(ctx, F.x, F.y, 32, COL_RAGE, 0.6);
     if (F.modeT > 0) glow(ctx, F.x, F.y, 20, '#FFFFFF', F.modeT / 0.3);
+    /* graze outline: a white heart one pixel-step around the soul, on
+       the graze flash (at most 3 Hz, set by the fight) */
+    if (F.grazeFlashT > 0) {
+      stamp(ctx, HEART, F.x - 2, F.y, 2, '#FFFFFF');
+      stamp(ctx, HEART, F.x + 2, F.y, 2, '#FFFFFF');
+      stamp(ctx, HEART, F.x, F.y - 2, 2, '#FFFFFF');
+      stamp(ctx, HEART, F.x, F.y + 2, 2, '#FFFFFF');
+    }
+    /* The dash pip that sat here (#B8E6FF, 2x6 at x+9, y-11) read as a
+       stray blue-white line stuck to the heart; it now lives in the HUD
+       panel (hud, DASH). Nothing but the heart is drawn on the soul. */
     drawSoul(ctx, F.x, F.y, F.dashI > 0 ? 0 : inv, col);
-    var qx = (F.x + 9) | 0, qy = (F.y - 11) | 0;
-    var k = F.dashCd > 0 ? (6 * (1 - F.dashCd / DASH_CD)) | 0 : 6;
-    ctx.fillStyle = '#4A4560'; ctx.fillRect(qx, qy, 2, 6);
-    ctx.fillStyle = '#B8E6FF'; ctx.fillRect(qx, qy + 6 - k, 2, k);
     ctx.font = FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     for (var j = 0; j < F.pops.length; j++) {
-      var p = F.pops[j];
+      var p = F.pops[j], px = Math.round(p.x), py = Math.round(p.y);
       ctx.globalAlpha = Math.max(0, 1 - p.age / POP_LIFE);
+      if (p.big) {
+        /* a melee number: twice the size, a black outline, a pop-in */
+        var sz = p.age < 0.08 ? 48 : 32;
+        ctx.font = 'bold ' + sz + 'px "Determination Mono","Pixelify Sans",monospace';
+        ctx.fillStyle = '#000000';
+        ctx.fillText(String(p.n), px - 2, py); ctx.fillText(String(p.n), px + 2, py);
+        ctx.fillText(String(p.n), px, py - 2); ctx.fillText(String(p.n), px, py + 2);
+        ctx.fillStyle = p.c;
+        ctx.fillText(String(p.n), px, py);
+        ctx.font = FONT;
+        continue;
+      }
       ctx.fillStyle = p.c;
-      ctx.fillText(String(p.n), Math.round(p.x), Math.round(p.y));
+      ctx.fillText(String(p.n), px, py);
     }
     ctx.globalAlpha = 1; ctx.textAlign = 'left';
   }
@@ -436,6 +462,39 @@
      its left, rage (and tp, when the boss has one) inside it.
      o = { w, h, AY, AH, name, hp, max, ticks, invuln, php, pmax, phase,
            tp?, rage?, rageOn? } */
+  /* TP, Deltarune's meter: a vertical bar down the arena's left side.
+     tp is 0..1 (the wiki's 0..250 shown as 0..100 %). MAX under 100. */
+  function tpMeter(ctx, tp, AX, AY, AH) {
+    /* Deltarune's look: a tall dark well with a white rim, orange fill
+       (yellow at MAX) with a bright line riding the top of it, the
+       letters T and P stacked down its left, the % above it. */
+    var f = Math.max(0, Math.min(1, tp)), w = 20, h = AH, max = f >= 1;
+    var x = Math.max(40, (AX - 52) | 0), y = AY | 0, slim = AX < 92;
+    /* a phone has no room left of the arena: a slim bar in the margin */
+    if (slim) { w = 6; x = Math.max(6, (AX - 12) | 0); }
+    ctx.fillStyle = '#000000'; ctx.fillRect(x - 3, y - 3, w + 6, h + 6);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(x - 2, y - 2, w + 4, 1); ctx.fillRect(x - 2, y + h + 1, w + 4, 1);
+    ctx.fillRect(x - 2, y - 2, 1, h + 4); ctx.fillRect(x + w + 1, y - 2, 1, h + 4);
+    ctx.fillStyle = '#3A1A06'; ctx.fillRect(x, y, w, h);
+    var fh = Math.round(h * f);
+    ctx.fillStyle = max ? '#FFD84A' : '#FF8A1E';
+    ctx.fillRect(x, y + h - fh, w, fh);
+    if (fh > 2) { ctx.fillStyle = max ? '#FFFFFF' : '#FFC88A'; ctx.fillRect(x, y + h - fh, w, 2); }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillStyle = '#FF8A1E';
+    if (!slim) {
+      ctx.fillText('T', x - 16, y + (h >> 1) - 20);
+      ctx.fillText('P', x - 16, y + (h >> 1));
+    }
+    ctx.fillStyle = max ? '#FFD84A' : '#EDE7DE';
+    if (slim) ctx.textAlign = 'left';
+    ctx.fillText((slim ? 'TP ' : '') + (max ? 'MAX' : Math.floor(f * 100) + '%'), slim ? x - 2 : x + w / 2, y - 24);
+    ctx.textAlign = 'center';
+    if (max) { ctx.fillStyle = '#EDE7DE'; ctx.fillText('100%', x + w / 2, y + h + 6); }
+    ctx.textAlign = 'left';
+  }
+
   function hud(ctx, F, o) {
     ctx.font = FONT; ctx.textBaseline = 'top';
     var r = Math.max(0, Math.min(1, o.hp / o.max));
@@ -471,13 +530,14 @@
     bar(ctx, px + 40, py + 8, pw - 110, 12, o.php / o.pmax, '#800000', '#FFFF00');
     var rg = o.rage !== undefined ? o.rage : F.rage;
     var rgOn = o.rageOn !== undefined ? o.rageOn : F.rageT > 0;
-    var half = o.tp !== undefined ? ((pw - 20) / 2) | 0 : pw - 20;
+    var half = pw - 20;
     ctx.textAlign = 'left'; ctx.fillStyle = COL_RAGE; ctx.fillText('RAGE', px + 10, py + 26);
-    bar(ctx, px + 58, py + 30, half - 52, 8, rgOn ? 1 : rg, '#3A0E0E', rgOn ? '#FFC46A' : COL_RAGE);
-    if (o.tp !== undefined) {
-      ctx.fillStyle = '#FF9E30'; ctx.fillText('TP', px + 14 + half, py + 26);
-      bar(ctx, px + 40 + half, py + 30, half - 34, 8, o.tp, '#3A2008', '#FF9E30');
-    }
+    bar(ctx, px + 58, py + 30, half - 152, 8, rgOn ? 1 : rg, '#3A0E0E', rgOn ? '#FFC46A' : COL_RAGE);
+    /* DASH: the cooldown, moved off the soul */
+    var dk = F.dashCd > 0 ? 1 - F.dashCd / (F.dashCdMax || DASH_CD) : 1;
+    ctx.fillStyle = dk >= 1 ? '#B8E6FF' : '#6A6480'; ctx.fillText('DASH', px + pw - 102, py + 26);
+    bar(ctx, px + pw - 54, py + 30, 44, 8, dk, '#1A2230', dk >= 1 ? '#B8E6FF' : '#5A7A90');
+    if (o.tp !== undefined) tpMeter(ctx, o.tp, o.AX, o.AY, o.AH);
     var gx = px - 22, ar = F.adrenT > 0 ? F.adrenT / ADREN_ON : F.adren;
     var fh = Math.round(ph * Math.max(0, Math.min(1, ar)));
     ctx.fillStyle = '#000000'; ctx.fillRect(gx - 2, py - 2, 18, ph + 4);

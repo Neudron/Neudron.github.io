@@ -38,7 +38,7 @@
   var AX = 0, AY = 0, AW = 640, AH = 480;
   var targetFn = null;
   var seekers = [], darts = [];
-  var ringAng = 0, volleyCd = 0, spawned = false;
+  var ringAng = 0, spawned = false;
 
   function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
   function dist(ax, ay, bx, by) {
@@ -64,9 +64,11 @@
     seekers.length = 0;
     darts.length = 0;
     ringAng = 0;                          // fixed: deterministic open
-    volleyCd = VOLLEY_EVERY;              // one beat of grace before the first volley
+    /* each seeker has its own volley clock, one step behind the last, so the
+       fire runs round the ring as a wave instead of all at once */
     for (var i = 0; i < SEEKERS; i++)
-      seekers.push({ a: i * Math.PI * 2 / SEEKERS, x: 0, y: 0, hp: SEEKER_HP });
+      seekers.push({ a: i * Math.PI * 2 / SEEKERS, x: 0, y: 0, hp: SEEKER_HP,
+                     cd: VOLLEY_EVERY * (i + 1) / SEEKERS });
     spawned = true;
     place();
   }
@@ -90,18 +92,14 @@
     dt = Math.min(dt, 0.05);
     ringAng += RING_SPIN * dt;
     place();
-    volleyCd -= dt;
-    if (volleyCd > 0) return;
-    volleyCd = VOLLEY_EVERY;
-    /* Synchronous volley — every living seeker fires one dart at the
-       player at once (wiki: "fire synchronous volleys of Brimstone
-       Darts"). The site's own arena is small, so the ring is the wall:
-       ten darts converging from a circle, once every three seconds. */
-    var p = plX === null ? tgt() : { x: plX, y: plY };
+    /* Each seeker fires on its own clock, every three seconds, at where the
+       soul will be when the dart gets there (predict), not where it is now. */
     for (var i = 0; i < seekers.length; i++) {
       var s = seekers[i];
-      if (s.hp <= 0) continue;
-      var a = Math.atan2(p.y - s.y, p.x - s.x);
+      s.cd -= dt;
+      if (s.cd > 0) continue;
+      s.cd += VOLLEY_EVERY;
+      var p = predict(s.x, s.y), a = Math.atan2(p.y - s.y, p.x - s.x);
       darts.push({ x: s.x, y: s.y,
                    vx: Math.cos(a) * DART_SPEED,
                    vy: Math.sin(a) * DART_SPEED,
@@ -109,7 +107,16 @@
     }
   }
 
-  var plX = null, plY = 0;
+  var plX = null, plY = 0, plVX = 0, plVY = 0;
+  /* the soul's position, and its velocity for the lead */
+  function predict(x, y) {
+    var p = plX === null ? tgt() : { x: plX, y: plY }, q = p, T = 0;
+    for (var k = 0; k < 2; k++) {
+      T = dist(x, y, q.x, q.y) / DART_SPEED;
+      q = { x: p.x + plVX * T, y: p.y + plVY * T };
+    }
+    return q;
+  }
 
   /* ── darts ─────────────────────────────────────────────────────── */
   /* Identical contract to scal-worm.tickDarts: grazeCb takes no
@@ -191,13 +198,12 @@
       seekers = [];
       darts = [];
       ringAng = 0;
-      volleyCd = 0;
       plX = null;
       spawned = false;
       return true;
     },
     setArena: setArena,
-    setPlayer: function (x, y) { plX = x; plY = y; },
+    setPlayer: function (x, y, vx, vy) { plX = x; plY = y; plVX = vx || 0; plVY = vy || 0; },
     spawn: spawn,
     clear: clear,
     tick: tick,

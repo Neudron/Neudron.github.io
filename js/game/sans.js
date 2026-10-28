@@ -524,7 +524,7 @@
      string for the whole call or an array running parallel to `lines`
      — the dog handing over the hammer is narration first and him
      second, and forcing that into one voice loses the beat. */
-  var queue = [], queueV = [], typing = null, curV = 'sans';
+  var queue = [], queueV = [], typing = null, curV = 'sans', curLine = '';
   var curIdx = 0, curTotal = 0, watch = null;
   var tface = document.getElementById('tboxFace');
   var tfaceImg = document.getElementById('tboxFaceImg');
@@ -597,6 +597,7 @@
       return;
     }
     var v = curV;
+    curLine = line;
     typing = setInterval(function () {
       ttxt.textContent = line.slice(0, ++i);
       if (i % 2 === 0) blip(v);
@@ -621,6 +622,19 @@
     if (tbox) tbox.hidden = true;
     srSay(''); setFace();
     if (watch) watch(-1, -1);
+  };
+  /* X fast-forwards: a line still typing is shown whole, a finished
+     one moves on. Never throws away the rest of the queue. */
+  NEU.talk.ff = function () {
+    if (tbox.hidden) return;
+    if (typing && ttxt.textContent.length < curLine.length) {
+      clearInterval(typing); typing = null;
+      ttxt.textContent = curLine;
+      if (tmore) tmore.hidden = false;
+      clearTimeout(next.hold); next.hold = setTimeout(next, 2400);
+      return;
+    }
+    next();
   };
   NEU.hush = function () { shutUp(); };
   /* Watchers get (index, total) as each line starts and (-1, -1) when
@@ -1906,14 +1920,64 @@
       The quest marks already remember where you were; re-arm from
       them. A console not yet docked comes back empty-handed: the blue
       blaster re-earns the charge, which is the battery's own rule. */
-  if (NEU.quest) {
-    if (NEU.quest.has('sleep')) {
-      asleep = true; switchSeen = true;
-      if (sleepSw) sleepSw.hidden = false;
+  /* Every object below is re-derived from the quest marks, once, at load.
+     Nothing is written back, so a second reload lands on the same state and
+     nothing can be duplicated. Order matters only where a later line reads
+     what an earlier one set. */
+  (function restore() {
+    function has(id) { return !!(NEU.quest && NEU.quest.has(id)); }
+
+    /* the sword is gone for good, the key lies where it fell */
+    if (has('break')) {
+      state = 'broken'; swings = LINES.length;
+      hasKey = true; NEU.hasKey = true;
+      if (NEU.doorGlow) NEU.doorGlow(true);
+      if (kel) {
+        var kr = sans.getBoundingClientRect();
+        kx = Math.max(48, (kr.left || innerWidth - 120) - 40);
+        ky = docH() - FLOOR;                 // on the page floor, as gainKey leaves it
+        kvx = kvy = 0; krot = kRest = 90;
+        kstate = 'rest'; klast = performance.now();
+        kel.hidden = false;
+      }
     }
-    if (NEU.quest.has('docked')) docked = true;
-    else if (NEU.quest.has('console')) hasConsole = true;
-  }
+    if (has('door')) { doorOpened = true; NEU.doorOpen = true; if (NEU.doorGlow) NEU.doorGlow(true); }
+
+    /* the cosmolight: the hammer stage, the jam, the smash, the blackout */
+    if (has('hammer')) dogTalks = DOGTALK.length;
+    if (has('hammer') && !has('smash')) {
+      hasHammer = true; stuck = true;
+      showChip(hammerChip, true);
+      if (swBtn) swBtn.classList.add('is-stuck');
+      if (dogEl) dogEl.classList.add('is-settled');
+    }
+    if (has('smash') && !has('fixed')) {
+      broken = true;
+      if (swBtn) swBtn.classList.add('is-smashed');
+      document.body.classList.add('is-blackout');
+      showChip(darkChip, true);
+    }
+    if (has('clicker') && !has('fixed')) { hasClicker = true; showChip(clickerChip, true); }
+
+    /* the sleep, the console, the dock */
+    if (has('sleep')) {
+      asleep = true; wantSleep = false;
+      if (sleepEl) { sleepEl.hidden = false; sleepEl.classList.add('is-in'); }
+      if (tvEl)    { tvEl.hidden = false; tvEl.classList.add('is-in'); }
+    }
+    if (has('console')) { switchSeen = true; if (sleepSw) sleepSw.hidden = false; }
+    if (has('console') && !has('docked')) {
+      hasConsole = true;
+      if (sleepSw) sleepSw.classList.add('is-taken');
+      showChip(swChip, true);
+    }
+    if (has('docked')) {
+      docked = true; hasConsole = false;
+      if (sleepSw) sleepSw.hidden = true;
+      if (tvEl) tvEl.classList.add('is-live');
+    }
+    tvState();
+  })();
 
   /* The smash is page-lifetime state like the sleep chain above. The
      flag was already being written and never read back, so a reload
