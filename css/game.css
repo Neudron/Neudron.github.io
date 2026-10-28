@@ -96,3 +96,33 @@
 @media (prefers-reduced-motion: reduce) {
   .bh:not([hidden]), .dk:not([hidden]) { animation: none; }
 }
+
+/* Act III sleep room: the props behind the sleepers (2x, like sans). */
+.sleep__rug {
+  position: absolute; left: -148px; right: -8px; bottom: -8px; height: 20px;
+  background: url(../img/act123/sleep-rug.png) 0 0 / 14px 20px;
+  image-rendering: pixelated;
+}
+.sleep__shelf { left: -136px; bottom: 12px; width: 104px; }
+.sleep__lamp  { left: -30px;  bottom: 12px; width: 34px; }
+@media (max-width: 600px) {
+  .sleep__rug   { left: -52px; }
+  .sleep__shelf { left: -52px; width: 52px; }
+  .sleep__lamp  { left: -4px; }
+}
+
+/* The deck (js/game/deck.js), Deltarune style: the selected game's
+   panel is the black two-step box, the selected caption is yellow, and
+   the red soul (one element, moved by pick()) is the cursor. */
+.deck__sel {
+  width: min(512px, 100%); box-sizing: border-box; padding: 16px 24px;
+  background: #000; border: 4px solid #fff;
+  box-shadow: inset 0 0 0 4px #000, inset 0 0 0 6px #fff;
+}
+.deck__tile { position: relative; }
+.deck__tile.is-on .deck__cap { color: #ff0; padding-left: 24px; }
+.deck__soul {
+  position: absolute; left: 0; top: 142px; width: 16px; height: 16px;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
+  image-rendering: pixelated;
+}

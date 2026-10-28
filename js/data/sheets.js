@@ -407,7 +407,13 @@
        ch2 spr_shortcut_door, ch1 bg_darktiles1 hole + pebbles. */
     darkFloor:  { src: 'img/act123/dark-floor.png',  w: 40, h: 40,  frames: 1, fw: 40, fh: 40, fps: 0 },
     darkDoor:   { src: 'img/act123/dark-door.png',   w: 36, h: 52,  frames: 1, fw: 36, fh: 52, fps: 0 },
-    darkDebris: { src: 'img/act123/dark-debris.png', w: 40, h: 72,  frames: 2, fw: 40, fh: 36, fps: 0 }
+    darkDebris: { src: 'img/act123/dark-debris.png', w: 40, h: 72,  frames: 2, fw: 40, fh: 36, fps: 0 },
+    /* Act III sleep room (index.html <img>s, game.css rug): the floor
+       lamp cut from bg_sansroom, spr_bookshelf, and bg_sansroom's
+       7x10 carpet repeat. */
+    sleepLamp:  { src: 'img/act123/sleep-lamp.png',  w: 17, h: 43,  frames: 1, fw: 17, fh: 43, fps: 0 },
+    sleepShelf: { src: 'img/act123/sleep-shelf.png', w: 52, h: 57,  frames: 1, fw: 52, fh: 57, fps: 0 },
+    sleepRug:   { src: 'img/act123/sleep-rug.png',   w: 7,  h: 10,  frames: 1, fw: 7,  fh: 10, fps: 0 }
   };
 
   /* ── ONE blitter, and one image cache ──────────────────────────────

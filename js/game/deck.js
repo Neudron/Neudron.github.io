@@ -176,6 +176,12 @@
 
   var sel = 0, open_ = false, tiles = [];
 
+  /* The red soul is the cursor, Deltarune-style. ONE element that pick()
+     moves into the selected tile, so there can never be two. */
+  var soul = document.createElement('span');
+  soul.className = 'deck__soul';
+  soul.setAttribute('aria-hidden', 'true');
+
   /* Seconds for the survival game, metres for the walk. Formatting the
      unit here rather than storing it means the save file holds one
      plain number per game. */
@@ -239,6 +245,7 @@
     sel = (i + GAMES.length) % GAMES.length;
     var g = GAMES[sel];
     tiles.forEach(function (t, n) { t.classList.toggle('is-on', n === sel); });
+    if (tiles[sel]) tiles[sel].appendChild(soul);
     if (elTitle) elTitle.textContent = g.title;
     /* A personal best is the only reason to reopen an endless game, so
        it goes on the meta line the moment one exists. */

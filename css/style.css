@@ -1653,7 +1653,7 @@ body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) satura
   color: var(--ghost);
 }
 .deck__tile.is-on { transform: translateY(-8px) scale(1.06); }
-.deck__tile.is-on .deck__art { border-color: #4FC3F7; }
+.deck__tile.is-on .deck__art { border-color: #ff0; }
 .deck__tile.is-on .deck__cap { color: var(--bone); }
 /* The ones that don't run are visibly greyed, so the failure is a
    promise the shelf already made rather than a surprise. */
