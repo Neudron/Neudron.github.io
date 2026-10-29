@@ -78,11 +78,12 @@
   var rage = 0, tp = 0, shieldT = 0;
   var rageMode = 0, rageModeT = 0;
   /* A2 combat state. stripOpen: the C menu (time runs at STRIP_SCALE).
-     healCd: seconds of fight time until HEAL is ready again. defendT:
-     the DEFEND window. hurtAcc: damage banked under DEFEND (a hit is
-     50% under it, so every second hit lands). meleeCd: the slash cooldown. */
-  var stripOpen = false, stripSel = 0, healCd = 0, healToast = 0;
-  var defendT = 0, hurtAcc = 0, meleeCd = 0, grazeAt = -9;
+     healCd: seconds of fight time until HEAL is ready again. meleeCd: the
+     slash cooldown. There is no DEFEND: it handed out +16 % TP for a key
+     press, so spamming it (under the menu's slowed clock) filled the bar
+     for free. TP comes only from grazing and melee now. */
+  var stripOpen = false, stripSel = 0, stripAt = 0, healCd = 0, healToast = 0;
+  var meleeCd = 0, grazeAt = -9;
   var STRIP_SCALE = 0.2, MELEE_DMG = 6, MELEE_R = 56, FIRE_DMG = 1.5, BUSTER_DMG = 40;
   var MELEE_CD = 0.3, FIRE_CD = 1.2, FIRE_HOLD = 0.45, HEAL_CD = 30;
   /* TP, Deltarune's numbers (maps/tp.md). The wiki's scale is 0..250
@@ -613,7 +614,7 @@
      prox (ends it when the soul is this close), acc (speed multiplier per
      second), vmax (speed cap), tag (for clearTag). The cap is dm.shot's. */
   function spawn(x, y, vx, vy, k, o) {
-    var r = k === 2 ? HB.gigablast : (k === 3 || k === 5) ? HB.hellblast : HB.dart;
+    var r = k === 2 ? HB.gigablast : k === 1 ? HB.fireblast : (k === 3 || k === 5) ? HB.hellblast : HB.dart;
     var c = k === 2 ? COL.dark : COL.brim;
     var n = bullets.length;
     if (dm.shot) dm.shot(bullets, x, y, vx, vy, r, c, k, 900);
@@ -733,7 +734,6 @@
     driftEmbers(dt);
     if (meleeCd > 0) meleeCd -= dt;
     if (shotCd > 0) shotCd -= dt;
-    if (defendT > 0) defendT -= dt;
     if (healCd > 0) {
       healCd -= dt;
       if (healCd <= 0) { healCd = 0; healToast = 1.6; if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick(); }
@@ -941,15 +941,7 @@
       if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(px, py, 12, '#B8E6FF'); }
       return false;
     }
-    /* DEFEND halves each hit. HP is whole, so the half is banked and the
-       second hit under DEFEND is the one that costs a heart. */
     inv = IFRAMES;
-    hurtAcc += defendT > 0 ? 0.5 : 1;
-    if (hurtAcc < 1) {
-      if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(px, py, 4, COL.soul); }
-      return false;
-    }
-    hurtAcc -= 1;
     hp--;
     dm.hurt(F, px, py - 12);
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
@@ -1652,18 +1644,38 @@
      Deltarune's TP menu. Time runs at STRIP_SCALE while it is open and
      the soul stands still. HEAL: +1 HP, no TP, 30 s of fight time
      between uses, and it stays on cooldown when the strip is reopened.
-     DEFEND: +16 % TP and half of each hit for 1.5 s. BRIMSTONE BUSTER:
-     50 % TP for a 40-damage piercing shot. SOUL SHIELD: 32 % TP for a
-     barrier that takes one hit. RAGE: free once the bar is full. Using
-     any option closes the strip. */
+     BRIMSTONE BUSTER: 50 % TP for a 40-damage piercing shot. SOUL
+     SHIELD: 32 % TP for a barrier that takes one hit. RAGE: free once
+     the bar is full. Using any option closes the strip. There is no
+     DEFEND: a free +16 % TP on a key press was the whole TP economy. */
   var FONT_UI = '16px "Determination Mono","Pixelify Sans",monospace';
+  /* each row: its icon (7x7, '#' lit), its colour, whether it can be
+     used now, the cost shown in TP orange when it can, and the reason
+     shown in grey when it cannot. cost: the TP share it spends (for the
+     gauge's preview). */
+  var ICON = {
+    heal:   ['..#..', '..#..', '#####', '..#..', '..#..'],
+    buster: ['..#....', '.##..#.', '.###.#.', '######.', '#######', '.#####.', '..###..'],
+    shield: ['#######', '#######', '#######', '.#####.', '.#####.', '..###..', '...#...'],
+    rage:   ['...##..', '..##...', '.#####.', '...##..', '..##...', '.##....', '##.....']
+  };
   var STRIP = [
-    { name: 'HEAL', ok: function () { return hp < MAXHP && healCd <= 0; },
-      tag: function () { return healCd > 0 ? Math.ceil(healCd) + 's' : hp >= MAXHP ? 'full' : 'free'; } },
-    { name: 'DEFEND', ok: function () { return true; }, tag: function () { return '+16%'; } },
-    { name: 'BRIMSTONE BUSTER', ok: function () { return tp >= 0.5; }, tag: function () { return '50%'; } },
-    { name: 'SOUL SHIELD', ok: function () { return tp >= 0.32 && shieldT <= 0; }, tag: function () { return '32%'; } },
-    { name: 'RAGE', ok: function () { return rage >= 1 && rageMode === 0; }, tag: function () { return rage >= 1 ? 'free' : Math.floor(rage * 100) + '%'; } }
+    { name: 'HEAL', icon: 'heal', col: '#5CF08C', cost: 0,
+      ok: function () { return hp < MAXHP && healCd <= 0; },
+      tag: function () { return 'FREE'; },
+      why: function () { return healCd > 0 ? 'WAIT ' + Math.ceil(healCd) + 's' : 'HP FULL'; } },
+    { name: 'BRIMSTONE BUSTER', icon: 'buster', col: '#FF6A2A', cost: 0.5,
+      ok: function () { return tp >= 0.5; },
+      tag: function () { return '50% TP'; },
+      why: function () { return 'NEED 50%'; } },
+    { name: 'SOUL SHIELD', icon: 'shield', col: '#8FD8FF', cost: 0.32,
+      ok: function () { return tp >= 0.32 && shieldT <= 0; },
+      tag: function () { return '32% TP'; },
+      why: function () { return shieldT > 0 ? 'ALREADY UP' : 'NEED 32%'; } },
+    { name: 'RAGE', icon: 'rage', col: '#E4C46A', cost: 0,
+      ok: function () { return rage >= 1 && rageMode === 0; },
+      tag: function () { return 'FREE'; },
+      why: function () { return rageMode ? 'BURNING' : Math.floor(rage * 100) + '% FULL'; } }
   ];
   function arrowName(e) {
     var k = e.key;
@@ -1675,18 +1687,19 @@
   }
   function useStrip(i) {
     var o = STRIP[i];
-    if (!o.ok()) { say(i === 0 && hp >= MAXHP ? '* you are already whole.' : '* not now.'); return; }
+    if (!o.ok()) {
+      say(i === 0 && hp >= MAXHP ? '* you are already whole.' : '* not now.');
+      stripShake = performance.now();
+      return;
+    }
     if (i === 0) {
       hp += 1; healCd = HEAL_CD;
       if (NEU.juice) NEU.juice.burst(px, py, 10, '#B8FFD0');
       say('* a little warmth. one heart back.');
     } else if (i === 1) {
-      addTp(0.16); defendT = 1.5;
-      say('* she braces. the next hits sting less.');
-    } else if (i === 2) {
       tp = Math.max(0, tp - 0.5); buster();
       say('* brimstone, from your own soul.');
-    } else if (i === 3) {
+    } else if (i === 2) {
       tp = Math.max(0, tp - 0.32); shieldT = 30;
       say('* the barrier blooms. it will take one hit.');
     } else {
@@ -1697,51 +1710,119 @@
     }
     stripOpen = false;
   }
+  var stripShake = -1e9;
   function stripKey(e) {
     var k = e.key;
     if (k === 'ArrowUp' || k === 'ArrowLeft') stripSel = (stripSel + STRIP.length - 1) % STRIP.length;
     else if (k === 'ArrowDown' || k === 'ArrowRight') stripSel = (stripSel + 1) % STRIP.length;
-    else if (k === 'z' || k === 'Z') useStrip(stripSel);
-    else if (k === 'x' || k === 'X' || k === 'c' || k === 'C') stripOpen = false;
+    else if (k === 'z' || k === 'Z' || k === 'Enter') { useStrip(stripSel); return; }
+    else if (k === 'x' || k === 'X' || k === 'c' || k === 'C') { stripOpen = false; return; }
+    else return;
+    if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
   }
-  /* Deltarune's battle box: black, a white rim with a soul-red inner
-     line, names left, costs right in TP orange, the red soul as the
-     cursor, greyed rows for what cannot be used. HEAL's cooldown is a
-     shrinking bar and the seconds, so it reads at a glance. */
+  /* Deltarune's battle menu, in her colours. A black panel with a double
+     rim (white outside, brimstone inside), a tab with the title, one row
+     per action: its icon, its name, the TP cost right-aligned in orange,
+     or, greyed, why it cannot be used. The selected row carries a stepped
+     brimstone highlight and the soul as the cursor, bobbing. Under the
+     rows: HP, and a segmented TP gauge that previews what the selected
+     action would spend. It drops in with a small overshoot. */
   function drawStrip(ctx) {
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(AX, AY, AW, AH);
-    var bw = Math.min(AW - 40, 432) | 0, bx = (AX + (AW - bw) / 2) | 0, by = (AY + 32) | 0;
-    var bh = 32 * STRIP.length + 80;
-    ctx.fillStyle = '#000000'; ctx.fillRect(bx, by, bw, bh);
+    var now = performance.now(), u = Math.min(1, (now - stripAt) / 140);
+    var ease = 1 + 0.12 * Math.sin(u * Math.PI) * (1 - u);       /* overshoot, then rest */
+    var reduce = !!(NEU.juice && NEU.juice.reduced);
+    var i, o, y, can, sel;
+    ctx.fillStyle = 'rgba(4,0,2,' + (0.62 * u).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH);
+    var rowH = 40, bw = Math.min(AW - 48, 464) | 0, bh = rowH * STRIP.length + 132;
+    var bx = (AX + (AW - bw) / 2) | 0;
+    var by = (AY + Math.max(40, (AH - bh) / 2) - (reduce ? 0 : (1 - u) * 24)) | 0;
+    var shake = now - stripShake < 180 && !reduce ? Math.round(Math.sin((now - stripShake) * 0.12) * 4) : 0;
+    bx += shake;
+    ctx.save();
+    if (!reduce && ease !== 1) {
+      ctx.translate(bx + bw / 2, by + bh / 2); ctx.scale(ease, ease); ctx.translate(-(bx + bw / 2), -(by + bh / 2));
+    }
+    /* drop shadow, panel, double rim */
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(bx + 6, by + 6, bw, bh);
+    ctx.fillStyle = '#050104'; ctx.fillRect(bx, by, bw, bh);
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(bx, by, bw, 3); ctx.fillRect(bx, by + bh - 3, bw, 3);
     ctx.fillRect(bx, by, 3, bh); ctx.fillRect(bx + bw - 3, by, 3, bh);
-    ctx.strokeStyle = '#5A1020'; ctx.lineWidth = 1; ctx.strokeRect(bx + 5.5, by + 5.5, bw - 11, bh - 11);
+    ctx.fillStyle = '#8C1A22';
+    ctx.fillRect(bx + 6, by + 6, bw - 12, 2); ctx.fillRect(bx + 6, by + bh - 8, bw - 12, 2);
+    ctx.fillRect(bx + 6, by + 6, 2, bh - 12); ctx.fillRect(bx + bw - 8, by + 6, 2, bh - 12);
+    /* corner studs */
+    ctx.fillStyle = '#FF9E30';
+    ctx.fillRect(bx + 6, by + 6, 4, 4); ctx.fillRect(bx + bw - 10, by + 6, 4, 4);
+    ctx.fillRect(bx + 6, by + bh - 10, 4, 4); ctx.fillRect(bx + bw - 10, by + bh - 10, 4, 4);
+    /* the title tab, sat on the top rim */
     ctx.font = FONT_UI; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
-    for (var i = 0; i < STRIP.length; i++) {
-      var o = STRIP[i], y = by + 20 + i * 32, can = o.ok();
-      if (i === stripSel) {
-        ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(bx + 8, y - 6, bw - 16, 28);
+    var title = 'TP  ACTIONS', tw = (ctx.measureText ? ctx.measureText(title).width : 120) + 24 | 0;
+    ctx.fillStyle = '#050104'; ctx.fillRect(bx + 20, by - 12, tw, 24);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(bx + 20, by - 12, tw, 2); ctx.fillRect(bx + 20, by - 12, 2, 14); ctx.fillRect(bx + 18 + tw, by - 12, 2, 14);
+    ctx.fillStyle = '#FF9E30'; ctx.fillText(title, bx + 32, by - 8);
+    for (i = 0; i < STRIP.length; i++) {
+      o = STRIP[i]; y = by + 28 + i * rowH; can = o.ok(); sel = i === stripSel;
+      if (sel) {
+        /* a stepped highlight: three bands, hot at the cursor end */
+        ctx.fillStyle = 'rgba(192,20,10,0.42)'; ctx.fillRect(bx + 12, y - 4, (bw - 24) * 0.34 | 0, 32);
+        ctx.fillStyle = 'rgba(192,20,10,0.24)'; ctx.fillRect(bx + 12 + ((bw - 24) * 0.34 | 0), y - 4, (bw - 24) * 0.33 | 0, 32);
+        ctx.fillStyle = 'rgba(192,20,10,0.12)'; ctx.fillRect(bx + 12 + ((bw - 24) * 0.67 | 0), y - 4, (bw - 24) * 0.33 | 0, 32);
+        ctx.fillStyle = can ? '#FF3A1A' : '#5A5668'; ctx.fillRect(bx + 12, y - 4, 2, 32);
+        var bob = reduce ? 0 : Math.round(Math.sin(now * 0.008) * 2);
         stamp(['.##.##.', '#######', '#######', '#######', '.#####.', '..###..', '...#...'],
-              bx + 24, y + 8, 2, COL.soul);
+              bx + 28 + bob, y + 12, 2, COL.soul);
       }
-      ctx.fillStyle = can ? (i === stripSel ? '#FFFF00' : '#FFFFFF') : '#5A5668';
-      ctx.fillText(o.name, bx + 44, y);
+      /* the icon in a small socket */
+      ctx.fillStyle = can ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)';
+      ctx.fillRect(bx + 46, y - 1, 22, 22);
+      stamp(ICON[o.icon], bx + 57, y + 10, 2, can ? o.col : '#3E3A48');
+      ctx.fillStyle = can ? (sel ? '#FFFF00' : '#FFFFFF') : '#5A5668';
+      ctx.fillText(o.name, bx + 80, y + 2);
       ctx.textAlign = 'right';
       ctx.fillStyle = can ? '#FF9E30' : '#6A6480';
-      ctx.fillText(o.tag(), bx + bw - 20, y);
+      ctx.fillText(can ? o.tag() : o.why(), bx + bw - 24, y + 2);
       ctx.textAlign = 'left';
       if (i === 0 && healCd > 0) {
-        ctx.fillStyle = '#1A3A24'; ctx.fillRect(bx + 44, y + 19, 120, 3);
-        ctx.fillStyle = '#5CF08C'; ctx.fillRect(bx + 44, y + 19, Math.round(120 * (1 - healCd / HEAL_CD)), 3);
+        ctx.fillStyle = '#1A3A24'; ctx.fillRect(bx + 80, y + 21, 128, 3);
+        ctx.fillStyle = '#5CF08C'; ctx.fillRect(bx + 80, y + 21, Math.round(128 * (1 - healCd / HEAL_CD)), 3);
       }
     }
-    ctx.fillStyle = '#C0BCC8';
-    ctx.fillText('HP ' + Math.max(0, hp) + '/' + MAXHP, bx + 20, by + bh - 56);
+    /* divider */
+    var fy = by + 28 + STRIP.length * rowH + 4;
+    ctx.fillStyle = '#3A1016'; ctx.fillRect(bx + 16, fy, bw - 32, 2);
+    /* HP as hearts, TP as a number, then the gauge across the panel */
+    ctx.fillStyle = '#C0BCC8'; ctx.fillText('HP', bx + 24, fy + 14);
+    for (i = 0; i < MAXHP; i++) {
+      stamp(['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'],
+            bx + 66 + i * 16, fy + 22, 2, i < hp ? COL.soul : '#2A1A20');
+    }
     ctx.textAlign = 'right'; ctx.fillStyle = '#FF9E30';
-    ctx.fillText('TP ' + Math.floor(tp * 100) + '%', bx + bw - 20, by + bh - 56);
+    ctx.fillText('TP ' + (tp >= 1 ? 'MAX' : Math.floor(tp * 100) + '%'), bx + bw - 24, fy + 14);
+    /* the TP gauge: cells across the panel, orange; the share the
+       selected action would spend blinks pale over the top of the fill */
+    var gx = bx + 24, gy = fy + 40, gw = bw - 48, cells = 25, cw = gw / cells, fill = tp * cells;
+    var cost = STRIP[stripSel].ok() ? STRIP[stripSel].cost : 0;
+    var blink = reduce ? 1 : (Math.floor(now / 260) % 2 ? 1 : 0.55);
+    ctx.fillStyle = '#3A1016'; ctx.fillRect(gx - 2, gy - 2, gw + 2, 16);
+    for (i = 0; i < cells; i++) {
+      var cx0 = Math.round(gx + i * cw), cx1 = Math.round(gx + (i + 1) * cw) - 2;
+      var on = i < Math.floor(fill + 1e-6), spend = cost > 0 && on && i >= Math.floor((tp - cost) * cells + 1e-6);
+      ctx.fillStyle = '#1E0E06'; ctx.fillRect(cx0, gy, cx1 - cx0, 12);
+      if (on) {
+        ctx.fillStyle = spend ? 'rgba(255,240,208,' + blink + ')' : (tp >= 1 ? '#FFD040' : '#FF9E30');
+        ctx.fillRect(cx0, gy, cx1 - cx0, 12);
+        ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(cx0, gy, cx1 - cx0, 3);
+        ctx.fillStyle = 'rgba(90,0,0,0.35)'; ctx.fillRect(cx0, gy + 9, cx1 - cx0, 3);
+      }
+    }
     ctx.textAlign = 'left'; ctx.fillStyle = COL.dim;
-    ctx.fillText('arrows pick · z use · x/c close', bx + 20, by + bh - 32);
+    ctx.fillText('z use  ·  x back', bx + 24, fy + 64);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#5A5668';
+    ctx.fillText('graze bullets for TP', bx + bw - 24, fy + 64);
+    ctx.textAlign = 'left';
+    ctx.restore();
   }
   /* X: a dash along the held arrows, or the way you face. */
   function dashKey() {
@@ -1789,7 +1870,7 @@
     if (e.key === 'x' || e.key === 'X') { e.preventDefault(); if (!e.repeat) dashKey(); return; }
     if (e.key === 'c' || e.key === 'C') {
       e.preventDefault();
-      if (!e.repeat && !dying) { stripOpen = true; stripSel = 0; keys = {}; }
+      if (!e.repeat && !dying) { stripOpen = true; stripSel = 0; stripAt = performance.now(); keys = {}; }
     }
   });
   addEventListener('keyup', function (e) {
@@ -1874,15 +1955,15 @@
     rageMode = 0; rageModeT = 0;
     rageShown = 0; tpShown = 0;
     stripOpen = false; stripSel = 0; healCd = 0; healToast = 0;
-    defendT = 0; hurtAcc = 0; meleeCd = 0; grazeAt = -9;
+    meleeCd = 0; grazeAt = -9;
     myShots = []; charging = false; chargeF = 0; shotCd = 0;
     willCharge = false;
-    /* 720 (x3 the old 240, the SCal rework). The fight runs 5-7 minutes
+    /* 540: the rework's 720 cut by a quarter. The fight runs 4-5 minutes
        before desperation, with the attack pool, the bags and the combos
        filling it. Every phase gate in damageTarget is a FRACTION of bossMax,
        so they rescale for free, and core/music.js takes hpMax from the first
        reading per fight. */
-    bossMax = 720; bossHP = bossMax; phase = 1; held = false; shotsFired = 0;
+    bossMax = 540; bossHP = bossMax; phase = 1; held = false; shotsFired = 0;
     pvx = 0; pvy = 0;
     /* dev `skip` to a phase (dev.js): start the boss at a share of its HP,
        once, so the next fight starts full again */
@@ -2014,12 +2095,11 @@
                get broHp() { return bros.map(function (b) { return b.hp; }); },
                 get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy }; }); },
                 get myShots() { return myShots.map(function (s) { return { x: s.x, y: s.y, vx: s.vx, vy: s.vy, owner: s.owner, kind: s.kind, dmg: s.dmg, pierce: !!s.pierce }; }); },
-               /* A2 hooks: the strip, heal, defend, the blue soul and the
+               /* A2 hooks: the strip, heal, the blue soul and the
                   melee arcs, for the tests and the view. */
                get stripOpen() { return stripOpen; },
                get stripSel() { return stripSel; },
                get healCd() { return healCd; },
-               get defendT() { return defendT; },
                get meleeCd() { return meleeCd; },
                get swings() { return F.swings.map(function (s) { return { x: s.x, y: s.y, ang: s.ang, t: s.t, dur: s.dur, hit: s.hit }; }); },
                get grazes() { return F.grazes.slice(); },

@@ -883,13 +883,13 @@
     return st.f >= 105;
   };
 
-  /* Arena Shrink (the final all-out). Over 1500 f the playable box closes 20% on
+  /* Arena Shrink (the final all-out). Over 1200 f the playable box closes 20% on
      each side (G.box, which the walls and her position follow; the soul is
-     not clamped to it). Every edge throws a row of flames inward, every 36 f
-     falling to every 12 f by the end, with a two-flame gap that walks along
-     each wall. Dodge: stay off the edge the walls are coming from. */
+     not clamped to it). Every edge throws a row of ten flames inward at 95
+     px/s, every 36 f falling to every 12 f by the end, with a two-flame gap
+     that walks along each wall. Dodge: stay off the edge the walls are coming from. */
   ATK.ArenaShrinkFlameWalls = function (st) {
-    var f = st.f, D_ = 1500, s = Math.min(1, f / D_) * 0.2, i, e, t, gp, cad, x, y, vx, vy, b, n = 8;
+    var f = st.f, D_ = 1200, s = Math.min(1, f / D_) * 0.2, i, e, t, gp, cad, x, y, vx, vy, b, n = 10, fs = 95;
     var wx = A.AW * s, wy = A.AH * s;
     G.box = { x: A.AX + wx, y: A.AY + wy, w: A.AW - 2 * wx, h: A.AH - 2 * wy };
     b = G.box;
@@ -910,24 +910,29 @@
       for (e = 0; e < 4; e++) for (i = 0; i < n; i++) {
         if ((((i - gp) % n) + n) % n < 2) continue;
         t = (i + 0.5) / n;
-        if (e === 0) { x = b.x + t * b.w; y = b.y; vx = 0; vy = 60; }
-        else if (e === 1) { x = b.x + t * b.w; y = b.y + b.h; vx = 0; vy = -60; }
-        else if (e === 2) { x = b.x; y = b.y + t * b.h; vx = 60; vy = 0; }
-        else { x = b.x + b.w; y = b.y + t * b.h; vx = -60; vy = 0; }
-        A.shot(x, y, vx, vy, 0, { tag: 'brim', fuse: 9 });
+        if (e === 0) { x = b.x + t * b.w; y = b.y; vx = 0; vy = fs; }
+        else if (e === 1) { x = b.x + t * b.w; y = b.y + b.h; vx = 0; vy = -fs; }
+        else if (e === 2) { x = b.x; y = b.y + t * b.h; vx = fs; vy = 0; }
+        else { x = b.x + b.w; y = b.y + t * b.h; vx = -fs; vy = 0; }
+        A.shot(x, y, vx, vy, 0, { tag: 'brim', fuse: 7 });
       }
     }
     return f >= D_;
   };
 
   /* Desperation, the chain. Brimstone Lightning (sub 0, so it is the forced
-     first attack), Calamitous Rend with five cuts, Gravity of Ruin in the blue
-     soul, then the final all-out that shrinks the arena and thickens the walls.
+     first attack), the port's flame pillars, Calamitous Rend with six cuts,
+     the bomb bullet hell, Gravity of Ruin in the blue soul (with the low
+     ceiling), the dart walls, the rapid teleports, then the final all-out
+     that shrinks the arena and thickens the walls.
      Each step runs its own attack on its own state; G.desp.stage names the step
      for the music and the visuals. She is invulnerable through the chain and
      wins when the final all-out ends. */
-  var DESP = ['BrimstoneLightning', 'CalamitousRend', 'GravityOfRuin', 'ArenaShrinkFlameWalls'];
-  var DESP_STAGE = ['lightning', 'rend', 'gravity', 'final'];
+  var DESP = ['BrimstoneLightning', 'FlamePillars', 'CalamitousRend', 'BombBulletHell', 'GravityOfRuin',
+              'DartWallRain', 'RapidTeleports', 'ArenaShrinkFlameWalls'];
+  /* the look's four stages (boss-scal despLevel): each restored substate
+     rides the stage of the step before it */
+  var DESP_STAGE = ['lightning', 'lightning', 'rend', 'rend', 'gravity', 'gravity', 'gravity', 'final'];
   ATK.DesperationPhase = function (st) {
     if (st.f === 0) {
       A.invuln(true); G.sub = 0; G.desp = G.desp || { stage: '' }; G.desp.stage = DESP_STAGE[0];
@@ -935,8 +940,8 @@
       G.hist.push({ name: DESP[0], lvl: G.lvl, f: G.fr });
     }
     if (ATK[DESP[G.sub]](st.p.s)) {
-      if (G.sub === 2) soulMode('red');
-      if (G.sub === 3) { A.win(); return true; }
+      if (DESP[G.sub] === 'GravityOfRuin') blueOff();
+      if (G.sub === DESP.length - 1) { A.win(); return true; }
       G.sub++; st.p.s = newSt();
       G.desp.stage = DESP_STAGE[G.sub];
       G.hist.push({ name: DESP[G.sub], lvl: G.lvl, f: G.fr });
@@ -1017,38 +1022,55 @@
     return segs;
   }
   ATK.BrimstoneLightning = function (st) {
-    var f = st.f, w, n, g, i, a;
+    var f = st.f, w, n, g, i, a, nw = G.lvl >= 1 ? 4 : 3, as;
     move(A.AX + A.AW / 2, A.AY + A.AH / 2, 0.05);
     if (f === 0) st.p.a0 = RNG() * TAU;
-    if (f < 270 && f % 90 === 0) {
-      w = f / 90; n = 12 + 6 * w; g = Math.floor(w * n / 3) % n;
+    if (f < nw * 90 && f % 90 === 0) {
+      w = f / 90; n = 16 + 6 * w; g = Math.floor(w * n / 3) % n;
       A.anim('casting'); A.sfx('hellblast');
       for (i = 0; i < n; i++) {
         if ((i - g + n) % n < 2) continue;
-        a = st.p.a0 + i * TAU / n;
+        a = st.p.a0 + i * TAU / n + (w % 2 ? Math.PI / n : 0);
         G.bolts.push({ x: A.bx, y: A.by, a: a, end: G.fr + 51, at: G.fr + 36,
                        segs: boltSegs(A.bx, A.by, a, Math.hypot(A.AW, A.AH) * 0.8) });
       }
-    }
-    if (f % 90 === 36 && f < 270) { G.lightPh++; A.shake('medium'); }
-    return f >= 240;
-  };
-
-  /* Hex Collapse: six brimstone circles open round the arena, three at f 0 and
-     three at f 75. Each shrinks over 2.5 s, then bursts into a ring of twelve
-     darts from its centre. Dodge: be outside a circle before it closes. */
-  ATK.HexCollapse = function (st) {
-    var f = st.f, k, h;
-    if (f === 0 || f === 75) {
-      for (k = 0; k < 3; k++) {
-        if (G.thin && k === 1) continue;   /* in a combo: two hexes, not three */
-        h = { x: hx(A.AX + A.AW * (0.15 + 0.7 * RNG())), y: hy(A.AY + A.AH * (0.15 + 0.7 * RNG())),
-              at: G.fr, life: 150 };
-        G.hexes.push(h);
-        later(150, (function (c) { return function () { ring(c.x, c.y, G.thin ? 6 : 12, V(7), 0, 'burst'); }; }(h)));
+      /* and one fork on the soul, unless it already stands in the gap */
+      as = aim();
+      if (Math.abs(((as - (st.p.a0 + (g + 0.5) * TAU / n + (w % 2 ? Math.PI / n : 0)) + 3 * Math.PI) % TAU) - Math.PI) > 1.5 * TAU / n) {
+        G.bolts.push({ x: A.bx, y: A.by, a: as, end: G.fr + 51, at: G.fr + 36,
+                       segs: boltSegs(A.bx, A.by, as, Math.hypot(A.AW, A.AH) * 0.8) });
       }
     }
-    return f >= 230;
+    if (f % 90 === 36 && f < nw * 90) { G.lightPh++; A.shake('medium'); }
+    return f >= nw * 90 - 30;
+  };
+
+  /* Hex Collapse: brimstone circles open round the arena, three waves at
+     f 0, 70 and 140 of three circles (four from phase 3), one of each
+     wave centred on the soul. Each shrinks over 2.5 s, then bursts into a
+     ring of fourteen darts, and a second ring (turned half a step,
+     faster) follows 10 f later. Dodge: leave the circle under you, then
+     step between the rings. A combo thins it to two circles and one ring. */
+  ATK.HexCollapse = function (st) {
+    var f = st.f, k, h, n = G.thin ? 2 : (G.lvl >= 2 ? 4 : 3);
+    if (f === 0 || f === 70 || f === 140) {
+      for (k = 0; k < n; k++) {
+        h = k === 0 ? { x: hx(A.px), y: hy(A.py) }
+                    : { x: hx(A.AX + A.AW * (0.12 + 0.76 * RNG())), y: hy(A.AY + A.AH * (0.12 + 0.76 * RNG())) };
+        h.at = G.fr; h.life = 150;
+        G.hexes.push(h);
+        later(150, (function (c) {
+          return function () {
+            var a0 = RNG() * TAU;
+            ringRamp(c.x, c.y, G.thin ? 6 : 14, V(7), a0);
+            if (!G.thin) later(10, function () { ringRamp(c.x, c.y, 14, V(8.5), a0 + TAU / 28); });
+            kick('small');
+          };
+        }(h)));
+      }
+      cue('chime');
+    }
+    return f >= 310;
   };
 
   /* Predictive Charge: the telegraph aims where the soul will be when she gets
@@ -1056,26 +1078,33 @@
      the aim fixed at the last frame. Then she charges at 900 px/s, leaving an
      afterimage every 4 f and two wake darts every 6 f, and stops with a ring. */
   ATK.PredictiveCharge = function (st) {
-    var f = st.f, k, dx, dy, L, s, pa, p;
-    if (f === 0) { st.p.tl = { x: A.bx, y: A.by, a: 0, at: G.fr, life: 40 }; G.tele.push(st.p.tl); }
-    if (f < 40) {
+    var f = st.f - (st.p.f0 || 0), k, dx, dy, L, s, pa, p, T = st.p.f0 ? 26 : 40;
+    if (f === 0) { st.p.tl = { x: A.bx, y: A.by, a: 0, at: G.fr, life: T }; G.tele.push(st.p.tl); }
+    if (f < T) {
       A.anim('charge_telegraph'); A.willCharge(true);
       p = predict(A.bx, A.by, 900);
       st.p.tl.x = A.bx; st.p.tl.y = A.by; st.p.tl.a = Math.atan2(p.y - A.by, p.x - A.bx);
       st.p.tx = p.x; st.p.ty = p.y;
       return false;
     }
-    if (f === 40) { A.willCharge(false); A.anim('charging'); }
-    k = f - 40;
+    if (f === T) { A.willCharge(false); A.anim('charging'); }
+    k = f - T;
     dx = st.p.tx - A.bx; dy = st.p.ty - A.by; L = Math.hypot(dx, dy); pa = Math.atan2(dy, dx);
-    if (L <= 15 || k >= 60) { ring(A.bx, A.by, 8, V(8), 0, 'burst'); A.anim('idle'); return true; }
+    if (L <= 15 || k >= 60) {
+      ringRamp(A.bx, A.by, 12, V(8), aim() + TAU / 24); A.anim('idle'); kick('small');
+      /* a chain: two charges (three from phase 3), each re-aimed */
+      st.p.c = (st.p.c || 0) + 1;
+      if (st.p.c < (G.lvl >= 2 ? 3 : 2)) { st.p.f0 = st.f + 1; return false; }
+      return true;
+    }
     s = 15 / L;
     if (k % 4 === 0) G.after.push({ x: A.bx, y: A.by, at: G.fr });
     if (k % 6 === 0) {
-      A.shot(A.bx, A.by, Math.cos(pa + Math.PI / 2) * 120, Math.sin(pa + Math.PI / 2) * 120, 0, { tag: 'brim', fuse: 5 });
-      A.shot(A.bx, A.by, Math.cos(pa - Math.PI / 2) * 120, Math.sin(pa - Math.PI / 2) * 120, 0, { tag: 'brim', fuse: 5 });
+      A.shot(A.bx, A.by, Math.cos(pa + Math.PI / 2) * 160, Math.sin(pa + Math.PI / 2) * 160, 0, { tag: 'brim', fuse: 5 });
+      A.shot(A.bx, A.by, Math.cos(pa - Math.PI / 2) * 160, Math.sin(pa - Math.PI / 2) * 160, 0, { tag: 'brim', fuse: 5 });
     }
     A.setBoss(hx(A.bx + dx * s), hy(A.by + dy * s));
+    if (Math.hypot(A.px - A.bx, A.py - A.by) < 24) A.hit();
     return false;
   };
 
@@ -1086,14 +1115,15 @@
      spiral has gaps that open as it closes; move with the arm. */
   ATK.ConvergingSkulls = function (st) {
     var f = st.f, cx = A.AX + A.AW / 2, cy = A.AY + A.AH / 2, cad = G.thin ? 12 : 6, k, r, q, x, y, ia;
+    var arms = !G.thin && G.lvl >= 2 ? 3 : 2, dr = 110 + 10 * Math.min(G.lvl, 3);
     move(cx, cy, 0.06);
     if (f >= 30 && f < 210 && (f - 30) % cad === 0) {
       r = Math.max(40, 330 - (f - 30) * 1.6);
-      for (k = 0; k < 2; k++) {
-        q = (f - 30) * 0.22 + k * Math.PI;
+      for (k = 0; k < arms; k++) {
+        q = (f - 30) * 0.22 + k * TAU / arms;
         x = cx + Math.cos(q) * r; y = cy + Math.sin(q) * r;
         ia = Math.atan2(cy - y, cx - x);
-        A.shot(x, y, Math.cos(ia) * 80, Math.sin(ia) * 80, 0, { tag: 'demon', fuse: 8 });
+        A.shot(x, y, Math.cos(ia) * dr, Math.sin(ia) * dr, 0, { tag: 'demon', fuse: 8 });
       }
     }
     /* the arm has run in: a final readable burst at the converge point with
@@ -1105,67 +1135,94 @@
     return f >= 240;
   };
 
-  /* Brimstone Rain (a falling screen with safe lanes). Ten lanes across the
-     top. Every 100 f two adjacent lanes are picked safe and shown for 40 f
-     (G.lanes). Then brimstone falls down the other lanes every 9 f (18 f
-     thinned) until the cycle ends. Dodge: be in the safe pair. Three cycles. */
+  /* Brimstone Rain (a falling screen with safe lanes). Ten lanes across
+     the top. Every 80 f two adjacent lanes are picked safe (one from phase
+     3, out of a combo) and shown for 32 f (G.lanes). Then brimstone falls
+     down the other lanes every 8 f (16 thinned) at 240 px/s until the
+     cycle ends. The safe lanes always move at least two lanes from the
+     last ones, so the soul has to cross. Four cycles. */
   ATK.BrimstoneRain = function (st) {
-    var f = st.f, L = 10, lw = A.AW / L, c = f % 100, i, x, cad = G.thin ? 18 : 9;
-    if (c === 0) { st.p.safe = (RNG() * (L - 1)) | 0; G.lanes = { s: st.p.safe, at: G.fr, life: 100 }; }
-    if (c >= 40 && (c - 40) % cad === 0) {
+    var f = st.f, L = 10, lw = A.AW / L, c = f % 80, i, x, cad = G.thin ? 16 : 8;
+    var w = !G.thin && G.lvl >= 2 ? 1 : 2, s0;
+    if (c === 0) {
+      s0 = st.p.safe;
+      do { st.p.safe = (RNG() * (L - w + 1)) | 0; } while (s0 !== undefined && Math.abs(st.p.safe - s0) < 2);
+      G.lanes = { s: st.p.safe, n: w, at: G.fr, life: 80 };
+      cue('chime');
+    }
+    if (c >= 32 && (c - 32) % cad === 0) {
       for (i = 0; i < L; i++) {
-        if (i === st.p.safe || i === st.p.safe + 1) continue;
-        x = A.AX + (i + 0.5) * lw;
-        A.shot(x, A.AY - 10, 0, 170, 0, { tag: 'brim', fuse: 3.5 });
+        if (i >= st.p.safe && i < st.p.safe + w) continue;
+        x = A.AX + (i + 0.5) * lw + ((c >> 3) % 2 ? -lw * 0.25 : lw * 0.25);
+        A.shot(x, A.AY - 10, 0, 240, 0, { tag: 'brim', fuse: 3 });
       }
     }
-    return f >= 300;
+    return f >= 320;
   };
 
-  /* Gigablast Cross (WotG's rotating arms, as Infernum's gigablasts). From her,
-     four gigablasts go out every 24 f (40 f thinned), the cross turning 0.012 rad
-     a frame, so it sweeps the 420 f attack. Dodge: between the arms as they turn. */
+  /* Gigablast Cross (WotG's rotating arms, as Infernum's gigablasts). From
+     her, four arms (five from phase 3) of gigablasts every 24 f (40 f
+     thinned), the cross turning 0.018 rad a frame and running back the
+     other way from f 210, so the gap you rode closes on you. Every 48 f a
+     locked 3-fan of darts goes at the soul. Dodge: ride between the arms,
+     turn with them at the toll. */
+  function crossAng(f) { return f < 210 ? f * 0.018 : 210 * 0.018 - (f - 210) * 0.018; }
   ATK.GigablastCross = function (st) {
-    var f = st.f, cad = G.thin ? 40 : 24, k, a, Tw;
+    var f = st.f, cad = G.thin ? 40 : 24, k, a, Tw, arms = !G.thin && G.lvl >= 2 ? 5 : 4;
     move(A.AX + A.AW / 2, A.AY + A.AH / 2, 0.05);
-    /* each volley's four arms show their angles teleT(cad) f ahead */
+    /* each volley's arms show their angles teleT(cad) f ahead */
     Tw = teleT(cad);
     if (f % cad === 0 && f + cad < 420) {
-      for (k = 0; k < 4; k++) {
-        warn({ x: A.bx, y: A.by, a: (f + cad) * 0.012 + k * Math.PI / 2, life: Tw, w: 3, len: 330 });
+      for (k = 0; k < arms; k++) {
+        warn({ x: A.bx, y: A.by, a: crossAng(f + cad) + k * TAU / arms, life: Tw, w: 3, len: 330 });
       }
       if (f === 0) cue('chime');
     }
+    if (f === 210) { warn({ x: A.bx, y: A.by, r: 40, w: 3, life: 18 }); cue('chime'); kick('small'); }
     if (f % cad === 0 && f < 420) {
-      for (k = 0; k < 4; k++) {
-        a = f * 0.012 + k * Math.PI / 2;
-        A.shot(A.bx, A.by, Math.cos(a) * 150, Math.sin(a) * 150, 2, { tag: 'gig', fuse: 2.5 });
+      for (k = 0; k < arms; k++) {
+        a = crossAng(f) + k * TAU / arms;
+        A.shot(A.bx, A.by, Math.cos(a) * 165, Math.sin(a) * 165, 2, { tag: 'gig', fuse: 2.5 });
       }
       if (f % 48 === 0) A.sfx('giga');
+    }
+    if (!G.thin && f % 48 === 30 && f < 400) {
+      var ga = aim(), x = A.bx, y = A.by;
+      warn({ x: x, y: y, a: ga, w: 2, len: 220, life: 14 });
+      later(14, function () { for (var j = -1; j <= 1; j++) shotRamp(x, y, ga + j * 0.14, 230, 0, { tag: 'brim', fuse: 4 }); });
     }
     return f >= 420;
   };
 
-  /* Eye Lock (Calamitas' eyes, WotG's lock-on). Three eyes open along the top of
-     the arena and lock in turn at f 20, 90 and 160. Each tracks the soul for 60 f
-     with a thin lock line, then fires a 40 f beam along the angle it held at the
-     lock. Dodge: the lock line shows where the beam will go. */
+  /* Eye Lock (Calamitas' eyes, WotG's lock-on). Three eyes open along the
+     top of the arena and lock in turn, 45 f apart; from phase 3 they go
+     round twice. Each tracks the soul for 50 f with a thin lock line, then
+     fires a 40 f beam along the angle it held, and throws a 3-fan at the
+     soul as it lights. Locks overlap, so the next line is tracking while
+     the last beam burns. Dodge: the lock line shows where the beam goes. */
   ATK.EyeLockBeams = function (st) {
-    var f = st.f, k, e;
+    var f = st.f, k, e, n = !G.thin && G.lvl >= 2 ? 6 : 3;
     if (f === 0) {
       st.p.eyes = [];
-      for (k = 0; k < 3; k++) st.p.eyes.push({ x: A.AX + A.AW * (0.2 + 0.3 * k), y: A.AY + 14, lock: 20 + k * 70, l: null });
+      for (k = 0; k < 3; k++) st.p.eyes.push({ x: A.AX + A.AW * (0.2 + 0.3 * k), y: A.AY + 14, lock: 20 + k * 45, l: null });
     }
-    for (k = 0; k < 3; k++) {
+    for (k = 0; k < n; k++) {
+      e = st.p.eyes[k % 3];
       if (G.thin && k === 1) continue;     /* in a combo: the middle eye stays shut */
-      e = st.p.eyes[k];
-      if (f === e.lock) {
-        e.l = { x: e.x, y: e.y, a: 0, len: beamLen(), at: G.fr + 60, end: G.fr + 100, tele: true };
+      var lk = 20 + k * 45;
+      if (f === lk) {
+        e.lock = lk;
+        e.l = { x: e.x, y: e.y, a: 0, len: beamLen(), at: G.fr + 50, end: G.fr + 90, tele: true };
         G.lasers.push(e.l);
       }
-      if (f >= e.lock && f < e.lock + 60) e.l.a = Math.atan2(A.py - e.y, A.px - e.x);
+      if (f >= lk && f < lk + 50) e.l.a = Math.atan2(A.py - e.y, A.px - e.x);
+      if (f === lk + 50 && !G.thin) {
+        var a = Math.atan2(A.py - e.y, A.px - e.x);
+        for (var j = -1; j <= 1; j++) shotRamp(e.x, e.y, a + j * 0.22, 210, 0, { tag: 'brim', fuse: 4 });
+        kick('small');
+      }
     }
-    return f >= 270;
+    return f >= 20 + (n - 1) * 45 + 100;
   };
 
   /* ArcingEyeStarbursts (WotG's ArcingEyeStarburst.cs, rubric 4). Three eyes
@@ -1199,55 +1256,37 @@
     return f >= 410;
   };
 
-  /* Darkness with Light Slashes (WotG's DarknessWithLightSlashes.cs, rubric
-     6). The arena dims to 9 % (loud owns the dark) and four bright slashes
-     sweep across it, one every 140 f: the lane shows as a warn line 30 f
-     ahead, then a 130 px band of light travels the full box in 87 f (the
-     GravityOfRuin G.lasers sw[] machinery). Alternate lanes and directions.
-     Dodge: be off the lane the light is on; a slash only hurts where the
-     band is. */
+  /* Darkness with Light Slashes (WotG's DarknessWithLightSlashes.cs,
+     rubric 6). The arena dims to 9 % (loud owns the dark) and six slash
+     volleys sweep it, one every 90 f. Each volley is four or five lanes 64
+     px apart, one of them on the soul's height when the warning shows; the
+     lanes show 30 f ahead, then 130 px bands of light travel the full box
+     in 70 f, alternating direction. Dodge: pick a dark gap between two
+     lanes; standing still is always a lane. */
   ATK.DarknessLightSlashes = function (st) {
-    var f = st.f, i, dir, y;
+    var f = st.f, i, dir, y0, k, n;
     move(A.AX + A.AW / 2, A.AY + A.AH * 0.2, 0.05);
     if (f === 0) { loud(true, 0.09); A.anim('casting'); }
-    for (i = 0; i < 4; i++) {
-      if (f !== 90 + i * 140) continue;
+    for (i = 0; i < 6; i++) {
+      if (f !== 60 + i * 90) continue;
       dir = i % 2;
-      y = A.AY + A.AH * (0.25 + 0.17 * i);
-      warn({ x: dir ? A.AX + A.AW : A.AX, y: y, a: dir ? Math.PI : 0, life: 30, w: 4, len: A.AW });
-      (function (d, ly) {
-        later(30, function () {
-          G.lasers.push({ x: d ? A.AX + A.AW : A.AX, y: ly, a: 0, len: 130, at: G.fr, end: G.fr + 87,
-                          sw: d ? [A.AX + A.AW, A.AX - 130] : [A.AX - 130, A.AX + A.AW] });
-        });
-      })(dir, y);
+      y0 = A.py - 64 * ((RNG() * 3) | 0);
+      n = G.lvl >= 2 ? 5 : 4;
+      for (k = 0; k < n; k++) {
+        var y = y0 + k * 64;
+        if (y < A.AY + 6 || y > A.AY + A.AH - 6) continue;
+        warn({ x: dir ? A.AX + A.AW : A.AX, y: y, a: dir ? Math.PI : 0, life: 30, w: 4, len: A.AW });
+        (function (d, ly) {
+          later(30, function () {
+            G.lasers.push({ x: d ? A.AX + A.AW : A.AX, y: ly, a: 0, len: 130, at: G.fr, end: G.fr + 70,
+                            sw: d ? [A.AX + A.AW, A.AX - 130] : [A.AX - 130, A.AX + A.AW] });
+          });
+        })(dir, y);
+      }
+      cue('chime');
     }
-    if (f >= 640) { loud(false); return true; }
+    if (f >= 60 + 6 * 90 + 30) { loud(false); return true; }
     return false;
-  };
-
-  /* Gravity of Ruin (the blue section). The soul turns blue (NEU.scalSoul.setMode
-     'blue': the gravity mode, which the soul module owns). Six bands at jump
-     height sweep the arena, each a 40 f telegraph and then a 90 f sweep of 130 px
-     across, alternating direction. Dodge: stand on the floor between the bands,
-     or jump the band as it comes. The soul goes back to red at the end. 720 f. */
-  ATK.GravityOfRuin = function (st) {
-    var f = st.f, j, y;
-    if (f === 0) {
-      soulMode('blue'); move(A.AX + A.AW / 2, A.AY + A.AH * 0.2, 0.1);
-      /* two ledges between the band heights: a third way past a band */
-      if (NEU.scalSoul) NEU.scalSoul.platforms = [
-        { x: A.AX + A.AW * 0.18, y: A.AY + A.AH - 95, w: A.AW * 0.22 },
-        { x: A.AX + A.AW * 0.60, y: A.AY + A.AH - 165, w: A.AW * 0.22 }];
-    }
-    for (j = 0; j < 6; j++) {
-      if (f !== 40 + j * 110) continue;
-      y = A.AY + A.AH - 60 - (j % 3) * 70;
-      G.lasers.push({ x: 0, y: y, a: 0, len: 130, at: G.fr + 40, end: G.fr + 130, tele: true,
-                      sw: j % 2 ? [A.AX + A.AW - 120, A.AX - 10] : [A.AX - 10, A.AX + A.AW - 120] });
-    }
-    if (f === 719) { soulMode('red'); if (NEU.scalSoul) NEU.scalSoul.platforms = null; }
-    return f >= 720;
   };
 
   /* Calamitous Rend (the screen cut, a WotG reality tear). She tears the arena
@@ -1258,18 +1297,20 @@
      two diagonals, so they lattice the arena. The last one passes through where
      the soul stands when it is drawn. Dodge: sit in a cell the rift misses. */
   ATK.CalamitousRend = function (st) {
-    var f = st.f, n = G.lvl >= 4 ? 5 : 4, k, ang, cx, cy, L;
-    if (f % 90 === 0 && f / 90 < n) {
-      k = f / 90;
+    var f = st.f, n = G.lvl >= 4 ? 6 : 5, k, ang, cx, cy, L, on;
+    if (f % 72 === 0 && f / 72 < n) {
+      k = f / 72;
+      /* every second cut, and the last, runs through the soul */
+      on = k % 2 === 1 || k === n - 1;
       ang = (k % 2 ? -0.5 : 0.5) + (RNG() - 0.5) * 0.12;
-      cx = k === n - 1 ? A.px : A.AX + A.AW * (0.2 + 0.6 * ((k * 0.37) % 1));
-      cy = k === n - 1 ? A.py : A.AY + A.AH * (0.25 + 0.5 * RNG());
+      cx = on ? A.px : A.AX + A.AW * (0.2 + 0.6 * ((k * 0.37) % 1));
+      cy = on ? A.py : A.AY + A.AH * (0.25 + 0.5 * RNG());
       L = Math.hypot(A.AW, A.AH);
       G.rend.push({ x1: cx - Math.cos(ang) * L, y1: cy - Math.sin(ang) * L,
                     x2: cx + Math.cos(ang) * L, y2: cy + Math.sin(ang) * L,
                     cx: cx, cy: cy, ang: ang, t: 0, phase: 'tele' });
     }
-    return f >= (n - 1) * 90 + 84;
+    return f >= (n - 1) * 72 + 84;
   };
   /* the cuts' clock, once per step: telegraph, then rift, then gone */
   function rendTick() {
@@ -1286,18 +1327,560 @@
         }
         continue;
       }
-      if (r.t % 5 === 0) {
+      if (r.t % 4 === 0) {
         u = (RNG() - 0.5) * Math.hypot(A.AW, A.AH) * 0.8;
         p = { x: r.cx + Math.cos(r.ang) * u, y: r.cy + Math.sin(r.ang) * u };
         sa = Math.sin(r.ang); ca = Math.cos(r.ang);
         if (p.x >= A.AX && p.x <= A.AX + A.AW && p.y >= A.AY && p.y <= A.AY + A.AH) {
-          A.shot(p.x, p.y, -sa * 150, ca * 150, 0, { tag: 'brim', fuse: 4 });
-          A.shot(p.x, p.y, sa * 150, -ca * 150, 0, { tag: 'brim', fuse: 4 });
+          A.shot(p.x, p.y, -sa * 185, ca * 185, 0, { tag: 'brim', fuse: 4 });
+          A.shot(p.x, p.y, sa * 185, -ca * 185, 0, { tag: 'brim', fuse: 4 });
         }
       }
       if (r.t >= 30) G.rend.splice(i, 1);
     }
   }
+
+  /* ── the blue soul ─────────────────────────────────────────────────
+     Gravity (core/danmaku.js move): the soul falls at GRAV 900 px/s2 and
+     Up jumps at 330 px/s, only from the floor or a ledge; letting go
+     early cuts the climb to 132 px/s. So a held jump peaks 60.5 px over
+     the floor and lasts 0.73 s; a one-frame tap still peaks about 15 px.
+     The soul's centre on the floor sits EDGE (7 px) over the box bottom,
+     its hit radius is 3.2.
+     Everything here is a rect that hurts (G.bones), so the heights are
+     exact:
+       low bone, H px tall from the floor: clear when h > H - 3.8
+       high bone, hangs to G px off the floor: hits when h > G - 10.2
+       ceiling, C px off the floor: hits when h > C - 10.2
+       lava: hits when h < 8 over its span
+     Proofs, with the numbers used below:
+       low 30: a full jump is over 26.2 px for 0.55 s; the bone and the
+         soul overlap for (12 + 6.4) / 420 = 0.044 s. A low pair 16 f apart
+         is cleared by one jump (0.27 + 0.044 < 0.55).
+       tall 42: over 38.2 px for 0.41 s; one bone only.
+       Every jump is centred on its bone 22 f after take-off (the parabola
+         is symmetric) and lands 22 f after it, so two jumps need 44 f
+         between their bones: single lows are 50 f or more apart, pairs
+         16 f.
+       high 26: hits above 15.8 px. On the floor you are 0, so stay down.
+         A high bone comes 44 f after a low one (you have landed), and a
+         low one 28 f after a high one (take-off is 22 f before it).
+       ceiling 50 with low bones 16: the window is 12.2 < h < 39.8. A hop
+         held 1-6 frames peaks 15-40 px: a short hop, not a jump.
+       ledges are 45 px up (a held jump reaches 60.5) and the top one is
+         45 px over those.
+     Every bone shows for 24 f on its edge before it moves (chevrons on
+     the floor, the colour of what it asks: brimstone = jump, pale blue =
+     stay down). A wave comes from one side only, and the next waits for
+     the last to leave, so a jump and a stay-down never meet at once. */
+  function floorH() { return A.AY + A.AH - 7 - A.py; }
+  function bone(kind, side, at, sp, H) {
+    var x0 = side > 0 ? A.AX - 8 : A.AX + A.AW + 8, bot = A.AY + A.AH, b;
+    b = { kind: kind, x0: x0, x: x0, vx: side > 0 ? sp : -sp, at: at, end: at + Math.ceil((A.AW + 24) / sp * 60),
+          w: 6, side: side, y0: 0, y1: bot };
+    if (kind === 'high') { b.y0 = A.AY; b.y1 = bot - (H || 26); b.w = 7; }
+    else b.y0 = bot - (H || 30);
+    G.bones.push(b);
+    return b;
+  }
+  /* a fixed column of fire (a geyser at a landing spot, a pillar) */
+  function column(x, half, top, at, life, kind) {
+    var b = { kind: kind || 'geyser', x0: x, x: x, vx: 0, at: at, end: at + life, w: half,
+              y0: top, y1: A.AY + A.AH, side: 0 };
+    G.bones.push(b);
+    return b;
+  }
+  /* one wave from one side: items [kind, frames after the last]; returns
+     the frame the last bone has left the box */
+  var WAVES = [
+    [['low', 0], ['low', 50], ['high', 44], ['low', 28], ['low', 16]],
+    [['high', 0], ['low', 28], ['tall', 52], ['high', 44], ['low', 28], ['low', 16]],
+    [['low', 0], ['low', 16], ['high', 44], ['high', 22], ['low', 28], ['tall', 52], ['low', 52]],
+    [['tall', 0], ['high', 44], ['low', 28], ['low', 16], ['low', 50], ['high', 44], ['tall', 28]]
+  ];
+  function wave(k, side, sp) {
+    var w = WAVES[k % WAVES.length], t = G.fr + 24, i, b, last = G.fr;
+    for (i = 0; i < w.length; i++) {
+      t += w[i][1];
+      b = bone(w[i][0] === 'tall' ? 'low' : w[i][0], side, t, sp, w[i][0] === 'tall' ? 42 : w[i][0] === 'low' ? 30 : 26);
+      if (w[i][0] === 'tall') b.tall = true;
+      last = b.end;
+    }
+    cue('chime');
+    return last;
+  }
+  /* while the soul is in the air, a ring marks where it will land and a
+     geyser climbs there 18 f later: keep moving through the landing */
+  function landingGeyser() {
+    var h = floorH(), t, x;
+    if (h < 6) return false;
+    /* time to fall from h with vy ~ -pvy (down positive): solve h = v t + 450 t2 */
+    var v = A.pvy;
+    t = (-v + Math.sqrt(Math.max(0, v * v + 1800 * h))) / 900;
+    x = hx(A.px + A.pvx * t);
+    warn({ x: x, y: A.AY + A.AH - 8, r: 14, w: 2, life: 18 });
+    column(x, 8, A.AY + A.AH - 64, G.fr + 18, 24);
+    return true;
+  }
+  function blueOn() {
+    soulMode('blue');
+    A.sfx('maelstrom'); kick('medium');
+  }
+  /* three ledges, 45 px up (two) and 90 px (one): only while the floor
+     burns, never with bones about, so a jump under one never lands you
+     on it in the path of a pale bone */
+  function ledges() {
+    if (NEU.scalSoul) NEU.scalSoul.platforms = [
+      { x: A.AX + A.AW * 0.12, y: A.AY + A.AH - 45, w: A.AW * 0.16 },
+      { x: A.AX + A.AW * 0.72, y: A.AY + A.AH - 45, w: A.AW * 0.16 },
+      { x: A.AX + A.AW * 0.42, y: A.AY + A.AH - 90, w: A.AW * 0.16 }];
+  }
+  function blueOff() {
+    soulMode('red');
+    if (NEU.scalSoul) NEU.scalSoul.platforms = null;
+  }
+  /* lava: the floor between x0 and x1 turns to brimstone, 40 f of glow,
+     then 70 f live. Ledges stand over it. */
+  function lava(x0, x1, life) {
+    G.lava.push({ x0: x0, x1: x1, at: G.fr + 40, end: G.fr + 40 + (life || 70), t0: G.fr });
+  }
+
+  /* Gravity of Ruin (the blue section). The soul turns blue. 1: a bone
+     wave (one side, jump the brimstone, stay under the pale ones),
+     landing geysers from phase 3. 2: three ledges rise and the floor burns
+     twice: first leaving one 96 px gap, then all of it, so the ledges are
+     the way out; aimed 3-fans fall on you while it burns. 3 (phase 3+ and
+     the desperation): the ceiling drops to 50 px and low bones run under
+     it both ways in turn: short hops only. The soul goes back to red. */
+  ATK.GravityOfRuin = function (st) {
+    var f = st.f, L = G.lvl, p = st.p, sp = 400 + 20 * Math.min(L, 4), gx, i, a;
+    if (f === 0) {
+      blueOn(); p.side = A.px < A.AX + A.AW / 2 ? 1 : -1;
+      p.sec = 0; p.t = 60; p.k = (RNG() * WAVES.length) | 0;
+    }
+    move(A.AX + A.AW / 2, A.AY + A.AH * 0.2, 0.08);
+    if (p.sec === 0 && f === p.t) { p.t = wave(p.k, p.side, sp) - G.fr + f + 8; p.sec = 1; }
+    if (p.sec === 1 && L >= 2 && f % 40 === 0) landingGeyser();
+    if (p.sec === 1 && f >= p.t) { p.sec = 2; p.t = f; }
+    if (p.sec === 2) {
+      var r = f - p.t;
+      if (r === 0) {
+        gx = A.AX + 40 + RNG() * (A.AW - 176);
+        ledges();
+        lava(A.AX, gx, 70); lava(gx + 96, A.AX + A.AW, 70);
+        cue('chime');
+      }
+      if (r === 130) { lava(A.AX, A.AX + A.AW, 80); cue('chime'); kick('small'); }
+      if ((r >= 40 && r < 110) || (r >= 170 && r < 250)) {
+        if ((r - 40) % 26 === 0) {
+          a = aim();
+          warn({ x: A.bx, y: A.by, a: a, w: 2, life: 14 });
+          (function (x, y, a0) {
+            later(14, function () {
+              for (var j = -1; j <= 1; j++) shotRamp(x, y, a0 + j * 0.16, 230 + 20 * L, 0, { tag: 'brim', fuse: 4 });
+            });
+          })(A.bx, A.by, a);
+        }
+      }
+      if (r >= 262) { p.sec = L >= 2 ? 3 : 9; p.t = f; }
+    }
+    if (p.sec === 3) {
+      var c = f - p.t;
+      if (c === 0) {
+        if (NEU.scalSoul) NEU.scalSoul.platforms = null;
+        G.ceil = { C: 50, at: G.fr + 36, end: G.fr + 36 + 250, t0: G.fr };
+        cue('chime'); kick('small');
+      }
+      if (c === 40 || c === 140) {
+        var sd = c === 40 ? p.side : -p.side, t0 = G.fr + 24, s2 = 330;
+        for (i = 0; i < 4; i++) bone('low', sd, t0 + i * 32, s2, 16);
+        cue('chime');
+      }
+      if (c >= 290) { p.sec = 9; p.t = f; }
+    }
+    if (p.sec === 9 && f - p.t >= 20 && !G.bones.length) { blueOff(); return true; }
+    return false;
+  };
+
+  /* Gravity Bone Rush (the shorter blue attack, phase 2+). Three bone
+     waves from alternating sides, each faster than the last; a landing
+     geyser every 34 f the soul is up, and from phase 3 her darts rain on
+     the floor between waves. */
+  ATK.GravityBoneRush = function (st) {
+    var f = st.f, L = G.lvl, p = st.p, i;
+    if (f === 0) { blueOn(); p.side = A.px < A.AX + A.AW / 2 ? 1 : -1; p.n = 0; p.t = 50; p.k = (RNG() * WAVES.length) | 0; }
+    move(A.AX + A.AW / 2, A.AY + A.AH * 0.18, 0.08);
+    if (p.n < 3 && f === p.t) {
+      p.t = wave(p.k + p.n, p.side, 380 + 30 * p.n + 15 * Math.min(L, 3)) - G.fr + f + 10;
+      p.side = -p.side; p.n++;
+      if (L >= 2) {
+        for (i = 0; i < 5; i++) (function (x) {
+          warn({ x: x, y: A.AY + 8, a: Math.PI / 2, w: 2, len: A.AH, life: 26 });
+          later(26, function () { A.shot(x, A.AY + 4, 0, 300, 0, { tag: 'brim', fuse: 3 }); });
+        })(A.AX + A.AW * (0.1 + 0.2 * i) + (RNG() - 0.5) * 30);
+      }
+    }
+    if (f % 34 === 17 && p.n > 0) landingGeyser();
+    if (p.n >= 3 && f >= p.t && !G.bones.length) { blueOff(); return true; }
+    return false;
+  };
+
+  /* ── restored: the V5 fight's attacks (902cf05~1 boss-scal.js) ────────
+     The fight before the Infernum port had its own cycle: dart bursts,
+     homing fireblasts and gigablasts, the side hellbarrage, the twin
+     charge, the five wall bullet hells and the flame-skull waves. They are
+     back as attacks of their own, dressed in the WotG kit. */
+
+  /* V5 dartBurst. She hovers 170 px over the soul; four bursts (five at
+     phase 2+) 20 f apart, each an 8-dart fan at the soul with one dart
+     missing. The hole walks between bursts and the fan's gap in pixels is
+     capped, so standing in a gap does not last. Three sets. */
+  ATK.DartBurstFans = function (st) {
+    var f = st.f, L = G.lvl, nb = L >= 1 ? 5 : 4, set = 30 + nb * 20 + 30, s = Math.floor(f / set), lf = f - s * set, k;
+    move(A.px, A.py - 170, 0.1);
+    if (s >= 3) return true;
+    if (lf === 10) { warn({ x: A.bx, y: A.by, r: 30, w: 2, life: 20 }); cue('chime'); }
+    if (lf >= 30 && lf < 30 + nb * 20 && (lf - 30) % 20 === 0) {
+      k = (lf - 30) / 20;
+      var n = 8, hole = (k * 3 + s * 2) % n, base = aim() + (k % 3 - 1) * 0.18;
+      var dist = Math.max(60, Math.hypot(A.px - A.bx, A.py - A.by));
+      var rot = Math.min(0.35, 12 * (n - 1) / (2 * dist)), sp = 180 + 35 * L;
+      for (var j = 0; j < n; j++) {
+        if (j === hole) continue;
+        shotRamp(A.bx, A.by, base + (j / (n - 1) * 2 - 1) * rot, sp, 0, { tag: 'brim', fuse: 4 });
+      }
+      A.anim('charging'); kick('small');
+    }
+    return false;
+  };
+
+  /* V5 fireblast / gigablast: homing brimstone that bursts when it comes
+     within 78 px (224 Terraria px) of the soul, or when its fuse is out.
+     Inertia 30 f, home speed 190 px/s (230 phase 2+). Three fireblasts,
+     45 f apart (four at phase 2+), each a 12-ring; from phase 3 two
+     gigablasts follow, slower, each a 16-ring. A ring shows on her hands
+     before each cast. */
+  function homers(st) {
+    var l = st.p.home || [], i, m, b, a, sp;
+    for (i = 0; i < l.length; i++) {
+      m = l[i]; b = m.b;
+      if (b.fuse <= 0) continue;
+      a = Math.atan2(A.py - b.y, A.px - b.x); sp = m.sp;
+      b.vx = (b.vx * (m.in - 1) + Math.cos(a) * sp) / m.in;
+      b.vy = (b.vy * (m.in - 1) + Math.sin(a) * sp) / m.in;
+      if (Math.hypot(A.px - b.x, A.py - b.y) < 78) b.fuse = 0.001;
+    }
+    st.p.home = l.filter(function (m) { return m.b.fuse > 0; });
+  }
+  function homer(st, giga, sp) {
+    var a = aim();
+    var b = A.shot(A.bx, A.by, Math.cos(a) * 60, Math.sin(a) * 60, giga ? 2 : 1, { tag: giga ? 'gig' : 'flame', fuse: 3,
+      onEnd: function (q) { ringRamp(q.x, q.y, giga ? 16 : 12, giga ? 150 : 170, RNG() * TAU); sparks(q.x, q.y, 10, 0, TAU, 160); kick('small'); } });
+    if (b) { tracked(b); (st.p.home = st.p.home || []).push({ b: b, sp: sp, in: giga ? 40 : 30 }); }
+    A.sfx(giga ? 'giga' : 'fireblast'); A.anim(giga ? 'casting' : 'charging');
+  }
+  ATK.FireblastVolley = function (st) {
+    var f = st.f, L = G.lvl, n = L >= 1 ? 4 : 3, g = L >= 2 ? 2 : 0, i;
+    move(A.px + (st.side || 1) * 220, A.AY + A.AH * 0.22, 0.06);
+    if (f === 0) st.side = A.bx < A.px ? -1 : 1;
+    for (i = 0; i < n + g; i++) {
+      var at = 30 + i * 45 + (i >= n ? 30 : 0);
+      if (f === at - 18) warn({ x: A.bx, y: A.by, r: i >= n ? 40 : 26, w: 2, life: 18 });
+      if (f === at) homer(st, i >= n, i >= n ? 150 : (L >= 1 ? 230 : 190));
+    }
+    homers(st);
+    var end = 30 + (n + g) * 45 + (g ? 30 : 0) + 150;
+    if (f === end - 10) settle();
+    return f >= end;
+  };
+
+  /* V5 hellbarrage. Hellblasts from the arena's edge at the soul's
+     height, every 20 f (16 at phase 2+), each lane locked and shown 18 f
+     ahead. They cross at 220 px/s (+25 a phase). The side flips every
+     six; every fourth is a pair 36 px either side of the lane, so a small
+     step is not enough. 320 f. */
+  ATK.SideHellbarrage = function (st) {
+    var f = st.f, L = G.lvl, iv = L >= 2 ? 16 : 20, sp = 220 + 25 * Math.min(L, 3);
+    if (f === 0) { st.side = A.px < A.AX + A.AW / 2 ? 1 : -1; A.sfx('hellblast'); st.n = 0; }
+    move(st.side > 0 ? A.AX + 40 : A.AX + A.AW - 40, A.py, 0.08);
+    A.anim('hellblast');
+    if (f >= 20 && f < 320 && (f - 20) % iv === 0) {
+      var y = hy(A.py + (RNG() - 0.5) * 24), side = st.side, x = side > 0 ? A.AX + 2 : A.AX + A.AW - 2, n = st.n++;
+      var ys = n % 4 === 3 ? [y - 36, y + 36] : [y];
+      for (var j = 0; j < ys.length; j++) warn({ x: x, y: ys[j], a: side > 0 ? 0 : Math.PI, w: 3, len: A.AW, life: 18 });
+      later(18, function () {
+        for (var q = 0; q < ys.length; q++) A.shot(x, ys[q], side * sp, 0, 3, { tag: 'hell', fuse: 5 });
+      });
+      if (st.n % 6 === 0) { st.side = -st.side; A.boom(A.bx, A.by); }
+    }
+    return f >= 360;
+  };
+
+  /* V5 charge. Two dashes (three at phase 3+): a 30 f wind-up for the
+     first and 18 f for the rest, the line tracking the soul until 6 f
+     before she goes; 420 px/s for 33 f. Touching her mid-dash hurts. Each
+     dash ends in a 10-ring with a two-dart gap toward the soul. */
+  ATK.TwinCharge = function (st) {
+    var f = st.f, p = st.p, n = G.lvl >= 2 ? 3 : 2;
+    if (f === 0) { p.c = 0; p.t = 30; p.w = warn({ x: A.bx, y: A.by, a: aim(), w: 6, len: 420 * 33 / 60 + 20, life: 30 }); A.willCharge(true); cue('chime'); }
+    if (p.c >= n) return f >= p.t;
+    if (f < p.t) {
+      A.anim('charge_telegraph');
+      if (p.w) { p.w.x = A.bx; p.w.y = A.by; if (p.t - f > 6) p.w.a = aim(); }
+      return false;
+    }
+    if (f === p.t) { p.a = p.w ? p.w.a : aim(); A.willCharge(false); A.anim('charging'); kick('small'); A.sfx('fireblast'); }
+    var k = f - p.t;
+    if (k < 33) {
+      A.setBoss(hx(A.bx + Math.cos(p.a) * 7), hy(A.by + Math.sin(p.a) * 7));
+      if (k % 4 === 0) G.after.push({ x: A.bx, y: A.by, at: G.fr });
+      if (Math.hypot(A.px - A.bx, A.py - A.by) < 26) A.hit();
+      return false;
+    }
+    ringRamp(A.bx, A.by, 10, 190, aim(), 9, 2);
+    p.c++;
+    if (p.c < n) { p.t = f + 18; p.w = warn({ x: A.bx, y: A.by, a: aim(), w: 6, len: 420 * 33 / 60 + 20, life: 18 }); }
+    else p.t = f + 30;
+    return false;
+  };
+
+  /* V5 startWall / wallLine: the five wall bullet hells. Three beats 81 f
+     apart; each beat fires its walls 14 f apart: a line of 22 darts from
+     an edge at 230 px/s with one 108 px hole. Two horizontal walls in one
+     beat share the hole's height, so one strip goes through both. The
+     hell is the phase's: 1 at phase 1, up to 4 (with flame skulls) at
+     phase 4. Each wall shows on its edge 22 f ahead, hole and all. */
+  var WALL_BEATS = [
+    [['d', 'r', 'l'], ['l', 'r'], ['d', 'l', 'r']],
+    [['u'], ['r'], ['l', 'r']],
+    [['d'], ['l'], ['l', 'r']],
+    [['u'], ['r'], ['l', 'r']],
+    [['d'], ['l', 'r'], ['d', 'l', 'r']]
+  ];
+  function wallLine(d, hole) {
+    var i, p, x, y, sp = 230 + 15 * Math.min(G.lvl, 3), vert = d === 'd' || d === 'u';
+    for (i = 0; i < 22; i++) {
+      p = i / 21;
+      if (vert) {
+        x = A.AX + p * A.AW;
+        if (Math.abs(x - hole) < 54) continue;
+        A.shot(x, d === 'd' ? A.AY - 6 : A.AY + A.AH + 6, 0, d === 'd' ? sp : -sp, 0, { tag: 'brim', fuse: 4 });
+      } else {
+        y = A.AY + p * A.AH;
+        if (Math.abs(y - hole) < 48) continue;
+        A.shot(d === 'r' ? A.AX - 6 : A.AX + A.AW + 6, y, d === 'r' ? sp : -sp, 0, 0, { tag: 'brim', fuse: 4 });
+      }
+    }
+  }
+  function wallWarn(d, hole) {
+    var vert = d === 'd' || d === 'u', T = 22, e;
+    if (vert) {
+      e = d === 'd' ? A.AY + 3 : A.AY + A.AH - 3;
+      warn({ x: A.AX, y: e, a: 0, w: 3, len: Math.max(0, hole - 54 - A.AX), life: T });
+      warn({ x: A.AX + A.AW, y: e, a: Math.PI, w: 3, len: Math.max(0, A.AX + A.AW - hole - 54), life: T });
+    } else {
+      e = d === 'r' ? A.AX + 3 : A.AX + A.AW - 3;
+      warn({ x: e, y: A.AY, a: Math.PI / 2, w: 3, len: Math.max(0, hole - 48 - A.AY), life: T });
+      warn({ x: e, y: A.AY + A.AH, a: -Math.PI / 2, w: 3, len: Math.max(0, A.AY + A.AH - hole - 48), life: T });
+    }
+  }
+  ATK.BrimstoneWalls = function (st) {
+    var f = st.f, v = WALL_BEATS[Math.min(G.lvl + 1, 4)], b, i;
+    move(A.AX + A.AW / 2, A.AY + A.AH * 0.12, 0.05);
+    if (f === 0) { A.sfx('maelstrom'); kick('small'); }
+    for (b = 0; b < 3; b++) {
+      if (f !== 20 + b * 81) continue;
+      var dirs = v[b], hy0 = A.AY + 70 + RNG() * (A.AH - 140);
+      for (i = 0; i < dirs.length; i++) (function (d, k) {
+        var hole = (d === 'l' || d === 'r') ? hy0 : A.AX + 60 + RNG() * (A.AW - 120);
+        later(k * 14, function () { wallWarn(d, hole); cue('chime'); });
+        later(k * 14 + 22, function () { wallLine(d, hole); });
+      })(dirs[i], i);
+      if (G.lvl >= 3) later(30, (function (left) { return function () { skullRow(st, left, 5); }; })(b % 2 === 0));
+    }
+    skulls(st);
+    return f >= 20 + 3 * 81 + (G.lvl >= 3 ? 200 : 90);
+  };
+
+  /* V5 skullWave: five flame skulls cross the box in a row, each bobbing
+     on its own phase (vy = 90 cos(3.2 t + 0.6 i)). Three rows from
+     alternating sides 70 f apart (four at phase 3+), and between rows she
+     throws a locked 5-fan. */
+  function skullRow(st, fromLeft, n) {
+    var l = st.p.sk = st.p.sk || [], i, y, b;
+    for (i = 0; i < n; i++) {
+      y = A.AY + 50 + i * (A.AH - 100) / (n - 1);
+      b = A.shot(fromLeft ? A.AX - 10 : A.AX + A.AW + 10, y, (fromLeft ? 1 : -1) * (150 + 15 * Math.min(G.lvl, 3)), 0, 5,
+                 { tag: 'demon', fuse: 6 });
+      if (b) l.push({ b: b, ph: i * 0.6, t: 0 });
+    }
+    A.sfx('hellblast');
+  }
+  function skulls(st) {
+    var l = st.p.sk || [], i, m;
+    for (i = 0; i < l.length; i++) { m = l[i]; m.t += TF; m.b.vy = Math.cos(m.t * 3.2 + m.ph) * 90; }
+    st.p.sk = l.filter(function (m) { return m.b.fuse > 0; });
+  }
+  ATK.SkullWave = function (st) {
+    var f = st.f, n = G.lvl >= 2 ? 4 : 3, k;
+    move(A.AX + A.AW / 2, A.AY + A.AH * 0.15, 0.05);
+    for (k = 0; k < n; k++) {
+      if (f === 20 + k * 70 - 18) {
+        var fl = k % 2 === 0;
+        for (var i = 0; i < 5; i++) warn({ x: fl ? A.AX + 6 : A.AX + A.AW - 6, y: A.AY + 50 + i * (A.AH - 100) / 4, r: 10, w: 2, life: 18 });
+        cue('chime');
+      }
+      if (f === 20 + k * 70) skullRow(st, k % 2 === 0, 5);
+      if (f === 20 + k * 70 + 40) {
+        var a = aim(), x = A.bx, y = A.by;
+        warn({ x: x, y: y, a: a, w: 2, life: 16 });
+        later(16, function () { for (var j = -2; j <= 2; j++) shotRamp(x, y, a + j * 0.2, 220, 0, { tag: 'brim', fuse: 5 }); });
+      }
+    }
+    skulls(st);
+    return f >= 20 + n * 70 + 220;
+  };
+
+  /* ── restored: the desperation substates of the Infernum port
+     (872c0a1~1), each an attack of its own again, and the desperation
+     chain runs them between the new steps. ───────────────────────── */
+
+  /* 0: flame pillars. A strip telegraphs for 60 f, then is live for 105 f,
+     and hurts the soul while it stands in it. Strips step 300 Terraria px
+     across the arena every 16 f. Lost souls every 18 f from her, straight
+     up, +-0.73 rad, speed 8-17 (RedirectingLostSoulProj, timeLeft 230),
+     that turn down onto the soul after 40 f. */
+  ATK.FlamePillars = function (st) {
+    var s = st.f, p = st.p, len = G.lvl >= 4 ? 600 : 480;
+    move(A.AX + A.AW / 2, A.AY + 30, 0.05);
+    if (s < len - 165 && s % 16 === 0) {
+      var k = p.k || 0;
+      column(A.AX + 20 + ((k * D(300)) % (A.AW - 40)), 16, A.AY, G.fr + 60, 105, 'pillar');
+      p.k = k + 1;
+    }
+    if (s < len - 60 && s % 18 === 0) {
+      var sp = V(rnd(8, 17)), la = -Math.PI / 2 + rnd(-0.73, 0.73);
+      var b = A.shot(A.bx, A.by, Math.cos(la) * sp, Math.sin(la) * sp, 0, { tag: 'soul', fuse: 230 / 60 });
+      if (b) { tracked(b); (p.ls = p.ls || []).push({ b: b, t: 0 }); }
+    }
+    var l = p.ls || [];
+    for (var i = 0; i < l.length; i++) {
+      var m = l[i];
+      if (++m.t === 40) {
+        var a = Math.atan2(A.py - m.b.y, A.px - m.b.x), v = Math.hypot(m.b.vx, m.b.vy);
+        m.b.vx = Math.cos(a) * v; m.b.vy = Math.sin(a) * v;
+      }
+    }
+    p.ls = l.filter(function (m) { return m.b.fuse > 0 && m.t < 41; });
+    return s >= len;
+  };
+
+  /* 1: bomb bullet hell. She teleports to the arena centre. Bombs in
+     bursts of four (plus shape, then X shape on odd bursts); the countdown
+     is 120 f, then 120 - 6n, floor 56. Darts every 56 f from f 28: seven
+     forward and seven reverse, spread +-0.79 rad at 8.4. */
+  ATK.BombBulletHell = function (st) {
+    var s = st.f, p = st.p, len = 480;
+    if (s === 0) { A.boom(A.bx, A.by); A.setBoss(A.AX + A.AW / 2, A.AY + A.AH / 2); p.cd = 90; p.bc = 0; A.sfx('maelstrom'); }
+    p.cd--;
+    if (p.cd === 16) warn({ x: A.bx, y: A.by, r: 36, w: 2, life: 16 });
+    if (p.cd <= 0 && s < len - 60) {
+      p.bc++;
+      var off = p.bc % 2 ? Math.PI / 4 : 0;
+      for (var i = 0; i < 4; i++) bombR(A.bx, A.by, Math.cos(i * Math.PI / 2 + off) * V(16),
+                                        Math.sin(i * Math.PI / 2 + off) * V(16), 60, 16, V(6));
+      p.cd = Math.max(56, 120 - 6 * p.bc);
+      kick('small');
+    }
+    if (s >= 28 && s < len - 30 && (s - 28) % 56 === 0) {
+      var a = aim();
+      for (var j = 0; j < 7; j++) {
+        var d = lerp(-0.79, 0.79, j / 6);
+        shotRamp(A.bx, A.by, a + d, V(8.4), 0, { tag: 'brim', fuse: 6 });
+        shotRamp(A.bx, A.by, a + Math.PI + d, V(8.4), 0, { tag: 'brim', fuse: 6 });
+      }
+    }
+    return s >= len;
+  };
+
+  /* 2: dart walls. Every 60 f a wall of darts falls from the top: 420
+     Terraria px wide with a 42 px gap in the middle, walls 840 px apart
+     and alternating offset (BrimstoneBarrageOld, velocity (0, 5)).
+     Gigablasts aimed at the soul every 75 f, minus 4 per shot, floor 34. */
+  ATK.DartWallRain = function (st) {
+    var s = st.f, p = st.p, len = 600;
+    move(A.AX + A.AW / 2, A.AY + 30, 0.05);
+    if (s === 0) { p.gcd = 75; p.gnext = 75; p.wn = 0; }
+    if (s < len - 60 && s % 60 === 0) {
+      var base = A.AX + ((p.wn++ % 2) ? D(420) : 0) - D(840);
+      for (var x0 = base; x0 < A.AX + A.AW; x0 += D(840)) {
+        warn({ x: Math.max(A.AX, x0), y: A.AY + 3, a: 0, w: 3, len: Math.max(0, Math.min(D(420), x0 + D(420) - A.AX)), life: 14 });
+        for (var x = x0; x < x0 + D(420); x += 12) {
+          if (x < A.AX || x > A.AX + A.AW || Math.abs(x - (x0 + D(210))) < D(21)) continue;
+          A.shot(x, A.AY - 10 - V(5) * 14 / 60, 0, V(5), 0, { tag: 'brim', fuse: 8 });
+        }
+      }
+    }
+    if (s >= p.gnext && s < len - 40) {
+      var a = aim();
+      shotRamp(A.bx, A.by, a, V(9.4), 2, { tag: 'gig', fuse: 2 });
+      cue('giga');
+      p.gcd = Math.max(34, p.gcd - 4);
+      p.gnext = s + p.gcd;
+    }
+    return s >= len;
+  };
+
+  /* 3: rapid teleports. Each lands 180-455 Terraria px from the soul and
+     drops a ten-dart ring. Countdown 38 f, down by 2 per teleport, floor
+     4 (6 here, so a ring can still be read), twenty teleports. Each
+     landing spot rings in first. */
+  ATK.RapidTeleports = function (st) {
+    var s = st.f, p = st.p;
+    if (s === 0) { p.tc = 38; p.nt = 38; p.count = 0; p.next = null; }
+    if (p.count < 20 && !p.next && s >= p.nt - Math.min(p.tc, 16)) {
+      var a = rnd(0, TAU), d = D(rnd(180, 455));
+      p.next = { x: hx(A.px + Math.cos(a) * d), y: hy(A.py + Math.sin(a) * d) };
+      warn({ x: p.next.x, y: p.next.y, r: 24, w: 2, life: Math.min(p.tc, 16) });
+    }
+    if (p.next && s >= p.nt && p.count < 20) {
+      A.boom(A.bx, A.by);
+      A.setBoss(p.next.x, p.next.y); p.next = null;
+      ringRamp(A.bx, A.by, 10, V(8), RNG() * TAU);
+      kick('small');
+      p.tc = Math.max(6, p.tc - 2);
+      p.nt = s + p.tc;
+      p.count++;
+      if (p.count === 20) p.end = s + 60;
+    }
+    return p.count >= 20 && s >= p.end;
+  };
+
+  /* The Infernum port's first FireLaserSpin (872c0a1~1), before the WotG
+     pass gave it the reversing tolls: she casts the orb at f 165, rises at
+     f 200, and its laser sweeps one full turn at a steady rate over f
+     245-565, aimed at the soul when it lights. Gigablasts every 75 f from
+     f 235 (57 at phase 3+). The beam's first line shows 36 f ahead. */
+  ATK.FireLaserSpinClassic = function (st) {
+    var f = st.f, L = G.lvl;
+    move(A.AX + A.AW / 2, A.AY + A.AH * (f < 200 ? 0.4 : 0.1), 0.04);
+    if (f === 165) A.anim('casting');
+    if (f === 209) { st.a1 = aim(); st.p.w = warn({ x: A.bx, y: A.by, a: st.a1, w: 6, life: 36 }); cue('chime'); }
+    if (st.p.w && f < 245) { st.p.w.x = A.bx; st.p.w.y = A.by; }
+    if (f === 245) { st.on = G.fr; kick('small'); cue('giga'); }
+    if (f >= 245 && f < 565) {
+      G.beam = { x: A.bx, y: A.by, a: st.a1 + TAU * (f - 245) / 320 * (L >= 3 ? 1.15 : 1), len: beamLen(), on: st.on, w: 1 };
+      if (f % 3 === 0) { var tp = rayTip(A.bx, A.by, G.beam.a); sparks(tp.x, tp.y, 2, G.beam.a + Math.PI, 1.6, 160); }
+    }
+    var gc = L >= 3 ? 57 : 75;
+    if (f >= 235 && f < 565 && (f - 235) % gc === 0) {
+      var sp = V(L >= 3 ? 11.75 : 10.5), ga = aim();
+      warn({ x: A.bx, y: A.by, a: ga, w: 3, len: 260, life: 12 });
+      later(12, function () { shotRamp(A.bx, A.by, ga, sp, 2, { tag: 'gig', fuse: 2.4 }); cue('giga'); });
+    }
+    if (f === 565) { G.beam = null; finale(12, V(7)); }
+    return f >= 620;
+  };
 
   /* A scripted combo: two attacks run together, each on its own state, with
      G.thin set so the bodies that thin their cadence do. Each one moves her
@@ -1320,17 +1903,26 @@
   /* ── the cycles (SupremeCalamitas.cs:188-241, in source order) ──────── */
   /* The pools, one per phase (phase 3 and 4 share the third). Each attack is
      one entry, and each pool holds BrimstoneLightning, so every phase has it
-     in its bag. A bag is the whole pool shuffled, drawn to the end, then
-     refilled: no attack comes round twice in one bag. */
+     in its bag. Each pool keeps the new attacks and has the old ones back:
+     the V5 fight's (dart bursts, fireblasts, the side hellbarrage, the twin
+     charge, the wall bullet hells, the skull waves), the port's own
+     desperation substates (pillars, the bomb hell, the dart walls, the
+     teleports) and the first FireLaserSpin.
+     A bag is the whole pool shuffled and drawn to the end: no attack comes
+     round again until every other one in the phase has run (see cycleNext). */
   var POOL = [
     ['HorizontalDarkSoulRelease', 'CondemnationFanBurst', 'ExplosiveCharges', 'SummonSuicideBomberDemons',
-     'BrimstoneLightning', 'HexCollapse', 'PredictiveCharge', 'ComboSkullRain'],
+     'BrimstoneLightning', 'HexCollapse', 'PredictiveCharge', 'ComboSkullRain',
+     'DartBurstFans', 'SideHellbarrage', 'TwinCharge', 'BrimstoneWalls'],
     ['CondemnationFanBurst', 'ShadowDemon_ReleaseExplodingShadowBlasts', 'HellblastBarrage', 'BrimstoneJewelBeam',
      'ExplosiveCharges', 'HorizontalDarkSoulRelease', 'SummonSuicideBomberDemons', 'BrimstoneLightning',
-     'ConvergingSkulls', 'EyeLockBeams', 'ArcingEyeStarbursts', 'ComboEyeHex', 'BrimstoneRain', 'PredictiveCharge', 'GravityOfRuin'],
+     'ConvergingSkulls', 'EyeLockBeams', 'ArcingEyeStarbursts', 'ComboEyeHex', 'BrimstoneRain', 'PredictiveCharge', 'GravityOfRuin',
+     'FireblastVolley', 'SkullWave', 'DartWallRain', 'FlamePillars', 'GravityBoneRush', 'BrimstoneWalls'],
     ['ShadowDemon_ShadowGigablastsAndCharges', 'FireLaserSpin', 'DarkMagicBombWalls', 'CondemnationFanBurst',
      'BrimstoneJewelBeam', 'ExplosiveCharges', 'BecomeBerserk', 'BrimstoneLightning', 'GigablastCross',
-     'PredictiveCharge', 'CalamitousRend', 'DarknessLightSlashes', 'ComboSkullRain', 'ComboEyeHex', 'ComboLaserHell']
+     'PredictiveCharge', 'CalamitousRend', 'DarknessLightSlashes', 'ComboSkullRain', 'ComboEyeHex', 'ComboLaserHell',
+     'FireLaserSpinClassic', 'BombBulletHell', 'RapidTeleports', 'HellblastBarrage', 'ShadowDemon_ReleaseExplodingShadowBlasts',
+     'GravityOfRuin', 'GravityBoneRush', 'FireblastVolley', 'SkullWave', 'BrimstoneWalls', 'TwinCharge']
   ];
   /* SelectNextAttack after BecomeBerserk: one of these three, uniformly */
   var BERSERK_PICK = ['CondemnationFanBurst', 'ExplosiveCharges', 'HellblastBarrage'];
@@ -1341,17 +1933,29 @@
   /* attacks that hold her invulnerable while they run */
   var INVULN = { PhaseTransition: 1, DesperationPhase: 1, SummonSepulcher: 1, SummonBrothers: 1, SummonSeekers: 1 };
 
+  /* A fresh bag for this phase: the whole pool, shuffled. The bag is
+     drawn from the end: if that would open on the attack just finished,
+     the first pick swaps with another one, so no attack runs twice in a
+     row across a refill either. */
+  function refill() {
+    G.bag = shuffle(POOL[Math.min(G.lvl, 2)].slice());
+    var n = G.bag.length - 1;
+    if (n > 0 && G.bag[n] === G.last) {
+      var j = (RNG() * n) | 0, t = G.bag[j];
+      G.bag[j] = G.bag[n]; G.bag[n] = t;
+    }
+  }
+  /* No repeats until the bag is empty. The berserk pick (SelectNextAttack
+     after BecomeBerserk) draws from the bag as well: one of the three
+     that is still in it, or the next in the bag when none of them is. An
+     attack started any other way (a gate's queued lightning, a force)
+     comes out of the bag in begin(). */
   function cycleNext() {
-    if (G.last === 'BecomeBerserk') return BERSERK_PICK[(RNG() * BERSERK_PICK.length) | 0];
-    if (!G.bag || !G.bag.length) {
-      G.bag = shuffle(POOL[Math.min(G.lvl, 2)].slice());
-      /* the bag is drawn from the end: if that would open on the attack just
-         finished, swap the first pick with another one */
-      var n = G.bag.length - 1;
-      if (G.bag[n] === G.last) {
-        var j = (RNG() * n) | 0, t = G.bag[j];
-        G.bag[j] = G.bag[n]; G.bag[n] = t;
-      }
+    if (!G.bag || !G.bag.length) refill();
+    if (G.last === 'BecomeBerserk') {
+      var c = [], i;
+      for (i = 0; i < G.bag.length; i++) if (BERSERK_PICK.indexOf(G.bag[i]) >= 0) c.push(i);
+      if (c.length) return G.bag.splice(c[(RNG() * c.length) | 0], 1)[0];
     }
     return G.bag.pop();
   }
@@ -1359,7 +1963,8 @@
   function fresh() {
     return { fr: 0, ev: [], last: '', queue: [], bag: null, lvl: 0, lightPh: 0, berserk: false,
              beam: null, sub: -1, desp: null, tele: [], rend: [], bolts: [], lasers: [],
-             hexes: [], after: [], lanes: null, box: null, thin: false, hist: [] };
+             hexes: [], after: [], lanes: null, box: null, thin: false, hist: [],
+             bones: [], lava: [], ceil: null };
   }
 
   function begin(name) {
@@ -1370,8 +1975,15 @@
       G.hexes = []; G.after = []; G.lanes = null; G.box = null; G.thin = false;
       if (G.fx) { G.fx.warn = []; G.fx.mine = []; G.fx.loud = false; }
     }
-    /* a blue section cut short (a gate, a force) does not leak into the next */
-    if (NEU.scalSoul && NEU.scalSoul.platforms) { NEU.scalSoul.platforms = null; soulMode('red'); }
+    /* a blue section cut short (a gate, a force) does not leak into the
+       next: the soul goes red and its bones, lava and ceiling go with it */
+    if (NEU.scalSoul && (NEU.scalSoul.platforms || (NEU.scalSoul.mode && NEU.scalSoul.mode() === 'blue'))) {
+      NEU.scalSoul.platforms = null; soulMode('red');
+    }
+    G.bones = []; G.lava = []; G.ceil = null;
+    /* an attack of this phase's pool that starts outside the draw (a
+       queued lightning, a force) is spent from the bag all the same */
+    if (G.bag) { var bi = G.bag.indexOf(name); if (bi >= 0) G.bag.splice(bi, 1); }
     /* a combo that was cut short (a gate, a force) must not leave its thinning on */
     G.thin = false;
     cur = { name: name, fn: ATK[name], st: newSt() };
@@ -1392,7 +2004,17 @@
      their strike, the rend rifts. The hit itself is boss-scal's (shield,
      i-frames, dash). */
   function hurtCheck() {
-    var b = G.beam, i, k, s, bo, r;
+    var b = G.beam, i, k, s, bo, r, h = A.AY + A.AH - 7 - A.py;
+    for (i = 0; i < G.bones.length; i++) {
+      bo = G.bones[i];
+      if (G.fr < bo.at) continue;
+      if (Math.abs(A.px - bo.x) < bo.w + 3.2 && A.py > bo.y0 - 3.2 && A.py < bo.y1 + 3.2) { A.hit(); break; }
+    }
+    for (i = 0; i < G.lava.length; i++) {
+      r = G.lava[i];
+      if (G.fr >= r.at && h < 8 && A.px > r.x0 && A.px < r.x1) { A.hit(); break; }
+    }
+    if (G.ceil && G.fr >= G.ceil.at && h > G.ceil.C - 10.2) A.hit();
     if (b) {
       var dx = A.px - b.x, dy = A.py - b.y, c = Math.cos(b.a), sn = Math.sin(b.a);
       var along = dx * c + dy * sn, across = Math.abs(dx * sn - dy * c);
@@ -1429,6 +2051,10 @@
     G.bolts = G.bolts.filter(function (b) { return fr < b.end; });
     G.lasers = G.lasers.filter(function (l) { return fr < l.end; });
     if (G.lanes && fr - G.lanes.at >= G.lanes.life) G.lanes = null;
+    G.bones = G.bones.filter(function (b) { return fr < b.end; });
+    for (i = 0; i < G.bones.length; i++) if (fr >= G.bones[i].at) G.bones[i].x = G.bones[i].x0 + G.bones[i].vx * (fr - G.bones[i].at) / 60;
+    G.lava = G.lava.filter(function (l) { return fr < l.end; });
+    if (G.ceil && fr >= G.ceil.end) G.ceil = null;
     for (i = 0; i < due.length; i++) due[i].fn();
     rendTick();
     hurtCheck();
@@ -1472,7 +2098,7 @@
       G.lvl++;
       G.lightPh = 0;
       A.level(G.lvl);
-      G.bag = null;
+      refill();
       if (G.lvl === 4) { G.desp = { stage: '' }; A.setHP(1); G.queue = [AFTER_PT[4]]; }
       else G.queue = (pend ? ['BrimstoneLightning'] : []).concat([AFTER_PT[G.lvl]]);
       begin('PhaseTransition');
@@ -1490,7 +2116,7 @@
        replay). The lead-in is dropped too: phase n's first attack starts now. */
     setLevel: function (n) {
       if (!G) return;
-      G.lvl = n; G.lightPh = 0; G.bag = null; G.queue = [];
+      G.lvl = n; G.lightPh = 0; G.queue = []; refill();
       A.level(n);
       if (n === 4) { G.desp = { stage: '' }; A.setHP(1); G.queue = ['DesperationPhase']; }
       begin(G.queue.length ? G.queue.shift() : cycleNext());
@@ -1526,6 +2152,11 @@
     lasers: function () { return G ? G.lasers : []; },
     hexes: function () { return G ? G.hexes : []; },
     lanes: function () { return G ? G.lanes : null; },
+    /* the blue section's hazards and the bag, for the tests */
+    bones: function () { return G ? G.bones : []; },
+    lava: function () { return G ? G.lava : []; },
+    ceil: function () { return G ? G.ceil : null; },
+    bag: function () { return G && G.bag ? G.bag.slice() : []; },
     box: function () { return G ? G.box : null; },
     afterimages: function () { return G ? G.after : []; },
     pending: function () { return G ? G.ev.length : 0; },
@@ -1608,6 +2239,7 @@
       ctx.strokeStyle = '#FFB070'; ctx.lineWidth = 2;
       ctx.strokeRect(bb.x | 0, bb.y | 0, bb.w | 0, bb.h | 0);
     }
+    drawBlue(ctx);
     /* hex collapse: a filled warning disc that brightens as it closes */
     for (i = 0; i < G.hexes.length; i++) {
       h = G.hexes[i];
@@ -1626,10 +2258,10 @@
     if (G.lanes) {
       var lw = A.AW / 10, ln = G.lanes;
       ctx.fillStyle = 'rgba(120,255,160,' + (G.fr - ln.at < 40 ? 0.22 : 0.08).toFixed(2) + ')';
-      ctx.fillRect(A.AX + ln.s * lw, A.AY, lw * 2, A.AH);
+      ctx.fillRect(A.AX + ln.s * lw, A.AY, lw * (ln.n || 2), A.AH);
       ctx.fillStyle = 'rgba(160,255,190,0.7)';
       ctx.fillRect((A.AX + ln.s * lw) | 0, A.AY, 2, A.AH);
-      ctx.fillRect((A.AX + (ln.s + 2) * lw - 2) | 0, A.AY, 2, A.AH);
+      ctx.fillRect((A.AX + (ln.s + (ln.n || 2)) * lw - 2) | 0, A.AY, 2, A.AH);
     }
     /* Brimstone Lightning. Telegraph: the fork's path as a dim red
        hairline that firms up over its 36 f. Strike: the forks in four
@@ -1720,6 +2352,119 @@
       if (k > 0) glowAt(ctx, af.x, af.y, 30, '#FF3A2A', 0.45 * k);
     }
     ctx.lineCap = 'butt';
+  }
+  /* The blue section and the fire columns. Ledges: a dark slab with a
+     pale-blue top edge. Lava: the floor glows and blinks through its 40 f
+     warning, then burns (a hot band, a white crust line, bubbles). The
+     ceiling: a dim band whose edge firms up, then a brimstone slab with a
+     white-hot underside. Bones: Undertale's, in her palette — brimstone
+     for the ones you jump, pale blue for the ones you stay under. Each one
+     waits on its edge for 24 f with chevrons pointing in, then crosses.
+     Columns (geysers, pillars) rise as a glowing shaft. */
+  var ICE = [[40, 70, 120], [90, 160, 230], [143, 216, 255], [235, 248, 255]];
+  function iceRGB(t) {
+    var u = 3 * clamp(t, 0, 1), i = Math.min(2, u | 0), k = u - i, a = ICE[i], b = ICE[i + 1];
+    return ((a[0] + (b[0] - a[0]) * k) | 0) + ',' + ((a[1] + (b[1] - a[1]) * k) | 0) + ',' + ((a[2] + (b[2] - a[2]) * k) | 0);
+  }
+  function boneRect(ctx, x, y0, y1, w, rgb, a, knobs) {
+    var op = ctx.globalCompositeOperation, h = Math.max(1, y1 - y0) | 0, xi = Math.round(x);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(' + rgb + ',' + (0.16 * a).toFixed(2) + ')'; ctx.fillRect(xi - w - 6, y0 | 0, 2 * w + 12, h);
+    ctx.fillStyle = 'rgba(' + rgb + ',' + (0.35 * a).toFixed(2) + ')'; ctx.fillRect(xi - w - 2, y0 | 0, 2 * w + 4, h);
+    ctx.globalCompositeOperation = op;
+    ctx.fillStyle = 'rgba(' + rgb + ',' + a.toFixed(2) + ')'; ctx.fillRect(xi - w, y0 | 0, 2 * w, h);
+    ctx.fillStyle = 'rgba(255,250,240,' + (0.9 * a).toFixed(2) + ')'; ctx.fillRect(xi - 1, y0 | 0, 2, h);
+    if (knobs & 1) { ctx.fillStyle = 'rgba(' + rgb + ',' + a.toFixed(2) + ')'; ctx.fillRect(xi - w - 3, y0 | 0, 2 * w + 6, 5); ctx.fillStyle = 'rgba(255,250,240,' + (0.8 * a).toFixed(2) + ')'; ctx.fillRect(xi - w - 1, (y0 | 0) + 1, 2 * w + 2, 2); }
+    if (knobs & 2) { ctx.fillStyle = 'rgba(' + rgb + ',' + a.toFixed(2) + ')'; ctx.fillRect(xi - w - 3, (y1 | 0) - 5, 2 * w + 6, 5); ctx.fillStyle = 'rgba(255,250,240,' + (0.8 * a).toFixed(2) + ')'; ctx.fillRect(xi - w - 1, (y1 | 0) - 4, 2 * w + 2, 2); }
+  }
+  function drawBlue(ctx) {
+    var i, b, t, rgb, u, op = ctx.globalCompositeOperation, bot = A.AY + A.AH, pl = NEU.scalSoul && NEU.scalSoul.platforms;
+    var blue = NEU.scalSoul && NEU.scalSoul.mode && NEU.scalSoul.mode() === 'blue';
+    if (blue) {
+      /* the floor the soul stands on: a pale line and a faint gradient up */
+      ctx.fillStyle = 'rgba(60,107,255,0.10)'; ctx.fillRect(A.AX, bot - 24, A.AW, 24);
+      ctx.fillStyle = 'rgba(60,107,255,0.06)'; ctx.fillRect(A.AX, bot - 48, A.AW, 24);
+      ctx.fillStyle = 'rgba(143,216,255,0.55)'; ctx.fillRect(A.AX, bot - 2, A.AW, 2);
+    }
+    for (i = 0; pl && i < pl.length; i++) {
+      b = pl[i];
+      ctx.fillStyle = 'rgba(10,14,30,0.92)'; ctx.fillRect(b.x | 0, b.y | 0, b.w | 0, 8);
+      ctx.fillStyle = '#8FD8FF'; ctx.fillRect(b.x | 0, b.y | 0, b.w | 0, 2);
+      ctx.fillStyle = 'rgba(143,216,255,0.35)'; ctx.fillRect((b.x | 0), (b.y | 0) + 8, 2, 6); ctx.fillRect((b.x + b.w - 2) | 0, (b.y | 0) + 8, 2, 6);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = 'rgba(90,160,230,0.18)'; ctx.fillRect((b.x | 0) - 2, (b.y | 0) - 4, (b.w | 0) + 4, 4);
+      ctx.globalCompositeOperation = op;
+    }
+    for (i = 0; i < G.lava.length; i++) {
+      b = G.lava[i];
+      if (G.fr < b.at) {
+        t = 1 - (b.at - G.fr) / 40;
+        u = (G.fr >> 3) % 2 ? 1 : 0.6;
+        ctx.fillStyle = 'rgba(' + rampRGB(t * 0.7) + ',' + ((0.25 + 0.5 * t) * u).toFixed(2) + ')';
+        ctx.fillRect(b.x0 | 0, bot - 6, (b.x1 - b.x0) | 0, 6);
+        if (G.fr % 4 === 0) sparks(b.x0 + Math.random() * (b.x1 - b.x0), bot - 4, 1, -Math.PI / 2, 0.6, 90);
+        continue;
+      }
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = 'rgba(255,58,26,0.22)'; ctx.fillRect(b.x0 | 0, bot - 30, (b.x1 - b.x0) | 0, 30);
+      ctx.fillStyle = 'rgba(255,58,26,0.30)'; ctx.fillRect(b.x0 | 0, bot - 18, (b.x1 - b.x0) | 0, 18);
+      ctx.globalCompositeOperation = op;
+      ctx.fillStyle = '#5A0000'; ctx.fillRect(b.x0 | 0, bot - 12, (b.x1 - b.x0) | 0, 12);
+      ctx.fillStyle = '#C0140A'; ctx.fillRect(b.x0 | 0, bot - 12, (b.x1 - b.x0) | 0, 7);
+      ctx.fillStyle = '#FF9A4A'; ctx.fillRect(b.x0 | 0, bot - 12, (b.x1 - b.x0) | 0, 2);
+      ctx.fillStyle = '#FFF0D0';
+      for (var q = b.x0 + ((G.fr * 3) % 24); q < b.x1; q += 24) ctx.fillRect(q | 0, bot - 11 - ((Math.sin(q * 0.3 + G.fr * 0.2) * 2) | 0), 2, 2);
+    }
+    if (G.ceil) {
+      var c = G.ceil, y = bot - c.C;
+      if (G.fr < c.at) {
+        t = 1 - (c.at - G.fr) / 36;
+        ctx.fillStyle = 'rgba(90,0,0,' + (0.25 * t).toFixed(2) + ')'; ctx.fillRect(A.AX, A.AY, A.AW, y - A.AY);
+        ctx.fillStyle = 'rgba(' + rampRGB(t) + ',' + (0.4 + 0.6 * t).toFixed(2) + ')';
+        for (var dx = A.AX; dx < A.AX + A.AW; dx += 16) ctx.fillRect(dx | 0, (y - 2) | 0, 10, 2);
+      } else {
+        ctx.fillStyle = 'rgba(40,0,6,0.78)'; ctx.fillRect(A.AX, A.AY, A.AW, y - A.AY);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = 'rgba(255,58,26,0.30)'; ctx.fillRect(A.AX, (y - 10) | 0, A.AW, 10);
+        ctx.fillStyle = 'rgba(255,154,74,0.35)'; ctx.fillRect(A.AX, (y - 4) | 0, A.AW, 4);
+        ctx.globalCompositeOperation = op;
+        ctx.fillStyle = '#FFF0D0'; ctx.fillRect(A.AX, (y - 2) | 0, A.AW, 2);
+        ctx.fillStyle = '#FF9A4A';
+        for (var dq = A.AX + ((G.fr * 2) % 40); dq < A.AX + A.AW; dq += 40) ctx.fillRect(dq | 0, (y + (G.fr + dq) % 12) | 0, 2, 3);
+      }
+    }
+    for (i = 0; i < G.bones.length; i++) {
+      b = G.bones[i];
+      var hi = b.kind === 'high', col = b.kind === 'geyser' || b.kind === 'pillar';
+      if (G.fr < b.at) {
+        if (b.at - G.fr > (col ? 60 : 24)) continue;
+        t = 1 - (b.at - G.fr) / (col ? 60 : 24);
+        if (col) {
+          ctx.fillStyle = 'rgba(' + rampRGB(t * 0.8) + ',' + (0.10 + 0.25 * t).toFixed(2) + ')';
+          ctx.fillRect((b.x - b.w) | 0, b.y0 | 0, (2 * b.w) | 0, (b.y1 - b.y0) | 0);
+          ctx.fillStyle = 'rgba(' + rampRGB(t) + ',' + (0.3 + 0.6 * t).toFixed(2) + ')';
+          ctx.fillRect((b.x - b.w) | 0, b.y0 | 0, 1, (b.y1 - b.y0) | 0); ctx.fillRect((b.x + b.w - 1) | 0, b.y0 | 0, 1, (b.y1 - b.y0) | 0);
+          continue;
+        }
+        rgb = hi ? iceRGB(t) : rampRGB(t);
+        var ex = b.side > 0 ? A.AX + 8 : A.AX + A.AW - 8, cy = hi ? b.y1 + 12 : b.y0 - 14, k;
+        boneRect(ctx, ex, b.y0, b.y1, b.w, rgb, 0.25 + 0.35 * t, hi ? 2 : 1);
+        ctx.fillStyle = 'rgba(' + rgb + ',' + (((G.fr >> 2) % 2 ? 1 : 0.5) * (0.4 + 0.6 * t)).toFixed(2) + ')';
+        for (k = 0; k < 3; k++) {
+          var cx = ex + b.side * (18 + k * 12);
+          /* a chevron pointing the way it will run, 3 px strokes */
+          for (var cj = -2; cj <= 2; cj++) ctx.fillRect((cx - b.side * 3 * Math.abs(cj)) | 0, (cy + cj * 3) | 0, 3, 3);
+        }
+        continue;
+      }
+      if (col) {
+        u = Math.min(1, (G.fr - b.at) / 6) * Math.min(1, (b.end - G.fr) / 8);
+        var top = b.y1 - (b.y1 - b.y0) * Math.min(1, (G.fr - b.at) / 5);
+        boneRect(ctx, b.x + ((G.fr % 4) < 2 ? 0 : 1), top, b.y1, b.w - 2 + ((G.fr >> 1) % 2), b.kind === 'pillar' ? '255,58,26' : '255,154,74', 0.85 * u, 0);
+        continue;
+      }
+      boneRect(ctx, b.x, b.y0, b.y1, b.w, hi ? '143,216,255' : '255,154,74', 1, hi ? 2 : 1);
+    }
   }
   /* the three EyeLock / ArcingEyeStarbursts eyes: each attack keeps them in
      its st.p.eyes; a combo keeps them on a sub-state (st.p.a / st.p.b).
