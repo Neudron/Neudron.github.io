@@ -414,6 +414,9 @@
     var eng = NEU.engine;
     if (!eng || !eng.running || eng.room !== ROOM) { abort(); overlayOff(); return; }
     raf = requestAnimationFrame(frame);
+    /* the pace cap (perf.js): `lastNow` advances on drawn frames only,
+       so dt covers the skipped vsyncs */
+    if (NEU.perf && !NEU.perf.paced(now)) return;
     var dt = lastNow ? Math.min(0.05, (now - lastNow) / 1000) : 0;
     lastNow = now;
     if (api && !run) dread(dt);

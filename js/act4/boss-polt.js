@@ -125,6 +125,9 @@
   function stepFn(nowMs) {
     if (!running) { if (dying) deathStep(nowMs); return; }
     requestAnimationFrame(stepFn);
+    /* the pace cap (perf.js): `last` advances on drawn frames only,
+       so dt covers the skipped vsyncs */
+    if (NEU.perf && !NEU.perf.paced(nowMs)) return;
     var dt = Math.min(0.033, (nowMs - last) / 1000); last = nowMs;
     if (NEU.juice && NEU.juice.frozen()) { draw(nowMs); return; }
     t += dt;
@@ -315,6 +318,8 @@
   }
 
   function deathStep(nowMs) {
+    /* the pace cap (perf.js) — skip must re-queue or the death loop dies */
+    if (NEU.perf && !NEU.perf.paced(nowMs)) { requestAnimationFrame(deathStep); return; }
     var ms = nowMs - dying;
     ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, innerWidth, innerHeight);
     frame();

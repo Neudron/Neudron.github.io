@@ -193,9 +193,12 @@
     });
   }
 
-  function step() {
+  function step(now) {
     if (!running) return;
     requestAnimationFrame(step);
+    /* the pace cap (perf.js): note judgment runs on the audio clock,
+       so a skipped draw costs no timing */
+    if (NEU.perf && !NEU.perf.paced(now)) return;
     var sp = songPos();
     S.countdown = countLabel(sp);
     /* Leave prompt up: hold the frame. Notes that pass meanwhile are judged on resume. */

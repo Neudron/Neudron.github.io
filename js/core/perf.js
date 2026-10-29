@@ -49,6 +49,24 @@
   var WINDOW = 180;           /* ~3s at 60fps */
   var DRAW_EVERY = 250;       /* ms between DOM writes */
 
+  /* THE PACE CAP — why draws skip frames on fast panels.
+     Everything on screen advances at 60 Hz (the engine's fixed step)
+     or on a dt. On a 240 Hz panel an uncapped draw of that state runs
+     four times between two logic steps — four full redraws of the
+     same pixels — and the budget there (4.16 ms per vsync) is smaller
+     than one arena draw (~9 ms), so the browser misses vsyncs at
+     random: the stutter, on a core pinned at 100%+. Rendering at most
+     twice per 60 Hz step (8.33 ms, an integer divisor of 240/144)
+     halves the work and puts the misses back on the even grid. A 60 Hz
+     panel clears PACE every frame and never notices. */
+  var PACE = 1000 / 120;
+  var pacedLast = 0;
+  function paced(now) {
+    if (now - pacedLast < PACE) return false;
+    pacedLast = now;
+    return true;
+  }
+
   var times = [], head = 0, n = 0;
   var running = false, raf = 0, last = 0, lastDraw = 0;
   var el = null, worstEver = 0;
@@ -159,7 +177,8 @@
 
   NEU.perf = {
     start: start, stop: stop, toggle: function () { return running ? (stop(), false) : (start(), true); },
-    stats: stats, line: line, scene: scene,
+    stats: stats, line: line, scene: scene, paced: paced, PACE: PACE,
+    _pacedReset: function () { pacedLast = 0; },
     get running() { return running; },
     TARGET: TARGET, WARN: WARN, FAIL: FAIL, WINDOW: WINDOW,
     /* tests: feed frames without a real rAF loop */

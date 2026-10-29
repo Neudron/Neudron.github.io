@@ -717,6 +717,10 @@
     if (!running) return;   /* startDeath() owns the death loop; handing off here started a second one */
     requestAnimationFrame(stepFn);
     if (held) return;
+    /* the pace cap (perf.js): no redraws faster than one logic step's
+       worth. `last` only advances on drawn frames, so dt covers the
+       skipped vsyncs and every sim stays dt-true. */
+    if (NEU.perf && !NEU.perf.paced(now)) return;
     var dt = Math.min(0.033, (now - last) / 1000); last = now;
     lastDt = dt;
     /* Hit-stop: hold the frame, keep rendering. Skipping the render
@@ -1275,14 +1279,16 @@
 
   function deathStep(now) {
     var ms = now - dying;
-    ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, VW, VH);
-    frame();
+    if (!NEU.perf || NEU.perf.paced(now)) {
+      ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, VW, VH);
+      frame();
     var playing = dm.death ? dm.death(ctx, px, py, ms, COL.soul) : (ms <= 1700);
     if (!playing) {
       dying = 0;
       if (msg) { msg.hidden = false;
         msg.innerHTML = '<b>she waits.</b><br>press Z to try again &middot; esc to leave'; }
       return;
+    }
     }
     requestAnimationFrame(deathStep);
   }

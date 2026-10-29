@@ -664,7 +664,9 @@
     var n = 0;
     while (acc >= STEP && n < 16) { update(STEP); acc -= STEP; n++; }
     if (n >= 16) acc = 0;
-    draw(now);
+    /* the pace cap (perf.js): on a 240 Hz panel an uncapped draw burns
+       four redraws of one 60 Hz step and misses the vsync budget. */
+    if (!NEU.perf || NEU.perf.paced(now)) draw(now);
   }
 
   /* ── draw ─────────────────────────────────────────────────────── */
