@@ -78,15 +78,22 @@
      time in the whole act anyone summarises anything, and it works
      because you were not entirely present for most of it. */
   function wake() {
-    document.body.classList.remove('is-trip');
+    /* Already woken (the timer and a room entry can both call this): the
+       writes below are idempotent, so every call re-arms the save, but
+       only the first narration, is-trip removal and settle timer run. */
+    var already = NEU.save && !NEU.save.flagged('tripping');
     /* Everything the save needs is written now, not in settle() 26s
        later: a reload in that window would leave the crack unarmed and
-       the boss unreachable. Only the DOM and the narration wait. */
+       the boss unreachable. Only the DOM and the narration wait. The
+       writes never depend on tripping — a bare wake on a fresh boot
+       must still arm the crack, chair and dog. */
     if (NEU.save) {
       NEU.save.flag('tripping', 0);
       NEU.save.flag('dog_gone', 1); NEU.save.flag('sans_sits', 1); NEU.save.flag('crack_armed', 1);
     }
     if (NEU.quest) { NEU.quest.mark('a4_wake'); NEU.quest.mark('a4_chair'); }
+    if (already) return;
+    document.body.classList.remove('is-trip');
     var lines = [
       ["you're awake.", 'sans'],
       ["you've been out about four hours. toby sat with you.", 'sans'],

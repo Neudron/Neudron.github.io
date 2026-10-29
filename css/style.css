@@ -734,6 +734,9 @@ body.is-scrolled .cue { opacity: 0; pointer-events: none; }
   cursor: pointer;
   -webkit-font-smoothing: antialiased;
 }
+/* narration has no face */
+.tbox[data-who="narr"] .tbox__face { display: none; }
+
 /* the Deltarune look (frame, *, portrait) lives in css/game.css */
 .tbox__more {
   align-self: end; color: #fff; font-size: 16px;

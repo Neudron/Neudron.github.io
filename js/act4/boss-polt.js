@@ -474,9 +474,8 @@
       return;
     }
     if (!running && !dying && (e.key === 'Enter' || e.key === 'z' || e.key === 'Z')) { e.preventDefault(); open(); return; }
-    /* c dash, v (or shift+z) adrenaline, b rage: the shared keys */
-    /* z strikes before the shared keys look, so shift (focus) + z is still a strike */
-    if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); tryHit(); return; }
+    /* z (or Enter) strikes before the soul looks at the key; x dashes. */
+    if (e.key === 'z' || e.key === 'Z' || (e.key === 'Enter' && running)) { e.preventDefault(); tryHit(); return; }
     if (running && dm.key(F, e)) { e.preventDefault(); return; }
     var n = dm.keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
   });

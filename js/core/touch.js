@@ -17,8 +17,6 @@
    WHAT IT HAS TO GET RIGHT
    - Diagonals. Dodging bullets on four-way input is not playable, so
      the stick is a vector, not four buttons.
-   - Focus/precision (Shift) in the three bullet-hell fights, for the
-     same reason.
    - Never a stuck key. Any lost pointer, any hidden scene, any blur
      releases everything. A held direction with nothing to release it
      walks you into a wall forever.
@@ -40,9 +38,6 @@
   /* ── which keys each scene wants ──────────────────────────────────
      Read straight off the modules' own handlers. `a` is the primary
      action, `b` is back, `x` is the one extra that scene needs.
-
-     `xHold` on an extra means it is a modifier you keep pressed (focus
-     mode) rather than a press you release immediately.
 
      `aHold` on the primary means A stays down while the thumb is down
      (charge-and-release: the fight reads keyup as the strike release).
@@ -71,12 +66,12 @@
       x: 'x',     xLabel: 'dash',   c: 'c', cLabel: 'TP', stick: true },
 
     { id: 'polt',   on: function () { return NEU.polt && NEU.polt.running; },
-      a: 'Enter', aLabel: 'ok',     b: 'Escape',
-      x: 'Shift', xLabel: 'focus',  xHold: true, stick: true },
+      a: 'z',     aLabel: 'strike', b: 'Escape',
+      x: 'x',     xLabel: 'dash',   stick: true },
 
     { id: 'bullet', on: function () { return NEU.bullet && NEU.bullet.running; },
       a: 'Enter', aLabel: 'ok',     b: 'Escape',
-      x: 'Shift', xLabel: 'focus',  xHold: true, stick: true },
+      x: 'x',     xLabel: 'dash',   stick: true },
 
     { id: 'dark',   on: function () { return NEU.dark && NEU.dark.running; },
       a: 'z',     aLabel: 'use',    b: 'Escape', stick: true },
@@ -203,8 +198,7 @@
 
   /* ── buttons ───────────────────────────────────────────────────── */
   /* `tap` = press and release on the same gesture (a confirm).
-     Otherwise the key is held for as long as the thumb is down, which
-     is what focus mode needs. */
+     Otherwise the key is held for as long as the thumb is down. */
   function wireButton(el, keyOf, tap) {
     var id = null;
     el.addEventListener('pointerdown', function (e) {
@@ -216,9 +210,9 @@
       send(k, true);
       /* A confirm is a press, not a hold. Release on the next frame so
          the keydown lands first and anything watching keyup still sees
-         a real pair. A held action (xHold or aHold) stays down until
-         the thumb lifts — that is the charge-and-release path. */
-      if (tap || (!cur.xHold && !cur.aHold)) requestAnimationFrame(function () { send(k, false); });
+         a real pair. A held action (aHold) stays down until the thumb
+         lifts — that is the charge-and-release path. */
+      if (tap || !cur.aHold) requestAnimationFrame(function () { send(k, false); });
       if (NEU.juice) NEU.juice.hit('tick');
     });
     function up(e) {

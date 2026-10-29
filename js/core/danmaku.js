@@ -263,7 +263,7 @@
     if (F.dashCd > 0) F.dashCd -= dt;
     if (F.dashI > 0) F.dashI -= dt;
     if (F.modeT > 0) F.modeT -= dt;
-    var y0 = F.y, sp = keys.focus ? NEU.danmaku.FOCUS : NEU.danmaku.SPEED;
+    var y0 = F.y, sp = NEU.danmaku.SPEED;
     var up = keys.up || keys.jump;
     if (F.dashT > 0) {
       F.dashT -= dt;
@@ -315,19 +315,16 @@
     if (k === 'ArrowRight' || k === 'd' || k === 'D') return 'right';
     if (k === 'ArrowUp'    || k === 'w' || k === 'W') return 'up';
     if (k === 'ArrowDown'  || k === 's' || k === 'S') return 'down';
-    if (k === 'Shift') return 'focus';
     return null;
   }
-  /* Keys every fight shares. Returns what it did ('' = not ours). B
-     returns 'rage' even on an empty shared bar, so a boss with a rage
-     model of its own (Calamitas) can route B into it. */
+  /* The soul's keys: X dashes, an arrow double-tap dashes. Returns 'dash'
+     or '' (not ours). Adrenaline and rage fill and burn on their own;
+     they have no key. */
   function key(F, e) {
     var k = e.key;
-    if (k === 'c' || k === 'C') { dash(F); return 'dash'; }
-    if (k === 'v' || k === 'V' || ((k === 'z' || k === 'Z') && e.shiftKey)) { adrenaline(F); return 'adren'; }
-    if (k === 'b' || k === 'B') { rage(F); return 'rage'; }
+    if (k === 'x' || k === 'X') { dash(F); return 'dash'; }
     var d = keyName(e);
-    if (d && d !== 'focus' && !e.repeat) tap(F, d);
+    if (d && !e.repeat) tap(F, d);
     return '';
   }
 
@@ -573,7 +570,6 @@
     death: death,
     resetDeath: resetDeath,
     IFRAMES: 1.1,
-    SPEED: 250,
-    FOCUS: 108
+    SPEED: 250
   };
 })();

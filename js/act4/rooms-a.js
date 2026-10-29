@@ -579,7 +579,7 @@
       say(c, ['the plate under you sinks.', 'the mirror holds the other one.',
               'the door opens anyway.']);
     },
-    onReset: function () { b5face = 0; }
+    onReset: function () { b5face = 0; if (NEU.save) NEU.save.flag('solved:b5_two', 0); }
   });
 
 /* ══ B6 — the torch ═════════════════════════════════════════════

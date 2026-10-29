@@ -535,11 +535,11 @@
      region is emptied when the box closes. */
   var tboxSR = document.getElementById('tboxSR');
   function srSay(s) { if (tboxSR) tboxSR.textContent = s; }
-  /* sheets.js crops; narr/dog/tv have no face */
+  /* narr has no face (css hides it) */
   var SH = NEU.sheets || {};
   function shSrc(k) { return SH[k] ? SH[k].src : ''; }
   var sansImg = btn.querySelector('img');
-  var FACE = { sans: shSrc('sansFace'),
+  var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/annoying-dog.gif', tv: 'img/tv.svg',
                witch: 'img/act4/witch-face.png',
                /* real mod filenames — HoodlessHeadIcon/HoodedHeadIcon from
                   NPCs/SupremeCalamitas/, see js/data/sheets.js scalFace* */

@@ -103,6 +103,220 @@
       onEnd: function (b) { ring(b.x, b.y, n, sp, 0, 'burst'); } });
   }
 
+  /* ── the WotG kit (summons, shadow demon, berserk, transition, the
+     specials). One palette, ramped telegraphs, cached twin flares with
+     afterimages, a shake budget, cue throttling, a blackout overlay.
+     NamelessDeity refs: TelegraphedScreenSlice.cs:21,167-171 (ramp, derived
+     telegraph time), LightDagger.cs:89-92,173-178 (speed clamp, afterimages),
+     ArcingStarburst.cs:155-156 (twin flare), TelegraphedPortalLaserbeam.cs:87
+     (shake budget). Every colour below indexes BRIM. */
+  var BRIM = ['#1a0000', '#5a0000', '#c0140a', '#ff3a1a', '#ff9a4a', '#fff0d0'];
+  var BRIM_RGB = [[26, 0, 0], [90, 0, 0], [192, 20, 10], [255, 58, 26], [255, 154, 74], [255, 240, 208]];
+  function fx() {
+    return G.fx || (G.fx = { warn: [], mine: [], dark: 0, darkTo: 0, shk: 0, cue: {}, loud: false });
+  }
+  /* dark red -> near white as t goes 0 -> 1 (pow .6), as 'r,g,b' */
+  function rampRGB(t) {
+    var u = 2 + 3 * Math.pow(clamp(t, 0, 1), 0.6), i = Math.min(4, u | 0), k = u - i, a = BRIM_RGB[i], b = BRIM_RGB[i + 1];
+    return ((a[0] + (b[0] - a[0]) * k) | 0) + ',' + ((a[1] + (b[1] - a[1]) * k) | 0) + ',' + ((a[2] + (b[2] - a[2]) * k) | 0);
+  }
+  /* telegraph length from the attack's own pace: clamp(T*2-22, 10, 60) */
+  function teleT(T) { return clamp(T * 2 - 22, 10, 60); }
+  /* a warning: a line (a = angle) or a ring (r = radius) that ramps up to its hit frame */
+  function warn(o) { o.at = G.fr; fx().warn.push(o); return o; }
+  /* a bullet that starts slow and reaches sp (floor .45, cap sp): read, then go */
+  function shotRamp(x, y, a, sp, k, o) {
+    o = o || {};
+    o.acc = o.acc || 4; o.vmax = sp;
+    var b = A.shot(x, y, Math.cos(a) * sp * 0.45, Math.sin(a) * sp * 0.45, k, o);
+    if (b) fx().mine.push(b);
+    return b;
+  }
+  function ringRamp(x, y, n, sp, a0, gapAt, gapN) {
+    A.boom(x, y);
+    for (var i = 0; i < n; i++) {
+      if (gapN && ((i - gapAt) % n + n) % n < gapN) continue;
+      shotRamp(x, y, a0 + i * TAU / n, sp, 0, { tag: 'burst', fuse: 6 });
+    }
+  }
+  /* a shake with a budget: one kick per 8 f, none while a louder beat owns the screen */
+  function kick(tier, loud) {
+    var F = fx();
+    if (F.loud && !loud) return;
+    if (G.fr - F.shk < 8) return;
+    F.shk = G.fr;
+    A.shake(tier);
+  }
+  /* a sound with a 50 ms floor per name (TelegraphedScreenSlice MaxInstances=1) */
+  function cue(name) {
+    var F = fx(), now = Date.now();
+    if (F.loud && name !== 'maelstrom') return;
+    if (now - (F.cue[name] || 0) < 50) return;
+    F.cue[name] = now;
+    if (name === 'chime') { if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick(); }
+    else A.sfx(name);
+  }
+  /* one flare, cached at first use: BRIM[5] core through BRIM[3] to nothing */
+  var FLARE = null;
+  function flareImg() {
+    if (FLARE !== null) return FLARE;
+    FLARE = false;
+    try {
+      var c = document.createElement('canvas'); c.width = c.height = 64;
+      var x = c.getContext && c.getContext('2d');
+      if (!x || !x.createRadialGradient) return FLARE;
+      var g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+      g.addColorStop(0, BRIM[5]); g.addColorStop(0.18, BRIM[4]); g.addColorStop(0.45, 'rgba(255,58,26,0.55)');
+      g.addColorStop(1, 'rgba(90,0,0,0)');
+      x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+      FLARE = c;
+    } catch (e) { FLARE = false; }
+    return FLARE;
+  }
+  /* two counter-rotating blits of the cached flare, stretched along travel */
+  function twinFlare(ctx, x, y, s, rot, a) {
+    var im = flareImg();
+    if (!im) return;
+    ctx.globalAlpha = a;
+    for (var i = 0; i < 2; i++) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(i ? -rot : rot);
+      ctx.drawImage(im, -s * 1.3, -s * 0.55, s * 2.6, s * 1.1);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+  /* drawn first in draw(): the blackout, then the ramped warnings, then the
+     tracked bullets' bloom and 6-tap afterimages (offset -v * i * 0.56 f) */
+  function drawFx(ctx) {
+    var F = G.fx, i, w, t, op = ctx.globalCompositeOperation, L = beamLen(), c, s, m, sp, rot, n;
+    if (!F) return;
+    F.dark += (F.darkTo - F.dark) * 0.08;
+    if (F.dark > 0.01) {
+      ctx.fillStyle = 'rgba(0,0,0,' + F.dark.toFixed(2) + ')';
+      ctx.fillRect(A.AX, A.AY, A.AW, A.AH);
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    F.warn = F.warn.filter(function (o) { return G.fr - o.at < o.life; });
+    for (i = 0; i < F.warn.length; i++) {
+      w = F.warn[i];
+      t = clamp((G.fr - w.at) / Math.max(1, w.life - 4), 0, 1);
+      c = rampRGB(t);
+      if (w.r !== undefined) {
+        /* a ring closes from 1.6x onto its burst radius as it ramps */
+        ctx.strokeStyle = 'rgba(' + c + ',' + (0.25 + 0.75 * t).toFixed(2) + ')';
+        ctx.lineWidth = Math.max(1, (w.w || 2) * t * 2);
+        ctx.beginPath(); ctx.arc(w.x, w.y, w.r * (1.6 - 0.6 * t), 0, TAU); ctx.stroke();
+        continue;
+      }
+      var ex = w.x + Math.cos(w.a) * (w.len || L), ey = w.y + Math.sin(w.a) * (w.len || L);
+      var gr = ctx.createLinearGradient ? ctx.createLinearGradient(w.x, w.y, ex, ey) : null;
+      if (gr) {
+        gr.addColorStop(0, 'rgba(' + c + ',' + (0.3 + 0.7 * t).toFixed(2) + ')');
+        gr.addColorStop(1, 'rgba(' + c + ',0)');
+      }
+      ctx.strokeStyle = gr || 'rgba(' + c + ',' + t.toFixed(2) + ')';
+      ctx.lineWidth = Math.max(1, (w.w || 2) * t * 2);
+      ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(ex, ey); ctx.stroke();
+    }
+    F.mine = F.mine.filter(function (b) {
+      return b.fuse > 0 && b.x > A.AX - 40 && b.x < A.AX + A.AW + 40 && b.y > A.AY - 40 && b.y < A.AY + A.AH + 40;
+    });
+    if (F.mine.length > 240) F.mine.splice(0, F.mine.length - 240);
+    n = rm() ? 2 : 6;
+    for (i = 0; i < F.mine.length; i++) {
+      m = F.mine[i];
+      sp = Math.hypot(m.vx, m.vy);
+      rot = Math.atan2(m.vy, m.vx);
+      s = m.k === 2 || m.k === 3 || m.k === 5 ? 22 : 12;
+      for (var j = n; j >= 1; j--) {
+        twinFlare(ctx, m.x - m.vx * j * 0.56 / 60 * 2, m.y - m.vy * j * 0.56 / 60 * 2, s * (1 - j / (n + 2)), rot, 0.4 * (1 - j / (n + 1)));
+      }
+      twinFlare(ctx, m.x, m.y, s * (1 + Math.min(1, sp / 400) * 0.3), rot + G.fr * 0.05, 0.9);
+    }
+    ctx.globalCompositeOperation = op;
+    ctx.lineCap = 'butt'; ctx.lineWidth = 1;
+  }
+  function rm() { return !!(NEU.juice && NEU.juice.reduced); }
+
+  /* ── beams, eyes, cross: shared bits (WotG pass) ──────────────────
+     anyActive: the one query an attack makes against what else is up
+     (TelegraphedScreenSlice.cs:96-98 thins its slice under the laser). */
+  function anyActive(k) {
+    if (k === 'combo') return G.thin;
+    if (G.beam) return true;
+    for (var i = 0; i < G.lasers.length; i++) if (G.fr >= G.lasers[i].at) return true;
+    return false;
+  }
+  /* embers: a pool of at most 64, life 20-40 f, colour BRIM[3..5]
+     (LightSlashTelegraph.cs:103-106). Positions are analytic from the
+     birth frame, so nothing ticks them. Math.random, not RNG: the look
+     must not move the pattern stream. */
+  function sparks(x, y, n, a, spread, sp, r0) {
+    var F = fx(), P = F.parts || (F.parts = []), q, i;
+    if (rm()) n = Math.ceil(n / 3);
+    for (i = 0; i < n; i++) {
+      if (P.length >= 64) P.shift();
+      q = a + (Math.random() - 0.5) * spread;
+      var v = sp * (0.6 + Math.random() * 0.6), r = r0 || 0;
+      P.push({ x: x + Math.cos(q) * r, y: y + Math.sin(q) * r, vx: Math.cos(q) * v, vy: Math.sin(q) * v,
+               at: G.fr, life: 20 + ((Math.random() * 21) | 0), c: 3 + ((Math.random() * 3) | 0) });
+    }
+  }
+  function drawSparks(ctx) {
+    var P = G.fx && G.fx.parts, i, p, u, d, op = ctx.globalCompositeOperation;
+    if (!P || !P.length) return;
+    ctx.globalCompositeOperation = 'lighter';
+    for (i = P.length - 1; i >= 0; i--) {
+      p = P[i]; u = (G.fr - p.at) / p.life;
+      if (u >= 1 || u < 0) { P.splice(i, 1); continue; }
+      d = (1 - Math.pow(0.95, G.fr - p.at)) / 0.05 / 60;   /* drag .95/f */
+      ctx.globalAlpha = 1 - u;
+      ctx.fillStyle = BRIM[p.c];
+      ctx.fillRect((p.x + p.vx * d) | 0, (p.y + p.vy * d) | 0, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = op;
+  }
+  /* where a ray from (x, y) at angle a leaves the arena */
+  function rayTip(x, y, a) {
+    var c = Math.cos(a), s = Math.sin(a), t = 1e9;
+    if (c > 1e-6) t = Math.min(t, (A.AX + A.AW - x) / c);
+    if (c < -1e-6) t = Math.min(t, (A.AX - x) / c);
+    if (s > 1e-6) t = Math.min(t, (A.AY + A.AH - y) / s);
+    if (s < -1e-6) t = Math.min(t, (A.AY - y) / s);
+    t = Math.max(0, Math.min(t, beamLen()));
+    return { x: x + c * t, y: y + s * t };
+  }
+  /* the bomb's rest point: drag .99 per frame for fuse frames */
+  function restAt(x, y, a, v, fuseF) {
+    var d = v / 60 * (1 - Math.pow(0.99, fuseF)) / 0.01;
+    return { x: x + Math.cos(a) * d, y: y + Math.sin(a) * d };
+  }
+  /* the gap-toward-the-soul ring that closes a beam attack: a ring warning
+     first, then a ramped ring with three shots missing on her line to the
+     soul, a hitstop and embers (the peak beat) */
+  function finale(n, sp) {
+    var a = aim();
+    ringRamp(A.bx, A.by, n, sp, a, n - 1, 3);
+    kick('medium'); cue('giga-hit');
+    sparks(A.bx, A.by, 24, 0, TAU, 220);
+  }
+  /* anyActive (TelegraphedScreenSlice.cs:96-98): a beam, bolts, lasers, rifts
+     or the worm on screen. Attacks thin themselves when this is true. */
+  function busy() {
+    return !!(G.beam || G.lasers.length || G.bolts.length || G.rend.length || G.hexes.length ||
+              (NEU.scalWorm && NEU.scalWorm.busy && NEU.scalWorm.busy()));
+  }
+  /* the handoff: what this attack fired fuses out within 20 f, so the next
+     one starts on a clean field (wotg.md #1, the 84 f gap after daggers) */
+  function settle() {
+    var m = fx().mine;
+    for (var i = 0; i < m.length; i++) if (m[i].fuse > 1 / 3) m[i].fuse = 1 / 3;
+  }
+  /* a big beat: owns the screen (lesser cues and kicks go quiet), dims it */
+  function loud(on, dark) { var F = fx(); F.loud = on; F.darkTo = on ? (dark || 0.5) : 0; }
+
   /* ── the attacks ──────────────────────────────────────────────────
      Each takes its state `st` (st.f is the frame into this attack, st.n a
      counter, st.side a side, st.p scratch) and returns true when it ends. */
@@ -110,17 +324,45 @@
   /* SupremeCalamitas.cs:726-799. She hovers 820 px to one side of the soul.
      Two volleys, in f 60-240 and f 300-480. Fire rate 7 f (5 at phase 1+,
      4 berserk). Soul speed 8.5, fan lerp(-0.67, 0.67) by shot number mod 3,
-     plus +-0.25 rad. */
+     plus +-0.25 rad.
+     verb: stream. dodge: weave between the fan's three lanes.
+     WotG pass: each volley's lanes ramp in first (warn, teleT of the rate)
+     with a chime and ride her hands; souls ramp 0.45 -> full with flares;
+     volley 2 fires one frame faster (floor 3) and ends on a 20-ring (peak,
+     hitstop). busy() or a combo halves the rate.
+     exit: she is to one side, high; the soul is wherever it weaved. */
+  /* a warning that rides her hands until it fires */
+  function pinTo(ws) { for (var i = 0; ws && i < ws.length; i++) { ws[i].x = A.bx; ws[i].y = A.by; } }
+  /* a DemonicBomb whose burst ramps, throws embers and kicks */
+  function bombR(x, y, vx, vy, fuseF, n, sp) {
+    return tracked(A.shot(x, y, vx, vy, 2, { fuse: fuseF / 60, acc: Math.pow(0.99, 60), tag: 'bomb',
+      onEnd: function (b) { ringRamp(b.x, b.y, n, sp, RNG() * TAU); sparks(b.x, b.y, 8, 0, TAU, 160); kick('small'); } }));
+  }
+  function tracked(b) { if (b) fx().mine.push(b); return b; }
   ATK.HorizontalDarkSoulRelease = function (st) {
-    var f = st.f;
+    var f = st.f, k, T, a0, v2;
     if (f === 0) st.side = A.bx < A.px ? -1 : 1;
     move(A.px + st.side * D(820), A.AY + A.AH * 0.2, 0.08);
     var on = (f >= 60 && f < 240) ? 60 : (f >= 300 && f < 480) ? 300 : -1;
     var rate = G.berserk ? 4 : (G.lvl >= 1 ? 5 : 7);
+    v2 = f >= 280;
+    if (v2) rate = Math.max(3, rate - 1);
+    if (busy() || G.thin) rate *= 2;
+    a0 = st.side < 0 ? 0 : Math.PI;
+    T = teleT(rate * 4);
+    if (f === 60 - T || f === 300 - T) {
+      st.p.w = [];
+      for (k = 0; k < 3; k++) st.p.w.push(warn({ x: A.bx, y: A.by, a: a0 + lerp(-0.67, 0.67, k / 2), life: T, w: 3, len: D(1500) }));
+      cue('chime'); kick('small');
+    }
+    pinTo(st.p.w);
     if (on >= 0 && (f - on) % rate === 0) {
-      var a = (st.side < 0 ? 0 : Math.PI) + lerp(-0.67, 0.67, (st.n++ % 3) / 2) + rnd(-0.25, 0.25);
-      A.shot(A.bx, A.by, Math.cos(a) * V(8.5), Math.sin(a) * V(8.5), 0,
-             { tag: 'soul', fuse: 6 });
+      var a = a0 + lerp(-0.67, 0.67, (st.n++ % 3) / 2) + rnd(-0.25, 0.25);
+      shotRamp(A.bx, A.by, a, V(8.5), 0, { tag: 'soul', fuse: 6 });
+    }
+    if (f === 479) {
+      ringRamp(A.bx, A.by, 20, V(6), aim());
+      kick('medium'); cue('fireblast'); sparks(A.bx, A.by, 20, 0, TAU, 200);
     }
     return f >= 480;
   };
@@ -133,17 +375,33 @@
      out at the chargeup, drifting in at 0.4 of their offset over the fan.
      Rest 48 f between fans.
      ceiling: arrows do not accelerate x1.025 per frame; they are capped at
-     the phase speed, because the source reaches about 7x in its 80 f life. */
+     the phase speed, because the source reaches about 7x in its 80 f life.
+     verb: sweep. dodge: get behind the sweep (the side it starts on, once
+     the first arrows pass) or outrun its far edge.
+     WotG pass: the sweep's two edges ramp in (warn, teleT of the fan) with
+     a chime; arrows ramp 0.45 -> cap with flares; fan 2 sweeps back the
+     other way 15 % faster and its last arrow is the peak (hitstop, embers).
+     busy() or a combo fires every 4 f, not 2.
+     exit: she is above the soul; the soul is on the side the sweep ended. */
   ATK.CondemnationFanBurst = function (st) {
     var f = st.f, L = G.lvl;
     var chg = L >= 1 ? 155 : 120, fan = 52, rest = 48, len = chg + fan + rest;
     if (f >= 2 * len - rest - 1) return true;
-    var i = Math.floor(f / len), lf = f - i * len;
+    var i = Math.floor(f / len), lf = f - i * len, T = teleT(fan / 2);
+    var spread = G.berserk ? 3.03 : (L >= 1 ? 2.72 : 2.94);
     move(A.px, A.AY + A.AH * 0.2, 0.1);
     if (lf === 0) {
       st.aim = aim() + rnd(-0.07, 0.07);
-      st.dir = RNG() < 0.5 ? -1 : 1;
+      st.dir = i ? -st.dir : (RNG() < 0.5 ? -1 : 1);
     }
+    if (lf === chg - T) {
+      st.p.w = [warn({ x: A.bx, y: A.by, a: st.aim - st.dir * spread / 2, life: T, w: 4, len: D(1500) }),
+                warn({ x: A.bx, y: A.by, a: st.aim + st.dir * spread / 2, life: T, w: 1.5, len: D(1500) })];
+      cue('chime');
+    }
+    if (lf < chg) pinTo(st.p.w);
+    if (lf === chg) kick('small');
+    if (i === 1 && lf === chg + fan - 2) { kick('medium'); cue('fireblast'); sparks(A.bx, A.by, 18, 0, TAU, 200); }
     if (lf === chg && L >= 1) {
       for (var k = 0; k < 6; k++) {
         var q = k * TAU / 6, ox = Math.cos(q) * D(650), oy = Math.sin(q) * D(650);
@@ -151,14 +409,13 @@
                { tag: 'brim', fuse: fan / 60 + 2 });
       }
     }
-    if (lf >= chg && lf < chg + fan && (lf - chg) % 2 === 0) {
+    if (lf >= chg && lf < chg + fan && (lf - chg) % ((busy() || G.thin) ? 4 : 2) === 0) {
       var t = (lf - chg) / fan;
-      var spread = G.berserk ? 3.03 : (L >= 1 ? 2.72 : 2.94);
-      var sp = V(L >= 3 ? 19.5 : L >= 1 ? 14.75 : 11.25);
+      var sp = V(L >= 3 ? 19.5 : L >= 1 ? 14.75 : 11.25) * (i ? 1.15 : 1);
       var cap = V(24);
       var ang = st.aim + st.dir * spread * (t - 0.5);
-      A.shot(A.bx, A.by, Math.cos(ang) * Math.min(sp, cap), Math.sin(ang) * Math.min(sp, cap), 0,
-             { tag: 'brim', look: 'arrow', fuse: 80 / 60 });
+      /* fuse 80 f plus the ramp's lost ground (about 18 f at full speed) */
+      shotRamp(A.bx, A.by, ang, Math.min(sp, cap), 0, { tag: 'brim', look: 'arrow', fuse: 98 / 60 });
     }
     return false;
   };
@@ -170,34 +427,49 @@
      Every third dash also fires a gigablast at half the bomb speed, with
      +-0.4 rad. Dash speed 43 (47.5 phase 1+, +3.5 phase 3+, +9.5 berserk).
      ceiling: the bomb drag is applied per second; the explosion is 14 darts,
-     not the DemonicExplosion radius. */
+     not the DemonicExplosion radius.
+     verb: ram. dodge: sidestep the locked line, then leave the bomb's ring.
+     WotG pass: every dash is a line that tracks the soul, then locks 6 f
+     before she goes (warn, teleT of half the dash) with a chime; each
+     dash comes 2 f sooner than the last (floor chT - 8); bombs burst in
+     ramped rings with embers; the gigablast dash is the hitstop beat.
+     busy() drops the gigablasts.
+     exit: she ends wherever the last dash took her; bombs still fusing. */
   ATK.ExplosiveCharges = function (st) {
-    var f = st.f, L = G.lvl, B = G.berserk;
-    var delay = 132, chT = L >= 1 ? 41 : 45, n = B ? 5 : 6;
+    var f = st.f, L = G.lvl, B = G.berserk, p = st.p;
+    var delay = 132, chT = L >= 1 ? 41 : 45, n = B ? 5 : 6, Tw = teleT(chT / 2);
     var spd = V((L >= 1 ? 47.5 : 43) + (L >= 3 ? 3.5 : 0) + (B ? 9.5 : 0));
     var bombSp = V(L >= 1 ? 15 : 20);
     var fuse = (L >= 3 ? 102 : 120) - (B ? 45 : 0);
-    if (f === 0) st.side = A.bx < A.px ? -1 : 1;
-    if (f >= delay + chT * n) return true;
+    if (f === 0) { st.side = A.bx < A.px ? -1 : 1; p.c = 0; p.t0 = delay; p.end = 1e9; }
+    if (f >= p.end) return true;
     if (f < delay) {
       A.anim('charge_telegraph'); A.willCharge(true);
       move(A.px + st.side * D(500), A.py - D(270), 0.06);
-      return false;
     }
-    var rel = f - delay, c = Math.floor(rel / chT), lf = rel - c * chT;
-    if (lf === 0) {
+    if (p.c < n && f === p.t0 - Tw) {
+      p.w = warn({ x: A.bx, y: A.by, a: aim(), life: Tw, w: 5, len: D(1600) });
+      cue('chime');
+    }
+    if (p.w && f < p.t0) { p.w.x = A.bx; p.w.y = A.by; if (p.t0 - f > 6) p.w.a = aim(); }
+    if (f === p.t0 && p.c < n) {
       A.willCharge(false); A.anim('charging');
-      var a = aim();
+      var a = p.w ? p.w.a : aim(), c = p.c++;
+      p.w = null;
       st.dx = Math.cos(a); st.dy = Math.sin(a);
-      bomb(A.bx, A.by, Math.cos(a) * bombSp, Math.sin(a) * bombSp, fuse, 14, V(6));
-      if (c % 3 === 2) {
+      bombR(A.bx, A.by, Math.cos(a) * bombSp, Math.sin(a) * bombSp, fuse, 14, V(6));
+      kick('small');
+      if (c % 3 === 2 && !busy()) {
         var ga = a + rnd(-0.4, 0.4);
-        A.shot(A.bx, A.by, Math.cos(ga) * bombSp * 0.5, Math.sin(ga) * bombSp * 0.5, 2,
-               { tag: 'gig', fuse: 1.5 });
-        A.sfx('giga');
+        tracked(A.shot(A.bx, A.by, Math.cos(ga) * bombSp * 0.5, Math.sin(ga) * bombSp * 0.5, 2,
+               { tag: 'gig', fuse: 1.5 }));
+        cue('giga'); kick('medium');
       }
+      var iv = Math.max(chT - 8, chT - c * 2);
+      p.t0 = f + iv;
+      if (p.c >= n) p.end = f + chT;
     }
-    if (lf < chT) {
+    if (f >= delay) {
       A.setBoss(hx(A.bx + st.dx * spd * TF), hy(A.by + st.dy * spd * TF));
     }
     return false;
@@ -213,6 +485,11 @@
   ATK.HellblastBarrage = function (st) {
     var f = st.f, L = G.lvl, B = G.berserk;
     if (f === 0) { st.side = A.px < A.AX + A.AW / 2 ? 1 : -1; A.sfx('hellblast'); }
+    /* the stream's lane shows teleT(60) f before the first hellblast fires */
+    if (f === 105 - teleT(60)) {
+      warn({ x: A.bx, y: A.by, a: st.side === 1 ? Math.PI : 0, life: teleT(60), w: 4, len: D(1500) });
+      cue('chime');
+    }
     var amp = 330 + (L >= 1 ? 20 : 0) + (L >= 3 ? 50 : 0) + (B ? 50 : 0);
     var bob = f >= 105 ? Math.sin((f - 105) * TAU / 56) * D(amp) : 0;
     /* in a combo the partner places her; this one only fires */
@@ -269,55 +546,114 @@
 
   /* SupremeCalamitas.cs:1358-1450 (FireLaserSpin). She hovers, casts the orb
      at f 165 and rises at f 200. The orb's laser sweeps one full turn over
-     f 245-565, aimed at the soul when it lights. Gigablasts every 75 f from
-     f 235 (57 at phase 3+), speed 10.5 (11.75 phase 3+), aimed at the soul.
+     f 245-565. Gigablasts from f 235 (gap 75 f, 57 at phase 3+), speed 10.5
+     (11.75 phase 3+), aimed at the soul.
+     dodge: run ahead of the sweep; on the toll, turn round with it.
+     WotG pass. The beam lights 0.9 rad behind the soul (in the sweep's
+     sense), shown teleT(36) f ahead by a ramped line (TelegraphedScreenSlice
+     .cs:167-171). Its turn rate ramps from 0 to a cap (LightDagger.cs:89-92
+     speed clamp) over each half. At f 405 it stops, tolls (ring warning,
+     chime) and runs back the other way (ClockConstellation.cs:66
+     TimeIsReversed). Each gigablast's aim locks under a warning line first,
+     and the gap shrinks 6 f a shot to a floor of 45 (SwordConstellation
+     .cs:114). The peak at f 565: a ring of 14 with its gap on the soul,
+     a hitstop. In a combo (anyActive) the beam is 0.6 wide.
+     entry: soul anywhere. exit: soul near her, still; the ring's gap faces
+     it, so the next attack starts on a soul that has just stepped in.
      ceiling: BrimstoneFlameOrb's laser internals are not in the notes, so the
-     laser is a plain swept beam over one turn. The first gigablast is at 3.9 s
-     in the source, so the attack's first bullet is outside a 3 s window. */
+     laser is a plain swept beam. */
   ATK.FireLaserSpin = function (st) {
-    var f = st.f, L = G.lvl;
+    var f = st.f, L = G.lvl, T = teleT(36), om, tg, gc;
     move(A.AX + A.AW / 2, A.AY + A.AH * (f < 200 ? 0.4 : 0.1), 0.04);
     if (f === 165) A.anim('casting');
-    if (f === 245) st.a1 = aim();
+    if (f === 245 - T) {
+      st.dir = RNG() < 0.5 ? -1 : 1; st.ang = aim() - st.dir * 0.9; st.om = 0;
+      st.p.w = warn({ x: A.bx, y: A.by, a: st.ang, life: T, w: 6 }); cue('chime');
+      st.p.next = 235;
+    }
+    if (st.p.w && f < 245) { st.p.w.x = A.bx; st.p.w.y = A.by; }
+    /* f 405 and f 490 tolls (ClockConstellation.cs, rubric 5): she stops, a
+       ring of nine ramped shots bursts with a three-gap on the soul, then
+       the spin runs back the other way */
+    if (f === 405 || f === 490) {
+      st.dir = -st.dir; st.om = 0;
+      ringRamp(A.bx, A.by, 9, V(7), aim(), 8, 3);
+      warn({ x: A.bx, y: A.by, r: 46, life: 18, w: 3 }); cue('chime'); kick('small');
+    }
     if (f >= 245 && f < 565) {
-      G.beam = { x: A.bx, y: A.by, a: st.a1 + TAU * (f - 245) / 320, len: beamLen() };
+      om = 0.024 * (L >= 3 ? 1.15 : 1);
+      st.om = Math.min(om, st.om + om / 40);
+      if (f > 245) st.ang += st.dir * st.om;
+      if (f === 245) { st.on = G.fr; kick('small'); cue('giga'); }
+      G.beam = { x: A.bx, y: A.by, a: st.ang, len: beamLen(), on: st.on, w: anyActive('combo') ? 0.6 : 1 };
+      if (f % 3 === 0) { var tp = rayTip(A.bx, A.by, st.ang); sparks(tp.x, tp.y, 2, st.ang + Math.PI, 1.6, 160); }
     }
-    var gc = (L >= 3 ? 57 : 75) * (G.thin ? 2 : 1);
-    if (f >= 235 && (f - 235) % gc === 0) {
-      var sp = V(L >= 3 ? 11.75 : 10.5), ga = aim();
-      A.shot(A.bx, A.by, Math.cos(ga) * sp, Math.sin(ga) * sp, 2, { tag: 'gig', fuse: 1.5 });
-      A.sfx('giga');
+    gc = Math.max(45, (L >= 3 ? 57 : 75) - 6 * st.n) * (G.thin ? 2 : 1);
+    tg = Math.round(teleT(gc) * 0.4);
+    if (st.p.next && f === st.p.next - tg) {
+      st.p.ga = aim();
+      warn({ x: A.bx, y: A.by, a: st.p.ga, life: tg, w: 3, len: 260 });
     }
-    if (f >= 565) G.beam = null;
-    return f >= 800;
+    if (st.p.next && f === st.p.next && f < 565) {
+      shotRamp(A.bx, A.by, st.p.ga, V(L >= 3 ? 11.75 : 10.5), 2, { tag: 'gig', fuse: 2.4 });
+      cue('giga'); st.n++; st.p.next = f + gc;
+    }
+    if (f === 545) warn({ x: A.bx, y: A.by, r: 40, life: 20, w: 3 });
+    if (f === 565) { G.beam = null; finale(14, V(7)); }
+    return f >= 640;
   };
 
   /* SupremeCalamitas.cs:1607-1767 (BrimstoneJewelBeam). She teleports to 600
      px beside the soul and charges for 142 f. Then a beam for 360 f sweeps
-     1.25 turns (x1.3 at phase 2+). Darts every 8 f (6 at phase 2+), speed 16,
-     aimed at the soul. A bomb every 60 f (50 at phase 2+), fused 120 f.
+     1.25 turns (x1.3 at phase 2+), starting half a sweep behind the soul.
+     Darts (speed 16) aimed at the soul, a bomb every 60 f (50 at phase 2+),
+     fused 120 f.
+     dodge: lead the sweep round her; weave the darts, which leave her slow.
+     WotG pass. Embers fall in on her through the charge; the beam's first
+     line is shown teleT(36) f before it lights. Its turn rate ramps up over
+     60 f, then holds. The dart gap shrinks a frame each 90 f (10 -> 6, 8 -> 4
+     at phase 2+). Darts ramp from 0.45 speed. Each bomb shows a closing ring
+     where it will stop. Her beam lights with a hitstop; it ends on the
+     gap-ring finale.
+     entry: soul anywhere (she places herself). exit: soul still, beside her.
      ceiling: the suicide-bomber rituals every 85 f are not spawned, and the
      source's 3330 px beam is clipped to the arena diagonal. */
   ATK.BrimstoneJewelBeam = function (st) {
-    var f = st.f, P2 = G.lvl >= 2;
+    var f = st.f, P2 = G.lvl >= 2, T = teleT(36), spin = TAU * 1.25 * (P2 ? 1.3 : 1), a, r, om;
     if (f === 0) {
       st.side = RNG() < 0.5 ? -1 : 1;
+      A.boom(A.bx, A.by);
       A.setBoss(hx(A.px + st.side * D(600)), hy(A.py));
+      sparks(A.bx, A.by, 16, 0, TAU, 200);
     }
-    if (f < 142) { A.anim('charge_telegraph'); return false; }
-    var lf = f - 142, spin = TAU * 1.25 * (P2 ? 1.3 : 1);
-    if (lf === 0) { st.a0 = aim() - spin / 2; A.sfx('giga'); }
+    if (f < 142) {
+      A.anim('charge_telegraph');
+      if (f % 6 === 0) sparks(A.bx, A.by, 3, RNG() * TAU, 0.6, -120, 70);
+      if (f === 142 - T) {
+        st.a0 = aim() - spin / 2; st.ang = st.a0; st.om = 0;
+        warn({ x: A.bx, y: A.by, a: st.a0, life: T, w: 6 }); cue('chime');
+      }
+      return false;
+    }
+    var lf = f - 142;
+    if (lf === 0) { st.on = G.fr; A.sfx('giga'); kick('medium'); }
     A.anim('casting');
-    G.beam = { x: A.bx, y: A.by, a: st.a0 + spin * lf / 360, len: beamLen() };
-    var a = aim();
-    if (lf % (P2 ? 6 : 8) === 0) {
-      A.shot(A.bx, A.by, Math.cos(a) * V(16), Math.sin(a) * V(16), 0, { tag: 'brim', fuse: 6 });
+    om = spin / 330;
+    st.om = Math.min(om, st.om + om / 60);
+    if (lf > 0) st.ang += st.om;
+    G.beam = { x: A.bx, y: A.by, a: st.ang, len: beamLen(), on: st.on, w: 1 };
+    if (lf % 3 === 0) { var tp = rayTip(A.bx, A.by, st.ang); sparks(tp.x, tp.y, 2, st.ang + Math.PI, 1.6, 160); }
+    a = aim();
+    if (lf % Math.max(P2 ? 4 : 6, (P2 ? 8 : 10) - ((lf / 90) | 0)) === 0) {
+      shotRamp(A.bx, A.by, a, V(16), 0, { tag: 'brim', fuse: 6 });
     }
-    if (lf % (P2 ? 50 : 60) === 0) {
+    if (lf % (P2 ? 50 : 60) === 0 && lf < 330) {
       bomb(A.bx, A.by, Math.cos(a) * V(12), Math.sin(a) * V(12), 120, 12, V(6));
+      r = restAt(A.bx, A.by, a, V(12), 120);
+      warn({ x: r.x, y: r.y, r: 30, life: 120, w: 2 });
     }
-    if (lf >= 360) { G.beam = null; return true; }
-    return false;
+    if (lf === 360) { G.beam = null; finale(12, V(6.5)); }
+    return lf >= 400;
   };
 
   /* SupremeCalamitas.cs:1488-1606 (SummonSuicideBomberDemons). She hovers 600
@@ -328,67 +664,127 @@
      five (seven at phase 1+) at speed 7.5, spread +-0.45 rad. The side flips
      every six volleys. ends at f 675 (687 at phase 1+).
      ceiling: the demon's chase speed is a guess (the notes do not read
-     SuicideBomberDemonHostile.cs); the ritual circle is not drawn. */
+     SuicideBomberDemonHostile.cs); the ritual circle is not drawn.
+     WotG pass. verb: hunt. dodge: keep crossing the demons' paths; every
+     burst ring opens a two-dart gap on the side facing the soul, so a demon
+     that pops beside you leaves a lane out. telegraph: each summon point
+     rings in 12 f before its demon steps out; each fan shows its locked aim
+     line min(rate-4, teleT(rate)) f. speed: demons ramp 0 -> 7 (V .25/f),
+     darts ramp .45 -> 1 (LightDagger.cs:89-92). escalation: the cadence
+     drops 1 f a volley (floor 16), a dart is added every second volley (cap
+     9); peak: at the end every demon left detonates, 4 f apart. busy: two
+     fewer darts. entry: any. exit: soul mid-box and moving, field settled. */
+  function demonBurst(b) {
+    ringRamp(b.x, b.y, 10, V(6), 0, Math.round(Math.atan2(A.py - b.y, A.px - b.x) / (TAU / 10) - 0.5), 2);
+    kick('small');
+  }
   ATK.SummonSuicideBomberDemons = function (st) {
-    var f = st.f, L = G.lvl, nd = L >= 1 ? 8 : 6, end = L >= 1 ? 687 : 675;
-    if (f === 0) st.side = A.bx < A.px ? -1 : 1;
+    var f = st.f, L = G.lvl, nd = L >= 1 ? 8 : 6, end = L >= 1 ? 687 : 675, i;
+    if (f === 0) { st.side = A.bx < A.px ? -1 : 1; st.next = 45; st.p.demons = []; }
     move(A.px + st.side * D(600), A.py - D(300), 0.1);
     if (f % 6 === 0 && f < 6 * nd) {
       var q = (f / 6) * TAU / nd;
-      var d = A.shot(A.bx + Math.cos(q) * D(225), A.by + Math.sin(q) * D(225), 0, 0, 3,
-                     { tag: 'demon', fuse: 7, prox: 12, onEnd: function (b) { ring(b.x, b.y, 10, V(6), 0, 'burst'); } });
-      if (d) st.p.demons = (st.p.demons || []).concat([{ b: d, t: f }]);
+      (function (sx, sy) {
+        warn({ x: sx, y: sy, r: 14, w: 2, life: 16 });
+        later(12, function () {
+          var d = A.shot(sx, sy, 0, 0, 3, { tag: 'demon', fuse: 7, prox: 12, onEnd: demonBurst });
+          if (d) { st.p.demons.push({ b: d, t: G.fr, v: 0 }); fx().mine.push(d); }
+        });
+      })(A.bx + Math.cos(q) * D(225), A.by + Math.sin(q) * D(225));
+      if (f === 0) cue('chime');
     }
-    var list = st.p.demons || [];
-    for (var i = 0; i < list.length; i++) {
+    var list = st.p.demons;
+    for (i = 0; i < list.length; i++) {
       var m = list[i], b = m.b;
-      if (b.fuse <= 0 || f - m.t < 45) continue;
+      if (b.fuse <= 0 || G.fr - m.t < 45) continue;
+      m.v = Math.min(m.v + V(0.25), V(7));
       var ha = Math.atan2(A.py - b.y, A.px - b.x);
-      b.vx = Math.cos(ha) * V(7); b.vy = Math.sin(ha) * V(7);
+      b.vx = Math.cos(ha) * m.v; b.vy = Math.sin(ha) * m.v;
     }
     st.p.demons = list.filter(function (m) { return m.b.fuse > 0; });
-    /* aimed at the soul at any range. The old gate (darts only past 320 px) meant
-       that standing close drew no darts at all. */
-    if (f >= 45 && f % (L >= 1 ? 27 : 32) === 0) {
-      var n = L >= 1 ? 7 : 5, base = aim();
-      for (var j = 0; j < n; j++) {
-        var da = base + lerp(-0.45, 0.45, j / (n - 1));
-        A.shot(A.bx, A.by, Math.cos(da) * V(7.5), Math.sin(da) * V(7.5), 0, { tag: 'brim', fuse: 6 });
-      }
+    /* aimed at the soul at any range, aim locked when the line shows */
+    if (f === st.next && f < end - 30) {
+      var rate = Math.max(16, (L >= 1 ? 27 : 32) - st.vol), T = Math.min(rate - 4, teleT(rate));
+      var n = Math.min(9, (L >= 1 ? 7 : 5) + (st.vol >> 1)) - (busy() ? 2 : 0), base = aim(), ox = A.bx, oy = A.by;
+      st.next += rate;
+      warn({ x: ox, y: oy, a: base, w: 2, life: T });
+      later(T, function () {
+        for (var j = 0; j < n; j++) shotRamp(ox, oy, base + lerp(-0.45, 0.45, j / (n - 1)), V(7.5), 0, { tag: 'brim', fuse: 6 });
+      });
       if (++st.vol % 6 === 0) {
         st.side = -st.side;
         A.setBoss(hx(A.px + st.side * D(600)), hy(A.py - D(300)));
+        A.boom(A.bx, A.by);
       }
     }
-    return f >= end;
+    if (f === end) {
+      for (i = 0; i < st.p.demons.length; i++) st.p.demons[i].b.fuse = (i * 4 + 1) / 60;
+      kick('medium');
+    }
+    if (f === end + 40) settle();
+    return f >= end + 50;
   };
 
   /* SupremeCalamitas.cs:1451-1487 (BecomeBerserk). She stands at the soul for
      95 f, then teleports 450 px above it and berserk turns on. The next attack
      is one of the three berserk picks (see cycleNext). A ring of twelve darts
      marks the teleport (DemonicExplosion, MaxRadius 500).
-     ceiling: the source's slowdown (velocity x0.95) is not applied. */
+     ceiling: the source's slowdown (velocity x0.95) is not applied.
+     WotG pass. verb: snap. dodge: step out radially between the darts of
+     ring 1, then again for ring 2 (turned half a step, so it fills ring
+     1's gaps: sideways does not work, out does). telegraph: the arena dims
+     over the 95 f wind-up while a ring closes on her landing spot; the spot
+     follows the soul until f 75, then locks. escalation: ring 2 is faster
+     (V 13 vs 10); the snap is the peak (large kick: hit-stop, one flash).
+     Owns the screen (loud). entry: any. exit: she is 450 px above the soul,
+     rings outbound, dim lifting; a berserk pick follows. */
   ATK.BecomeBerserk = function (st) {
-    if (st.f === 95) {
-      G.berserk = true;
-      A.setBoss(hx(A.px), hy(A.py - D(450)));
-      ring(A.bx, A.by, 12, V(10), 0, 'burst');
-      A.shake('small');
+    var f = st.f, w = st.p.w;
+    if (f === 0) {
+      loud(true, 0.45); cue('chime'); A.anim('charge_telegraph');
+      w = st.p.w = warn({ x: 0, y: 0, r: 60, w: 3, life: 96 });
     }
-    return st.f >= 96;
+    if (f < 75) { w.x = hx(A.px); w.y = hy(A.py - D(450)); }
+    if (f === 95) {
+      G.berserk = true;
+      A.setBoss(w.x, w.y);
+      A.anim('idle');
+      ringRamp(A.bx, A.by, 12, V(10), 0);
+      kick('large', true);
+      A.sfx('maelstrom');
+      later(14, function () { ringRamp(A.bx, A.by, 12, V(13), TAU / 24); });
+      later(40, function () { loud(false); });
+    }
+    return f >= 96;
   };
 
   /* SupremeCalamitas.cs:1774-1812 (SummonShadowDemon). The phase-one gate. The
      shadow demon arrives at f 170 (SupremeCalamitas.cs:1789-1800).
      ceiling: the ShadowDemon NPC and its black screen are not drawn; its two
-     attacks run from the cycle instead, and its arrival is a dart ring here. */
+     attacks run from the cycle instead, and its arrival is a dart ring here.
+     WotG pass. verb: arrive. dodge: keep distance through the dim, step out
+     radially through ring 1 (8) and ring 2 (12, turned half a step), then
+     sidestep the 5-fan off its locked line. telegraph: the arena dims from
+     f 0 (the demon's black screen, to 0.55), a ring closes on her from f
+     140, the fan's aim line ramps 24 f. escalation: 8 -> 12 -> fan, 20-24 f
+     apart, each faster. Owns the screen (loud) until the fan. entry: she is
+     idle, soul anywhere. exit: the dim lifts at the fan, f 224. */
   ATK.SummonShadowDemon = function (st) {
-    if (st.f === 0) A.anim('idle');
+    if (st.f === 0) { A.anim('idle'); loud(true, 0.55); }
+    if (st.f === 140) { warn({ x: A.bx, y: A.by, r: 40, w: 3, life: 30 }); cue('chime'); }
     if (st.f === 170) {
-      ring(A.bx, A.by, 8, V(8), 0, 'burst');
+      ringRamp(A.bx, A.by, 8, V(8), 0);
       A.sfx('fireblast');
-      /* the bare ring was all she did on arrival: a fan aimed at the soul follows half a second on */
-      later(30, function () { fan(5, 0.45, 150); });
+      kick('medium', true);
+      later(20, function () { ringRamp(A.bx, A.by, 12, V(9), TAU / 24); });
+      later(30, function () {
+        var a = aim(), x = A.bx, y = A.by;
+        warn({ x: x, y: y, a: a, w: 2, life: 24 });
+        later(24, function () {
+          for (var j = -2; j <= 2; j++) shotRamp(x, y, a + j * 0.225, 170, 0, { tag: 'brim', fuse: 6 });
+          loud(false);
+        });
+      });
       return true;
     }
     return false;
@@ -397,48 +793,93 @@
   /* ShadowDemon.cs:152-155 (ReleaseExplodingShadowBlasts, PARTIAL in the
      notes). Eight shadow flames out from her, each fused 32 f (ShadowFlameBlast
      Lifetime, ShadowFlameBlast.cs:12) into a twelve-dart ring.
-     ceiling: the cadence is the notes' best reading, not verified line by line. */
-  ATK.ShadowDemon_ReleaseExplodingShadowBlasts = function (st) {
-    if (st.f === 0) {
-      for (var i = 0; i < 8; i++) {
-        var a = i * TAU / 8;
-        A.shot(A.bx, A.by, Math.cos(a) * V(10), Math.sin(a) * V(10), 5,
-               { tag: 'shadow', fuse: 32 / 60, onEnd: function (b) { ring(b.x, b.y, 12, V(6), 0, 'burst'); } });
-      }
+     ceiling: the cadence is the notes' best reading, not verified line by line.
+     WotG pass. verb: bloom. dodge: stand between two warning rings (each
+     marks where a flame bursts), then weave out while the burst darts are
+     still slow. telegraph: every burst point rings in for the flame's 32 f
+     flight. escalation: two waves; wave 2 is turned half a step, faster,
+     12 darts a ring not 10 (the peak). busy (beam, bolts, worm set-piece):
+     wave 2 is dropped. entry: any. exit: field settled at f 170. */
+  function shadowWave(sp, a0, rn, rsp) {
+    for (var i = 0; i < 8; i++) {
+      var a = a0 + i * TAU / 8, vx = Math.cos(a) * sp, vy = Math.sin(a) * sp;
+      warn({ x: A.bx + vx * 32 / 60, y: A.by + vy * 32 / 60, r: 20, w: 2, life: 32 });
+      var b = A.shot(A.bx, A.by, vx, vy, 5, { tag: 'shadow', fuse: 32 / 60,
+        onEnd: function (b) { ringRamp(b.x, b.y, rn, rsp, a0); kick('small'); } });
+      if (b) fx().mine.push(b);
     }
-    return st.f >= 60;
+    cue('chime');
+  }
+  ATK.ShadowDemon_ReleaseExplodingShadowBlasts = function (st) {
+    if (st.f === 0) shadowWave(V(10), 0, 10, V(6));
+    if (st.f === 60 && !busy()) shadowWave(V(11), TAU / 16, 12, V(7));
+    if (st.f === 160) settle();
+    return st.f >= 170;
   };
 
   /* ShadowDemon.cs:152-155 (ShadowGigablastsAndCharges, PARTIAL in the notes).
      Three gigablasts aimed at the soul, every 20 f, then a 30 f dash through
      her line of aim.
-     ceiling: the demon's own timings are not verified against source. */
+     ceiling: the demon's own timings are not verified against source.
+     WotG pass. verb: charge. dodge: sidestep each blast's locked line, then
+     step off the wide dash lane. telegraph: blast i's line ramps
+     teleT(26 - 6i) f (30, 18, 10: the gap shrinks with the beat); the dash
+     lane ramps 30 f at body width. escalation: blasts 26/20 f apart, each
+     15 % faster; the dash is the peak (medium kick, afterimages). busy:
+     blasts 20 % slower. entry: any. exit: she is across the box, settled. */
   ATK.ShadowDemon_ShadowGigablastsAndCharges = function (st) {
-    var f = st.f;
-    if (f < 60 && f % 20 === 0) {
-      var a = aim();
-      A.shot(A.bx, A.by, Math.cos(a) * V(9.4), Math.sin(a) * V(9.4), 2, { tag: 'gig', fuse: 1.5 });
-      A.sfx('giga');
+    var f = st.f, i;
+    for (i = 0; i < 3; i++) if (f === [0, 26, 46][i]) (function (i) {
+      var a = aim(), x = A.bx, y = A.by, T = teleT(26 - 6 * i), sp = V(9.4) * (1 + 0.15 * i) * (busy() ? 0.8 : 1);
+      warn({ x: x, y: y, a: a, w: 3, life: T });
+      if (!i) cue('chime');
+      later(T, function () {
+        shotRamp(x, y, a, sp, 2, { tag: 'gig', fuse: 1.6 });
+        A.sfx('giga'); kick('small');
+      });
+    })(i);
+    if (f === 66) {
+      var b = aim(); st.dx = Math.cos(b); st.dy = Math.sin(b);
+      warn({ x: A.bx, y: A.by, a: b, w: 8, len: V(30) * 0.5 + 20, life: 30 });
     }
-    if (f === 60) { var b = aim(); st.dx = Math.cos(b); st.dy = Math.sin(b); }
-    if (f >= 60 && f < 90) A.setBoss(hx(A.bx + st.dx * V(30) * TF), hy(A.by + st.dy * V(30) * TF));
-    return f >= 120;
+    if (f === 96) { kick('medium'); A.sfx('fireblast'); }
+    if (f >= 96 && f < 126) {
+      A.setBoss(hx(A.bx + st.dx * V(30) * TF), hy(A.by + st.dy * V(30) * TF));
+      if (f % 4 === 0) G.after.push({ x: A.bx, y: A.by, at: G.fr });
+    }
+    if (f === 140) settle();
+    return f >= 150;
   };
 
   /* SupremeCalamitas.cs:2047-2129 (PhaseTransition). She clears the field,
      drops a ring of sixteen darts 600 px out, teleports 450 px above the soul,
      and waits 105 f. The next attack is the head of G.queue, set by the gate:
-     a pending lightning first, then shadow demon, brothers, seekers or desperation. */
+     a pending lightning first, then shadow demon, brothers, seekers or desperation.
+     WotG pass. verb: reset. dodge: ring 1 (16) opens a 3-dart gap toward
+     the soul: hold under her and drift into it; ring 2 (20, turned half a
+     step) asks for one radial step. telegraph: blackout to 0.6
+     (MomentOfCreation.cs:145-146) and a ring closing on her for 36 f.
+     escalation: 16 then 20 darts, V 12 then 14; ring 2 is the peak (large
+     kick: hit-stop). Owns the screen (loud). entry: any (the gate cut the
+     last attack; the field is cleared). exit: dim lifts at f 90, soul
+     below her, rings outbound; the queue's attack starts at f 105. */
   ATK.PhaseTransition = function (st) {
     if (st.f === 0) {
       A.clearAll();
       A.setBoss(hx(A.px), hy(A.py - D(450)));
-      ring(A.bx, A.by, 16, V(12), 0, 'burst');
       G.berserk = false;
       A.anim('idle');
-      A.shake('medium');
+      loud(true, 0.6);
+      warn({ x: A.bx, y: A.by, r: 48, w: 3, life: 36 });
+      kick('medium', true);
       A.sfx('maelstrom');
     }
+    if (st.f === 36) {
+      ringRamp(A.bx, A.by, 16, V(12), 0, Math.round(aim() / (TAU / 16) - 1), 3);
+      kick('medium', true);
+    }
+    if (st.f === 64) { ringRamp(A.bx, A.by, 20, V(14), TAU / 40); kick('large', true); }
+    if (st.f === 90) loud(false);
     return st.f >= 105;
   };
 
@@ -453,6 +894,16 @@
     G.box = { x: A.AX + wx, y: A.AY + wy, w: A.AW - 2 * wx, h: A.AH - 2 * wy };
     b = G.box;
     move(A.AX + A.AW / 2, A.AY + A.AH / 2, 0.04);
+    /* the four wall lanes show along the box's edges teleT(36) f ahead of
+       the first volley; the wall glow itself keeps them visible after */
+    if (f === 0) {
+      var Tw = teleT(36);
+      warn({ x: b.x, y: b.y, a: 0, life: Tw, w: 3, len: b.w });
+      warn({ x: b.x, y: b.y + b.h, a: 0, life: Tw, w: 3, len: b.w });
+      warn({ x: b.x, y: b.y, a: Math.PI / 2, life: Tw, w: 3, len: b.h });
+      warn({ x: b.x + b.w, y: b.y, a: Math.PI / 2, life: Tw, w: 3, len: b.h });
+      cue('chime');
+    }
     cad = Math.round(36 - 24 * Math.min(1, f / D_));
     if (f % cad === 0) {
       gp = (f / cad) | 0;
@@ -645,6 +1096,12 @@
         A.shot(x, y, Math.cos(ia) * 80, Math.sin(ia) * 80, 0, { tag: 'demon', fuse: 8 });
       }
     }
+    /* the arm has run in: a final readable burst at the converge point with
+       a three-gap on the soul, not the last bullets silently fusing out */
+    if (f === 210) {
+      ringRamp(cx, cy, 9, V(7), aim(), 8, 3);
+      kick('medium'); cue('fireblast'); sparks(cx, cy, 20, 0, TAU, 200);
+    }
     return f >= 240;
   };
 
@@ -669,8 +1126,16 @@
      four gigablasts go out every 24 f (40 f thinned), the cross turning 0.012 rad
      a frame, so it sweeps the 420 f attack. Dodge: between the arms as they turn. */
   ATK.GigablastCross = function (st) {
-    var f = st.f, cad = G.thin ? 40 : 24, k, a;
+    var f = st.f, cad = G.thin ? 40 : 24, k, a, Tw;
     move(A.AX + A.AW / 2, A.AY + A.AH / 2, 0.05);
+    /* each volley's four arms show their angles teleT(cad) f ahead */
+    Tw = teleT(cad);
+    if (f % cad === 0 && f + cad < 420) {
+      for (k = 0; k < 4; k++) {
+        warn({ x: A.bx, y: A.by, a: (f + cad) * 0.012 + k * Math.PI / 2, life: Tw, w: 3, len: 330 });
+      }
+      if (f === 0) cue('chime');
+    }
     if (f % cad === 0 && f < 420) {
       for (k = 0; k < 4; k++) {
         a = f * 0.012 + k * Math.PI / 2;
@@ -701,6 +1166,64 @@
       if (f >= e.lock && f < e.lock + 60) e.l.a = Math.atan2(A.py - e.y, A.px - e.x);
     }
     return f >= 270;
+  };
+
+  /* ArcingEyeStarbursts (WotG's ArcingEyeStarburst.cs, rubric 4). Three eyes
+     open along the top as in EyeLockBeams. Each shows a warn ring for
+     teleT(70) f, then fires 27 starburst shots on an arc of 6.91 rad (just
+     over a full turn, so the arms overlap) over 70 f: ramped 0.45 -> cap, so
+     the arms wind into a near-ring that stays dodgeable while it grows.
+     One eye every 70 f; the middle eye stays shut in a combo. Dodge: step
+     under an eye as its ring closes, then move with the arc it throws. */
+  ATK.ArcingEyeStarbursts = function (st) {
+    var f = st.f, k, i, j, e, N = 27, T = 70, tap = 6.91;
+    if (f === 0) {
+      st.p.eyes = [];
+      for (k = 0; k < 3; k++) st.p.eyes.push({ x: A.AX + A.AW * (0.2 + 0.3 * k), y: A.AY + 14, at: 60 + k * T });
+    }
+    for (k = 0; k < 3; k++) {
+      e = st.p.eyes[k];
+      if (G.thin && k === 1) continue;
+      if (f === e.at - teleT(T)) warn({ x: e.x, y: e.y, r: 20, life: teleT(T), w: 2 });
+      if (f === e.at) {
+        A.sfx('fireblast'); kick('small');
+        for (i = 0; i < N; i++) {
+          (function (index, k0, ex, ey) {
+            later(Math.round(index * T / N), function () {
+              shotRamp(ex, ey, index * tap / N + (k0 - 1) * 0.9, V(24), 0, { tag: 'burst', fuse: 6 });
+            });
+          })(i, k, e.x, e.y);
+        }
+      }
+    }
+    return f >= 410;
+  };
+
+  /* Darkness with Light Slashes (WotG's DarknessWithLightSlashes.cs, rubric
+     6). The arena dims to 9 % (loud owns the dark) and four bright slashes
+     sweep across it, one every 140 f: the lane shows as a warn line 30 f
+     ahead, then a 130 px band of light travels the full box in 87 f (the
+     GravityOfRuin G.lasers sw[] machinery). Alternate lanes and directions.
+     Dodge: be off the lane the light is on; a slash only hurts where the
+     band is. */
+  ATK.DarknessLightSlashes = function (st) {
+    var f = st.f, i, dir, y;
+    move(A.AX + A.AW / 2, A.AY + A.AH * 0.2, 0.05);
+    if (f === 0) { loud(true, 0.09); A.anim('casting'); }
+    for (i = 0; i < 4; i++) {
+      if (f !== 90 + i * 140) continue;
+      dir = i % 2;
+      y = A.AY + A.AH * (0.25 + 0.17 * i);
+      warn({ x: dir ? A.AX + A.AW : A.AX, y: y, a: dir ? Math.PI : 0, life: 30, w: 4, len: A.AW });
+      (function (d, ly) {
+        later(30, function () {
+          G.lasers.push({ x: d ? A.AX + A.AW : A.AX, y: ly, a: 0, len: 130, at: G.fr, end: G.fr + 87,
+                          sw: d ? [A.AX + A.AW, A.AX - 130] : [A.AX - 130, A.AX + A.AW] });
+        });
+      })(dir, y);
+    }
+    if (f >= 640) { loud(false); return true; }
+    return false;
   };
 
   /* Gravity of Ruin (the blue section). The soul turns blue (NEU.scalSoul.setMode
@@ -804,10 +1327,10 @@
      'BrimstoneLightning', 'HexCollapse', 'PredictiveCharge', 'ComboSkullRain'],
     ['CondemnationFanBurst', 'ShadowDemon_ReleaseExplodingShadowBlasts', 'HellblastBarrage', 'BrimstoneJewelBeam',
      'ExplosiveCharges', 'HorizontalDarkSoulRelease', 'SummonSuicideBomberDemons', 'BrimstoneLightning',
-     'ConvergingSkulls', 'EyeLockBeams', 'ComboEyeHex', 'BrimstoneRain', 'PredictiveCharge', 'GravityOfRuin'],
+     'ConvergingSkulls', 'EyeLockBeams', 'ArcingEyeStarbursts', 'ComboEyeHex', 'BrimstoneRain', 'PredictiveCharge', 'GravityOfRuin'],
     ['ShadowDemon_ShadowGigablastsAndCharges', 'FireLaserSpin', 'DarkMagicBombWalls', 'CondemnationFanBurst',
      'BrimstoneJewelBeam', 'ExplosiveCharges', 'BecomeBerserk', 'BrimstoneLightning', 'GigablastCross',
-     'PredictiveCharge', 'CalamitousRend', 'ComboSkullRain', 'ComboEyeHex', 'ComboLaserHell']
+     'PredictiveCharge', 'CalamitousRend', 'DarknessLightSlashes', 'ComboSkullRain', 'ComboEyeHex', 'ComboLaserHell']
   ];
   /* SelectNextAttack after BecomeBerserk: one of these three, uniformly */
   var BERSERK_PICK = ['CondemnationFanBurst', 'ExplosiveCharges', 'HellblastBarrage'];
@@ -845,6 +1368,7 @@
          hazards and every timer still queued (bomb fuses, rings, lunges) */
       G.beam = null; G.ev = []; G.tele = []; G.rend = []; G.bolts = []; G.lasers = [];
       G.hexes = []; G.after = []; G.lanes = null; G.box = null; G.thin = false;
+      if (G.fx) { G.fx.warn = []; G.fx.mine = []; G.fx.loud = false; }
     }
     /* a blue section cut short (a gate, a force) does not leak into the next */
     if (NEU.scalSoul && NEU.scalSoul.platforms) { NEU.scalSoul.platforms = null; soulMode('red'); }
@@ -872,7 +1396,7 @@
     if (b) {
       var dx = A.px - b.x, dy = A.py - b.y, c = Math.cos(b.a), sn = Math.sin(b.a);
       var along = dx * c + dy * sn, across = Math.abs(dx * sn - dy * c);
-      if (along > 0 && along < b.len && across < 6) A.hit();
+      if (along > 0 && along < b.len && across < 6 * (b.w || 1)) A.hit();
     }
     for (i = 0; i < G.bolts.length; i++) {
       bo = G.bolts[i];
@@ -1010,6 +1534,19 @@
     rift: function () { return liveRift(); },
     frame: function () { return G ? G.fr : 0; },
     berserk: function () { return G ? G.berserk : false; },
+    /* the WotG kit for the bodies boss-scal and the set-pieces run: one
+       palette, ramped warnings, ramped shots, the shake budget, cues */
+    kit: {
+      BRIM: BRIM, rampRGB: rampRGB, twinFlare: twinFlare, teleT: teleT,
+      warn: function (o) { return G ? warn(o) : o; },
+      shotRamp: function (x, y, a, sp, k, o) { return G ? shotRamp(x, y, a, sp, k, o) : null; },
+      ringRamp: function (x, y, n, sp, a0, gapAt, gapN) { if (G) ringRamp(x, y, n, sp, a0, gapAt, gapN); },
+      kick: function (tier, l) { if (G) kick(tier, l); },
+      cue: function (n) { if (G) cue(n); },
+      later: function (n, fn) { if (G) later(n, fn); },
+      loud: function (on, d) { if (G) loud(on, d); },
+      settle: function () { if (G) settle(); }
+    },
     /* drawn over the field, under the bullets: the telegraphs, the
        beams, the new hazards */
     draw: function (ctx) {
@@ -1018,6 +1555,7 @@
       /* lines and the beam stop at the forcefield */
       ctx.save();
       ctx.beginPath(); ctx.rect(A.AX, A.AY, A.AW, A.AH); ctx.clip();
+      drawFx(ctx);
       /* DemonicTelegraphLine.PreDraw: Color.Red, width lerp(0.3, 3) over
          a 0-1-0 bump, opacity three times the bump, capped at 1 */
       for (i = 0; i < G.tele.length; i++) {
@@ -1028,6 +1566,8 @@
       }
       if (G.beam) beam(ctx, G.beam);
       drawNew(ctx);
+      drawEyes(ctx);
+      drawSparks(ctx);
       ctx.restore();
     }
   };
@@ -1181,6 +1721,43 @@
     }
     ctx.lineCap = 'butt';
   }
+  /* the three EyeLock / ArcingEyeStarbursts eyes: each attack keeps them in
+     its st.p.eyes; a combo keeps them on a sub-state (st.p.a / st.p.b).
+     Shut until their open time, then a socket that heats up; hot through
+     the lock beam, dark again after. Red palette only, additive core. */
+  function drawEyes(ctx) {
+    if (!cur) return;
+    var s = cur.st, sets = [], i, k, e, t, op;
+    if (s.p.eyes) sets.push(s.p.eyes);
+    if (s.p.a && s.p.a.p.eyes) sets.push(s.p.a.p.eyes);
+    if (s.p.b && s.p.b.p.eyes) sets.push(s.p.b.p.eyes);
+    if (!sets.length) return;
+    op = ctx.globalCompositeOperation;
+    for (i = 0; i < sets.length; i++) for (k = 0; k < sets[i].length; k++) {
+      e = sets[i][k];
+      if (G.thin && k === 1) continue;   /* the combo keeps the middle eye shut */
+      /* EyeLockBeams' timeline: shut until the lock frame, ramping over its
+         60 f track, hot through the beam, shut after. The arcing eyes only
+         have their wave's `at`: a 60 f warm-up, lit through the burst. */
+      if (e.l) t = G.fr < e.lock ? 0 : (G.fr < e.l.at ? (G.fr - e.lock) / 60 : (G.fr < e.l.end ? 1 : 0));
+      else t = e.at ? clamp(1 - (e.at - G.fr) / 60, 0, 1) : 0;
+      if (t <= 0) {
+        ctx.fillStyle = 'rgba(26,0,0,0.85)';
+        ctx.beginPath(); ctx.arc(e.x, e.y, 8, 0, TAU); ctx.fill();
+        line(ctx, e.x - 5, e.y, e.x + 5, e.y, 'rgba(90,0,0,0.6)', 2);
+        continue;
+      }
+      ctx.fillStyle = 'rgba(90,0,0,0.95)';
+      ctx.beginPath(); ctx.arc(e.x, e.y, 8, 0, TAU); ctx.fill();
+      var r = 3 + 3.5 * clamp(t, 0, 1);
+      ctx.fillStyle = 'rgba(255,58,26,' + (0.35 + 0.6 * t).toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x, e.y, r * 0.5, 0, TAU);
+      ctx.fillStyle = 'rgba(255,240,208,' + (0.45 + 0.5 * t).toFixed(2) + ')';
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = op;
+  }
   function liveRift() {
     for (var i = G ? G.rend.length - 1 : -1; i >= 0; i--)
       if (G.rend[i].phase === 'rift') return G.rend[i];
@@ -1192,29 +1769,45 @@
     ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
   }
 
-  /* The BrimstoneLaserbeam: three additive glow steps (the source's
-     red-to-white primitive, stepped), then BrimstoneRayMid tiled down the
-     beam at half size with BrimstoneRayEnd at the tip. The 13 px core
-     matches the 12 px hit band in hurtCheck. */
+  /* The BrimstoneLaserbeam, WotG pass. Four additive layers, each a
+     gradient brightest at the source that fades to a quarter at the far
+     end (TelegraphedPortalLaserbeam.cs:95-96 taper): a wide BRIM[1]
+     back-glow, BRIM[3], BRIM[4], a BRIM[5] core (LightSlashTelegraph.cs
+     :146-157 dark-under-bright). The width eases in over 16 f from b.on and
+     overshoots ~20 % before it settles (LightSlashTelegraph.cs:123-124).
+     Twin flares at the source and where it meets the wall, then
+     BrimstoneRayMid tiled down it. b.w scales it and the hurt band. */
+  function gradLine(ctx, x0, y0, x1, y1, i, a, w) {
+    var c = BRIM_RGB[i], rgb = c[0] + ',' + c[1] + ',' + c[2];
+    var g = ctx.createLinearGradient ? ctx.createLinearGradient(x0, y0, x1, y1) : null;
+    if (g) { g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); g.addColorStop(1, 'rgba(' + rgb + ',' + (a * 0.25).toFixed(2) + ')'); }
+    line(ctx, x0, y0, x1, y1, g || 'rgba(' + rgb + ',' + a + ')', w);
+  }
   function beam(ctx, b) {
     var ex = b.x + Math.cos(b.a) * b.len, ey = b.y + Math.sin(b.a) * b.len;
-    var op = ctx.globalCompositeOperation;
+    var op = ctx.globalCompositeOperation, w = b.w || 1;
+    var u = b.on === undefined ? 1 : clamp((G.fr - b.on) / 16, 0, 1);
+    var s = (Math.sin(Math.pow(u, 1.3) * Math.PI / 2) + 0.3 * Math.sin(u * Math.PI)) * w;
     ctx.lineCap = 'butt';
     ctx.globalCompositeOperation = 'lighter';
-    line(ctx, b.x, b.y, ex, ey, 'rgba(160,20,30,0.35)', 34);
-    line(ctx, b.x, b.y, ex, ey, 'rgba(255,60,40,0.45)', 20);
-    line(ctx, b.x, b.y, ex, ey, 'rgba(255,170,110,0.6)', 8);
-    if (NEU.danmaku && NEU.danmaku.glow) NEU.danmaku.glow(ctx, b.x, b.y, 40, '#FF4A2A', 0.9);
+    gradLine(ctx, b.x, b.y, ex, ey, 1, 0.7, 46 * s);
+    gradLine(ctx, b.x, b.y, ex, ey, 3, 0.5, 22 * s);
+    gradLine(ctx, b.x, b.y, ex, ey, 4, 0.7, 10 * s);
+    gradLine(ctx, b.x, b.y, ex, ey, 5, 0.95, Math.max(1, 4 * s));
+    twinFlare(ctx, b.x, b.y, 34 * s + 6, G.fr * 0.06, 0.9);
+    var tp = rayTip(b.x, b.y, b.a);
+    twinFlare(ctx, tp.x, tp.y, 20 * s + 4, -G.fr * 0.08, 0.8);
     ctx.globalCompositeOperation = op;
     var mid = NEU.sheetReady && NEU.sheetReady(NEU.sheets.scalRay);
     var end = NEU.sheetReady && NEU.sheetReady(NEU.sheets.scalRayEnd);
-    if (mid) {
+    if (mid && s > 0.3) {
       ctx.save();
+      ctx.globalAlpha = Math.min(1, s / w);
       ctx.translate(b.x | 0, b.y | 0); ctx.rotate(b.a - Math.PI / 2);
-      for (var y = 0; y < b.len; y += 15) ctx.drawImage(mid, 0, 0, 26, 30, -6, y, 13, 15);
-      if (end) ctx.drawImage(end, 0, 0, 26, 22, -6, b.len | 0, 13, 11);
+      for (var y = 0; y < b.len; y += 15) ctx.drawImage(mid, 0, 0, 26, 30, -6 * w, y, 13 * w, 15);
+      if (end) ctx.drawImage(end, 0, 0, 26, 22, -6 * w, b.len | 0, 13 * w, 11);
       ctx.restore();
-    } else line(ctx, b.x, b.y, ex, ey, 'rgba(255,74,42,0.95)', 4);
+    }
     ctx.lineWidth = 1;
   }
 }());

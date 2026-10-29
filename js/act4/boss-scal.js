@@ -922,7 +922,7 @@
     }
 
     if (!bros.length) {
-      invuln = false; mode = 'fight';
+      phase = 2; mode = 'fight'; invuln = false;
       if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(2);
       say("* she laughs. that is the first noise she has made.");
       later(function () { if (running) say("* now she is trying."); }, 2200);
@@ -946,7 +946,7 @@
     inv = IFRAMES;
     hurtAcc += defendT > 0 ? 0.5 : 1;
     if (hurtAcc < 1) {
-      if (NEU.juice) NEU.juice.hit('small');
+      if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(px, py, 4, COL.soul); }
       return false;
     }
     hurtAcc -= 1;
@@ -1822,7 +1822,10 @@
     invuln: function (v) { invuln = v; },
     shake: function (s) {
       if (!NEU.juice) return;
-      if (s === 'medium') NEU.juice.hit('medium'); else NEU.juice.hit('small');
+      /* large carries a 90 ms hit-stop and one 50 ms flash: the big beats only */
+      if (s === 'medium') NEU.juice.hit('medium');
+      else if (s === 'large') NEU.juice.hit('large');
+      else NEU.juice.hit('small');
     },
     sfx: function (n) { sfxPlay(n); },
     hit: function () { if (inv <= 0 && mode !== 'won') hitPlayer(); },

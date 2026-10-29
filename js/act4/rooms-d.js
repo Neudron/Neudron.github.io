@@ -99,6 +99,11 @@
                 'it is not on the board with the prices.'] },
       { t: 'exit', x: 23, y: 4, to: 'd2_alley', spawn: 'west' },
       { t: 'exit', x: 1, y: 4, to: 'b7_altar', spawn: 'east' },
+      /* The way back to the pot. Nothing else leads into the trip room
+         from the city, so without this the five mushrooms could never
+         reach the pot. Open only while tripping (see rooms-g h3_trip). */
+      { t: 'exit', x: 12, y: 3, to: 'h3_trip', spawn: 'in', locked: 'tripping',
+        lines: ['a door painted on the street. it has no handle while you are sober.'] },
       { t: 'sign', x: 18, y: 6,
         lines: ['BUS STOP.',
                 'the timetable is a drawing of a bus. someone has coloured it in, carefully.'] }

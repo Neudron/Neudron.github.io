@@ -292,6 +292,12 @@
       { t: 'exit', x: 19, y: 4, to: 'd1_street', spawn: 'east' }
     ].concat(D('plant', [1, 1, 18, 1, 18, 7]), D('vase', [7, 1, 13, 1]), D('poster', [16, 6])),
     onEnter: function (c) {
+      /* Soup made but not yet woken (a reload in the 3.2s window, or a
+         room change before the timer ran): finish the wake here. The
+         saved tripping flag is unreliable in exactly the reload case we
+         are healing, so the quest mark — written by wake itself — is
+         the alone source of truth. */
+      if (c.flagged('soup_made') && NEU.quest && !NEU.quest.has('a4_wake') && NEU.act4) { NEU.act4.wake(); return; }
       if (c.flagged('h3_seen')) return;
       c.flag('h3_seen', 1);
       say(c, ['the colours have opinions now.',
@@ -344,12 +350,14 @@
       c.say(['a mushroom. you want it very badly. you have nothing sharp.'], 'narr');
       return;
     }
-    var e = c.ents().filter(function (x) { return x.mush === id; })[0];
+    var ents = (typeof c.ents === 'function') ? c.ents() : (c.ents || []);
+    var e = ents.filter(function (x) { return x.mush === id; })[0];
     var n = mushrooms() + 1;
     var lines = n < 5 ? ['you take the mushroom. ' + n + ' of five.']
       : ['you take the mushroom. five of five.',
-         'bring them to the pot. it is in the trip room, the one the trip keeps dropping you in.'];
-    NEU.take(e, id, lines);
+         'bring them to the pot. the street has a door that opens only while you are tripping; it goes to the pot.'];
+    if (e) { NEU.take(e, id, lines); }
+    else { if (NEU.save) NEU.save.give(id); if (NEU.say) NEU.say(lines || ['* You got the ' + id.toUpperCase() + '.'], 'narr'); }
     if (NEU.quest) NEU.quest.bump('a4_mush', mushrooms());
   };
 

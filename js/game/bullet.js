@@ -12,11 +12,11 @@
                        its beam and it charges what you carry
      3  the last six   a spiral, walls with one gap, blasters, aimed
 
-   Movement, dash (C or a double-tap), adrenaline (V), the HUD and the
+   Movement, dash (X or a double-tap), the HUD and the
    screen-reader line all come from danmaku.js, shared with the bosses.
    Bullets spawn OUTSIDE the box and are culled well beyond it, so
-   nothing ever pops into existence on top of you. Shift focuses and
-   draws the true hitbox.                                             */
+   nothing ever pops into existence on top of you. There is no focus
+   key.                                                                */
 
 (function () {
   'use strict';
@@ -449,11 +449,6 @@
     for (var q = 0; q < blasters.length; q++) drawBlaster(blasters[q]);
 
     dm.drawFX(ctx, F, inv);
-    /* focus reveals the true hitbox — the whole reason focus exists */
-    if (keys.focus) {
-      ctx.fillStyle = COL.bone;
-      ctx.fillRect((F.x - 1) | 0, (F.y - 1) | 0, 3, 3);
-    }
 
     /* the phase's line, Undertale-style, inside the box */
     if (phase && t - phaseAt < TELE + 0.6) {
@@ -620,6 +615,7 @@
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
     begin();
+    announce('HP 3/3');
   }
   function close() {
     running = false;
