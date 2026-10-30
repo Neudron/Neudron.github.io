@@ -1210,6 +1210,19 @@
       kstate = 'thrown'; keyHit.nagged = false;
       if (Math.hypot(kvx, kvy) > 420 && NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
     });
+
+    /* A carried key lets the page scroll through it (css: .keyobj.is-carried),
+       so a swipe that starts on it ends here instead of in pointerup. Put it
+       back in the hand; anything else that gets cancelled just drops. */
+    addEventListener('pointercancel', function (e) {
+      if (kstate !== 'held') return;
+      if (kGrabId !== null && e.pointerId !== kGrabId) return;
+      kel.classList.remove('is-held');
+      kGrabId = null;
+      kvx = 0; kvy = 0;
+      if (kFromCarry) { kstate = 'carry'; return; }
+      kstate = 'thrown';
+    });
   }
 
   function carryKey() {
@@ -1239,7 +1252,7 @@
   function tellCarry(what) {
     if (!grabTapFor(what) || told[what]) return;
     told[what] = true;
-    if (what === 'sword') say(["tap me to swing it. tap anywhere else and it goes home."]);
+    if (what === 'sword') say(["tap me to swing it. tap anywhere else and it goes home. scrolling's fine, it stays with you."]);
     else                  say(["tap it to pick it up. flick it to throw."]);
   }
   function grabTapFor(what) { return what === 'sword' ? grabTap : kGrabTap; }
@@ -1373,9 +1386,28 @@
      the pointerup which closes the pickup tap does not count as a drop —
      without that guard the sword goes home the instant you lift, and
      tap-to-carry never engages at all. */
+  /* Where each finger came down, so a lift can be told apart from the
+     end of a scroll. With the sword riding at the bottom of the screen,
+     the thumb that scrolls the page lands on or near it constantly; when
+     every lift counted as a tap, scrolling swung it (or sent it home) and
+     you could never get to the bottom of the page while carrying it. */
+  var downAt = {};
+  addEventListener('pointerdown', function (e) {
+    downAt[e.pointerId] = { x: e.clientX, y: e.clientY };
+  }, true);
+  function wasScroll(e) {
+    var d = downAt[e.pointerId];
+    delete downAt[e.pointerId];
+    return !!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) >= TAP_SLOP;
+  }
+
   addEventListener('pointerup', function (e) {
+    var scrolled = wasScroll(e);
     if (grabTap && grabId !== null && e.pointerId === grabId) { grabId = null; carrySword(); return; }
     if (grabTap && state !== 'held') return;
+    /* Carrying on a finger: only a TAP drops or swings. A finger that
+       travelled was scrolling the page, and the sword stays in your hand. */
+    if (grabTap && grabId === null && scrolled) return;
     /* The dialogue box is modal and sits over the page; tapping it means
        "advance the text", never "drop what you are holding". Without this
        the hint that explains tap-to-carry is itself what drops the sword,
@@ -1385,7 +1417,11 @@
     attempt(e.clientX, e.clientY);
   });
   addEventListener('pointercancel', function (e) {
+    delete downAt[e.pointerId];
     if (state !== 'held') return;
+    /* The browser cancels a touch the moment it turns into a scroll. That
+       is the page moving, not the player letting go: keep carrying. */
+    if (grabTap && grabId === null) return;
     /* A cancelled PICKUP still leaves it in your hand — that is the
        recoverable state, and a tap elsewhere still drops it. A cancelled
        mouse drag goes home, as before. */

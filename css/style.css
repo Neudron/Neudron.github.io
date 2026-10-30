@@ -879,6 +879,11 @@ body.is-scrolled .cue { opacity: 0; pointer-events: none; }
    rewrites the transform on both of these every frame and would wipe
    a keyframed one out entirely. */
 .sword.is-carried, .keyobj.is-carried { animation: carried 1.7s ease-in-out infinite; }
+/* Riding at the bottom of a phone screen, a carried thing sits right
+   where the thumb scrolls. touch-action:none there meant a swipe that
+   started on it moved nothing, so you could not reach the bottom of the
+   page. Let the page pan through it; sans.js tells a tap from a scroll. */
+.sword.is-carried, .keyobj.is-carried { touch-action: pan-x pan-y; }
 
 @keyframes carried {
   0%, 100% { filter: drop-shadow(0 6px 18px rgba(0,0,0,.5)); }
