@@ -19,9 +19,10 @@
       worse.
 
    3. EVERY PUZZLE TEACHES ITS OWN RULE, THEN BENDS IT. B2 teaches
-      "push blocks onto plates". B3 teaches "order matters". B4 teaches
-      "you cannot stop". B5 breaks the rule B2 taught: you need two
-      plates held at once and there is one of you.
+      "read the room, press what you believe, r if you are wrong". B3
+      teaches "order matters". B4 teaches "you cannot stop". B5 bends
+      the plates B4 taught: you need two held at once and there is one
+      of you.
 
    4. NOTHING IS TIMED. Not one puzzle here needs reflexes. The fights
       are where reflexes live; these rooms are where thinking lives,
@@ -30,7 +31,23 @@
    5. THE MUSHROOMS ARE PLANTED HOURS EARLY. Two of the five are in
       this zone, visible and unobtainable. When Zone H finally asks for
       them you should feel like you already knew where they were —
-      because you did.                                                */
+      because you did.
+
+   6. EVERY ROOM IS A PLACE. Each has its own composition, a focal
+      point and its own light (the clearing's moonbeam, the long walk's
+      stream, the fork's castle wall, the nave, the riddle wall, the
+      fire temple, the frozen cloister, the mirror gallery, the crypt,
+      the chapel). The look is drawn by js/act4/look-woods.js and
+      js/act4/look-castle.js from these grids and entities — rooms stay
+      data; a room without those files still plays on the engine's bake.
+
+   7. DOORS ARE WALKED THROUGH. Every exit sits IN the room's outer
+      wall (the two-row north wall counts), on the end of a path, and
+      every return spawn is one cell inside it facing away. Each exit
+      names a `style` for js/core/engine-doors.js: the woods use
+      tunnels of trees, paths and a root arch; the castle uses arches,
+      doors, gates, curtains, stairs and the fire door's portal. A
+      locked one says what it is waiting for when you bump it.        */
 
 (function () {
   'use strict';
@@ -65,10 +82,14 @@
        a sheet 404s. */
     src: 'img/act4/tiles/woods.png',
     rects: { '#': [0, 0], '~': [16, 0], '.': [32, 0], ',': [48, 0], '=': [64, 0], '|': [80, 0], '_': [96, 0], '+': [112, 0] },
-    solid: '#~|+',
+    /* w  black stream (solid)   T  the foot of a big tree (solid)
+       m  moss / the unswept track (walkable). All three are painted by
+       look-woods.js; the colours are the no-art fallback. */
+    solid: '#~|+wT',
     colours: { '#': '#0B0E14', '~': '#101725', '.': '#0D1119',
                ',': '#1C2333', '=': '#161320', '|': '#241d2e',
-               '_': '#2A1E33', '+': '#3A3245' }
+               '_': '#2A1E33', '+': '#3A3245',
+               'w': '#0A1626', 'T': '#1E1820', 'm': '#1C3432' }
   });
   E.tileset('castle', {
     /* Texture from the real Deltarune atlases, PALETTE from this site.
@@ -85,8 +106,11 @@
     src: 'img/act4/tiles/castle.png',
     rects: { '#': [0, 0], '|': [16, 0], '.': [32, 0], ',': [48, 0], '=': [64, 0], '_': [80, 0], '+': [96, 0],
              'A': [112, 0] },
-    solid: '#|+',
+    /* D  dais (walkable)   d  the dais's front step (walkable)
+       L  the ember trench in b3 (solid). Painted by look-castle.js. */
+    solid: '#|+L',
     colours: { '#': '#191426', '|': '#2A2238', '.': '#1A1726',
+               'D': '#2E2840', 'd': '#2A2438', 'L': '#2A1614',
                ',': '#221D33', '=': '#231E33', '_': '#3A2140',
                '+': '#4A3255',
                /* 'A' is the altar plinth in b7. It is 2x2 in the grid but
@@ -98,34 +122,73 @@
 
   function say(c, l, w) { c.say(l, w || 'narr'); }
 
+  /* ── the woods' look ───────────────────────────────────────────────
+     Every woods room carries one `woodsfloor` (its whole floor, painted
+     once from this grid by js/act4/look-woods.js) and one `woodsfx` on
+     its bottom row (moonbeams `beams` and drifting ground mist `mist`,
+     drawn above every sprite). Props are `woodsprop` with a `v`; a prop
+     standing on walkable ground is `solid` so nothing can be walked
+     through. Without look-woods.js these kinds draw nothing and the
+     engine's own tile bake shows instead, so the rooms never depend on
+     the art to be playable. */
+  function P(v, x, y, extra) {
+    var e = { t: 'woodsprop', v: v, x: x, y: y };
+    for (var k in extra || {}) e[k] = extra[k];
+    return e;
+  }
+  function woodsLook(h) {
+    return [{ t: 'woodsfloor', x: 0, y: 0 }, { t: 'woodsfx', x: 0, y: h - 1 }];
+  }
+
   /* ══ A1 — where you arrive ═══════════════════════════════════════
      Deliberately small and almost empty. One route out, lit. The
      first thing a player does in an unfamiliar space is look for the
-     exit, and finding it immediately is what buys patience for A2. */
+     exit, and finding it immediately is what buys patience for A2.
+
+     LAYOUT. An oval clearing walled by black forest, one shaft of
+     moonlight on the spot you wake in, a ring of pale stones, a fire
+     somebody let go out. The lit path starts under your feet and runs
+     east between two hedges into a tunnel of trees — the only lit thing
+     in the room, so it is the only thing to do. Three lanterns hang
+     along it ("somebody has lit a path"). The exit is the far end of
+     that tunnel, IN the east wall: walk to the end of the light and you
+     are through. Arriving back from A2 puts you one step inside it. */
   E.register('a1_clearing', {
     tileset: 'woods',
     tiles: [
-      '####################',
-      '#~~~~~~~~~~~~~~~~~~#',
-      '#~..............~~~#',
-      '#~....,,,,,,....~~~#',
-      '#~....,......,..~~~#',
-      '#~....,......,..~~~#',
-      '#~~~~~,~~~~~~,~~~~~#',
-      '#~~~~~,~~~~~~,~~~~~#',
-      '#.....,,,,,,,,.....#',
-      '#..................#',
-      '####################'
+      '########################',
+      '########~~~~~~##########',
+      '####~~~~......~~~~~~####',
+      '###~~...........~~~~~###',
+      '##~~.............~~~~~##',
+      '##~...............~~~~##',
+      '##~...............~~~~~#',
+      '##~......,,,,,,,,,,,,,,#',
+      '##~~..............~~~~~#',
+      '###~~............~~~~###',
+      '####~~~.........~~~~####',
+      '######~~~~~~~~~~~~######',
+      '########################'
     ].join('\n'),
-    spawns: { default: { x: 9, y: 4, face: 'down' }, north: { x: 9, y: 2 } },
-    entities: [
-      { t: 'save', x: 6, y: 3 },
-      { t: 'npc', x: 12, y: 4, colour: '#4A4560',
+    beams: [[10, 7, 110, 28]],
+    mist: [9, 3],
+    spawns: { default: { x: 10, y: 7, face: 'right' }, east: { x: 22, y: 7, face: 'left' },
+              north: { x: 10, y: 3, face: 'down' } },
+    entities: woodsLook(13).concat([
+      { t: 'save', x: 6, y: 5 },
+      { t: 'npc', x: 17, y: 6, colour: '#4A4560', skin: 'sign1', look: 'signpost',
         lines: ['a signpost. the writing has run.',
                 'you can make out one word. "ahead".'] },
-      { t: 'exit', x: 13, y: 8, to: 'a2_path', spawn: 'west' }
-    ].concat(D('tree', [1, 1, 5, 1, 10, 1, 14, 1, 18, 2, 17, 4, 3, 6, 10, 7, 16, 6]),
-             D('bush', [2, 9, 17, 9, 9, 6]), D('grass', [3, 4, 15, 2, 8, 9]), D('stone', [18, 8])),
+      { t: 'exit', x: 23, y: 7, to: 'a2_path', spawn: 'west', style: 'tunnel' },
+      P('moon', 10, 7),
+      P('campfire', 13, 4, { solid: true }),
+      P('lantern', 12, 6, { solid: true }), P('lantern', 16, 8, { solid: true }), P('lantern', 20, 6),
+      P('oak', 4, 3), P('oak', 16, 2, { big: 1 }), P('pine', 7, 2, { h: 70 }), P('pine', 19, 4),
+      P('dead', 21, 9), P('oak', 3, 9), P('pine', 18, 10, { h: 56 }), P('oak', 6, 11),
+      P('stump', 4, 7, { solid: true }), P('rock', 15, 9, { solid: true }), P('ferns', 7, 9),
+      P('shrooms', 4, 6), P('shrooms', 14, 3, { seed: 1 }), P('ferns', 12, 2), P('bush', 3, 5),
+      P('bush', 22, 8), P('ferns', 9, 10)
+    ]),
     onEnter: function (c) {
       if (c.flagged('a1_seen')) return;
       c.flag('a1_seen', 1);
@@ -142,79 +205,114 @@
      THE TWO LIT PATHS MUST STAY JOINED AT BOTH ENDS. You arrive on the
      top path and the exit east is on the BOTTOM one, so the columns at
      x=1 and x=24 are the only reason this room can be finished at all.
-     Without them row 5 is solid undergrowth from wall to wall, the two
-     corridors never touch, and a player who walks east and presses e
-     gets silence — which is what shipped first and what the
+     Between the two paths runs a black stream (row 5, solid water):
+     it is what makes the walk long and it is never crossed — no bridge,
+     on purpose, or the room stops being a walk. Without the end
+     columns the two corridors never touch, and a player who walks east
+     gets nothing — which is what shipped first and what the
      reachability proof in fixes8 now exists to catch.
 
      One cell wide and lit, same as the descents in A1, because A1
      already taught "lit ground is walkable" and this room should not
      have to teach it twice. They sit hard against the walls on purpose:
      hold right until you stop and you are standing in the gap, so the
-     turn costs no aiming. */
+     turn costs no aiming. The mushroom sits in a mossy hollow on the
+     south bank under a patch of moonlight, so it is seen from the top
+     path across the water long before you can reach it. */
   E.register('a2_path', {
     tileset: 'woods',
     tiles: [
       '##########################',
-      '#~~~~~~~~~~~~~~~~~~~~~~~~#',
-      '#~~..~~~~..~~~~~~..~~~~~~#',
+      '##~~~~~~~~~~~~~~~~~~~~~~##',
+      '#~~..~~~~~..~~~~~~..~~~~~#',
       '#,,,,,,,,,,,,,,,,,,,,,,,,#',
-      '#,~..~~~~..~~~~..~~~~..~,#',
-      '#,~~~~~~~~~~~~~~~~~~~~~~,#',
-      '#,...~~~~....~~~~....~~~,#',
+      '#,~...~~~~~..~~~~~..~~~~,#',
+      '#,wwwwwwwwwwwwwwwwwwwwww,#',
+      '#,~~...~mm..~~~~~...~~~~,#',
       '#,,,,,,,,,,,,,,,,,,,,,,,,#',
-      '#~~~~~~~~~~~~~~~~~~~~~~~~#',
+      '#~~~~..~~~~~~~..~~~~~~~~~#',
+      '##~~~~~~~~~~~~~~~~~~~~~~##',
       '##########################'
     ].join('\n'),
+    beams: [[8, 6, 90, 18], [18, 2, 70, 16]],
+    mist: [5, 8],
     spawns: { west: { x: 1, y: 3, face: 'right' }, east: { x: 24, y: 7, face: 'left' } },
-    entities: [
+    entities: woodsLook(11).concat([
       { t: 'npc', x: 8, y: 6, colour: '#C4705F', mush: 'mush1', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush1'); } },
-      { t: 'npc', x: 17, y: 2, colour: '#4A4560',
+      { t: 'npc', x: 18, y: 2, colour: '#4A4560', skin: 'barktree', look: 'tree',
         lines: ['the trees here have no bark on the north side.',
                 'there is no north here.'] },
-      { t: 'exit', x: 25, y: 7, to: 'a3_fork', spawn: 'west' },
-      { t: 'exit', x: 0, y: 3, to: 'a1_clearing', spawn: 'default' }
-    ].concat(D('tree', [2, 1, 7, 1, 13, 1, 20, 1, 24, 1, 4, 5, 11, 5, 18, 5, 5, 8, 15, 8, 22, 8]),
-             D('bush', [3, 4, 22, 4, 19, 6]), D('grass', [16, 4, 3, 6, 10, 4]))
+      { t: 'exit', x: 25, y: 7, to: 'a3_fork', spawn: 'west', style: 'path' },
+      { t: 'exit', x: 0, y: 3, to: 'a1_clearing', spawn: 'east', style: 'tunnel' },
+      P('moon', 8, 6, { r: 40 }), P('moon', 18, 2, { r: 36 }),
+      P('lantern', 4, 2, { solid: true }), P('lantern', 11, 4, { solid: true }), P('lantern', 19, 4, { solid: true }),
+      P('lantern', 5, 8, { solid: true }), P('lantern', 15, 8, { solid: true }), P('lantern', 22, 6),
+      P('pine', 2, 1, { h: 60 }), P('oak', 7, 1), P('pine', 13, 1, { h: 72 }), P('oak', 22, 1, { big: 1 }),
+      P('pine', 3, 9, { h: 46 }), P('oak', 10, 10, { h: 34, rx: 22, ry: 14 }), P('oak', 18, 10, { h: 36, rx: 24, ry: 15 }), P('pine', 23, 9, { h: 44 }),
+      P('dead', 15, 4), P('log', 13, 5), P('rock', 3, 4, { solid: true }), P('rock', 21, 2, { solid: true }),
+      P('stump', 12, 2, { solid: true }), P('shrooms', 10, 6), P('shrooms', 17, 6, { seed: 2 }),
+      P('ferns', 5, 6), P('ferns', 20, 6), P('ferns', 8, 2), P('bush', 24, 2), P('ferns', 14, 8)
+    ])
   });
 
   /* ══ A3 — the fork ═══════════════════════════════════════════════
      Left is the castle. Right is the altar room you cannot open yet,
      and it says so as a promise rather than a wall. The difference
      between "locked" and "not yet" is one line of dialogue and it is
-     the difference between curiosity and annoyance. */
+     the difference between curiosity and annoyance.
+
+     LAYOUT. The castle's curtain wall closes the whole north edge; its
+     gate is the exit at (10,1), up three swept steps between two stone
+     lanterns that someone keeps lit — the lit path runs straight to it.
+     You arrive from the west on the same lit path. At the junction it
+     turns north; the other branch carries on east as an unswept mossy
+     track under fallen leaves, past the oldest tree in the wood, to an
+     overgrown arch in the east edge (b7). Read at a glance: lit means
+     expected, moss means "not swept in a long time". */
   E.register('a3_fork', {
     tileset: 'woods',
     tiles: [
-      '######################',
-      '#~~~~~~~~~~~~~~~~~~~~#',
-      '#~~~~,,,,,,,,,,~~~~~~#',
-      '#~~~~,~~~~~~~~,~~~~~~#',
-      '#~~~~,~~~~~~~~,~~~~~~#',
-      '#,,,,,~~~~~~~~,,,,,,,#',
-      '#~~~~~~~~~~~~~~~~~~~~#',
-      '#~~~~~~~~~~~~~~~~~~~~#',
-      '######################'
+      '########################',
+      '########################',
+      '#~~~~~~~.,,,.~~~~~~~~~~#',
+      '#~~~~~~..,,,..~~~~~~~~~#',
+      '#~~~~.....,.....~~~~~~~#',
+      '#~~.......,......T~~~~~#',
+      '#~........,.......~~~~~#',
+      '#,,,,,,,,,,mmmmmmmmmmmm#',
+      '#~~.................mm~#',
+      '#~~~~~...........~~~~~~#',
+      '#~~~~~~~~~~~~~~~~~~~~~~#',
+      '########################'
     ].join('\n'),
-    spawns: { west: { x: 1, y: 5, face: 'right' },
-              castle: { x: 5, y: 2, face: 'down' },
-              altar: { x: 20, y: 5, face: 'left' } },
-    entities: [
-      { t: 'save', x: 8, y: 2 },
-      { t: 'exit', x: 5, y: 1, to: 'b1_throne', spawn: 'south' },
-      { t: 'exit', x: 21, y: 5, to: 'b7_altar', spawn: 'east' },
-      { t: 'exit', x: 0, y: 5, to: 'a2_path', spawn: 'east' },
-      { t: 'npc', x: 14, y: 5, colour: '#8A8598', look: 'signpost',
+    beams: [[10, 4, 70, 30]],
+    mist: [8],
+    spawns: { west: { x: 1, y: 7, face: 'right' },
+              castle: { x: 10, y: 2, face: 'down' },
+              altar: { x: 22, y: 7, face: 'left' } },
+    entities: woodsLook(12).concat([
+      { t: 'save', x: 5, y: 6 },
+      { t: 'exit', x: 10, y: 1, to: 'b1_throne', spawn: 'south', style: 'gate' },
+      { t: 'exit', x: 23, y: 7, to: 'b7_altar', spawn: 'east', style: 'arch' },
+      { t: 'exit', x: 0, y: 7, to: 'a2_path', spawn: 'east', style: 'path' },
+      { t: 'npc', x: 11, y: 6, colour: '#8A8598', look: 'signpost', skin: 'signfork',
         lines: function (s) {
           return s.flagged('witch_met')
             ? ['the left one goes up to her. you have been up it.',
                'the right one is still waiting for somebody to care about it.']
             : ['two ways. the left one has been swept.',
                'the right one has not been swept in a long time.'];
-        } }
-    ].concat(D('tree', [2, 1, 9, 1, 16, 1, 19, 2, 3, 3, 10, 4, 17, 4, 2, 7, 8, 6, 13, 7, 19, 7]),
-             D('bush', [7, 3, 11, 3]), D('stone', [12, 6, 4, 7])),
+        } },
+      P('moon', 10, 4, { r: 50 }),
+      P('toro', 8, 3, { solid: true }), P('toro', 12, 3, { solid: true }),
+      P('oak', 17, 5, { big: 1, seed: 41 }),
+      P('pine', 3, 2, { h: 50 }), P('oak', 6, 3), P('pine', 15, 3, { h: 66 }), P('oak', 21, 3),
+      P('oak', 2, 9), P('pine', 6, 10, { h: 60 }), P('dead', 19, 9), P('oak', 13, 10), P('pine', 22, 10, { h: 50 }),
+      P('menhir', 15, 8, { solid: true }), P('rock', 4, 8, { solid: true }), P('stump', 8, 9, { solid: true }),
+      P('shrooms', 18, 6), P('shrooms', 7, 5, { seed: 3 }), P('ferns', 3, 5), P('ferns', 13, 9),
+      P('bush', 21, 8), P('ferns', 16, 4)
+    ]),
     onEnter: function (c) {
       if (c.flagged('a3_seen')) return;
       c.flag('a3_seen', 1);
@@ -223,28 +321,67 @@
     }
   });
 
+  /* ── the castle's look ─────────────────────────────────────────────
+     Same contract as the woods: one `castlefloor` (js/act4/look-castle.js
+     paints the whole room from its grid once — flagstones, the tall
+     north wall and everything hung on it), one `castlefx` on the bottom
+     row for window light (`shafts`), and `castleprop`s with a `v`.
+     Logic-bearing things keep their engine kind and only carry a `skin`.
+     Every castle room has a TWO-row north wall: the second row is the
+     wall's face, tall enough to hang a window on. */
+  function Q(v, x, y, extra) {
+    var e = { t: 'castleprop', v: v, x: x, y: y };
+    for (var k in extra || {}) e[k] = extra[k];
+    return e;
+  }
+  function castleLook(h) {
+    return [{ t: 'castlefloor', x: 0, y: 0 }, { t: 'castlefx', x: 0, y: h - 1 }];
+  }
+  function columns(xy, extra) {
+    var out = [];
+    for (var i = 0; i + 1 < xy.length; i += 2) out.push(Q('column', xy[i], xy[i + 1], extra));
+    return out;
+  }
+
   /* ══ B1 — the throne room ════════════════════════════════════════
-     The lie is here, and so is the evidence against it. */
+     The lie is here, and so is the evidence against it.
+
+     LAYOUT. A nave, deliberately too big for one person: you come in
+     through the arch in the south wall onto a crimson runner that runs
+     the whole length of the hall to a raised dais. Five columns a side.
+     Three windows of moonlight — a rose window over the dais and a lancet
+     either side — throw shafts down the hall; candelabras burn on the
+     dais corners. On the dais, TWO thrones. The second one is never
+     pointed at, but the dust in this room has one line of footprints in
+     it, and it leads to that throne, not to hers. The door she means is
+     in the east wall, between the columns, and it stays shut until she
+     has finished talking. */
   E.register('b1_throne', {
     tileset: 'castle',
     tiles: [
-      '######################',
-      '#....................#',
-      '#..||............||..#',
-      '#..||....____....||..#',
-      '#........____........#',
-      '#..||....____....||..#',
-      '#..||....____....||..#',
-      '#....................#',
-      '#........,,,,........#',
-      '#........,,,,........#',
-      '######################'
+      '#######################',
+      '#######################',
+      '#.....DDDDDDDDDDD.....#',
+      '#.|...DDDDDDDDDDD...|.#',
+      '#.....dddd___dddd.....#',
+      '#.|.......___.......|.#',
+      '#.........___.........#',
+      '#.|.......___.......|.#',
+      '#.........___.........#',
+      '#.|.......___.......|.#',
+      '#.........___.........#',
+      '#.|.......___.......|.#',
+      '#.........___.........#',
+      '#######################'
     ].join('\n'),
-    spawns: { south: { x: 10, y: 9, face: 'up' }, north: { x: 10, y: 2 } },
-    entities: [
-      { t: 'exit', x: 10, y: 10, to: 'a3_fork', spawn: 'castle' },
+    shafts: [[4, 90, 16, 0.32], [18, 90, 16, -0.32], [11, 110, 26, 0]],
+    shade: 0.55,
+    spawns: { south: { x: 11, y: 12, face: 'up' }, north: { x: 21, y: 8, face: 'left' } },
+    entities: castleLook(14).concat([
+      { t: 'exit', x: 11, y: 13, to: 'a3_fork', spawn: 'castle', style: 'arch' },
+      Q('throne', 9, 2),
       /* the second throne. never pointed at. */
-      { t: 'npc', x: 13, y: 3, colour: '#3A2140', look: 'throne',
+      { t: 'npc', x: 13, y: 2, colour: '#3A2140', look: 'throne', skin: 'throne2',
         lines: function (s) {
           return s.flagged('witch_met')
             ? ['the second throne has been sat in. she is not a good guest.',
@@ -255,9 +392,16 @@
       { t: 'npc', x: 9, y: 3, colour: '#C2405F', key: 'witch',
         lines: ['...'],
         run: function (c) { witchTalk(c); } },
-      { t: 'exit', x: 20, y: 4, to: 'b2_blocks', spawn: 'west', locked: 'witch_met' }
-    ].concat(D('banner', [4, 0, 8, 0, 13, 0, 17, 0], PURPLE), D('torch', [6, 0, 15, 0]),
-             D('vase', [1, 1, 20, 1, 1, 9, 20, 9])),
+      { t: 'exit', x: 22, y: 8, to: 'b2_blocks', spawn: 'west', locked: 'witch_met', style: 'door',
+        lines: ['a heavy door, and it is locked from her side.',
+                'she has not told you about it yet. go and be told.'] },
+      Q('candelabra', 6, 3, { solid: true }), Q('candelabra', 16, 3, { solid: true }),
+      Q('sconce', 7, 1), Q('sconce', 15, 1),
+      Q('armour', 1, 12, { solid: true }), Q('armour', 21, 12, { solid: true }),
+      Q('glow', 4, 5, { r: 50 }), Q('glow', 18, 5, { r: 50 }), Q('glow', 11, 7, { r: 64 }),
+      Q('glow', 11, 3, { r: 54, col: '#FFC873', g: 0.08 }), Q('glow', 11, 10, { r: 50, col: '#FFC873', g: 0.05 }),
+      Q('candles', 7, 12, { solid: true }), Q('candles', 15, 12, { solid: true, seed: 1 })
+    ]).concat(columns([2, 3, 2, 5, 2, 7, 2, 9, 2, 11, 20, 3, 20, 5, 20, 7, 20, 9, 20, 11])),
     onEnter: function (c) {
       if (c.flagged('witch_met')) return;
       say(c, ['the room is much too big for one person.']);
@@ -293,7 +437,15 @@
      never will be; every other room in the castle had one until this
      one taught the press and the reset. The answer is on the wall and
      the two wrong stones are not "the game is unfair", they are the
-     lesson that a wrong press costs nothing but your time. */
+     lesson that a wrong press costs nothing but your time.
+
+     LAYOUT. A dim scriptorium. The riddle is a carved relief across the
+     whole north wall (a bowl at one end, a fire at the other), and the
+     three loose stones stand in a row under it, each cut with its own
+     sign and named on a brass plate at its foot: FRIEND, ASH, PLEASE.
+     Two urns of ash flank the relief — the room's answer in plain sight
+     — and the floor medallion repeats it (a bowl in a flame). The lit
+     path runs straight from the west arch to the sealed east door. */
   var b2picked = '';
   function pickStone(c, word) {
     if (b2picked) return;   /* one press per attempt; r to try again */
@@ -318,25 +470,30 @@
   E.register('b2_blocks', {
     tileset: 'castle',
     tiles: [
-      '################',
-      '#..............#',
-      '#....######....#',
-      '#..............#',
-      '#.........,,,,,#',
-      '#..............#',
-      '#....######....#',
-      '#..............#',
-      '################'
+      '#####################',
+      '#####################',
+      '#...................#',
+      '#.|...............|.#',
+      '#...................#',
+      '#...................#',
+      '#,,,,,,,,,,,,,,,,,,,#',
+      '#...................#',
+      '#.|...............|.#',
+      '#...................#',
+      '#...................#',
+      '#####################'
     ].join('\n'),
-    spawns: { west: { x: 2, y: 4, face: 'right' } },
-    entities: [
-      { t: 'npc', x: 6, y: 4, colour: '#564B66', solid: true, stone: 'friend',
+    shafts: [[10, 60, 30, 0, '#D8C8FF']],
+    shade: 0.5,
+    spawns: { west: { x: 1, y: 6, face: 'right' }, east: { x: 19, y: 6, face: 'left' } },
+    entities: castleLook(12).concat([
+      { t: 'npc', x: 7, y: 4, colour: '#564B66', solid: true, stone: 'friend', skin: 'wordstone',
         run: function (c) { pickStone(c, 'friend'); } },
-      { t: 'npc', x: 8, y: 4, colour: '#564B66', solid: true, stone: 'ash',
+      { t: 'npc', x: 10, y: 4, colour: '#564B66', solid: true, stone: 'ash', skin: 'wordstone',
         run: function (c) { pickStone(c, 'ash'); } },
-      { t: 'npc', x: 10, y: 4, colour: '#564B66', solid: true, stone: 'please',
+      { t: 'npc', x: 13, y: 4, colour: '#564B66', solid: true, stone: 'please', skin: 'wordstone',
         run: function (c) { pickStone(c, 'please'); } },
-      { t: 'npc', x: 13, y: 2, colour: '#4A4560', look: 'inscription',
+      { t: 'npc', x: 10, y: 1, colour: '#4A4560', look: 'inscription', skin: 'riddle',
         lines: function (s) {
           return s.flagged('solved:b2_blocks')
             ? ['the riddle is answered. the ash went where it was paid to go.',
@@ -348,13 +505,20 @@
       /* A hint the player asked for by walking up to it. Signs only
          repeat what the room already showed them; the castle's rooms
          tell you the rules once and expect you to walk them again. */
-      { t: 'sign', x: 2, y: 2,
+      { t: 'sign', x: 3, y: 5, skin: 'lectern',
         lines: ['a wall of three loose stones, each with a word.',
                 'the bowl wants what the fire leaves.'] },
-      { t: 'exit', x: 15, y: 4, to: 'b3_braziers', spawn: 'west', locked: 'solved:b2_blocks' },
-      { t: 'exit', x: 0, y: 4, to: 'b1_throne', spawn: 'north' }
-    ].concat(D('banner', [5, 0, 10, 0], PURPLE), D('torch', [3, 0, 12, 0]),
-             D('vase', [1, 7, 14, 7, 14, 1])),
+      { t: 'exit', x: 20, y: 6, to: 'b3_braziers', spawn: 'west', locked: 'solved:b2_blocks', style: 'door',
+        lines: ['a door with no handle, set flush in the wall.',
+                'it is waiting for one of the three stones. read the wall.'] },
+      { t: 'exit', x: 0, y: 6, to: 'b1_throne', spawn: 'north', style: 'arch' },
+      Q('urn', 5, 2, { solid: true }), Q('urn', 15, 2, { solid: true }),
+      Q('candelabra', 4, 9, { solid: true }), Q('candelabra', 16, 9, { solid: true }),
+      Q('books', 1, 10, { solid: true }), Q('books', 19, 10, { solid: true }),
+      Q('sconce', 3, 1), Q('sconce', 17, 1),
+      Q('candles', 10, 10, { solid: true }), Q('rubble', 18, 4),
+      Q('glow', 10, 4, { r: 72, col: '#D8C8FF', g: 0.08 })
+    ]).concat(columns([2, 3, 18, 3, 2, 8, 18, 8])),
     onEnter: function (c) {
       b2picked = c.flagged('solved:b2_blocks') ? 'ash' : '';
       if (c.flagged('b2_seen')) return;
@@ -370,29 +534,43 @@
   /* ══ B3 — the braziers ═══════════════════════════════════════════
      Order matters. The order is shown once, on entry, and can be
      asked for again — hiding it behind a single unrepeatable viewing
-     is not difficulty, it is a memory test with no retry. */
+     is not difficulty, it is a memory test with no retry.
+
+     LAYOUT. A fire temple, dark until you light it: four bronze
+     braziers on round daises, numbered I to IV on the floor in front of
+     them (so "third, first, fourth, second" is read off the floor, not
+     counted), a mural of four flames above them, and the plaque on its
+     stand against the east wall. Below the walkway, an ember trench
+     runs the width of the room and catches a quarter of its length per
+     brazier held — the room shows you how far along you are. Get it
+     wrong and the trench goes cold with the braziers. */
   var B3_ORDER = [2, 0, 3, 1];
 
   E.register('b3_braziers', {
     tileset: 'castle',
     tiles: [
-      '##################',
-      '#................#',
-      '#................#',
-      '#..#..#..#..#....#',
-      '#................#',
-      '#..........,,,,,,#',
-      '#................#',
-      '#................#',
-      '##################'
+      '#######################',
+      '#######################',
+      '#.....................#',
+      '#.....................#',
+      '#.....................#',
+      '#.....................#',
+      '#,,,,,,,,,,,,,,,,,,,,,#',
+      '#.....................#',
+      '#..|...............|..#',
+      '#..LLLLLLLLLLLLLLLLL..#',
+      '#.....................#',
+      '#######################'
     ].join('\n'),
-    spawns: { west: { x: 1, y: 5, face: 'right' } },
-    entities: [
-      { t: 'brazier', x: 3, y: 4, n: 0, run: function (c) { light(c, 0); } },
-      { t: 'brazier', x: 6, y: 4, n: 1, run: function (c) { light(c, 1); } },
-      { t: 'brazier', x: 9, y: 4, n: 2, run: function (c) { light(c, 2); } },
-      { t: 'brazier', x: 12, y: 4, n: 3, run: function (c) { light(c, 3); } },
-      { t: 'npc', x: 15, y: 2, colour: '#4A4560', look: 'inscription',
+    /* dim until all four hold; the braziers are the room's real light */
+    shade: function (c) { return c && c.solved && c.solved('b3_braziers') ? 0.3 : 0.6; },
+    spawns: { west: { x: 1, y: 6, face: 'right' }, east: { x: 21, y: 6, face: 'left' } },
+    entities: castleLook(12).concat([
+      { t: 'brazier', x: 5, y: 4, n: 0, skin: 'brazier', lamp: 34, run: function (c) { light(c, 0); } },
+      { t: 'brazier', x: 9, y: 4, n: 1, skin: 'brazier', lamp: 34, run: function (c) { light(c, 1); } },
+      { t: 'brazier', x: 13, y: 4, n: 2, skin: 'brazier', lamp: 34, run: function (c) { light(c, 2); } },
+      { t: 'brazier', x: 17, y: 4, n: 3, skin: 'brazier', lamp: 34, run: function (c) { light(c, 3); } },
+      { t: 'npc', x: 21, y: 3, colour: '#4A4560', look: 'inscription', skin: 'plaque', lamp: 30,
         lines: function (s) {
           return s.flagged('solved:b3_braziers')
             ? ['a plaque. four notches, worn in a particular order.',
@@ -400,12 +578,17 @@
             : ['a plaque. four notches, worn in a particular order.',
                'third. first. fourth. second.'];
         } },
-      { t: 'sign', x: 2, y: 2,
+      { t: 'sign', x: 2, y: 4, skin: 'lectern',
         lines: ['four braziers and one order.',
                 'the plaque is on the east wall. read it before you touch the braziers.'] },
-      { t: 'exit', x: 17, y: 5, to: 'b4_ice', spawn: 'west', locked: 'solved:b3_braziers' },
-      { t: 'exit', x: 0, y: 5, to: 'b2_blocks', spawn: 'west' }
-    ].concat(D('banner', [4, 0, 8, 0, 13, 0], PURPLE), D('vase', [16, 1, 1, 7, 16, 7])),
+      { t: 'exit', x: 22, y: 6, to: 'b4_ice', spawn: 'west', locked: 'solved:b3_braziers', style: 'gate',
+        lines: ['an iron gate, cold to the touch.',
+                'it lifts when all four braziers hold. the plaque says in what order.'] },
+      { t: 'exit', x: 0, y: 6, to: 'b2_blocks', spawn: 'east', style: 'curtain' },
+      Q('sconce', 2, 1), Q('sconce', 20, 1),
+      Q('urn', 1, 10, { solid: true }), Q('urn', 21, 10, { solid: true }),
+      Q('rubble', 11, 10), Q('bones', 7, 10, { seed: 1 })
+    ]).concat(columns([3, 8, 19, 8])),
     onEnter: function (c) {
       b3seq = [];
       if (c.flagged('b3_seen')) return;
@@ -451,43 +634,59 @@
      by design; the whole room is about reading the lines the ice
      gives you.
 
-     Solvable in three slides, no brute force:
-       1. walk up to (1,2), step east onto (3,2) → slide east along the
-          top row, which dies on its last ice cell (11,2) → plate locks.
+     Solvable in three slides, no brute force (BFS-checked):
+       1. walk up to (4,3), step east onto (5,3) → slide east along the
+          top row, which dies on its last ice cell (13,3) → plate locks.
        2. step south: the ice underfoot commits you again → slide down
-          the east column, dying on (11,7) → plate locks.
-       3. step west → slide along the bottom row, dying on (3,7)
+          the east column, dying on (13,8) → plate locks.
+       3. step west → slide along the bottom row, dying on (5,8)
           → plate locks. The way opens.
      The puzzle is not "find the plates", it is "understand that the
      ice decides where you stop". The old version was a block-push
      with the block born on the ice; that read as a physics quirk and
-     was retired with the rest of the castle's blocks. */
+     was retired with the rest of the castle's blocks.
+
+     LAYOUT. A frozen cloister: the ring is the same shape it always
+     was, moved one cell in and down to sit under a two-row north wall
+     hung with icicles and two frosted windows. A knight frozen solid
+     stands on the pillar in the middle of the ring. Each plate is a
+     frost rune inside a pale ring painted where its slide dies, so the
+     three "destinations" are visible from the door. */
   E.register('b4_ice', {
     tileset: 'castle',
     tiles: [
-      '################',
-      '#..............#',
-      '#..iiiiiiiii...#',
-      '#..i.......i...#',
-      '#..i...#...i...#',
-      '#..i.......i,,,#',
-      '#..i.......i...#',
-      '#..iiiiiiiii...#',
-      '#..............#',
-      '################'
+      '####################',
+      '####################',
+      '#..................#',
+      '#....iiiiiiiii.....#',
+      '#....i.......i.....#',
+      '#....i...|...i.....#',
+      '#....i.......i,,,,,#',
+      '#....i.......i.....#',
+      '#....iiiiiiiii.....#',
+      '#..................#',
+      '#..................#',
+      '####################'
     ].join('\n'),
-    spawns: { west: { x: 1, y: 5, face: 'right' } },
-    entities: [
-      { t: 'plate', x: 11, y: 2, slideOnly: true },
-      { t: 'plate', x: 11, y: 7, slideOnly: true },
-      { t: 'plate', x: 3, y: 7, slideOnly: true },
-      { t: 'sign', x: 13, y: 2,
+    shafts: [[3, 80, 14, 0.25, '#CFE8FF'], [16, 80, 14, -0.25, '#CFE8FF']],
+    shade: 0.35,
+    spawns: { west: { x: 1, y: 6, face: 'right' }, east: { x: 18, y: 6, face: 'left' } },
+    entities: castleLook(12).concat([
+      { t: 'plate', x: 13, y: 3, slideOnly: true, skin: 'iceplate' },
+      { t: 'plate', x: 13, y: 8, slideOnly: true, skin: 'iceplate' },
+      { t: 'plate', x: 5, y: 8, slideOnly: true, skin: 'iceplate' },
+      { t: 'sign', x: 16, y: 3, skin: 'lectern',
         lines: ['step onto the ice and you will not stop until it runs out.',
                 'let it carry you onto the plates. three slides.'] },
-      { t: 'exit', x: 14, y: 5, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice' },
-      { t: 'exit', x: 0, y: 5, to: 'b3_braziers', spawn: 'west' }
-    ].concat(D('banner', [5, 0, 10, 0], PURPLE), D('torch', [2, 0, 13, 0]),
-             D('vase', [1, 1, 1, 8, 14, 8])),
+      { t: 'exit', x: 19, y: 6, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice', style: 'door',
+        lines: ['the door is frozen into its frame.',
+                'three plates on the ice. it opens when a slide has landed on each one.'] },
+      { t: 'exit', x: 0, y: 6, to: 'b3_braziers', spawn: 'east', style: 'arch' },
+      Q('statue', 9, 5, { frozen: true }),
+      Q('glow', 3, 4, { r: 46, col: '#BFE0FF' }), Q('glow', 16, 4, { r: 46, col: '#BFE0FF' }),
+      Q('sconce', 9, 1), Q('armour', 1, 2, { solid: true }), Q('armour', 18, 10, { solid: true }),
+      Q('rubble', 2, 10)
+    ]),
     onEnter: function (c) {
       if (c.flagged('b4_seen')) return;
       c.flag('b4_seen', 1);
@@ -521,7 +720,15 @@
      it is nonsense, which is why it works: the castle locks its own
      doors for fun. The old version used a push block; the block is
      gone with the rest of them, and the mirror carries the whole
-     room now. */
+     room now.
+
+     LAYOUT. A gallery of mirrors. The big gilt one hangs in the middle
+     of the north wall; four smaller ones either side are dull and two
+     are cracked. The plates sit symmetrically at (5,5) and (15,5) in
+     brass settings. When the mirror looks at a plate, a dotted beam
+     runs from its glass to that plate and the plate's eye lights; stand
+     on the OTHER plate and your reflection appears on the held one —
+     the rule, drawn. */
   var b5face = 0;   /* 0 = turned away, 1 = looks at the east plate, 2 = looks at the west plate */
   function mirrorTurn(c) {
     if (c.solved('b5_two')) { c.say(['the mirror is done with you. it looks at the wall now.'], 'narr'); return; }
@@ -534,28 +741,41 @@
   E.register('b5_two', {
     tileset: 'castle',
     tiles: [
-      '##################',
-      '#.....MMMM.......#',
-      '#................#',
-      '#................#',
-      '#....P......P....#',
-      '#..........,,,,,,#',
-      '#................#',
-      '##################'
+      '#####################',
+      '#####################',
+      '#...................#',
+      '#..|.............|..#',
+      '#...................#',
+      '#....P.........P....#',
+      '#...................#',
+      '#...................#',
+      '#,,,,,,,,,,,,,,,,,,,#',
+      '#...................#',
+      '#...................#',
+      '#####################'
     ].join('\n'),
-    spawns: { west: { x: 1, y: 5, face: 'right' } },
-    entities: [
-      { t: 'plate', x: 5, y: 4, id: 'L' },
-      { t: 'plate', x: 12, y: 4, id: 'R' },
-      { t: 'npc', x: 7, y: 1, colour: '#8A8598', mirror: true,
+    shafts: [[10, 70, 20, 0, '#DCE8FF']],
+    shade: 0.42,
+    /* look-castle.js reads where the mirror is looking (beam, glints) */
+    mirrorFace: function () { return b5face; },
+    spawns: { west: { x: 1, y: 8, face: 'right' }, east: { x: 19, y: 8, face: 'left' } },
+    entities: castleLook(12).concat([
+      { t: 'plate', x: 5, y: 5, id: 'L', skin: 'mirrorplate' },
+      { t: 'plate', x: 15, y: 5, id: 'R', skin: 'mirrorplate' },
+      { t: 'npc', x: 10, y: 1, colour: '#8A8598', mirror: true, skin: 'mirror',
         run: function (c) { mirrorTurn(c); } },
-      { t: 'sign', x: 9, y: 1,
+      { t: 'sign', x: 12, y: 3, skin: 'lectern',
         lines: ['the mirror holds whatever it looks at.',
                 'stand where it looks.'] },
-      { t: 'exit', x: 17, y: 5, to: 'b6_dark', spawn: 'west', locked: 'solved:b5_two' },
-      { t: 'exit', x: 0, y: 5, to: 'b4_ice', spawn: 'west' }
-    ].concat(D('banner', [2, 0, 13, 0, 16, 0], PURPLE), D('torch', [11, 0]),
-             D('vase', [1, 1, 16, 1, 2, 6, 16, 6])),
+      { t: 'exit', x: 20, y: 8, to: 'b6_dark', spawn: 'west', locked: 'solved:b5_two', style: 'door',
+        lines: ['the door has a plate on each side of the room and one of you.',
+                'the mirror on the north wall is the other one. press e on it.'] },
+      { t: 'exit', x: 0, y: 8, to: 'b4_ice', spawn: 'east', style: 'curtain' },
+      Q('candelabra', 7, 3, { solid: true }), Q('candelabra', 13, 3, { solid: true }),
+      Q('sconce', 1, 1), Q('sconce', 19, 1),
+      Q('armour', 1, 10, { solid: true }), Q('armour', 19, 10, { solid: true }),
+      Q('candles', 10, 10, { solid: true })
+    ]).concat(columns([3, 3, 17, 3])),
     /* One plate under the mirror's gaze, and you standing where it
        looks. The mirror turns with e; the room counts what it looks
        at as held. */
@@ -563,7 +783,7 @@
       if (!b5face) return false;
       var p = c.player;
       var cx = Math.floor(p.x / 16), cy = Math.floor((p.y - 1) / 16);
-      var onL = (cx === 5 && cy === 4), onR = (cx === 12 && cy === 4);
+      var onL = (cx === 5 && cy === 5), onR = (cx === 15 && cy === 5);
       return (b5face === 1 && onR) || (b5face === 2 && onL);
     },
     onEnter: function (c) {
@@ -591,9 +811,16 @@
      torch is seated. While you carry the torch the light follows you
      through the room (the engine's `light` hook) — the dark stops
      being a wall the moment the light comes with you, which is the
-     whole lesson. Take it at (2,5), put it in the socket at (10,5),
-     and the lights come back. The four blind alcoves are untouched —
-     they are the shape you are meant to remember. */
+     whole lesson. Take it at (2,6), put it in the cresset at (10,6),
+     and the lights come back. The six blind alcoves are untouched —
+     they are the shape you are meant to remember.
+
+     LAYOUT. A crypt: the alcoves are sealed niches, a sarcophagus in
+     each, cobwebs in every corner, bones where the dark was kindest.
+     The torch hangs in a bracket by the west door (solid, so it can be
+     found by touch); the cresset stands on scorched stone in the very
+     middle of the cross-corridor. Lit, the room is a different place:
+     you see for the first time what you walked past. */
   var b6carry = false, b6lit = false;
   function takeTorch(c) {
     if (b6carry) { c.say(['you already have it.'], 'narr'); return; }
@@ -619,26 +846,35 @@
     tileset: 'castle',
     tiles: [
       '####################',
+      '####################',
       '#..................#',
       '#.####.######.####.#',
       '#.#..#.#....#.#..#.#',
       '#.#..#.#....#.#..#.#',
       '#................,,#',
       '#.#..#.#....#.#..#.#',
+      '#.#..#.#....#.#..#.#',
       '#.####.######.####.#',
       '#..................#',
       '####################'
     ].join('\n'),
-    spawns: { west: { x: 1, y: 5, face: 'right' } },
-    entities: [
-      { t: 'npc', x: 2, y: 5, colour: '#E4A64A', solid: true, torch: true,
+    spawns: { west: { x: 1, y: 6, face: 'right' }, east: { x: 18, y: 6, face: 'left' },
+              default: { x: 1, y: 6, face: 'right' } },
+    entities: castleLook(12).concat([
+      { t: 'npc', x: 2, y: 6, colour: '#E4A64A', solid: true, torch: true, skin: 'walltorch',
         run: function (c) { takeTorch(c); } },
-      { t: 'npc', x: 10, y: 5, colour: '#5A5470', socket: true,
+      { t: 'npc', x: 10, y: 6, colour: '#5A5470', socket: true, skin: 'cresset',
         run: function (c) { placeTorch(c); } },
-      { t: 'exit', x: 19, y: 5, to: 'b7_altar', spawn: 'north', locked: 'solved:b6_dark' },
-      { t: 'exit', x: 0, y: 5, to: 'b5_two', spawn: 'west' }
-    /* no wall torches here: the dark is the puzzle */
-    ].concat(D('banner', [3, 0, 9, 0, 16, 0], PURPLE), D('vase', [1, 1, 18, 1, 1, 8, 18, 8])),
+      { t: 'exit', x: 19, y: 6, to: 'b7_altar', spawn: 'west', locked: 'solved:b6_dark', style: 'gate',
+        lines: ['an iron gate. there is no light on the other side of it either.',
+                'it will not lift for somebody standing in the dark.'] },
+      { t: 'exit', x: 0, y: 6, to: 'b5_two', spawn: 'east', style: 'arch' },
+      /* no wall torches here: the dark is the puzzle */
+      Q('bones', 6, 2), Q('bones', 13, 10, { seed: 1 }), Q('rubble', 18, 2), Q('bones', 1, 10),
+      /* nothing solid in the corridors: they are one cell wide and the
+         dark is enough of an obstacle */
+      Q('candles', 6, 10, { lightIf: 'solved:b6_dark' }), Q('rubble', 1, 2)
+    ]),
     onEnter: function (c) {
       b6carry = false;
       b6lit = !!c.flagged('solved:b6_dark');
@@ -657,43 +893,72 @@
   /* ══ B7 — the altar ══════════════════════════════════════════════
      Reachable from the fork long before it is useful. Going out of
      your way early and being told "not yet, and here is exactly what
-     it wants" is how a player builds a mental map. */
+     it wants" is how a player builds a mental map.
+
+     LAYOUT. A cross-shaped chapel with a door in every wall, so the room
+     is a hub you can read: east, the overgrown arch back to the fork
+     (roots have come in through the wall after you); north, the stairs
+     down to the hall at the back (barred until the dark room is lit);
+     west, the gate from the dark room (barred from that side too);
+     south, nothing — until the ashes go in and the fire door opens in
+     the south wall. The altar stands on its plinth in the middle of an
+     old ash circle, ringed with candles; the lit path is a cross through
+     it. Show the doors you did not earn: all four are visible from the
+     moment you walk in. The second mushroom grows out of a crack in the
+     south-east corner, in plain sight, out of reach of anything you
+     have yet. */
   E.register('b7_altar', {
     tileset: 'castle',
     tiles: [
-      '################',
-      '#..............#',
-      '#....######....#',
-      '#....#....#....#',
-      '#....#.AA.#....#',
-      '#,,,,..AA.,,,,,#',
-      '#....#....#....#',
-      '#....######....#',
-      '#..............#',
-      '################'
+      '#######################',
+      '#######################',
+      '#.........,,,.........#',
+      '#..|......,,,......|..#',
+      '#.........,,,.........#',
+      '#.....................#',
+      '#,,,,,,,,.AAA.,,,,,,,,#',
+      '#.........AAA.........#',
+      '#.....................#',
+      '#..|......,,,......|..#',
+      '#.........,,,.........#',
+      '#.........,,,.........#',
+      '#######################'
     ].join('\n'),
-    spawns: { east: { x: 14, y: 5, face: 'left' }, north: { x: 1, y: 5, face: 'right' } },
-    entities: [
-      { t: 'save', x: 3, y: 2 },
-      { t: 'altar', x: 8, y: 4, needs: 'ashes', gives: 'firedoor',
+    shafts: [[2, 70, 12, 0.3, '#CFE0FF'], [20, 70, 12, -0.3, '#CFE0FF']],
+    shade: 0.55,
+    spawns: { east: { x: 21, y: 6, face: 'left' }, north: { x: 11, y: 2, face: 'down' },
+              west: { x: 1, y: 6, face: 'right' } },
+    entities: castleLook(13).concat([
+      { t: 'save', x: 4, y: 10 },
+      { t: 'altar', x: 11, y: 7, needs: 'ashes', gives: 'firedoor', skin: 'altar',
         empty: ['a stone bowl on a stone plinth.',
                 'there is a ring of ash in it that has been there long enough to be part of the stone.',
                 'it wants more. it is fairly clear about that.'],
         lines: ['you tip the ashes in.',
                 'the bowl takes them without a sound, which is worse than a sound.',
                 'a door opens in the south wall. it is on fire. it does not seem bothered.'] },
-      { t: 'npc', x: 12, y: 3, colour: '#C4705F', mush: 'mush2', sheet: 'mushroom',
+      { t: 'npc', x: 19, y: 10, colour: '#C4705F', mush: 'mush2', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush2'); } },
-      { t: 'exit', x: 15, y: 5, to: 'a3_fork', spawn: 'altar' },
-      { t: 'exit', x: 0, y: 5, to: 'b8_arena', spawn: 'west', locked: 'solved:b6_dark' },
+      { t: 'exit', x: 22, y: 6, to: 'a3_fork', spawn: 'altar', style: 'arch' },
+      { t: 'exit', x: 11, y: 1, to: 'b8_arena', spawn: 'west', locked: 'solved:b6_dark', style: 'stairs',
+        lines: ['stairs going down, and something at the bottom of them with a heartbeat.',
+                'a grate is down across them. it lifts when the dark room is lit.'] },
+      { t: 'exit', x: 0, y: 6, to: 'b6_dark', spawn: 'east', locked: 'solved:b6_dark', style: 'door',
+        lines: ['a door, barred from the other side.',
+                'whatever is through there, you will come at it the long way first.'] },
       /* The fire door. It does not exist until the ashes go in, and it
-         is drawn burning so it cannot be mistaken for the other two
-         exits in a room that already has two exits. */
-      { t: 'exit', x: 8, y: 8, to: 'd1_street', spawn: 'fire', locked: 'firedoor',
-        sheet: 'firedoor',
-        lines: ['the east wall is a wall.'] }
-    ].concat(D('banner', [4, 0, 11, 0], PURPLE), D('torch', [2, 0, 13, 0, 5, 2, 10, 2]),
-             D('vase', [1, 1, 14, 1, 1, 8, 14, 8]))
+         is drawn burning so it cannot be mistaken for the other
+         exits in a room that already has three. */
+      { t: 'exit', x: 11, y: 12, to: 'd1_street', spawn: 'fire', locked: 'firedoor',
+        sheet: 'firedoor', style: 'portal',
+        lines: ['the south wall is a wall.'] },
+      Q('candles', 9, 5, { solid: true }), Q('candles', 13, 5, { solid: true, seed: 1 }),
+      Q('candles', 9, 8, { solid: true, seed: 1 }), Q('candles', 13, 8, { solid: true }),
+      Q('candelabra', 6, 4, { solid: true }), Q('candelabra', 16, 4, { solid: true }),
+      Q('sconce', 8, 1), Q('sconce', 14, 1),
+      Q('glow', 2, 4, { r: 40, col: '#BFD3FF' }), Q('glow', 20, 4, { r: 40, col: '#BFD3FF' }),
+      Q('bones', 17, 11), Q('urn', 1, 2, { solid: true }), Q('urn', 21, 2, { solid: true })
+    ]).concat(columns([3, 3, 19, 3, 3, 9, 19, 9]))
   });
 
   /* ══ B8 — the door at the back ═══════════════════════════════════
