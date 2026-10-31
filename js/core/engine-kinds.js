@@ -83,8 +83,29 @@
   function unlocked(e) { return !e.locked || !!(NEU.save && NEU.save.flagged(e.locked)); }
 
   /* ── exit ─────────────────────────────────────────────────────────── */
+  /* Exits are entered by WALKING into them (engine.js walkExits); Z / E
+     still fires one, and `walk: false` makes an exit press-only again
+     (it then keeps its "press z" cap, which a walk-in exit does not).
+
+     ART HOOK — js/core/engine-doors.js may define window.NEU.engineDoors:
+       NEU.engineDoors.draw(g, e, d)  -> true if it drew the door (the
+                                         fallback below is then skipped)
+       NEU.engineDoors.light(e, d)    -> a light {r,col,glow,a}, null for
+                                         none, or undefined to fall back
+     For an exit, `d` carries the usual S, sx, sy (screen px of the cell's
+     bottom-centre), now, api, entHere, plus:
+       d.open     bool   unlocked (no `locked` flag, or the flag is set)
+       d.side     'n'|'s'|'e'|'w'  side of the cell facing walkable floor
+                         (also NEU.engine.exitSide(e))
+       d.near     0..1   1 when the player touches it, 0 beyond ~3 tiles
+       d.tileset  string room tileset name
+       d.room     string room id   (exits only: other kinds get the room)
+       d.T        16     tile size in world units
+     e is the entity: e.x, e.y (cell), e.to, e.label, e.sheet, e.locked,
+     e.glowOpen, e.walk. light() always gets d. */
   kind('exit', {
     interactive: function () { return true; },
+    noPrompt: function (e) { return e.walk !== false; },
     fire: function (e, sys) {
       /* A locked door says what it is waiting for. "Nothing happens"
          is the least useful sentence a game can produce. */
@@ -102,6 +123,8 @@
        shut" can be read at a glance. */
     drawn: function (e) { return true; },
     draw: function (g, e, d) {
+      var DR = NEU.engineDoors;
+      if (DR && DR.draw && DR.draw(g, e, d)) return;
       if (e.sheet) { drawSheet(g, e, d); return; }
       var S = d.S, x = d.sx, y = d.sy - 14 * S;
       if (e.label) plate(g, e.label, d.sx, d.sy - 24 * S, d.S, unlocked(e));
@@ -117,7 +140,9 @@
       g.fillStyle = '#120F18'; g.fillRect(x, y + S, S, S);
     },
     width: function (e, S) { return e.sheet ? sheetWidth(e, S) : 0; },
-    light: function (e) {
+    light: function (e, d) {
+      var DR = NEU.engineDoors;
+      if (DR && DR.light && d) { var r = DR.light(e, d); if (r !== undefined) return r; }
       if (e.sheet === 'firedoor') return { r: 70, col: '#FF8A3A', glow: 0.22 };
       /* A door that carries `glowOpen` glows in that colour once its lock
          is satisfied: the prize corridor's doors you earned, in the gold
@@ -374,6 +399,7 @@
      through tryPush; a plate is floor paint and never is. */
   function promptable(e) {
     var k = get(e);
+    if (k.noPrompt && k.noPrompt(e)) return false;
     return interactive(e) || !!(k.promptable && k.promptable(e));
   }
   function fire(e, sys) { var k = get(e); if (k.fire) k.fire(e, sys); else if (hasRun(e)) e.run(sys.api); }

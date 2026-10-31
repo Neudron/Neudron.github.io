@@ -364,6 +364,103 @@
     return best;
   }
 
+  /* ── exits: walk into them ────────────────────────────────────────
+     An exit is entered by WALKING into it. Three cases, one test:
+       - the exit cell is floor: the feet box has to be well inside it;
+       - the exit cell is a wall / door-frame / undergrowth tile: the feet
+         box is pressed against it while the input points into it;
+       - either way the input is whatever `keys` holds, which is also what
+         the touch stick feeds (touch.js dispatches arrow keydowns).
+     Landing never bounces you back: every entity is a fresh copy on land,
+     and an exit is ARMED only after the player has been out of contact
+     with it once (e.__arm). Z / E on an exit still fires it, and an exit
+     flagged `walk: false` is press-only (the old behaviour). */
+  function ov(a0, a1, b0, b1) { return Math.min(a1, b1) - Math.max(a0, b0); }
+
+  function exitTouch(e, ix, iy) {
+    var x0 = e.x * TILE, y0 = e.y * TILE, x1 = x0 + TILE, y1 = y0 + TILE;
+    var bx0 = px - PLAYER_W / 2, bx1 = px + PLAYER_W / 2, by0 = py - PLAYER_H, by1 = py;
+    var ox = ov(bx0, bx1, x0, x1), oy = ov(by0, by1, y0, y1);
+    if (ox >= 5 && oy >= 4) return true;                       // standing in it
+    if (ix && oy >= 3) {                                        // pressing sideways into it
+      var ox2 = ov(bx0 + ix * 2, bx1 + ix * 2, x0, x1);
+      if (ox2 > Math.max(ox, 0.5)) return true;
+    }
+    if (iy && ox >= 3) {                                        // pressing up / down into it
+      var oy2 = ov(by0 + iy * 2, by1 + iy * 2, y0, y1);
+      if (oy2 > Math.max(oy, 0.5)) return true;
+    }
+    return false;
+  }
+
+  /* 0..1: 1 when the feet box touches the cell, 0 beyond ~3 tiles. */
+  function exitNear(e) {
+    var x0 = e.x * TILE, y0 = e.y * TILE;
+    var gx = Math.max(0, x0 - (px + PLAYER_W / 2), (px - PLAYER_W / 2) - (x0 + TILE));
+    var gy = Math.max(0, y0 - py, (py - PLAYER_H) - (y0 + TILE));
+    var g = Math.sqrt(gx * gx + gy * gy);
+    return Math.max(0, Math.min(1, 1 - g / (3 * TILE)));
+  }
+
+  /* 'n' | 's' | 'e' | 'w': the side of the exit cell that faces walkable
+     floor. When several do, the one pointing most toward the room's
+     interior; when none does, toward the interior anyway. */
+  function exitSide(e) {
+    if (!room) return 's';
+    var D = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
+    var ccx = room.w / 2 - 0.5, ccy = room.h / 2 - 0.5;
+    var vx_ = ccx - e.x, vy_ = ccy - e.y, best = null, bs = -Infinity, any = null, as = -Infinity;
+    for (var k in D) {
+      var nx = e.x + D[k][0], ny = e.y + D[k][1];
+      var score = D[k][0] * vx_ + D[k][1] * vy_;
+      if (score > as) { as = score; any = k; }
+      if (nx < 0 || ny < 0 || ny >= room.h || nx >= room.grid[ny].length) continue;
+      if (solidAt(nx, ny)) continue;
+      if (score > bs) { bs = score; best = k; }
+    }
+    return best || any;
+  }
+
+  /* The context the door art gets (see engine-kinds.js, kind 'exit'). */
+  function doorCtx(d, e) {
+    d.open = !e.locked || !!(NEU.save && NEU.save.flagged(e.locked));
+    d.side = exitSide(e);
+    d.near = exitNear(e);
+    d.tileset = room.tileset;
+    d.room = room.id;                 /* exits see the id; every other kind the room */
+    d.T = TILE;
+    return d;
+  }
+
+  function walkExits() {
+    if (!room || busy || fadeDir || slideD || NEU.activeMinigame) return;
+    if (NEU.tboxOpen && NEU.tboxOpen()) return;
+    var ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    var iy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+    var hit = null;
+    for (var i = 0; i < ents.length; i++) {
+      var e = ents[i];
+      if (e.t !== 'exit' || e.dead || e.walk === false) continue;
+      if (!exitTouch(e, ix, iy)) { e.__arm = true; continue; }
+      if (!e.__arm || hit) continue;
+      hit = e;
+    }
+    if (!hit) return;
+    hit.__arm = false;                 /* once per approach */
+    var open = !hit.locked || !!(NEU.save && NEU.save.flagged(hit.locked));
+    if (open) {
+      if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+      fire(hit);
+      return;
+    }
+    /* Locked: it talks when bumped if it is a wall / frame tile or a
+       labelled door. A locked THING on open floor (the fire door, the
+       painted door) stays press-only, or it would nag every time you
+       crossed its cell. */
+    var solid = solidAt(hit.x, hit.y);
+    if (solid || hit.label) fire(hit);
+  }
+
   /* Rapid e on the same entity inside the cooldown is one press. */
   var lastInteractedEntity = null, lastInteractedTime = 0;
 
@@ -580,7 +677,7 @@
     if ((padPoll -= dt) <= 0) { padPoll = 0.5; var ph = measurePad(); if (ph !== padH) padH = ph; }
     if (!room) return;
 
-    if (!busy) move(dt); else { vx = 0; vy = 0; moving = false; }
+    if (!busy) { move(dt); walkExits(); } else { vx = 0; vy = 0; moving = false; }
     camFollow(dt);
     var decay = Math.exp(-14 * dt);
     kickX *= decay; kickY *= decay;
@@ -693,6 +790,7 @@
       var e = ents[i];
       if (e.dead) continue;
       var k = K ? K.get(e) : null;
+      if (e.t === 'exit') doorCtx(d, e); else d.room = room;
       var li = k && k.light ? k.light(e, d) : null;
       if (!li) continue;
       var p = entAt(e);
@@ -778,6 +876,7 @@
         continue;
       }
       var pp = entAt(dr.e); d.sx = sx(pp.x); d.sy = sy(pp.y);
+      if (dr.e.t === 'exit') doorCtx(d, dr.e);
       if (dr.k && dr.k.draw) dr.k.draw(ctx, dr.e, d);
       else { ctx.fillStyle = dr.e.colour || '#B892FF'; ctx.fillRect(d.sx - 3 * S, d.sy - 6 * S, 6 * S, 6 * S); }
     }
@@ -1063,6 +1162,7 @@
                lights: (room && look()) ? lightsFor(0, camX, camY, view()).list.length : 0,
                view: view(), timers: timers.length };
     },
-    nearest: function () { return nearest(promptable); }
+    nearest: function () { return nearest(promptable); },
+    exitSide: function (e) { return exitSide(e); }
   };
 })();
