@@ -974,10 +974,12 @@
        (10,7), so the room says where to go without a word. The old
        trigger once sat sealed inside its own frame (reach.mjs
        untouchable); everything here is reachable and nothing blocks the
-       path. */
+       path. 2026-11: a two-row north wall like every other castle room
+       (the wall's face carries her sigil, the banners and the plaques),
+       and the whole floor is one baked `scalfloor v:'hall'`. */
     tiles: [
       '#####################',
-      '#...................#',
+      '#####################',
       '#..|.............|..#',
       '#...................#',
       '#...................#',
@@ -992,8 +994,11 @@
     ].join('\n'),
     spawns: { west: { x: 1, y: 7, face: 'right' } },
     entities: [
+      /* the hall itself — floor, walls, sigil, gutters — FIRST: floor
+         decals draw in list order, and everything else sits on it */
+      { t: 'scalfloor', v: 'hall', x: 0, y: 0 },
       { t: 'save', x: 2, y: 9 },
-      /* floor paint first: the hex circle and the bloodstone cracks */
+      /* floor paint: the hex circle and the bloodstone cracks */
       { t: 'scalfloor', v: 'circle', x: 10, y: 6 },
       { t: 'scalfloor', v: 'cracks', x: 6, y: 10 },
       { t: 'scalfloor', v: 'cracks', x: 15, y: 6 },
@@ -1019,26 +1024,36 @@
       { t: 'scalprop', v: 'brazier', x: 14, y: 2, solid: true },
       { t: 'scalprop', v: 'brazier', x: 5, y: 11, solid: true },
       { t: 'scalprop', v: 'brazier', x: 15, y: 11, solid: true },
-      { t: 'scalprop', v: 'chain', x: 8, y: 1, len: 30 },
-      { t: 'scalprop', v: 'chain', x: 12, y: 1, len: 38 },
-      { t: 'scalprop', v: 'chain', x: 1, y: 1, len: 22 },
-      { t: 'scalprop', v: 'chain', x: 19, y: 1, len: 26 },
+      { t: 'scalprop', v: 'sconce', x: 2, y: 1 },
+      { t: 'scalprop', v: 'sconce', x: 18, y: 1 },
+      /* chains from the vault (they hang from world y 0; `y` is only
+         where they sort), one with a gibbet that still has someone in it */
+      { t: 'scalprop', v: 'chain', x: 8, y: 2, len: 44 },
+      { t: 'scalprop', v: 'chain', x: 12, y: 3, len: 38, cage: true },
+      { t: 'scalprop', v: 'chain', x: 1, y: 1, len: 24 },
+      { t: 'scalprop', v: 'chain', x: 19, y: 1, len: 28 },
       { t: 'scalprop', v: 'skulls', x: 1, y: 11 },
-      { t: 'scalprop', v: 'skulls', x: 19, y: 11 },
+      { t: 'scalprop', v: 'skulls', x: 19, y: 11, candle: true },
       { t: 'scalprop', v: 'skulls', x: 19, y: 5 },
-      { t: 'scalprop', v: 'skulls', x: 9, y: 11 },
+      { t: 'scalprop', v: 'skulls', x: 9, y: 11, candle: true },
       { t: 'scalprop', v: 'skulls', x: 2, y: 3 },
-      /* the lore, on the north wall either side of the altar */
-      { t: 'npc', x: 7, y: 0, look: 'inscription', who: 'narr',
-        lines: ['a brass plaque, warm to the touch.',
-                '"here the witch was bound, and here she was not."',
-                '"do not light the circle. she does not need the help."'] },
-      { t: 'npc', x: 13, y: 0, look: 'inscription', who: 'narr',
-        lines: ['someone has scratched under the plaque with a knife.',
-                '"everyone who came down here was the strongest person they knew."',
-                'there are a lot of skulls in this room.'] },
-      { t: 'exit', x: 0, y: 7, to: 'b7_altar', spawn: 'north' }
-    ].concat(D('banner', [4, 0, 10, 0, 16, 0], { colour: '#7A2A3A' }), D('torch', [2, 0, 18, 0])),
+      /* the lore, on the north wall either side of her sigil (the brass
+         is painted into the wall; these are what you press E at) */
+      { t: 'scalprop', v: 'plaque', x: 7, y: 1,
+        run: function (c) {
+          say(c, ['a brass plaque, warm to the touch.',
+                  '"here the witch was bound, and here she was not."',
+                  '"do not light the circle. she does not need the help."']);
+        } },
+      { t: 'scalprop', v: 'plaque', x: 13, y: 1,
+        run: function (c) {
+          say(c, ['someone has scratched under the plaque with a knife.',
+                  '"everyone who came down here was the strongest person they knew."',
+                  'there are a lot of skulls in this room.']);
+        } },
+      /* back up the stairs you came down, lit from the hall's own fire */
+      { t: 'exit', x: 0, y: 7, to: 'b7_altar', spawn: 'north', style: 'stairs', dir: 'up', tint: '#FF6A3A' }
+    ],
     /* the hall is lit by its own fire; the summoning puts that out too */
     dark: function () { return NEU.summon ? NEU.summon.dark() : 0; },
     light: function () { return NEU.summon ? NEU.summon.light() : null; },
