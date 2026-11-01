@@ -62,7 +62,8 @@
 
   function L() { return NEU.engineLook; }
   function save() { return NEU.save; }
-  function dead() { return !!(save() && save().flagged('scal_dead')); }
+  var forceDead = null;   /* tests only */
+  function dead() { return forceDead !== null ? forceDead : !!(save() && save().flagged('scal_dead')); }
   function seen() { return !!(save() && save().flagged('scal_summon_seen')); }
   function J() { return NEU.juice || {}; }
   function noShake() { var j = J(); return !NEU.juice || !!j.reduced || !!j.noShake; }
@@ -88,14 +89,16 @@
   }
 
   /* ── colour ─────────────────────────────────────────────────────── */
-  function hex(c) { return [parseInt(c.substr(1, 2), 16), parseInt(c.substr(3, 2), 16), parseInt(c.substr(5, 2), 16)]; }
+  var HEXC = {}, H2 = [];
+  for (var hi = 0; hi < 256; hi++) H2.push((hi < 16 ? '0' : '') + hi.toString(16));
+  function hex(c) {
+    return HEXC[c] || (HEXC[c] = [parseInt(c.substr(1, 2), 16), parseInt(c.substr(3, 2), 16), parseInt(c.substr(5, 2), 16)]);
+  }
   function mix(a, b, k) {
-    var A = hex(a), B = hex(b), out = '#';
-    for (var i = 0; i < 3; i++) {
-      var v = Math.round(A[i] + (B[i] - A[i]) * clamp(k)).toString(16);
-      out += v.length < 2 ? '0' + v : v;
-    }
-    return out;
+    var A = hex(a), B = hex(b);
+    k = clamp(k);
+    return '#' + H2[Math.round(A[0] + (B[0] - A[0]) * k)] + H2[Math.round(A[1] + (B[1] - A[1]) * k)] +
+                 H2[Math.round(A[2] + (B[2] - A[2]) * k)];
   }
   /* a slow pulse, ~1 Hz at full dread: a heartbeat, never a strobe */
   function pulse(now, rate) { return still() ? 0.5 : 0.5 + 0.5 * Math.sin(now / 1000 * Math.PI * 2 * (rate || 0.6)); }
@@ -133,18 +136,121 @@
     return { x: d.sx - (e.x + 0.5) * TILE * d.S, y: d.sy - (e.y + 1) * TILE * d.S };
   }
 
+  /* ── baked layers ───────────────────────────────────────────────────
+     PERF. Everything in this room's STATIC paint (the circle, the
+     cracks, the altar's stone, the columns, the brazier stands) used to
+     be re-issued every frame as procedural fillRects: ~3300 draw calls a
+     frame in total, 1700 of them for the circle alone. Each piece is now
+     painted ONCE into a small canvas at 1 canvas px per world px (no
+     scale in the key, so a resize or a new S costs nothing) and blitted
+     with nearest-neighbour scaling, which lands on exactly the pixels
+     the fillRects did.
+
+     HOW TO ADD STATIC PAINT (art agents: start here):
+       1. write a painter  function (g, ox, oy, S, col)  using the P /
+          ellipse / line helpers or plain fillRect on  ox + x*S ;
+       2. bake it:   var b = bake('my:key', x0, y0, w, h, painter);
+          x0,y0,w,h is its box in WORLD px (or entity-relative px for
+          props); `bake` runs the painter once with S = 1;
+       3. in the draw function:  blit(g, b, originX, originY, S);
+          a layer that must change colour: paint it white and use
+          tinted(b, colour)  (re-tints only when the colour changes).
+     Anything that MOVES or whose shape changes every frame (flames,
+     chains, the eruption, embers) stays immediate-mode. If a canvas is
+     unavailable bake() returns a layer with no bitmap and blit()
+     paints the same thing immediately, so nothing depends on it.
+     `NEU.summon._slow = true` forces the immediate path (A/B checks). */
+  var bakes = {}, slow = false;
+  function mkc(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function bake(key, x0, y0, w, h, paint) {
+    var b = bakes[key];
+    if (b) return b;
+    b = bakes[key] = { cv: null, tin: null, col: null, x0: x0, y0: y0, w: w, h: h, paint: paint };
+    try {
+      var c = mkc(w, h), x = c.getContext && c.getContext('2d');
+      if (x && x.drawImage) { paint(x, -x0, -y0, 1, '#FFFFFF'); b.cv = c; }
+    } catch (err) { b.cv = null; }
+    return b;
+  }
+  /* at (ox, oy) = where the layer's (0,0) lands on screen, scale S */
+  function blit(g, b, ox, oy, S, col) {
+    if (b.cv && !slow) g.drawImage(b.cv, ox + b.x0 * S, oy + b.y0 * S, b.w * S, b.h * S);
+    else b.paint(g, ox, oy, S, col || '#FFFFFF');
+  }
+  /* the layer's mask in `col`, re-tinted only when the colour changes */
+  function tinted(b, col) {
+    if (!b.cv) return null;
+    if (b.col !== col) {
+      if (!b.tin) b.tin = mkc(b.w, b.h);
+      var t = b.tin.getContext('2d');
+      t.globalCompositeOperation = 'copy';
+      t.drawImage(b.cv, 0, 0);
+      t.globalCompositeOperation = 'source-in';
+      t.fillStyle = col; t.fillRect(0, 0, b.w, b.h);
+      t.globalCompositeOperation = 'source-over';
+      b.col = col;
+    }
+    return b.tin;
+  }
+  /* A painter that puts several colours down in a fixed ORDER (the
+     cracks: black shadow line, then glow line over it) cannot be split
+     into per-colour layers without changing who wins an overlapping
+     pixel. Paint it once with one flat role colour per role, read the
+     pixels back and keep, per role, only the pixels that survived. */
+  function bakeRoles(key, x0, y0, w, h, nRoles, paint) {
+    var b = bakes[key];
+    if (b) return b;
+    b = bakes[key] = { roles: null, x0: x0, y0: y0, w: w, h: h, paint: paint, n: nRoles };
+    try {
+      var c = mkc(w, h), x = c.getContext && c.getContext('2d');
+      if (!x || !x.getImageData) return b;
+      var cols = [], i;
+      for (i = 0; i < nRoles; i++) cols.push('rgb(' + (i + 1) * 40 + ',0,0)');
+      paint(x, -x0, -y0, 1, cols);
+      var px = x.getImageData(0, 0, w, h).data, out = [], ctxs = [], ims = [];
+      for (i = 0; i < nRoles; i++) {
+        out.push(mkc(w, h)); ctxs.push(out[i].getContext('2d')); ims.push(ctxs[i].createImageData(w, h));
+      }
+      for (var p = 0; p < px.length; p += 4) {
+        if (px[p + 3] < 128) continue;
+        var r = Math.round(px[p] / 40) - 1;
+        if (r < 0 || r >= nRoles) continue;
+        var d = ims[r].data;
+        d[p] = d[p + 1] = d[p + 2] = 255; d[p + 3] = 255;
+      }
+      for (i = 0; i < nRoles; i++) ctxs[i].putImageData(ims[i], 0, 0);
+      b.roles = out.map(function (cv) { return { cv: cv, tin: null, col: null, w: w, h: h }; });
+    } catch (err) { b.roles = null; }
+    return b;
+  }
+  function roleTint(r, col) {
+    if (r.col !== col) {
+      if (!r.tin) r.tin = mkc(r.w, r.h);
+      var t = r.tin.getContext('2d');
+      t.globalCompositeOperation = 'copy';
+      t.drawImage(r.cv, 0, 0);
+      t.globalCompositeOperation = 'source-in';
+      t.fillStyle = col; t.fillRect(0, 0, r.w, r.h);
+      t.globalCompositeOperation = 'source-over';
+      r.col = col;
+    }
+    return r.tin;
+  }
+
   /* ── the hex circle ─────────────────────────────────────────────── */
   var RUNES = [['111', '101', '111', '100', '100'], ['101', '111', '010', '010', '111'],
                ['110', '010', '011', '010', '110'], ['111', '001', '010', '100', '111'],
                ['010', '111', '010', '101', '101'], ['100', '110', '111', '011', '001']];
   function circleState() { return dead() ? 'cracked' : run ? 'lit' : 'dormant'; }
-  function drawCircle(g, e, d) {
-    var S = d.S, o = orig(e, d), ox = o.x, oy = o.y, now = d.now;
-    origin.x = ox; origin.y = oy; origin.S = S;
-    var st = circleState(), lit = st === 'lit' ? dbg.rings : 0;
+
+  /* The circle's box in world px: the outer ring is RX/RY wide, the
+     scorch RX+6/RY+4, and the cracked state's break runs from CX-64
+     to CX+64 and sags 25px below CY-10. */
+  var CBX = CX - 72, CBY = CY - 56, CBW = 144, CBH = 112;
+  var GAP_CRACKED = function (t) { return hash(Math.floor(t * 23)) < 0.28; };
+  var RY2 = RY - 7, RX2 = RX - 9;
+  var P_SCORCH = function (g, ox, oy, S) {
     var r, k;
-    /* scorched ground under it, stepped */
-    g.globalAlpha = 0.5;
     for (r = -RY - 4; r <= RY + 4; r += 1) {
       k = 1 - (r * r) / ((RY + 4) * (RY + 4));
       if (k <= 0) continue;
@@ -152,76 +258,154 @@
       g.fillStyle = (r & 3) ? '#14070A' : '#1C0A0E';
       g.fillRect(ox + Math.round(CX - hw) * S, oy + Math.round(CY + r) * S, hw * 2 * S, S);
     }
-    g.globalAlpha = 1;
+  };
+  /* one painter per ring group; `gap` is only set in the cracked state */
+  function circlePainters(gap, st) {
+    return {
+      glow: function (g, ox, oy, S, c) { ellipse(g, ox, oy, S, CX, CY, RX + 1, RY + 1, c, gap); },
+      r0: function (g, ox, oy, S, c) {
+        ellipse(g, ox, oy, S, CX, CY, RX, RY, c, gap); ellipse(g, ox, oy, S, CX, CY, RX - 2, RY - 2, c, gap);
+      },
+      r1: function (g, ox, oy, S, c) { ellipse(g, ox, oy, S, CX, CY, RX2, RY2, c, gap); },
+      runes: function (g, ox, oy, S, c) {
+        for (var i = 0; i < 12; i++) {
+          var a = (i + 0.5) / 12 * Math.PI * 2;
+          var gx = Math.round(CX + Math.cos(a) * (RX - 5.5)) - 1, gy = Math.round(CY + Math.sin(a) * (RY - 4.5)) - 2;
+          var rn = RUNES[i % RUNES.length];
+          if (st === 'cracked' && hash(i + 9) < 0.4) continue;
+          for (var ry = 0; ry < 5; ry++) for (var rx = 0; rx < 3; rx++)
+            if (rn[ry].charAt(rx) === '1') P(g, ox, oy, S, gx + rx, gy + ry, 1, 1, c);
+        }
+      },
+      star: function (g, ox, oy, S, c) {
+        var pts = [], i, a;
+        for (i = 0; i < 6; i++) {
+          a = -Math.PI / 2 + i * Math.PI / 3;
+          pts.push([Math.round(CX + Math.cos(a) * RX2), Math.round(CY + Math.sin(a) * RY2)]);
+        }
+        for (i = 0; i < 6; i++) {
+          var p0 = pts[i], p1 = pts[(i + 2) % 6];
+          line(g, ox, oy, S, p0[0], p0[1], p1[0], p1[1], c, gap);
+        }
+      },
+      inner: function (g, ox, oy, S, c) { ellipse(g, ox, oy, S, CX, CY, 24, 17, c, gap); },
+      crack: function (g, ox, oy, S, c) {
+        var x = CX - RX - 4, y = CY - 10;
+        for (var i = 0; i < 16; i++) {
+          var nx = x + 8, ny = y + Math.round((hash(i + 3) - 0.5) * 8) + 1;
+          line(g, ox, oy, S, x, y, nx, ny, '#060306');
+          x = nx; y = ny;
+        }
+      }
+    };
+  }
+  /* the six ring groups, baked once per state ('cracked' differs from the rest) */
+  var CIRC = { cracked: null, normal: null, comp: null, compKey: '', scorch: null };
+  function circleLayers(st) {
+    var id = st === 'cracked' ? 'cracked' : 'normal';
+    if (CIRC[id]) return CIRC[id];
+    var pp = circlePainters(id === 'cracked' ? GAP_CRACKED : null, id), L = {}, k;
+    for (k in pp) L[k] = bake('circle:' + id + ':' + k, CBX, CBY, CBW, CBH, pp[k]);
+    return (CIRC[id] = L);
+  }
+  /* everything under the hot-core runners, composed into ONE bitmap that
+     is rebuilt only when a ring colour changes (every frame while the
+     dormant rings pulse on the approach, otherwise never) */
+  function circleBitmap(st, cols) {
+    var L = circleLayers(st), key = st + '|' + cols.join(',');
+    if (CIRC.comp && CIRC.compKey === key) return CIRC.comp;
+    if (!L.r0.cv) return null;
+    if (!CIRC.scorch) CIRC.scorch = bake('circle:scorch', CBX, CBY, CBW, CBH, P_SCORCH);
+    if (!CIRC.comp) CIRC.comp = mkc(CBW, CBH);
+    var t = CIRC.comp.getContext('2d');
+    t.clearRect(0, 0, CBW, CBH);
+    t.globalAlpha = 0.5; t.drawImage(CIRC.scorch.cv, 0, 0); t.globalAlpha = 1;
+    var order = ['glow', 'r0', 'r1', 'runes', 'star', 'inner', 'crack'];
+    for (var i = 0; i < order.length; i++) {
+      if (!cols[i]) continue;
+      t.drawImage(tinted(L[order[i]], cols[i]), 0, 0);
+    }
+    CIRC.compKey = key;
+    return CIRC.comp;
+  }
+  function circleColours(st, lit, now) {
     var beat = pulse(now, 0.4 + near * 0.8);
     var dim = st === 'cracked' ? '#2E2830' : mix('#3A0E14', '#8A1A20', near * (0.4 + 0.6 * beat));
-    var hot = '#FF3A22', core = '#FFC890', glowC = '#7A0A0E';
+    var hot = '#FF3A22', core = '#FFC890';
     function col(i) { return i < lit ? hot : dim; }
-    /* cracked: chunks missing, seeded so they stay put */
-    var gap = st === 'cracked' ? function (t) { return hash(Math.floor(t * 23)) < 0.28; } : null;
-    var ry2 = RY - 7, rx2 = RX - 9;
-    /* 0: the outer ring, doubled */
-    if (lit > 0) ellipse(g, ox, oy, S, CX, CY, RX + 1, RY + 1, glowC, gap);
-    ellipse(g, ox, oy, S, CX, CY, RX, RY, col(0), gap);
-    ellipse(g, ox, oy, S, CX, CY, RX - 2, RY - 2, col(0), gap);
-    /* 1: the rune band and its inner ring */
-    ellipse(g, ox, oy, S, CX, CY, rx2, ry2, col(1), gap);
-    for (var i = 0; i < 12; i++) {
-      var a = (i + 0.5) / 12 * Math.PI * 2;
-      var gx = Math.round(CX + Math.cos(a) * (RX - 5.5)) - 1, gy = Math.round(CY + Math.sin(a) * (RY - 4.5)) - 2;
-      var rn = RUNES[i % RUNES.length];
-      if (st === 'cracked' && hash(i + 9) < 0.4) continue;
-      for (var ry = 0; ry < 5; ry++) for (var rx = 0; rx < 3; rx++)
-        if (rn[ry].charAt(rx) === '1') P(g, ox, oy, S, gx + rx, gy + ry, 1, 1, lit > 1 ? core : col(1));
+    return [lit > 0 ? '#7A0A0E' : '', col(0), col(1), lit > 1 ? core : col(1), col(2), col(3),
+            st === 'cracked' ? '#060306' : ''];
+  }
+  function drawCircle(g, e, d) {
+    var S = d.S, o = orig(e, d), ox = o.x, oy = o.y, now = d.now;
+    origin.x = ox; origin.y = oy; origin.S = S;
+    var st = circleState(), lit = st === 'lit' ? dbg.rings : 0;
+    var cols = circleColours(st, lit, now);
+    var bm = slow ? null : circleBitmap(st, cols);
+    if (!bm) { drawCircleSlow(g, ox, oy, S, st, lit, cols); }
+    else {
+      var sm = g.imageSmoothingEnabled;
+      g.imageSmoothingEnabled = false;
+      g.drawImage(bm, ox + CBX * S, oy + CBY * S, CBW * S, CBH * S);
+      if (sm) g.imageSmoothingEnabled = sm;
     }
-    /* 2: the hexagram */
-    var pts = [];
-    for (i = 0; i < 6; i++) {
-      a = -Math.PI / 2 + i * Math.PI / 3;
-      pts.push([Math.round(CX + Math.cos(a) * rx2), Math.round(CY + Math.sin(a) * ry2)]);
-    }
-    for (i = 0; i < 6; i++) {
-      var p0 = pts[i], p1 = pts[(i + 2) % 6];
-      line(g, ox, oy, S, p0[0], p0[1], p1[0], p1[1], col(2), gap);
-    }
-    /* 3: the inner ring around the altar */
-    ellipse(g, ox, oy, S, CX, CY, 24, 17, col(3), gap);
     /* lit rings carry a hot core that runs round them */
     if (lit > 0 && !still()) {
       var run0 = (now / 6) % 360;
-      for (i = 0; i < 10; i++) {
-        a = (run0 + i * 36) * Math.PI / 180;
-        P(g, ox, oy, S, CX + Math.cos(a) * RX, CY + Math.sin(a) * RY, 1, 1, core);
+      for (var i = 0; i < 10; i++) {
+        var a = (run0 + i * 36) * Math.PI / 180;
+        P(g, ox, oy, S, CX + Math.cos(a) * RX, CY + Math.sin(a) * RY, 1, 1, '#FFC890');
       }
     }
-    /* cracked: one break straight through it */
-    if (st === 'cracked') {
-      var x = CX - RX - 4, y = CY - 10;
-      for (i = 0; i < 16; i++) {
-        var nx = x + 8, ny = y + Math.round((hash(i + 3) - 0.5) * 8) + 1;
-        line(g, ox, oy, S, x, y, nx, ny, '#060306');
-        x = nx; y = ny;
-      }
-    }
+  }
+  /* the original immediate-mode painter: the fallback with no canvas, and
+     the reference the baked bitmap is checked against */
+  function drawCircleSlow(g, ox, oy, S, st, lit, cols) {
+    var L = circlePainters(st === 'cracked' ? GAP_CRACKED : null, st === 'cracked' ? 'cracked' : 'normal');
+    g.globalAlpha = 0.5;
+    P_SCORCH(g, ox, oy, S);
+    g.globalAlpha = 1;
+    if (cols[0]) L.glow(g, ox, oy, S, cols[0]);
+    L.r0(g, ox, oy, S, cols[1]);
+    L.r1(g, ox, oy, S, cols[2]);
+    L.runes(g, ox, oy, S, cols[3]);
+    L.star(g, ox, oy, S, cols[4]);
+    L.inner(g, ox, oy, S, cols[5]);
+    if (cols[6]) L.crack(g, ox, oy, S, cols[6]);
   }
 
   /* ── bloodstone cracks ─────────────────────────────────────────── */
-  function drawCracks(g, e, d) {
-    var S = d.S, o = orig(e, d), seed = e.x * 31 + e.y * 7;
+  /* painter: cols = [shadow, glow]; the black line goes down first, the
+     glow line (and its branch) over it, per segment */
+  function paintCracks(g, ox, oy, S, cols, e, glowPaint) {
+    var seed = e.x * 31 + e.y * 7;
     var x = (e.x + 0.5) * TILE - 10, y = (e.y + 0.5) * TILE;
-    var glow = dead() ? '#3A1418' : mix('#6A0A10', '#FF3020', 0.25 + near * 0.5 * pulse(d.now, 0.5 + near));
     for (var i = 0; i < 6; i++) {
       var nx = x + 3 + Math.round(hash(seed + i) * 2), ny = y + Math.round((hash(seed + i + 50) - 0.5) * 6);
-      line(g, o.x, o.y, d.S, x, y + 1, nx, ny + 1, '#050204');
-      line(g, o.x, o.y, d.S, x, y, nx, ny, glow);
-      if (hash(seed + i + 90) > 0.6) line(g, o.x, o.y, S, nx, ny, nx + 2, ny + 3, glow);
+      line(g, ox, oy, S, x, y + 1, nx, ny + 1, cols[0]);
+      line(g, ox, oy, S, x, y, nx, ny, cols[1]);
+      if (hash(seed + i + 90) > 0.6) line(g, ox, oy, S, nx, ny, nx + 2, ny + 3, cols[1]);
       x = nx; y = ny;
     }
   }
+  function drawCracks(g, e, d) {
+    var S = d.S, o = orig(e, d);
+    var glow = dead() ? '#3A1418' : mix('#6A0A10', '#FF3020', 0.25 + near * 0.5 * pulse(d.now, 0.5 + near));
+    var bx = Math.floor((e.x + 0.5) * TILE - 10) - 3, by = Math.floor((e.y + 0.5) * TILE) - 26;
+    var b = slow ? null : bakeRoles('cracks:' + e.x + ',' + e.y, bx, by, 48, 56, 2,
+                                    function (g2, ox, oy, S2, cols) { paintCracks(g2, ox, oy, S2, cols, e); });
+    if (!b || !b.roles) { paintCracks(g, o.x, o.y, S, ['#050204', glow], e); return; }
+    var sm = g.imageSmoothingEnabled;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(roleTint(b.roles[0], '#050204'), o.x + bx * S, o.y + by * S, 48 * S, 56 * S);
+    g.drawImage(roleTint(b.roles[1], glow), o.x + bx * S, o.y + by * S, 48 * S, 56 * S);
+    if (sm) g.imageSmoothingEnabled = sm;
+  }
 
   /* ── the altar ─────────────────────────────────────────────────── */
-  function drawAltar(g, e, d) {
-    var S = d.S, x = d.sx, y = d.sy, now = d.now, cold = dead();
+  /* the altar's stone (tiers + the bowl's rim): static, baked once, in
+     altar-relative px. The runes, the fire and the heart move/glow. */
+  function paintAltarStone(g, x, y, S) {
     function R(px, py, w, h, c) { g.fillStyle = c; g.fillRect(x + px * S, y + py * S, w * S, h * S); }
     /* three stepped tiers of black stone */
     R(-25, -12, 50, 12, '#0B070D');
@@ -230,12 +414,23 @@
     R(-18, -20, 36, 3, '#4A3A4C'); R(-18, -17, 36, 6, '#2C2030');
     R(-13, -29, 26, 9, '#0B070D');
     R(-12, -28, 24, 2, '#5A4A5C'); R(-12, -26, 24, 6, '#33263A');
+  }
+  function paintAltarBowl(g, x, y, S) {
+    function R(px, py, w, h, c) { g.fillStyle = c; g.fillRect(x + px * S, y + py * S, w * S, h * S); }
+    R(-9, -31, 18, 3, '#0B070D'); R(-8, -31, 16, 1, '#6A5A6C');
+  }
+  function drawAltar(g, e, d) {
+    var S = d.S, x = d.sx, y = d.sy, now = d.now, cold = dead();
+    function R(px, py, w, h, c) { g.fillStyle = c; g.fillRect(x + px * S, y + py * S, w * S, h * S); }
+    /* stone first; the runes (drawn after it) never overlap the bowl rim,
+       so the bowl rim can sit in the same bitmap */
+    blit(g, bake('altar:stone', -26, -32, 52, 33, function (g2, ox, oy, S2) {
+      paintAltarStone(g2, ox, oy, S2); paintAltarBowl(g2, ox, oy, S2);
+    }), x, y, S);
     /* bloodstone runes cut into the face */
     var rc = cold ? '#2A2028' : mix('#5A0A10', '#FF4A2A', 0.3 + 0.7 * Math.max(near * pulse(now, 0.5 + near), run ? 1 : 0));
     for (var i = 0; i < 7; i++) R(-21 + i * 6, -7 + (i & 1), 2, 3, rc);
     R(-10, -16, 2, 2, rc); R(-1, -17, 2, 3, rc); R(8, -16, 2, 2, rc);
-    /* the bowl */
-    R(-9, -31, 18, 3, '#0B070D'); R(-8, -31, 16, 1, '#6A5A6C');
     if (cold) {
       R(-6, -33, 12, 2, '#4A4048'); R(-3, -34, 6, 1, '#5A5058');
       return;
@@ -256,8 +451,8 @@
   }
 
   /* ── broken columns ────────────────────────────────────────────── */
-  function drawPillar(g, e, d) {
-    var S = d.S, x = d.sx, y = d.sy, h = e.h || 28;
+  function paintPillar(g, x, y, S, e) {
+    var h = e.h || 28;
     function R(px, py, w, hh, c) { g.fillStyle = c; g.fillRect(x + px * S, y + py * S, w * S, hh * S); }
     R(-8, -6, 16, 6, '#0B070D'); R(-7, -5, 14, 4, '#3A3044');          /* plinth */
     R(-6, -6 - h, 12, h, '#0B070D');
@@ -272,14 +467,25 @@
     R(7, -3, 5, 3, '#0B070D'); R(8, -3, 3, 2, '#4A3E58');
     R(-12, -2, 3, 2, '#0B070D'); R(-11, -2, 2, 1, '#4A3E58');
   }
+  /* static: the whole column is one baked bitmap per (x, height) */
+  function drawPillar(g, e, d) {
+    var h = e.h || 28;
+    blit(g, bake('pillar:' + e.x + ':' + h, -14, -(h + 14), 28, h + 16, function (g2, ox, oy, S2) {
+      paintPillar(g2, ox, oy, S2, e);
+    }), d.sx, d.sy, d.S);
+  }
 
   /* ── brimstone braziers ────────────────────────────────────────── */
   function drawBrazier(g, e, d) {
     var S = d.S, x = d.sx, y = d.sy, now = d.now;
     function R(px, py, w, h, c) { g.fillStyle = c; g.fillRect(x + px * S, y + py * S, w * S, h * S); }
-    R(-5, -1, 2, 1, '#0B070D'); R(3, -1, 2, 1, '#0B070D');            /* feet */
-    R(-4, -9, 2, 8, '#1A1420'); R(2, -9, 2, 8, '#1A1420'); R(-1, -9, 2, 9, '#2A2232');
-    R(-7, -13, 14, 4, '#0B070D'); R(-6, -13, 12, 1, '#5A4E68'); R(-6, -12, 12, 2, '#2E2638');
+    /* the stand and bowl are static: baked; only the flame is live */
+    blit(g, bake('brazier:stand', -8, -14, 16, 15, function (g2, ox, oy, S2) {
+      function Q(px, py, w, h, c) { g2.fillStyle = c; g2.fillRect(ox + px * S2, oy + py * S2, w * S2, h * S2); }
+      Q(-5, -1, 2, 1, '#0B070D'); Q(3, -1, 2, 1, '#0B070D');            /* feet */
+      Q(-4, -9, 2, 8, '#1A1420'); Q(2, -9, 2, 8, '#1A1420'); Q(-1, -9, 2, 9, '#2A2232');
+      Q(-7, -13, 14, 4, '#0B070D'); Q(-6, -13, 12, 1, '#5A4E68'); Q(-6, -12, 12, 2, '#2E2638');
+    }), x, y, S);
     if (dead()) { R(-5, -14, 10, 1, '#4A4048'); return; }
     var f = still() ? 1 : ((now / 80 + e.x) | 0) % 4, up = Math.round(near * 3) + (run ? 3 : 0);
     var wv = [0, 1, 2, 1][f];
@@ -435,31 +641,67 @@
     if (near > 0.35 && quakeAcc >= 700) { quakeAcc = 0; shake(0.08 + 0.22 * near); }
   }
 
-  function paint(now, dt) {
-    var w = innerWidth, h = innerHeight, dpr = Math.min(devicePixelRatio || 1, 2);
-    if (cv.width !== ((w * dpr) | 0) || cv.height !== ((h * dpr) | 0)) {
-      cv.width = (w * dpr) | 0; cv.height = (h * dpr) | 0;
+  /* The overlay is drawn at 1 canvas px per CSS px and scaled up by the
+     browser (css: image-rendering: pixelated). Everything on it is an
+     integer-CSS-px block, so at dpr 2/3 it lands on the same device
+     pixels as a native-resolution canvas would, for a quarter to a
+     ninth of the fill cost (the vignette alone covers the screen
+     several times over). */
+  var vig = null, vigKey = '';
+  /* the black stepped vignette, cached: it only changes with `near` */
+  function vignette(w, h, bw, aStr) {
+    var key = w + 'x' + h + ':' + bw + ':' + aStr;
+    if (key === vigKey && vig) return vig;
+    if (!vig) vig = mkc(w, h);
+    if (vig.width !== w || vig.height !== h) { vig.width = w; vig.height = h; }
+    var v = vig.getContext('2d');
+    v.clearRect(0, 0, w, h);
+    v.fillStyle = 'rgba(0,0,0,' + aStr + ')';
+    for (var i = 0; i < 10; i++) {
+      v.fillRect(0, 0, w, (i + 1) * bw); v.fillRect(0, h - (i + 1) * bw, w, (i + 1) * bw);
+      v.fillRect(0, 0, (i + 1) * bw, h); v.fillRect(w - (i + 1) * bw, 0, (i + 1) * bw, h);
     }
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    vigKey = key;
+    return vig;
+  }
+
+  function paint(now, dt) {
+    var w = innerWidth, h = innerHeight;
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, w, h);
     var S = origin.S, ox = origin.x, oy = origin.y, cold = dead();
     var dk = run ? dbg.dark : 0;
+    var i;
     /* the vignette: stepped bands, black, then a red rim that beats */
-    var bands = 10, bw = Math.max(4, Math.round(Math.min(w, h) / 64));
-    for (var i = 0; i < bands; i++) {
-      var a = (cold ? 0.035 : 0.06) * (1 + near);
-      g.fillStyle = 'rgba(0,0,0,' + a.toFixed(3) + ')';
-      g.fillRect(0, 0, w, (i + 1) * bw); g.fillRect(0, h - (i + 1) * bw, w, (i + 1) * bw);
-      g.fillRect(0, 0, (i + 1) * bw, h); g.fillRect(w - (i + 1) * bw, 0, (i + 1) * bw, h);
-    }
+    var bw = Math.max(4, Math.round(Math.min(w, h) / 64));
+    var aStr = ((cold ? 0.035 : 0.06) * (1 + near)).toFixed(3);
+    if (slow) {
+      for (i = 0; i < 10; i++) {
+        g.fillStyle = 'rgba(0,0,0,' + aStr + ')';
+        g.fillRect(0, 0, w, (i + 1) * bw); g.fillRect(0, h - (i + 1) * bw, w, (i + 1) * bw);
+        g.fillRect(0, 0, (i + 1) * bw, h); g.fillRect(w - (i + 1) * bw, 0, (i + 1) * bw, h);
+      }
+    } else g.drawImage(vignette(w, h, bw, aStr), 0, 0);
     if (!cold) {
-      /* nested bands, each a little more red: a stepped gradient edge */
+      /* nested bands, each a little more red: a stepped gradient edge.
+         Band i is the frame i+1 steps deep, so the ring j steps in has
+         been painted (6 - j) times; paint each ring ONCE at the alpha
+         those repeats add up to (one pass over the frame, not ~3.5). */
       var rim = (0.03 + 0.1 * near + (run ? 0.1 : 0)) * (0.55 + 0.45 * pulse(now, 0.5 + near * 0.7));
+      var ra = parseFloat(rim.toFixed(3));
       for (i = 0; i < 6; i++) {
-        g.fillStyle = 'rgba(170,8,14,' + rim.toFixed(3) + ')';
         var t = (i + 1) * bw;
-        g.fillRect(0, 0, w, t); g.fillRect(0, h - t, w, t); g.fillRect(0, t, t, h - 2 * t); g.fillRect(w - t, t, t, h - 2 * t);
+        if (slow) {
+          g.fillStyle = 'rgba(170,8,14,' + ra.toFixed(3) + ')';
+          g.fillRect(0, 0, w, t); g.fillRect(0, h - t, w, t); g.fillRect(0, t, t, h - 2 * t); g.fillRect(w - t, t, t, h - 2 * t);
+          continue;
+        }
+        var j = i, x0 = j * bw, iw = w - 2 * x0, ih = h - 2 * x0;
+        if (iw <= 0 || ih <= 0) break;
+        g.fillStyle = 'rgba(170,8,14,' + (1 - Math.pow(1 - ra, 6 - j)).toFixed(4) + ')';
+        g.fillRect(x0, x0, iw, bw); g.fillRect(x0, h - x0 - bw, iw, bw);
+        g.fillRect(x0, x0 + bw, bw, ih - 2 * bw); g.fillRect(w - x0 - bw, x0 + bw, bw, ih - 2 * bw);
       }
     }
     /* the dark falls */
@@ -701,6 +943,13 @@
     debug: dbg,
     /* dev/screenshots: jump the scene's clock (ms from the press) */
     _seek: function (ms) { if (run) run.t = Math.max(run.t, ms); },
+    /* tests: pose the room without the engine (near 0..1, dead, rings lit 0..4) */
+    _pose: function (o) {
+      if ('near' in o) near = o.near;
+      if ('dead' in o) forceDead = o.dead === null ? null : !!o.dead;
+      if ('rings' in o) { dbg.rings = o.rings; run = o.rings ? { c: api, t: 0, talked: false, flashAt: 0, fade: false, stop: null } : null; }
+    },
+    set _slow(v) { slow = !!v; }, get _slow() { return slow; },
     _lightAt: lightAt,
     _circleState: circleState
   };

@@ -418,10 +418,56 @@
      The project's pixel-art primitive: ASCII rows plus a palette, drawn
      at the world scale so a sprite pixel and a tile pixel are the same
      size on screen. Anchored at the feet. */
+  /* PERF: a sprite is baked ONCE into a 1px-per-sprite-pixel canvas and
+     blitted with nearest-neighbour scaling. The loop it replaces issued
+     one fillStyle + fillRect per lit sprite pixel per frame: a 13x9 prop
+     is ~100 draw calls, a skull pile ~500, a room of banners/torches/
+     skulls well over a thousand. drawImage at an integer scale lands on
+     exactly the same device pixels as the fillRects did.
+     The cache lives on the `rows` array (one entry per palette/flip) so
+     it dies with the sprite. Palettes handed in must not be mutated
+     after their first use; a fresh-but-equal palette is matched by
+     content, so building one per frame is wasteful but not a leak. */
+  function spriteFor(rows, pal, flip) {
+    if (rows.__lp === pal && rows.__lf === flip) return rows.__ls;
+    var sig = flip ? 'f' : 'n', k;
+    for (k in pal) sig += k + pal[k];
+    var all = rows.__spr || (rows.__spr = { n: 0, m: {} });
+    var cv = all.m[sig];
+    if (cv === undefined) {
+      if (all.n > 12) { all.n = 0; all.m = {}; }
+      var h = rows.length, w = rows[0].length, g;
+      cv = mkCanvas(w, h);
+      g = cv.getContext && cv.getContext('2d');
+      if (!g) cv = null;
+      else for (var r = 0; r < h; r++) {
+        var row = rows[r];
+        for (var c = 0; c < w; c++) {
+          var ch = row[flip ? w - 1 - c : c];
+          if (ch === '.' || !pal[ch]) continue;
+          g.fillStyle = pal[ch];
+          g.fillRect(c, r, 1, 1);
+        }
+      }
+      all.m[sig] = cv; all.n++;
+    }
+    rows.__lp = pal; rows.__lf = flip; rows.__ls = cv;
+    return cv;
+  }
   function stamp(ctx, rows, pal, cx, cy, s, opts) {
     var h = rows.length, w = rows[0].length;
     var flip = opts && opts.flip, dy = (opts && opts.dy) || 0, sq = opts && opts.squash;
     var x0 = Math.round(cx - w * s / 2), y0 = Math.round(cy - h * s) + dy * s;
+    if (!sq && s >= 1 && s === (s | 0) && ctx.drawImage) {
+      var spr = spriteFor(rows, pal, !!flip);
+      if (spr) {
+        var sm = ctx.imageSmoothingEnabled;
+        if (sm) ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(spr, x0, y0, w * s, h * s);
+        if (sm) ctx.imageSmoothingEnabled = sm;
+        return;
+      }
+    }
     for (var r = 0; r < h; r++) {
       var row = rows[r];
       for (var c = 0; c < w; c++) {
@@ -467,11 +513,15 @@
               ['...c.c...', '...b.b...', '..b...b..'],   /* stride A */
               ['..c...c..', '..bb.bb..', '..b...b..']];  /* stride B */
 
+  var rowsMemo = {};   /* one rows array per pose, so stamp() can cache the baked sprite on it */
   function playerRows(face, phase, blink) {
     var f = face === 'right' ? 'left' : face;
+    var mk = f + (phase === 1 ? 1 : phase === 3 ? 2 : 0) + ((blink && BLINK[f]) ? 'b' : '');
+    var hit = rowsMemo[mk];
+    if (hit) return hit;
     var body = (blink && BLINK[f]) ? BLINK[f] : BODY[f];
     var legs = phase === 1 ? LEGS[1] : phase === 3 ? LEGS[2] : LEGS[0];
-    return body.concat(legs);
+    return (rowsMemo[mk] = body.concat(legs));
   }
 
   /* phase: 0..3 from distance walked; dip on the strides. */
@@ -623,10 +673,12 @@
   /* These look like people and breathe; props hold still. */
   var LIVING = { figure: 1, witch: 1, merchant: 1, sans: 1 };
 
+  var palMemo = {};      /* tintPal() per prop+tint: stable identity keeps stamp()'s sprite cache hot */
   function drawProp(ctx, name, tint, cx, cy, s, now, seed) {
     var pr = PROPS[name] || PROPS.figure;
     var bob = (LIVING[name] && !reduced) ? ((((now || 0) + seed * 700) % 1400) < 700 ? 0 : -1) : 0;
-    stamp(ctx, pr.rows, tintPal(pr.pal, tint), cx, cy, s * (pr.scale || 1), { dy: bob });
+    var pk = name + '|' + (tint || ''), pal = palMemo[pk] || (palMemo[pk] = tintPal(pr.pal, tint));
+    stamp(ctx, pr.rows, pal, cx, cy, s * (pr.scale || 1), { dy: bob });
     return pr;
   }
   function propWidth(name) { var pr = PROPS[name] || PROPS.figure; return pr.rows[0].length * (pr.scale || 1); }
@@ -785,8 +837,16 @@
       } else if (wKind === 'drizzle' || wKind === 'storm') {
         ctx.globalAlpha = wKind === 'storm' ? 0.42 : 0.3;
         ctx.fillStyle = '#9FB8FF';
-        var L = p.len;
-        for (var s2 = 0; s2 < L; s2++) ctx.fillRect(x + Math.round(p.vx / p.vy * s2 * S), y - s2 * S, S, S);
+        /* PERF: a drop is a slanted run of S-px blocks; consecutive blocks
+           that share an x are one tall rect (same pixels, ~3x fewer calls) */
+        var L = p.len, runX = 0, runTop = 0, runN = 0;
+        for (var s2 = 0; s2 < L; s2++) {
+          var bx = x + Math.round(p.vx / p.vy * s2 * S);
+          if (runN && bx === runX) { runN++; continue; }
+          if (runN) ctx.fillRect(runX, y - (runTop + runN - 1) * S, S, runN * S);
+          runX = bx; runTop = s2; runN = 1;
+        }
+        if (runN) ctx.fillRect(runX, y - (runTop + runN - 1) * S, S, runN * S);
         ctx.globalAlpha = 1;
       } else if (wKind === 'sparkle') {
         var k = Math.sin((p.life / 1.4) * Math.PI);
@@ -843,7 +903,7 @@
   NEU.engineLook = {
     zone: zone, palette: palette, material: material, bakeRoom: bakeRoom,
     drawAnimated: drawAnimated, stamp: stamp, shadow: shadow,
-    drawPlayer: drawPlayer, playerRows: playerRows, walkPhase: walkPhase,
+    drawPlayer: drawPlayer, playerRows: function (f, p, b) { return playerRows(f, p, b).slice(); }, walkPhase: walkPhase,
     lookFor: lookFor, drawProp: drawProp, propWidth: propWidth, props: PROPS, living: LIVING,
     drawLight: drawLight, glow: glow,
     weatherReset: weatherReset, weatherStep: weatherStep, weatherDraw: weatherDraw,

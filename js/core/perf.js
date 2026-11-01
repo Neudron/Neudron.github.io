@@ -60,11 +60,21 @@
      halves the work and puts the misses back on the even grid. A 60 Hz
      panel clears PACE every frame and never notices. */
   var PACE = 1000 / 120;
-  var pacedLast = 0;
+  var pacedLast = 0, pacedNow = -1, pacedOk = true;
+  /* ONE VERDICT PER VSYNC. Every rAF callback of a frame is handed the
+     same `now`, and more than one loop asks (the engine's room draw and
+     summon.js's overlay, both in b8_arena). The first call of a frame
+     used to take the slot and every later one read "too soon" — so
+     whichever loop was registered first drew every frame and the other
+     NEVER drew: the room canvas stayed black behind the overlay, or the
+     overlay's embers/vignette never painted over the room. The decision
+     is made once per timestamp and shared by all callers of that frame. */
   function paced(now) {
-    if (now - pacedLast < PACE) return false;
+    if (now === pacedNow) return pacedOk;
+    pacedNow = now;
+    if (now - pacedLast < PACE) return (pacedOk = false);
     pacedLast = now;
-    return true;
+    return (pacedOk = true);
   }
 
   var times = [], head = 0, n = 0;
@@ -178,7 +188,7 @@
   NEU.perf = {
     start: start, stop: stop, toggle: function () { return running ? (stop(), false) : (start(), true); },
     stats: stats, line: line, scene: scene, paced: paced, PACE: PACE,
-    _pacedReset: function () { pacedLast = 0; },
+    _pacedReset: function () { pacedLast = 0; pacedNow = -1; pacedOk = true; },
     get running() { return running; },
     TARGET: TARGET, WARN: WARN, FAIL: FAIL, WINDOW: WINDOW,
     /* tests: feed frames without a real rAF loop */
