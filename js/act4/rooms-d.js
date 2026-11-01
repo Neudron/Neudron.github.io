@@ -122,7 +122,7 @@
                                         'it is not your cat. it is nobody\'s cat, which it seems to have arranged.'] }),
       P('planter', 16, 10), P('bin', 19, 10), P('hydrant', 23, 10),
       { t: 'exit', x: 25, y: 7, to: 'd2_alley', spawn: 'west', style: 'arch' },
-      { t: 'exit', x: 0, y: 7, to: 'b7_altar', spawn: 'east', style: 'door' },
+      { t: 'exit', x: 0, y: 7, to: 'b7_altar', spawn: 'fire', style: 'door' },
       /* The way back to the pot. Nothing else leads into the trip room
          from the city, so without this the five mushrooms could never
          reach the pot. Open only while tripping (see rooms-g h3_trip).

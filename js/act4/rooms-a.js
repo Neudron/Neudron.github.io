@@ -927,7 +927,8 @@
     shafts: [[2, 70, 12, 0.3, '#CFE0FF'], [20, 70, 12, -0.3, '#CFE0FF']],
     shade: 0.55,
     spawns: { east: { x: 21, y: 6, face: 'left' }, north: { x: 11, y: 2, face: 'down' },
-              west: { x: 1, y: 6, face: 'right' } },
+              west: { x: 1, y: 6, face: 'right' },
+              fire: { x: 11, y: 11, face: 'up' } },
     entities: castleLook(13).concat([
       { t: 'save', x: 4, y: 10 },
       { t: 'altar', x: 11, y: 7, needs: 'ashes', gives: 'firedoor', skin: 'altar',

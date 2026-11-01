@@ -346,6 +346,7 @@
       var e = ents[i];
       if (e.dead || e.t === 'trigger') continue;
       if (want && !want(e)) continue;
+      if (exitHidden(e)) continue;
       /* exit tiles: measure to the face you can stand at, not the tile's
          far wall — a door embedded in a wall was only reachable in a sliver. */
       if (e.t === 'exit') {
@@ -382,12 +383,18 @@
     var bx0 = px - PLAYER_W / 2, bx1 = px + PLAYER_W / 2, by0 = py - PLAYER_H, by1 = py;
     var ox = ov(bx0, bx1, x0, x1), oy = ov(by0, by1, y0, y1);
     if (ox >= 5 && oy >= 4) return true;                       // standing in it
-    if (ix && oy >= 3) {                                        // pressing sideways into it
-      var ox2 = ov(bx0 + ix * 2, bx1 + ix * 2, x0, x1);
+    /* The probe is 4 units, not 2: sweep() stops a sub-step short of a
+       wall (up to ~1.6 u at 60 fps, 3+ at 30 fps), so a 2-unit probe
+       sometimes never reached the cell and the walk-in silently failed.
+       The cross-axis overlap only has to be 1 u: nudge() cannot slide you
+       along a solid exit tile, so a feet box straddling two rows could
+       never get the 3 u it used to ask for. */
+    if (ix && oy >= 1) {                                        // pressing sideways into it
+      var ox2 = ov(bx0 + ix * 4, bx1 + ix * 4, x0, x1);
       if (ox2 > Math.max(ox, 0.5)) return true;
     }
-    if (iy && ox >= 3) {                                        // pressing up / down into it
-      var oy2 = ov(by0 + iy * 2, by1 + iy * 2, y0, y1);
+    if (iy && ox >= 1) {                                        // pressing up / down into it
+      var oy2 = ov(by0 + iy * 4, by1 + iy * 4, y0, y1);
       if (oy2 > Math.max(oy, 0.5)) return true;
     }
     return false;
@@ -421,6 +428,16 @@
     return best || any;
   }
 
+  /* A locked exit that carries a `sheet` (b7_altar's fire door) does not
+     exist until its lock is satisfied: not drawn, lit, prompted or bumped.
+     `hiddenLocked: false` opts a sheet exit out; `hiddenLocked: true` opts
+     any exit in. */
+  function exitHidden(e) {
+    if (e.t !== 'exit' || !e.locked) return false;
+    if (NEU.save && NEU.save.flagged(e.locked)) return false;
+    return e.hiddenLocked === undefined ? !!e.sheet : !!e.hiddenLocked;
+  }
+
   /* The context the door art gets (see engine-kinds.js, kind 'exit'). */
   function doorCtx(d, e) {
     d.open = !e.locked || !!(NEU.save && NEU.save.flagged(e.locked));
@@ -440,7 +457,7 @@
     var hit = null;
     for (var i = 0; i < ents.length; i++) {
       var e = ents[i];
-      if (e.t !== 'exit' || e.dead || e.walk === false) continue;
+      if (e.t !== 'exit' || e.dead || e.walk === false || exitHidden(e)) continue;
       if (!exitTouch(e, ix, iy)) { e.__arm = true; continue; }
       if (!e.__arm || hit) continue;
       hit = e;
@@ -788,10 +805,11 @@
     /* entity lights */
     for (var i = 0; i < ents.length; i++) {
       var e = ents[i];
-      if (e.dead) continue;
+      if (e.dead || exitHidden(e)) continue;
       var k = K ? K.get(e) : null;
-      if (e.t === 'exit') doorCtx(d, e); else d.room = room;
+      if (e.t === 'exit') doorCtx(d, e);
       var li = k && k.light ? k.light(e, d) : null;
+      d.room = room;                  /* doorCtx lent the exit the id; give the room back */
       if (!li) continue;
       var p = entAt(e);
       var r = li.r;
@@ -849,11 +867,24 @@
       var pf = entAt(e); d.sx = sx(pf.x); d.sy = sy(pf.y);
       k.draw(ctx, e, d);
     }
+    /* Doors in a south / east / west wall (side 'n' | 'e' | 'w') are wall
+       furniture the player stands IN FRONT of: sorted by their bottom edge
+       they covered the player at the arrival spawn. Draw them as decals;
+       only north-wall doors (side 's') take part in the foot-Y sort. */
+    for (i = 0; i < ents.length; i++) {
+      e = ents[i];
+      if (e.dead || e.t !== 'exit' || exitHidden(e) || exitSide(e) === 's') continue;
+      k = K ? K.get(e) : null;
+      if (!k || !k.draw) continue;
+      var pw = entAt(e); d.sx = sx(pw.x); d.sy = sy(pw.y);
+      doorCtx(d, e); k.draw(ctx, e, d); d.room = room;
+    }
     /* everything that stands, sorted by foot Y */
     var drawn = [];
     for (i = 0; i < ents.length; i++) {
       e = ents[i];
-      if (e.dead || e.t === 'trigger') continue;
+      if (e.dead || e.t === 'trigger' || exitHidden(e)) continue;
+      if (e.t === 'exit' && exitSide(e) !== 's') continue;   /* drawn in the pre-pass above */
       k = K ? K.get(e) : null;
       if (k && (k.floor || k.hidden)) continue;
       drawn.push({ e: e, k: k, y: (e.y + 1) * TILE });
@@ -877,7 +908,7 @@
       }
       var pp = entAt(dr.e); d.sx = sx(pp.x); d.sy = sy(pp.y);
       if (dr.e.t === 'exit') doorCtx(d, dr.e);
-      if (dr.k && dr.k.draw) dr.k.draw(ctx, dr.e, d);
+      if (dr.k && dr.k.draw) { dr.k.draw(ctx, dr.e, d); d.room = room; }
       else { ctx.fillStyle = dr.e.colour || '#B892FF'; ctx.fillRect(d.sx - 3 * S, d.sy - 6 * S, 6 * S, 6 * S); }
     }
 
