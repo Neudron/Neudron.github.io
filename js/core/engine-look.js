@@ -693,39 +693,64 @@
     return lctx;
   }
   /* Four hard bands, centre fully lit. `a` scales the whole light.
-     The gradient is built once at the origin and placed by translate,
-     and the last one is kept: a run of lights with the same radius and
-     alpha (every path tile) shares it. ponytail: one-slot cache, so
-     interleaved radii rebuild; a per-radius map if that ever shows. */
-  var cutGr = null, cutR = 0, cutA = 0;
+     Gradients are expensive to build and the radii breathe every frame
+     (torch flicker, the carried light), so each light is a SPRITE: the
+     gradient is rendered once into a small offscreen canvas per
+     (quantized radius, quantized alpha) and every frame just blits it,
+     scaled by the sub-step remainder, nearest-neighbour so the bands
+     stay hard. Radius steps are half a lightmap pixel (2 screen px). */
+  var cutSprites = {}, cutCount = 0;
+  function cutSprite(r, k) {
+    var qr = Math.max(0.5, Math.round(r * 2) / 2), qa = Math.round(k * 20) / 20;
+    var key = qr + '|' + qa, sp = cutSprites[key];
+    if (sp) return sp;
+    if (cutCount > 300) { cutSprites = {}; cutCount = 0; }   /* a runaway key set can never grow without bound */
+    var D = Math.ceil(qr * 2) + 2, cv = mkCanvas(D, D), c = cv.getContext && cv.getContext('2d');
+    if (!c) return null;
+    var gr = c.createRadialGradient(D / 2, D / 2, 0, D / 2, D / 2, qr);
+    gr.addColorStop(0, 'rgba(0,0,0,' + qa + ')');
+    gr.addColorStop(0.42, 'rgba(0,0,0,' + qa + ')');
+    gr.addColorStop(0.43, 'rgba(0,0,0,' + (qa * 0.72) + ')');
+    gr.addColorStop(0.66, 'rgba(0,0,0,' + (qa * 0.72) + ')');
+    gr.addColorStop(0.67, 'rgba(0,0,0,' + (qa * 0.4) + ')');
+    gr.addColorStop(0.88, 'rgba(0,0,0,' + (qa * 0.4) + ')');
+    gr.addColorStop(0.89, 'rgba(0,0,0,' + (qa * 0.14) + ')');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = gr; c.fillRect(0, 0, D, D);
+    cutCount++;
+    return (cutSprites[key] = { cv: cv, D: D, qr: qr });
+  }
   function cutLight(g, x, y, r, a) {
     if (r <= 0) return;
-    var k = a === undefined ? 1 : a;
-    if (!cutGr || r !== cutR || k !== cutA) {
-      cutGr = g.createRadialGradient(0, 0, 0, 0, 0, r); cutR = r; cutA = k;
-      cutGr.addColorStop(0, 'rgba(0,0,0,' + k + ')');
-      cutGr.addColorStop(0.42, 'rgba(0,0,0,' + k + ')');
-      cutGr.addColorStop(0.43, 'rgba(0,0,0,' + (k * 0.72) + ')');
-      cutGr.addColorStop(0.66, 'rgba(0,0,0,' + (k * 0.72) + ')');
-      cutGr.addColorStop(0.67, 'rgba(0,0,0,' + (k * 0.4) + ')');
-      cutGr.addColorStop(0.88, 'rgba(0,0,0,' + (k * 0.4) + ')');
-      cutGr.addColorStop(0.89, 'rgba(0,0,0,' + (k * 0.14) + ')');
-      cutGr.addColorStop(1, 'rgba(0,0,0,0)');
-    }
-    g.save();
-    g.translate(x, y);
-    g.fillStyle = cutGr;
-    g.fillRect(-r, -r, r * 2, r * 2);
-    g.restore();
+    var sp = cutSprite(r, a === undefined ? 1 : a);
+    if (!sp) return;
+    var sc = r / sp.qr, d = sp.D * sc;
+    g.drawImage(sp.cv, Math.round(x - d / 2), Math.round(y - d / 2), Math.round(d), Math.round(d));
   }
+  /* The warm additive halo: same idea, in screen px, one sprite per
+     (colour, radius step of 2px, alpha step of 0.02). */
+  var glowSprites = {}, glowCount = 0;
   function glow(ctx, x, y, r, col, a) {
-    var gr = ctx.createRadialGradient(x, y, 0, x, y, r);
-    gr.addColorStop(0, rgba(col, a));
-    gr.addColorStop(0.5, rgba(col, a * 0.5));
-    gr.addColorStop(0.51, rgba(col, a * 0.25));
-    gr.addColorStop(1, rgba(col, 0));
-    ctx.fillStyle = gr;
-    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    if (r <= 0) return;
+    var qr = Math.max(2, Math.round(r / 2) * 2), qa = Math.max(0.02, Math.round(a * 50) / 50);
+    var key = col + '|' + qr + '|' + qa, sp = glowSprites[key];
+    if (!sp) {
+      if (glowCount > 200) { glowSprites = {}; glowCount = 0; }
+      var D = qr * 2, cv = mkCanvas(D, D), c = cv.getContext && cv.getContext('2d');
+      if (!c) return;
+      var gr = c.createRadialGradient(qr, qr, 0, qr, qr, qr);
+      gr.addColorStop(0, rgba(col, qa));
+      gr.addColorStop(0.5, rgba(col, qa * 0.5));
+      gr.addColorStop(0.51, rgba(col, qa * 0.25));
+      gr.addColorStop(1, rgba(col, 0));
+      c.fillStyle = gr; c.fillRect(0, 0, D, D);
+      glowCount++;
+      sp = glowSprites[key] = { cv: cv, D: D };
+    }
+    var smooth = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sp.cv, Math.round(x - r), Math.round(y - r), Math.round(r * 2), Math.round(r * 2));
+    ctx.imageSmoothingEnabled = smooth;
   }
 
   /* lights: [{x, y, r, col, a, glow}] in WORLD units. */
@@ -739,6 +764,7 @@
     g.fillStyle = rgba(night, Math.max(0, Math.min(1, 1 - ambient)));
     g.fillRect(0, 0, W, H);
     g.globalCompositeOperation = 'destination-out';
+    g.imageSmoothingEnabled = false;
     var k = S / LQ, i, L;
     for (i = 0; i < lights.length; i++) {
       L = lights[i];

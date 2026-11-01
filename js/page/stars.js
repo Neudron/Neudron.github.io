@@ -159,7 +159,9 @@
 
   function tick(now) {
     requestAnimationFrame(tick);
-    if (!visible || now - last < FRAME_MS) return;
+    /* A full-screen game (engine, minigames) covers the sky: stop
+       repainting it. scene.js pauses on the same class. */
+    if (!visible || now - last < FRAME_MS || document.body.classList.contains('is-playing')) return;
     last = now;
 
     for (var i = 0; i < stars.length; i++) {
