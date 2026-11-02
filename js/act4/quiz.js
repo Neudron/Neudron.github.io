@@ -65,9 +65,16 @@
   if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) { reduced = r; });
 
   /* ── the questions ──────────────────────────────────────────────
-     Four per game, rotating, so no two consecutive questions share a
-     category. `a` is the index of the correct option. */
-  var Q = [
+     POOL holds 30: six per category. A run draws four from each of
+     the five categories (twenty in all), and the order is seeded:
+     makeDeal(seed) returns the same run for the same seed, and a
+     fresh Math.random seed each time the show begins. The categories
+     run in one shuffled order that repeats four times, so no two
+     consecutive questions share a category.
+     Every question's options are shuffled too, and the index of the
+     correct one is tracked with them. `a` in POOL is the index of the
+     correct option before the shuffle. */
+  var POOL = [
     ['UNDERTALE', 'What does the "ACT" button let you do?',
       ['Attack twice', 'Interact non-violently', 'Flee the battle', 'Use an item'], 1],
     ['TERRARIA', 'Which boss must be defeated to enter Hardmode?',
@@ -110,8 +117,64 @@
     ['ISAAC', 'How many hearts does Isaac start with?',
       ['2', '3', '4', '6'], 1],
     ['VALORANT', 'Which agent is a duelist known for flames?',
-      ['Sage', 'Phoenix', 'Cypher', 'Omen'], 1]
+      ['Sage', 'Phoenix', 'Cypher', 'Omen'], 1],
+
+    /* added: two more per category, same voice */
+    ['UNDERTALE', 'What does Papyrus want to be, more than anything?',
+      ['A royal guard', 'A chef', 'A comedian', 'A lawyer'], 0],
+    ['UNDERTALE', 'Who looks after the Ruins, and makes the pie?',
+      ['Asgore', 'Toriel', 'Undyne', 'Mettaton'], 1],
+    ['TERRARIA', 'What does the Guide NPC do?',
+      ['Sells potions', 'Explains crafting', 'Fights bosses', 'Guards the spawn'], 1],
+    ['TERRARIA', 'What is the usual first pickaxe made of?',
+      ['Wood', 'Copper', 'Iron', 'Gold'], 1],
+    ['MINECRAFT', 'Which item do you need to make a bed?',
+      ['Wool', 'Glass', 'Leather', 'Feathers'], 0],
+    ['MINECRAFT', 'What do you craft a torch with?',
+      ['Stick and coal', 'Stick and stone', 'Sand and dust', 'Paper and string'], 0],
+    ['ISAAC', 'Which room lets you buy an item with coins?',
+      ['Shop', 'Boss room', 'Secret room', 'Treasure room'], 0],
+    ['ISAAC', 'What opens a locked door in the basement?',
+      ['A key', 'A bomb', 'A coin', 'A card'], 0],
+    ['VALORANT', 'Which agent is the Sentinel who heals?',
+      ['Sage', 'Killjoy', 'Brimstone', 'Viper'], 0],
+    ['VALORANT', 'Which map has teleporters?',
+      ['Bind', 'Haven', 'Split', 'Ascent'], 0]
   ];
+  var PER_CAT = 4, seedNext = null;
+
+  /* mulberry-style LCG: small, deterministic, ES5 */
+  function rng(seed) {
+    var s = seed >>> 0;
+    return function () { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
+  }
+  function shuffle(a, r) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(r() * (i + 1)), t = a[i];
+      a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  /* A run: [category, question, options (shuffled), index of right one]. */
+  function makeDeal(seed) {
+    var r = rng(seed), cats = [], by = {}, out = [], k, c, n, order, idx, q;
+    for (k = 0; k < POOL.length; k++) {
+      c = POOL[k][0];
+      if (!by[c]) { by[c] = []; cats.push(c); }
+      by[c].push(POOL[k]);
+    }
+    shuffle(cats, r);
+    for (c in by) if (by.hasOwnProperty(c)) shuffle(by[c], r);
+    for (n = 0; n < PER_CAT; n++) {
+      for (k = 0; k < cats.length; k++) {
+        q = by[cats[k]][n];
+        idx = shuffle([0, 1, 2, 3], r);
+        out.push([q[0], q[1], idx.map(function (i) { return q[2][i]; }), idx.indexOf(q[3])]);
+      }
+    }
+    return out;
+  }
+  var deal = makeDeal((Math.random() * 4294967296) >>> 0);
 
   /* ── the board ──────────────────────────────────────────────────*/
   var RANKS = [
@@ -401,6 +464,8 @@
     stopTimers();
     stopPhase();
     clearFx();
+    deal = makeDeal(seedNext == null ? (Math.random() * 4294967296) >>> 0 : seedNext);
+    seedNext = null;
     i = 0; score = 0; locked = false; ended = false; leaving = false;
     dodged = false; shot = false;
     wrap.classList.remove('is-finale', 'is-off');
@@ -474,13 +539,13 @@
        run is its own flag, reset by begin(). */
     if (i === 10 && !dodged) { dodged = true; dodgeStart(8); return; }
     /* Round 2 Phase B: after the last question, SHOOT THE TARGETS. */
-    if (i >= Q.length && !shot) { shot = true; shootStart(8); return; }
-    if (i >= Q.length) { finish(); return; }
+    if (i >= deal.length && !shot) { shot = true; shootStart(8); return; }
+    if (i >= deal.length) { finish(); return; }
     state = 'ask';
     locked = false;
-    var q = Q[i];
+    var q = deal[i];
     if (elCat) elCat.textContent = q[0];
-    if (elNum) elNum.textContent = (i + 1) + ' / ' + Q.length + '   ·   ' + score + ' right';
+    if (elNum) elNum.textContent = (i + 1) + ' / ' + deal.length + '   ·   ' + score + ' right';
     if (elQ) { elQ.textContent = q[1]; again(elQ, 'is-in'); }
     pose('point', ['grin', 'smug', 'wink'][i % 3]);
     if (elOpts) {
@@ -522,7 +587,7 @@
     locked = true;
     state = 'reveal';
     clearInterval(tick); tick = null;
-    var q = Q[i], right = q[3];
+    var q = deal[i], right = q[3];
     var btns = elOpts ? elOpts.children : [];
     for (var k = 0; k < btns.length; k++) {
       if (k === right) btns[k].classList.add('is-right');
@@ -542,7 +607,7 @@
       pose('shrug', n < 0 ? 'sad' : 'shock');
       if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     }
-    if (elNum) elNum.textContent = (i + 1) + ' / ' + Q.length + '   ·   ' + score + ' right';
+    if (elNum) elNum.textContent = (i + 1) + ' / ' + deal.length + '   ·   ' + score + ' right';
     i++;
     later(ask, 1500);
   }
@@ -576,7 +641,7 @@
       elEnd.hidden = false;
       elEnd.innerHTML =
         '<p class="quiz__fin">AND THAT’S THE SHOW!</p>' +
-        '<p class="quiz__score"><b id="quizTally">0</b> / ' + Q.length + '</p>' +
+        '<p class="quiz__score"><b id="quizTally">0</b> / ' + deal.length + '</p>' +
         '<p class="quiz__rank" id="quizRank"></p>' +
         '<p class="quiz__doors" id="quizDoors"></p>' +
         '<button type="button" class="quiz__go" id="quizGoBtn">to the doors →</button>' +
@@ -616,7 +681,7 @@
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     var take = TAKES[runRank] || TAKES.Z;
     pose(take[0], take[1]);
-    host(score + ' OUT OF ' + Q.length + '! ' + (TENNA.rank[runRank] || ''));
+    host(score + ' OUT OF ' + deal.length + '! ' + (TENNA.rank[runRank] || ''));
     if (score >= 12) burst(50, fxW / 2, fxH * 0.45, 0, -420, 760);
     later(doors, 1300);
   }
@@ -673,7 +738,7 @@
     stopTimers();
     showRank(false);
     doorsLine();
-    host(score + ' OUT OF ' + Q.length + '! ' + TENNA.prizes);
+    host(score + ' OUT OF ' + deal.length + '! ' + TENNA.prizes);
     later(off, 500);
   }
 
@@ -1014,7 +1079,7 @@
       return;
     }
     if (e.key === 'Escape') { e.preventDefault(); leave(); return; }
-    if (phase || i >= Q.length) return;
+    if (phase || i >= deal.length) return;
     if (optionKey(e)) { e.preventDefault(); return; }
     var k = 'abcd'.indexOf(String(e.key).toLowerCase());
     if (k >= 0) { e.preventDefault(); answer(k); return; }
@@ -1033,6 +1098,7 @@
   });
 
   NEU.quiz = { open: open, close: close, skip: skip,
+               seed: function (n) { seedNext = n; }, makeDeal: makeDeal,
                fast: function (on) { fast = !!on; },
                get running() { return open_; },
                get score() { return score; },
@@ -1043,6 +1109,6 @@
                get look() { return { pose: look.pose, face: look.face }; },
                get limit() { return limit(); },
                get soul() { return { x: soul.x, y: soul.y }; },
-               questions: Q, ranks: RANKS,
+               get questions() { return deal; }, ranks: RANKS, pool: POOL,
                rankFor: rankFor, opens: opens };
 })();

@@ -15,9 +15,11 @@
 
    1. WRONG ARRANGEMENTS ARE FREE. Nothing is consumed until you take
       the result, and you can pick items back out with a click.
-   2. THE OUTPUT SLOT PREVIEWS. The instant the shape is right the
-      result appears, greyed, before you commit. Discovery should be
-      confirmed on the spot, not two clicks later.                   */
+   2. THE OUTPUT SLOT IS BLIND. It shows '?' while you place things; the
+      result is revealed only when you commit (click the slot). A right
+      shape yields the soup. A wrong commit gives a line from the pot
+      and every mushroom comes back to the tray. Trial and error is the
+      discovery, so the grid itself never says which shape is right.  */
 
 (function () {
   'use strict';
@@ -73,11 +75,10 @@
       trayEl.appendChild(lbl);
     }
     if (outEl) {
-      var good = matches();
-      outEl.className = 'craft__out' + (good ? ' is-ready' : '');
-      outEl.innerHTML = good
-        ? '<b>mushroom soup</b><span>click to take it</span>'
-        : '<span>nothing yet</span>';
+      outEl.className = 'craft__out' + (revealed ? ' is-ready' : '');
+      outEl.innerHTML = revealed
+        ? '<b>mushroom soup</b><span>taken</span>'
+        : '<span>?</span>';
     }
   }
 
@@ -86,15 +87,28 @@
     else if (held > 0) { grid[n] = 'M'; held--; }
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
     render();
-    if (matches() && sayEl) sayEl.textContent = 'that is the shape the pot is.';
   }
 
+  var revealed = false;                  /* the result shows only after a commit */
   var taken = false;                     /* the 3.2s close delay leaves the grid matching —
                                             one shot only, or Enter re-stacks wake timers */
+
+  /* A wrong commit: the pot refuses, the mushrooms come back. Nothing lost. */
+  function reject() {
+    var n = 0;
+    for (var i = 0; i < 9; i++) if (grid[i]) { grid[i] = null; held++; n++; }
+    if (!n) return;
+    if (sayEl) sayEl.textContent = 'the pot refuses it. your mushrooms come back to you.';
+    render();
+  }
+
+  function commit() { if (matches()) take(); else reject(); }
 
   function take() {
     if (taken || !matches()) return;
     taken = true;
+    revealed = true;
+    render();
     if (NEU.save) {
       for (var i = 1; i <= 5; i++) NEU.save.take('mush' + i);
       NEU.save.give('soup');
@@ -130,6 +144,7 @@
 
   function open() {
     taken = false;
+    revealed = false;
     /* Where to put the player back when they leave. Same courtesy the
        quiz and the settings panel give. Only captured once. */
     if (!lastFocus) lastFocus = document.activeElement;
@@ -153,7 +168,7 @@
     lastFocus = null;
   }
 
-  if (outEl) outEl.addEventListener('click', take);
+  if (outEl) outEl.addEventListener('click', commit);
   var q = document.getElementById('craftQuit');
   if (q) q.addEventListener('click', function () {
     close();
@@ -219,5 +234,6 @@
                 recipe: RECIPE,
                 matches: matches,
                 put: function (n) { click(n); },
-                take: take };
+                take: take,
+                commit: commit };
 })();

@@ -122,6 +122,45 @@
 
   function say(c, l, w) { c.say(l, w || 'narr'); }
 
+  /* Hint ladder. Each room counts its own resets (the engine only calls
+     onReset for a real reset: not a solved room, not R-spam). The third
+     reset gets a nudge about how to think; the sixth a firmer one. Neither
+     names the answer, and nothing is ever solved for you. */
+  var resets = {};
+  var HINTS = {
+    b2_blocks: [
+      ['the loose block is a decoy. it only stops things.',
+       'move the lane stones one push at a time, and keep the decoy out of the corners.'],
+      ['a stone in a corner stays there for good. count the walls before every push.',
+       'the lane stones have to go up and across, not straight up.']],
+    b3_braziers: [
+      ['the plaque and the lectern are both true, and neither is the whole order.',
+       'put the two together and see which place is still empty.'],
+      ['start from the brazier the plaque says comes before another.',
+       'the fourth one hangs off the first. the rest falls in around them.']],
+    b4_ice: [
+      ['every slide ends on ice. the ice decides where you stop, not you.',
+       'a plate only locks when a slide dies on it.'],
+      ['the ring runs both ways. the last plate is the one you have not stood beside.',
+       'walk round the south band before you step onto the ice.']],
+    b5_two: [
+      ['a stone on the ice keeps going until something stops it.',
+       'a plate only holds a stone that stopped on it.'],
+      ['the ice lane runs one way. a stone pushed off it has to be pushed back on.',
+       'count the pushes before you walk away from a stone.']],
+    b6_dark: [
+      ['the dark only hides the floor. carry the torch and look before you push.',
+       'a stone that is pushed into a niche does not come back out the way it went in.'],
+      ['the cross corridor is the only road the stones can take to the far alcoves.',
+       'a stone moves along a corridor. it never turns a corner by itself.']]
+  };
+  function resetHint(room) {
+    var k = resets[room] = (resets[room] || 0) + 1;
+    var h = HINTS[room];
+    if (!h || (k !== 3 && k !== 6) || !NEU.talk) return;
+    NEU.talk(h[k === 3 ? 0 : 1], 'narr');
+  }
+
   /* ── the woods' look ───────────────────────────────────────────────
      Every woods room carries one `woodsfloor` (its whole floor, painted
      once from this grid by js/act4/look-woods.js) and one `woodsfx` on
@@ -528,7 +567,7 @@
               'the loose block is a decoy. do not push it into a corner.',
               'press r if you make a mess of it. the room does not mind.']);
     },
-    onReset: function () { b2picked = ''; },
+    onReset: function () { b2picked = ''; resetHint('b2_blocks'); },
     onSolved: function (c) {
       c.markSolved('b2_blocks');
       if (NEU.quest) NEU.quest.bump('a4_rooms', 1);
@@ -551,9 +590,19 @@
      brazier held — the room shows you how far along you are. Get it
      wrong and the trench goes cold with the braziers. */
   var B3_ORDER = [2, 0, 3, 1];
+  /* The order, said only in part. Each clue is true of B3_ORDER and
+     true of no other way round on its own; together they admit exactly
+     one order (tests/fixes69.mjs checks all 24). Positions are read off
+     the floor: first is the west brazier, fourth the east one. */
+  var B3_CLUES = [
+    { k: 'before', a: 0, b: 1, where: 'plaque' },
+    { k: 'before', a: 2, b: 0, where: 'plaque' },
+    { k: 'after', a: 0, b: 3, where: 'lectern' }
+  ];
 
   E.register('b3_braziers', {
     tileset: 'castle',
+    clues: B3_CLUES,
     tiles: [
       '#######################',
       '#######################',
@@ -582,14 +631,15 @@
             ? ['a plaque. four notches, worn in a particular order.',
                'all four are still lit. you read it, and then you did it.']
             : ['a plaque. four notches, worn in a particular order.',
-               'third. first. fourth. second.'];
+               'the first is lit before the second.',
+               'the third is lit before the first.'];
         } },
       { t: 'sign', x: 2, y: 4, skin: 'lectern',
-        lines: ['four braziers and one order.',
-                'the plaque is on the east wall. read it before you touch the braziers.'] },
+        lines: ['four braziers, one order, and nobody to ask.',
+                'the fourth is lit straight after the first.'] },
       { t: 'exit', x: 22, y: 6, to: 'b4_ice', spawn: 'west', locked: 'solved:b3_braziers', style: 'gate',
         lines: ['an iron gate, cold to the touch.',
-                'it lifts when all four braziers hold. the plaque says in what order.'] },
+                'it lifts when all four braziers hold, lit in the order the room gives.'] },
       { t: 'exit', x: 0, y: 6, to: 'b2_blocks', spawn: 'east', style: 'curtain' },
       Q('sconce', 2, 1), Q('sconce', 20, 1),
       Q('urn', 1, 10, { solid: true }), Q('urn', 21, 10, { solid: true }),
@@ -602,7 +652,7 @@
       say(c, ['four braziers, all cold.',
               'there is a plaque on the east wall. it is worth reading.']);
     },
-    onReset: function () { b3seq = []; }
+    onReset: function () { b3seq = []; resetHint('b3_braziers'); }
   });
 
   var b3seq = [];
@@ -620,7 +670,7 @@
          reads as the game not registering the press. */
       for (var j = 0; j < es.length; j++) if (es[j].t === 'brazier') es[j].lit = false;
       b3seq = [];
-      c.say(['they all go out at once.', 'third. first. fourth. second.'], 'narr');
+      c.say(['they all go out at once.', 'the wrong one went first.'], 'narr');
       if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
       return;
     }
@@ -718,6 +768,7 @@
         if (es[i].t === 'plate') { any = true; if (!es[i].armed) return false; }
       return any;
     },
+    onReset: function () { resetHint('b4_ice'); },
     onSolved: function (c) {
       c.markSolved('b4_ice');
       if (NEU.quest) NEU.quest.bump('a4_rooms', 3);
@@ -726,42 +777,25 @@
     }
   });
 
-  /* ══ B5 — two plates, one of you ════════════════════════════════
-     Teaches that not every press is a push. The mirror holds the
-     second plate: stand in front of it, press e, and it turns to
-     face one plate or the other. The room only answers when you
-     stand where the mirror is looking — you hold one plate, the
-     mirror's gaze holds the other. It is nonsense and the room knows
-     it is nonsense, which is why it works: the castle locks its own
-     doors for fun. The old version used a push block; the block is
-     gone with the rest of them, and the mirror carries the whole
-     room now.
+  /* ══ B5 — the ice lane ═══════════════════════════════════════════
+     Teaches that a push on ice is a throw. A stone on the ice keeps
+     going until something stops it, so the lane is an aim, not a walk.
+     Two plates sit under the north wall; both stones have to come up
+     off the south half and stop on them, and the walls and pillars
+     decide where each one can stop.
 
-     LAYOUT. A gallery of mirrors. The big gilt one hangs in the middle
-     of the north wall; four smaller ones either side are dull and two
-     are cracked. The plates sit symmetrically at (5,5) and (15,5) in
-     brass settings. When the mirror looks at a plate, a dotted beam
-     runs from its glass to that plate and the plate's eye lights; stand
-     on the OTHER plate and your reflection appears on the held one —
-     the rule, drawn. */
-  var b5face = 0;   /* 0 = turned away, 1 = looks at the east plate, 2 = looks at the west plate */
-  function mirrorTurn(c) {
-    if (c.solved('b5_two')) { c.say(['the mirror is done with you. it looks at the wall now.'], 'narr'); return; }
-    b5face = (b5face + 1) % 3;
-    if (b5face === 0) c.say(['the mirror turns away from the room.'], 'narr');
-    else if (b5face === 1) c.say(['the mirror looks east. whatever stands over the east plate stands on the west one too.'], 'narr');
-    else c.say(['the mirror looks west. whatever stands over the west plate stands on the east one too.'], 'narr');
-    if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
-  }
+     LAYOUT. A gallery with one ice lane across its middle, a pillar
+     either side of the plates, and a lit path along the south wall. The
+     room never says where a stone should stop. */
   E.register('b5_two', {
     tileset: 'castle',
     tiles: [
       '#####################',
       '#####################',
       '#...................#',
-      '#..|.............|..#',
+      '#.|...............|.#',
       '#...................#',
-      '#....P.........P....#',
+      '#iiiiiiiiiiiiiiiiiii#',
       '#...................#',
       '#...................#',
       '#,,,,,,,,,,,,,,,,,,,#',
@@ -771,77 +805,61 @@
     ].join('\n'),
     shafts: [[10, 70, 20, 0, '#DCE8FF']],
     shade: 0.42,
-    /* look-castle.js reads where the mirror is looking (beam, glints) */
-    mirrorFace: function () { return b5face; },
     spawns: { west: { x: 1, y: 8, face: 'right' }, east: { x: 19, y: 8, face: 'left' } },
     entities: castleLook(12).concat([
-      { t: 'plate', x: 5, y: 5, id: 'L', skin: 'mirrorplate' },
-      { t: 'plate', x: 15, y: 5, id: 'R', skin: 'mirrorplate' },
-      { t: 'npc', x: 10, y: 1, colour: '#8A8598', mirror: true, skin: 'mirror',
-        run: function (c) { mirrorTurn(c); } },
-      { t: 'sign', x: 12, y: 3, skin: 'lectern',
-        lines: ['the mirror holds whatever it looks at.',
-                'stand where it looks.'] },
+      { t: 'plate', x: 5, y: 3, skin: 'mirrorplate' },
+      { t: 'plate', x: 15, y: 3, skin: 'mirrorplate' },
+      { t: 'block', x: 8, y: 6, push: true, skin: 'stoneblock' },
+      { t: 'block', x: 12, y: 9, push: true, skin: 'stoneblock' },
+      { t: 'sign', x: 9, y: 2, skin: 'lectern',
+        lines: ['the ice does not stop when you do.',
+                'a stone keeps running on it until something stops the stone.'] },
       { t: 'exit', x: 20, y: 8, to: 'b6_dark', spawn: 'west', locked: 'solved:b5_two', style: 'door',
-        lines: ['the door has a plate on each side of the room and one of you.',
-                'the mirror on the north wall is the other one. press e on it.'] },
+        lines: ['a door set into the east wall.',
+                'it opens when both plates hold a stone.'] },
       { t: 'exit', x: 0, y: 8, to: 'b4_ice', spawn: 'east', style: 'curtain' },
       Q('candelabra', 7, 3, { solid: true }), Q('candelabra', 13, 3, { solid: true }),
       Q('sconce', 1, 1), Q('sconce', 19, 1),
       Q('armour', 1, 10, { solid: true }), Q('armour', 19, 10, { solid: true }),
       Q('candles', 10, 10, { solid: true })
     ]).concat(columns([3, 3, 17, 3])),
-    /* One plate under the mirror's gaze, and you standing where it
-       looks. The mirror turns with e; the room counts what it looks
-       at as held. */
-    solved: function (c) {
-      if (!b5face) return false;
-      var p = c.player;
-      var cx = Math.floor(p.x / 16), cy = Math.floor((p.y - 1) / 16);
-      var onL = (cx === 5 && cy === 5), onR = (cx === 15 && cy === 5);
-      return (b5face === 1 && onR) || (b5face === 2 && onL);
-    },
     onEnter: function (c) {
-      b5face = 0;
       if (c.flagged('b5_seen')) return;
       c.flag('b5_seen', 1);
-      say(c, ['two plates. there is nobody to hold the second one.',
-              'the mirror on the north wall has opinions. press e on it.']);
+      say(c, ['two plates, two stones.',
+              'the ice lane runs across the room. read the sign before you push anything onto it.']);
     },
     onSolved: function (c) {
       c.markSolved('b5_two');
       if (NEU.quest) NEU.quest.bump('a4_rooms', 4);
-      say(c, ['the plate under you sinks.', 'the mirror holds the other one.',
-              'the door opens anyway.']);
+      say(c, ['the second stone settles onto its plate.',
+              'both plates hold. the door opens.']);
     },
-    onReset: function () { b5face = 0; }
+    onReset: function () { resetHint('b5_two'); }
   });
 
 /* ══ B6 — the torch ═════════════════════════════════════════════
-     A callback, not a reskin: the torch from the blackout, in a room
-     that is about remembering a shape rather than finding a door.
+     The dark is the puzzle, and the torch is the light you need to
+     solve it. The crypt is black: you see only what is near you, so
+     the plates in the far alcoves are a thing you have to go and find.
+     Take the torch from the bracket by the west door, and the light
+     walks with you. Put it back in the cresset and the whole crypt
+     comes up, for good, whether or not the stones are placed yet.
 
-     The dark is a function, not a number: the room answers the
-     darkness every frame, and the answer changes the moment the
-     torch is seated. While you carry the torch the light follows you
-     through the room (the engine's `light` hook) — the dark stops
-     being a wall the moment the light comes with you, which is the
-     whole lesson. Take it at (2,6), put it in the cresset at (10,6),
-     and the lights come back. The six blind alcoves are untouched —
-     they are the shape you are meant to remember.
+     The stones are the actual puzzle. Two plates lie in the alcoves at
+     each end, and two stones have to be pushed onto them through the
+     one-cell corridors. A stone cannot turn a corner, and a stone in a
+     corridor corner is gone for good.
 
      LAYOUT. A crypt: the alcoves are sealed niches, a sarcophagus in
      each, cobwebs in every corner, bones where the dark was kindest.
-     The torch hangs in a bracket by the west door (solid, so it can be
-     found by touch); the cresset stands on scorched stone in the very
-     middle of the cross-corridor. Lit, the room is a different place:
-     you see for the first time what you walked past. */
+     The torch hangs in a bracket by the west door; the cresset stands
+     on scorched stone in the middle of the cross-corridor. */
   var b6carry = false, b6lit = false;
   function takeTorch(c) {
     if (b6carry) { c.say(['you already have it.'], 'narr'); return; }
     b6carry = true;
-    /* the torch leaves the wall when it leaves the room with you —
-       it was solid so it could be found by touch in the dark */
+    /* the torch leaves the wall when it leaves the room with you */
     var es = c.ents();
     for (var i = 0; i < es.length; i++)
       if (es[i].torch) es[i].dead = true;
@@ -849,11 +867,9 @@
     c.say(['you take the torch. the light walks with you.'], 'narr');
   }
   function placeTorch(c) {
-    if (c.solved('b6_dark')) { c.say(['the socket is lit. it has been lit since you were last here.'], 'narr'); return; }
+    if (b6lit) { c.say(['the socket is lit. it has been lit since you were last here.'], 'narr'); return; }
     if (!b6carry) { c.say(['a socket in the wall, empty.', 'it is waiting for a light.'], 'narr'); return; }
     b6carry = false; b6lit = true;
-    c.markSolved('b6_dark');
-    if (NEU.quest) NEU.quest.bump('a4_rooms', 5);
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
     c.say(['it fits. light pours back into the room.'], 'narr');
   }
@@ -876,18 +892,19 @@
     spawns: { west: { x: 1, y: 6, face: 'right' }, east: { x: 18, y: 6, face: 'left' },
               default: { x: 1, y: 6, face: 'right' } },
     entities: castleLook(12).concat([
-      { t: 'npc', x: 2, y: 6, colour: '#E4A64A', solid: true, torch: true, skin: 'walltorch',
+      { t: 'npc', x: 2, y: 6, colour: '#E4A64A', torch: true, skin: 'walltorch',
         run: function (c) { takeTorch(c); } },
       { t: 'npc', x: 10, y: 6, colour: '#5A5470', socket: true, skin: 'cresset',
         run: function (c) { placeTorch(c); } },
+      { t: 'plate', x: 2, y: 2, skin: 'stoneplate' },
+      { t: 'plate', x: 17, y: 10, skin: 'stoneplate' },
+      { t: 'block', x: 6, y: 6, push: true, skin: 'stoneblock' },
+      { t: 'block', x: 14, y: 6, push: true, skin: 'stoneblock' },
       { t: 'exit', x: 19, y: 6, to: 'b7_altar', spawn: 'west', locked: 'solved:b6_dark', style: 'gate',
         lines: ['an iron gate. there is no light on the other side of it either.',
-                'it will not lift for somebody standing in the dark.'] },
+                'it lifts when both alcove plates hold a stone.'] },
       { t: 'exit', x: 0, y: 6, to: 'b5_two', spawn: 'east', style: 'arch' },
-      /* no wall torches here: the dark is the puzzle */
       Q('bones', 6, 2), Q('bones', 13, 10, { seed: 1 }), Q('rubble', 18, 2), Q('bones', 1, 10),
-      /* nothing solid in the corridors: they are one cell wide and the
-         dark is enough of an obstacle */
       Q('candles', 6, 10, { lightIf: 'solved:b6_dark' }), Q('rubble', 1, 2)
     ]),
     onEnter: function (c) {
@@ -902,7 +919,13 @@
     },
     dark: function () { return b6lit ? 0 : 108; },
     light: function (c) { return b6carry ? { x: c.player.x, y: c.player.y } : null; },
-    onReset: function () { b6carry = false; b6lit = false; }
+    onSolved: function (c) {
+      c.markSolved('b6_dark');
+      b6lit = true;
+      if (NEU.quest) NEU.quest.bump('a4_rooms', 5);
+      say(c, ['the second stone settles.', 'the crypt lights itself. the gate lifts.']);
+    },
+    onReset: function () { b6carry = false; b6lit = false; resetHint('b6_dark'); }
   });
 
   /* ══ B7 — the altar ══════════════════════════════════════════════

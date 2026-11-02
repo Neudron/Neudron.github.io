@@ -173,7 +173,7 @@
       var m = ms(Math.abs(n.t - sp));
       if (m <= WINDOW_MS && m < bm) { bm = m; best = n; }
     }
-    if (!best) return;                  /* ghost tap: forgiven, no penalty */
+    if (!best) { judge(4, 0); return; } /* ghost tap: a miss, so mashing cannot farm health */
     best.hit = true;
     confirmAt[1][lane] = singAt[1] = now(); singLane[1] = lane;
     if (bm <= EDGE[0] && !still()) splashes.push({ l: lane, t: now() });

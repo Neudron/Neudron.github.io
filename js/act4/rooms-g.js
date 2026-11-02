@@ -38,8 +38,8 @@
 
    THE VENDING MACHINE:
    You have no money and the game never pretends otherwise. The verb is
-   punching, it takes six goes, and the machine complains more each
-   time. A "buy" prompt with no currency would be a puzzle about
+   choosing: three machines, one decision, and each one says what it
+   costs. A "buy" prompt with no currency would be a puzzle about
    noticing you cannot buy things, which is not a puzzle.             */
 
 (function () {
@@ -126,6 +126,11 @@
         if (STYLE[n] === 'door') out.push(P('rope', doorX(n), 2, { lock: 'rank:' + r, rank: r }));
       });
       out.push({ t: 'save', x: 30, y: 4 });
+      /* the way down to the storm. Rank A or better opens it. T is a
+         room of its own, cosmetic, and is not on this path. */
+      out.push({ t: 'exit', x: 31, y: 5, to: 'h1_storm', spawn: 'top', style: 'stairs', locked: 'rank:A',
+                 lines: ['stairs down, behind a velvet rope. the rope wants an A.',
+                         'the best room is a nice room. it is not the way down.'] });
       out.push(P('podium', 16, 7, { solid: true,
                  lines: ['PRIZE CORRIDOR. one door per rank.',
                          'complaints go in the bin. there is no bin.'] }));
@@ -133,6 +138,9 @@
       return out;
     })(),
     onEnter: function (c) {
+      /* an old save at T or S already holds the A flag once it reads
+         the quiz; this makes sure a save with only the T flag passes */
+      if (NEU.save && (NEU.save.flagged('rank:T') || NEU.save.flagged('rank:S'))) NEU.save.flag('rank:A', 1);
       if (c.flagged('g0_seen')) return;
       c.flag('g0_seen', 1);
       var rank = (NEU.save && NEU.save.flag('quiz_rank')) || 'Z';
@@ -328,61 +336,61 @@
     spawns: { door: { x: 15, y: 17, face: 'up' } },
     entities: [
       { t: 'prizefloor', v: 'h2', x: 0, y: 0 },
-      { t: 'prizenpc', v: 'vending', x: 15, y: 8, solid: true, colour: '#E4C46A', look: 'vending',
-        run: function (c) { punch(c); } },
+      /* three machines, one decision: the first slot you use is the
+         only one that works. Every slot leads to the same trip. */
+      { t: 'prizenpc', v: 'vend_a', x: 12, y: 8, solid: true, colour: '#E4C46A', look: 'vending',
+        run: function (c) { vend(c, 0); } },
+      { t: 'prizenpc', v: 'vend_b', x: 15, y: 8, solid: true, colour: '#E4C46A', look: 'vending',
+        run: function (c) { vend(c, 1); } },
+      { t: 'prizenpc', v: 'vend_c', x: 18, y: 8, solid: true, colour: '#E4C46A', look: 'vending',
+        run: function (c) { vend(c, 2); } },
       { t: 'exit', x: 15, y: 18, to: 'h1_storm', spawn: 'door', style: 'hatch' },
       P('aframe', 12, 11, { lines: ['OUT OF ORDER.', 'the sign is not on the machine. it is on the room.'] }),
-      P('mbin', 17, 8, { solid: true }), P('crate2', 4, 15, { solid: true }), P('crate2', 5, 15, { solid: true, k: 1 }),
+      P('mbin', 21, 8, { solid: true }), P('crate2', 4, 15, { solid: true }), P('crate2', 5, 15, { solid: true, k: 1 }),
       P('pillar', 5, 4), P('pillar', 25, 4), P('pillar', 5, 13), P('pillar', 25, 13),
       P('coin', 22, 11, { lines: ['a coin.', 'it is painted on the floor. someone thought that was funny.'] })
     ],
     onEnter: function (c) {
-      /* The trip is committed on the fifth punch, so a reload before the
+      /* The trip is committed on the decision, so a reload before the
          eat has played lands here tripping: carry on to h3 from here. A
          save from before that change holds nutz and no trip; finish it. */
       if (NEU.save && NEU.save.has('nutz')) { NEU.save.take('nutz'); NEU.save.flag('tripping', 1); }
       if (c.flagged('tripping')) { setTimeout(function () { c.go('h3_trip', 'in'); }, 600); return; }
       if (c.flagged('h2_seen')) return;
       c.flag('h2_seen', 1);
-      say(c, ['a vending machine, humming, alone, in the biggest room in the world.',
-              'one item. slot D4. "Deez Nutz".',
-              'you have no money. you have never had any money.']);
+      say(c, ['three vending machines, humming, in the biggest room in the world.',
+              'left: "DEEZ NUTZ". middle: a can with no label. right: a packet that says HOLD ME.',
+              'you have no money. you can take one. the machines will not give you a second.']);
     }
   });
 
-  var PUNCH = [
-    'you hit the vending machine. it does not comment.',
-    'you hit it again. it makes a note of this.',
-    'the bag moves about a centimetre. the machine sighs.',
-    'the machine says something in a language of servos.',
-    'it is very nearly over the edge. so is the machine.',
-    'the bag drops. the machine turns its light off, pointedly.'
+  /* The decision. Each slot says what it costs and then leads to the
+     same trip; the flag vend_pick records which one, and once any slot
+     has been used the others are spent. */
+  var VEND = [
+    ['you take DEEZ NUTZ. the bag drops.',
+     'you eat them, standing up, in a storm. fast, certain, and no bag to keep.'],
+    ['you take the can. it is cold, and then it is not.',
+     'you drink all of it in the rain. no bag, no souvenir, and a faint sense of having been warned.'],
+    ['you take the packet that says HOLD ME. you hold it.',
+     'you open it slowly, which is somehow worse. the trip is the same. only the wait was yours.']
   ];
 
-  function punch(c) {
-    var n = (NEU.save && NEU.save.flag('punches')) || 0;
-    if (n >= PUNCH.length) { c.say(['it has turned its light off. that is a boundary.'], 'narr'); return; }
-    c.say([PUNCH[n]], 'narr');
+  function vend(c, n) {
+    if (NEU.save && NEU.save.flagged('vend_pick')) {
+      c.say(['the machines have made their one decision. they are not taking another.'], 'narr');
+      return;
+    }
+    if (NEU.save) { NEU.save.flag('vend_pick', n + 1); NEU.save.flag('tripping', 1); }
+    if (NEU.quest) { NEU.quest.mark('a4_nutz'); NEU.quest.mark('a4_trip'); }
+    c.say(VEND[n], 'narr');
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     /* SMALL: a hit landed, on a machine */
     if (NEU.juice && NEU.juice.hit) NEU.juice.hit('small');
-    n++;
-    if (NEU.save) NEU.save.flag('punches', n);
-    if (n >= PUNCH.length) {
-      /* The trip is written in this same step, not 2.6s later: a reload
-         anywhere after this point must not leave the trip unset. The
-         timer below only narrates and moves you. */
-      if (NEU.save) NEU.save.flag('tripping', 1);
-      if (NEU.quest) { NEU.quest.mark('a4_nutz'); NEU.quest.mark('a4_trip'); }
-      setTimeout(function () { eat(c); }, 2600);
-    }
+    setTimeout(function () { trip(c); }, 2600);
   }
 
-  function eat(c) {
-    c.say(['you eat them, standing up, in a storm, out of a machine you assaulted.',
-           'they are fine.',
-           '...',
-           'they are not fine.'], 'narr');
+  function trip(c) {
     document.body.classList.add('is-trip');
     setTimeout(function () { c.go('h3_trip', 'in'); }, 5200);
   }
