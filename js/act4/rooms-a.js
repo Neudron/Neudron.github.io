@@ -430,22 +430,17 @@
     }
   }
 
-  /* ══ B2 — the riddle stones ══════════════════════════════════════
-     Teaches the rule: read the room, press e on the thing you believe,
-     and r if you are wrong — which is announced the first time you
-     enter rather than hidden in a manual. There are no blocks here and
-     never will be; every other room in the castle had one until this
-     one taught the press and the reset. The answer is on the wall and
-     the two wrong stones are not "the game is unfair", they are the
-     lesson that a wrong press costs nothing but your time.
+  /* ══ B2 — the riddle and stone lanes ══════════════════════════════
+     The ash answer is visible on the wall. After the riddle, move two
+     blocks up parallel lanes onto their plates. Each needs six pushes.
+     A third block is a decoy; its north-west corner is a reachable
+     deadlock. R remains the safe reset, and there is no timer.
 
-     LAYOUT. A dim scriptorium. The riddle is a carved relief across the
-     whole north wall (a bowl at one end, a fire at the other), and the
-     three loose stones stand in a row under it, each cut with its own
-     sign and named on a brass plate at its foot: FRIEND, ASH, PLEASE.
-     Two urns of ash flank the relief — the room's answer in plain sight
-     — and the floor medallion repeats it (a bowl in a flame). The lit
-     path runs straight from the west arch to the sealed east door. */
+     LAYOUT. A dim scriptorium. The riddle is carved into the north
+     wall; the three loose stones stand beneath it. Farther south, two
+     marked lanes lead to pale plates, while one plain block has no
+     target. The room shows the answer and the risk before either is
+     needed. */
   var b2picked = '';
   function pickStone(c, word) {
     if (b2picked) return;   /* one press per attempt; r to try again */
@@ -455,11 +450,9 @@
       if (es[i].t === 'npc' && es[i].stone)
         es[i].colour = es[i].stone === word ? '#E4C46A' : '#2A2A38';
     if (word === 'ash') {
-      c.markSolved('b2_blocks');
-      if (NEU.quest) NEU.quest.bump('a4_rooms', 1);
       if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
-      c.say(['the ash stone sinks into the wall.',
-             'the way east is open.']);
+      c.say(['the ash falls into the bowl.',
+             'the two pale plates wake. the third block is not for them.']);
       return;
     }
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
@@ -474,10 +467,10 @@
       '#####################',
       '#...................#',
       '#.|...............|.#',
-      '#...................#',
-      '#...................#',
+      '#.....=.......=.....#',
+      '#.....=.......=.....#',
       '#,,,,,,,,,,,,,,,,,,,#',
-      '#...................#',
+      '#.....=...=...=.....#',
       '#.|...............|.#',
       '#...................#',
       '#...................#',
@@ -497,7 +490,7 @@
         lines: function (s) {
           return s.flagged('solved:b2_blocks')
             ? ['the riddle is answered. the ash went where it was paid to go.',
-               'the stone is sunk flush into the wall now. it has stopped pretending to be a word.']
+               'two stones rest on the plates. the third is still a decoy.']
             : ['a riddle, cut into the wall.',
                'i am what the fire leaves, what the bowl wants,',
                'and what her door is paid with. press the right stone.'];
@@ -508,11 +501,16 @@
       { t: 'sign', x: 3, y: 5, skin: 'lectern',
         lines: ['a wall of three loose stones, each with a word.',
                 'the bowl wants what the fire leaves.'] },
+      { t: 'plate', x: 6, y: 3, skin: 'stoneplate' },
+      { t: 'plate', x: 14, y: 3, skin: 'stoneplate' },
+      { t: 'block', x: 6, y: 9, push: true, skin: 'stoneblock' },
+      { t: 'block', x: 14, y: 9, push: true, skin: 'stoneblock' },
+      { t: 'block', x: 10, y: 6, push: true, skin: 'stoneblock', decoy: true },
       { t: 'exit', x: 20, y: 6, to: 'b3_braziers', spawn: 'west', locked: 'solved:b2_blocks', style: 'door',
         lines: ['a door with no handle, set flush in the wall.',
-                'it is waiting for one of the three stones. read the wall.'] },
+                'it opens when both pale plates hold a stone.'] },
       { t: 'exit', x: 0, y: 6, to: 'b1_throne', spawn: 'north', style: 'arch' },
-      Q('urn', 5, 2, { solid: true }), Q('urn', 15, 2, { solid: true }),
+      Q('urn', 4, 2, { solid: true }), Q('urn', 16, 2, { solid: true }),
       Q('candelabra', 4, 9, { solid: true }), Q('candelabra', 16, 9, { solid: true }),
       Q('books', 1, 10, { solid: true }), Q('books', 19, 10, { solid: true }),
       Q('sconce', 3, 1), Q('sconce', 17, 1),
@@ -526,9 +524,17 @@
       say(c, ['the way east is a wall of three loose stones.',
               'each one has a word. one of them is the word.',
               'read the riddle. press e on the stone you believe.',
+              'then push the two lane stones onto the plates above them.',
+              'the loose block is a decoy. do not push it into a corner.',
               'press r if you make a mess of it. the room does not mind.']);
     },
-    onReset: function () { b2picked = ''; }
+    onReset: function () { b2picked = ''; },
+    onSolved: function (c) {
+      c.markSolved('b2_blocks');
+      if (NEU.quest) NEU.quest.bump('a4_rooms', 1);
+      say(c, ['the last stone settles into its plate.',
+              'the bowl and the floor answer together. the east door opens.']);
+    }
   });
 
   /* ══ B3 — the braziers ═══════════════════════════════════════════

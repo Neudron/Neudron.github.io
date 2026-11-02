@@ -640,6 +640,13 @@ body.is-scrolled .cue { opacity: 0; pointer-events: none; }
 }
 .sans__btn:hover img { transform: translateY(-4px); }
 .sans__btn:focus-visible { outline: 2px solid var(--edge); outline-offset: 5px; }
+.sans__secret {
+  position: absolute; left: -28px; top: 2px; width: 40px; height: 40px;
+  padding: 0; color: var(--accent); background: transparent; border: 0;
+  font: 20px/1 var(--font-quest); cursor: pointer;
+}
+.sans__secret:hover { color: var(--edge); }
+.sans__secret:focus-visible { outline: 2px solid var(--edge); outline-offset: 1px; }
 
 /* the totem, popping over his head — same keyframes as the cat, just
    scaled by --pk. small, as asked. */
@@ -1035,6 +1042,25 @@ body.is-playing { overflow: hidden; }
 .sleep__blanket { left: 0; bottom: 0; width: 250px; }
 .sleep__sans    { left: 26px;  bottom: 16px; width: 46px;  transform: rotate(-90deg); }
 .sleep__dog     { left: 108px; bottom: 20px; width: 92px; }
+.sleep__beat {
+  position: absolute; left: -12px; bottom: 146px; z-index: 2;
+  width: min(272px, calc(100vw - 32px)); padding: 10px;
+  color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line); box-shadow: 3px 3px 0 var(--shadow);
+  font: 12px/1.4 var(--font-quest);
+}
+.sleep__beat p { margin: 0 0 7px; }
+.sleep__progress { height: 6px; margin: 0 0 8px; background: var(--line); }
+.sleep__progress span { display: block; width: 0; height: 100%; background: var(--accent); }
+.sleep__beat button {
+  min-height: 36px; margin-right: 5px; padding: 5px 9px;
+  color: var(--ink); background: var(--paper); border: 1px solid var(--line);
+  font: inherit; cursor: pointer;
+}
+.sleep__beat button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .sleep__progress span { transition: none !important; }
+}
 
 /* ── the console ──────────────────────────────────────────────────
    It is a real object you take, so it has to look takeable: it bobs

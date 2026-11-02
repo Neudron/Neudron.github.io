@@ -103,6 +103,7 @@
   <button class="sans__btn" id="sansBtn" aria-label="Talk to sans">
     <img src="img/act123/sans-idle.png" alt="" width="23" height="30" draggable="false">
   </button>
+  <button class="sans__secret" id="sansSecret" type="button" aria-label="Inspect the little star">✦</button>
   <!-- the totem pops here, over his head. src is set in js with a
        cache-buster so the animation restarts from frame one. -->
   <div class="pop" id="sansPop" aria-hidden="true"><img id="sansPopImg" alt="" width="52" height="52"></div>
@@ -435,6 +436,12 @@
     <span class="zzz zzz--1" aria-hidden="true">Z</span>
     <span class="zzz zzz--2" aria-hidden="true">Z</span>
     <span class="zzz zzz--3" aria-hidden="true">Z</span>
+    <div class="sleep__beat" id="sleepBeat" hidden>
+      <p id="sleepBeatText" aria-live="polite">hold for 10 seconds to let them sleep, or skip.</p>
+      <div class="sleep__progress" id="sleepBeatProgress" role="progressbar" aria-label="sleeping" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0"><span></span></div>
+      <button type="button" id="sleepHold">hold to sleep</button>
+      <button type="button" id="sleepSkip">skip</button>
+    </div>
     <img class="sleep__chair" id="armchair" src="img/act4/undertale/armchair.png" alt="" width="45" height="83" decoding="async" loading="lazy" hidden>
     <button class="sleep__sw" id="sleepSwitch" aria-label="take the console" hidden>
       <img src="img/switch2.svg" alt="" width="16" height="7" decoding="async" loading="lazy">

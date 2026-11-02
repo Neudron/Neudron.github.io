@@ -56,6 +56,7 @@
   var talks = 0, through = false, fixed = false;
   var found = false;
   var face = 'down', walked = 0, moving = false;
+  var routeUntil = 0, idleSince = 0, presence = 0;
   var debris = [];
 
   /* YOU is the youWalk sheet: one column per facing, one row per step,
@@ -169,6 +170,11 @@
     if (mode === 'walk') {
       px = Math.min(Math.max(px + dx, 12), innerWidth - 12);
       py = Math.min(Math.max(py + dy, 12), innerHeight - 12);
+      if (moving) { idleSince = now; presence = 0; }
+      else if (now - idleSince > 6000) {
+        var reducedMotion = !!(NEU.motion && NEU.motion.reduced && NEU.motion.reduced());
+        presence = reducedMotion ? 1 : Math.min(1, (now - idleSince - 6000) / 5000);
+      }
     } else {
       px = Math.min(Math.max(px + dx, 20), W - 20);
       py = Math.min(Math.max(py + dy, 20), H - 20);
@@ -195,6 +201,17 @@
          walking around on the site rather than on a picture of it. */
       ctx.clearRect(0, 0, w, h);
       var r = swRect();
+      if (r && now < routeUntil) {
+        var tx = r.left + r.width / 2, ty = r.top + r.height / 2;
+        ctx.save();
+        ctx.globalAlpha = 0.68;
+        ctx.strokeStyle = '#D8C8FF';
+        ctx.lineWidth = 2;
+        if (ctx.setLineDash) ctx.setLineDash([5, 7]);
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(tx, ty); ctx.stroke();
+        if (ctx.setLineDash) ctx.setLineDash([]);
+        ctx.restore();
+      }
       if (r) {
         var on = onSwitch();
         ctx.globalAlpha = on ? 0.9 : (0.34 + 0.12 * Math.sin(now / 380));
@@ -203,6 +220,14 @@
         ctx.fillRect((r.left - 8) | 0, (r.bottom + 5) | 0, (r.width + 16) | 0, 3);
         ctx.fillRect((r.left - 8) | 0, (r.top - 8) | 0, 3, (r.height + 16) | 0);
         ctx.fillRect((r.right + 5) | 0, (r.top - 8) | 0, 3, (r.height + 16) | 0);
+        ctx.globalAlpha = 1;
+      }
+      if (presence > 0) {
+        var calm = !!(NEU.motion && NEU.motion.reduced && NEU.motion.reduced());
+        var ghostX = px - 74 + (calm ? 0 : presence * 34);
+        ctx.globalAlpha = 0.34 * presence;
+        ctx.fillStyle = '#8B78A8';
+        ctx.beginPath(); ctx.ellipse(ghostX, py - 4, 15 + 7 * presence, 28, 0, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
       }
       drawPlayer(px | 0, py | 0);
@@ -300,6 +325,8 @@
     mode = 'walk';
     wrap.classList.add('is-walk');
     px = innerWidth / 2; py = innerHeight * 0.62;
+    routeUntil = performance.now() + 6000;
+    idleSince = performance.now(); presence = 0;
     face = 'up'; walked = 0;
     say('you are back on the page. the switch is where you left it.');
   }
@@ -321,6 +348,7 @@
     mode = 'dark';
     torch = LIGHT;
     if (endless) { talks = 0; through = false; walked = 0; px = 420; py = 380; }
+    routeUntil = 0; idleSince = performance.now(); presence = 0;
     wrap.classList.remove('is-walk');
     wrap.hidden = false;
     NEU.activeMinigame = 'dark';        /* the room underneath must not move or take Escape */
@@ -353,6 +381,7 @@
   function reset() {
     mode = 'dark';
     talks = 0; through = false; fixed = false; found = false;
+    routeUntil = 0; idleSince = 0; presence = 0;
     px = 420; py = 380; walked = 0; face = 'down';
     if (wrap) wrap.classList.remove('is-walk');
   }

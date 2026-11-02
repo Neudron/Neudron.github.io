@@ -31,6 +31,7 @@
 
   var sans   = document.getElementById('sans');
   var btn    = document.getElementById('sansBtn');
+  var secret = document.getElementById('sansSecret');
   var pop    = document.getElementById('sansPop');
   var sword  = document.getElementById('sword');
   var tbox   = document.getElementById('tbox');
@@ -955,6 +956,17 @@
   }
 
   /* ── click sans ─────────────────────────────────────────────────*/
+  if (secret) secret.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (NEU.save && NEU.save.flagged && NEU.save.flagged('act1:star')) {
+      say(['the tiny star is still there. it does not need anything.']);
+      return;
+    }
+    if (NEU.save && NEU.save.flag) NEU.save.flag('act1:star', 1);
+    say(['the little star was tucked behind his sleeve.',
+         'it is warm. somebody left it here for you.']);
+  });
+
   btn.addEventListener('click', function () {
     /* Feeding him beats everything else he might have to say. */
     if (hasFood) { summonDog(); return; }
@@ -1639,6 +1651,65 @@
   var tvEl        = document.getElementById('tv');
   var tvLbl       = document.getElementById('tvLbl');
   var asleep = false, switchSeen = false, docked = false;
+  var sleepBeat = document.getElementById('sleepBeat');
+  var sleepHold = document.getElementById('sleepHold');
+  var sleepSkip = document.getElementById('sleepSkip');
+  var sleepBeatText = document.getElementById('sleepBeatText');
+  var sleepBeatProgress = document.getElementById('sleepBeatProgress');
+  var sleepBeatTimer = 0, sleepBeatStart = 0;
+
+  function sleepBeatDone() {
+    return !!(NEU.save && NEU.save.flagged && NEU.save.flagged('sleep:beat'));
+  }
+  function finishSleepBeat(skipped) {
+    if (sleepBeatTimer) { clearInterval(sleepBeatTimer); sleepBeatTimer = 0; }
+    if (!sleepBeat) return;
+    if (NEU.save && NEU.save.flag) NEU.save.flag('sleep:beat', 1);
+    if (sleepBeatText) sleepBeatText.textContent = skipped ? 'they rest. you let the room be.' : 'they are asleep. the room is quiet.';
+    if (sleepBeatProgress) {
+      sleepBeatProgress.setAttribute('aria-valuenow', skipped ? '0' : '10');
+      sleepBeatProgress.firstElementChild.style.width = skipped ? '0%' : '100%';
+    }
+    sleepBeat.hidden = true;
+  }
+  function stopSleepBeat() {
+    if (sleepBeatTimer) { clearInterval(sleepBeatTimer); sleepBeatTimer = 0; }
+    if (sleepBeatProgress) {
+      sleepBeatProgress.setAttribute('aria-valuenow', '0');
+      sleepBeatProgress.firstElementChild.style.width = '0%';
+    }
+    if (sleepBeatText) sleepBeatText.textContent = 'hold for 10 seconds to let them sleep, or skip.';
+  }
+  function startSleepBeat() {
+    if (sleepBeatTimer || !sleepBeat || sleepBeat.hidden) return;
+    sleepBeatStart = Date.now();
+    if (sleepBeatText) sleepBeatText.textContent = 'you stay. they settle.';
+    sleepBeatTimer = setInterval(function () {
+      var seconds = Math.min(10, (Date.now() - sleepBeatStart) / 1000);
+      if (sleepBeatProgress) {
+        sleepBeatProgress.setAttribute('aria-valuenow', String(Math.floor(seconds)));
+        sleepBeatProgress.firstElementChild.style.width = (seconds * 10) + '%';
+      }
+      if (seconds >= 10) finishSleepBeat(false);
+    }, 80);
+  }
+  if (sleepHold) {
+    sleepHold.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      if (sleepHold.setPointerCapture && e.pointerId !== undefined) sleepHold.setPointerCapture(e.pointerId);
+      startSleepBeat();
+    });
+    sleepHold.addEventListener('pointerup', stopSleepBeat);
+    sleepHold.addEventListener('pointercancel', stopSleepBeat);
+    sleepHold.addEventListener('keydown', function (e) {
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); startSleepBeat(); }
+    });
+    sleepHold.addEventListener('keyup', function (e) {
+      if (e.key === ' ' || e.key === 'Enter') stopSleepBeat();
+    });
+  }
+  if (sleepSkip) sleepSkip.addEventListener('click', function () { finishSleepBeat(true); });
+  window.addEventListener('blur', stopSleepBeat);
 
   /* The hand lands where the dog actually is rather than at a fixed
      spot, so it reads as petting THAT dog and not as a cursor. */
@@ -1832,6 +1903,7 @@
     if (sleepEl) {
       sleepEl.hidden = false;
       requestAnimationFrame(function () { sleepEl.classList.add('is-in'); });
+      if (sleepBeat && !sleepBeatDone()) sleepBeat.hidden = false;
     }
     if (tvEl) {
       tvEl.hidden = false;
@@ -2082,6 +2154,7 @@
     if (has('sleep')) {
       asleep = true; wantSleep = false;
       if (sleepEl) { sleepEl.hidden = false; sleepEl.classList.add('is-in'); }
+      if (sleepBeat && !sleepBeatDone()) sleepBeat.hidden = false;
       if (tvEl)    { tvEl.hidden = false; tvEl.classList.add('is-in'); }
     }
     if (has('console')) { switchSeen = true; if (sleepSw) sleepSw.hidden = false; }
