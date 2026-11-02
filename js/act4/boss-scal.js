@@ -2147,12 +2147,12 @@
     meleeCd = 0; grazeAt = -9;
     myShots = []; charging = false; chargeF = 0; shotCd = 0; myBeam = null;
     willCharge = false;
-    /* 540: the rework's 720 cut by a quarter. The fight runs 4-5 minutes
+    /* 783: 540 (the rework's 720 cut by a quarter) raised 45 % after the player buffs (4-dmg split fireball, BRIMSTONE laser). The fight runs 4-5 minutes
        before desperation, with the attack pool, the bags and the combos
        filling it. Every phase gate in damageTarget is a FRACTION of bossMax,
        so they rescale for free, and core/music.js takes hpMax from the first
        reading per fight. */
-    bossMax = 540; bossHP = bossMax; phase = 1; held = false; shotsFired = 0;
+    bossMax = 783; bossHP = bossMax; phase = 1; held = false; shotsFired = 0;
     pvx = 0; pvy = 0;
     /* dev `skip` to a phase (dev.js): start the boss at a share of its HP,
        once, so the next fight starts full again */
