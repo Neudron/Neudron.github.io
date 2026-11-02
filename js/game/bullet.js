@@ -608,6 +608,7 @@
      score is how long you lasted. Same module, one flag. */
   var endless = false;
   function open(opts) {
+    if (NEU.settings && NEU.settings.warnFlash) NEU.settings.warnFlash();
     if (running) return;                 /* already mid-run — never stack a second loop */
     endless = !!(opts && opts.endless);
     NEU.activeMinigame = 'bullet';

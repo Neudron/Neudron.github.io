@@ -60,7 +60,9 @@
   var beams  = wrap.querySelectorAll('.quiz__beam');
   function lights(on) { for (var k = 0; k < beams.length; k++) beams[k].hidden = !on; }
 
-  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var reduced = (window.NEU && window.NEU.motion) ? window.NEU.motion.reduced() : matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* NEU.motion (motion.js) is the one source; it can change live. */
+  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) { reduced = r; });
 
   /* ── the questions ──────────────────────────────────────────────
      Four per game, rotating, so no two consecutive questions share a

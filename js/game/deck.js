@@ -47,7 +47,9 @@
   var elBatt  = document.getElementById('deckBattTxt');
   var elFill  = document.getElementById('deckBattFill');
 
-  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var reduced = (window.NEU && window.NEU.motion) ? window.NEU.motion.reduced() : matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* NEU.motion (motion.js) is the one source; it can change live. */
+  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) { reduced = r; });
 
   /* ── cover art ──────────────────────────────────────────────────
      Six of the seven tiles used to be two letters on a gradient. That

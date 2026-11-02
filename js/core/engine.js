@@ -45,7 +45,9 @@
   if (!ctx) { NEU.engine = { enter: function () {}, leave: function () {} }; return; }
 
   var reduced = false;
-  try { reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  try { reduced = (window.NEU && window.NEU.motion) ? window.NEU.motion.reduced() : matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  /* NEU.motion (motion.js) is the one source; it can change live. */
+  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) { reduced = r; });
 
   var TILE = 16;              // world units per cell
   var SPEED = 96;             // world units/sec — top speed, unchanged from v1
@@ -254,6 +256,12 @@
 
   function resetPuzzle() {
     if (!room) return;
+    /* A solved room stays solved: R must never relock a door you
+       earned (b5 used to clear its own flag, b6 put its lights out). */
+    if (NEU.save && NEU.save.flagged('solved:' + room.id)) {
+      say(['the room is done. it stays done.'], 'narr');
+      return;
+    }
     /* R-spam is the cheese: brute-forcing a puzzle by resetting every
        second is not solving it. */
     if (performance.now() - lastReset < 4000) {
@@ -1025,6 +1033,7 @@
   /* ── open / close ─────────────────────────────────────────────── */
   /* opts.iris: seconds for the iris to open on arrival (default 0.22). */
   function enter(id, spawn, opts) {
+    if (NEU.settings && NEU.settings.warnFlash) NEU.settings.warnFlash();
     if (!rooms[id]) return false;
     wrap.hidden = false;
     document.body.classList.add('is-playing');

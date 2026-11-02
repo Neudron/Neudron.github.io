@@ -37,7 +37,7 @@
   }
 
   function drawSoul(ctx, x, y, inv, col) {
-    if (NEU.juice && (NEU.juice.noFlash || NEU.juice.reduced)) {
+    if (NEU.juice && NEU.juice.noFlash) {
       if (inv > 0) {
         ctx.globalAlpha = 0.45;
         stamp(ctx, HEART, x, y, 2, col || COL_SOUL);
@@ -444,7 +444,7 @@
   /* The boss's own hit flash, at its position (inside the shake). */
   function drawFlash(ctx, F, x, y, r) {
     if (F.flashT <= 0) return;
-    if (NEU.juice && (NEU.juice.noFlash || NEU.juice.reduced)) return;
+    if (NEU.juice && NEU.juice.noFlash) return;
     glow(ctx, x, y, r, '#FFFFFF', F.flashT / 0.1);
   }
 

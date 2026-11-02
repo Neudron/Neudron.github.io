@@ -47,7 +47,13 @@
   'use strict';
   var NEU = window.NEU = window.NEU || {};
 
-  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var reduced = (window.NEU && window.NEU.motion) ? window.NEU.motion.reduced() : matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* NEU.motion (motion.js) is the one source; it can change live. */
+  var calmFlash = (window.NEU && window.NEU.motion) ? window.NEU.motion.calmFlash() : reduced;
+  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r, f) { reduced = r; calmFlash = f; });
+  /* 0..1 from the settings slider. Scales the trauma each hit ADDS, so
+     a stack still stacks; 0 is the same as no shake. */
+  var shakeScale = 1;
   var customNoShake = false, customNoFlash = false;
   var customNoHitstop = false, customNoParticles = false;
 
@@ -121,8 +127,8 @@
   function hit(tier, opts) {
     var t = TIER[tier] || TIER.small;
     opts = opts || {};
-    var noShake = reduced || customNoShake;
-    var noFlash = reduced || customNoFlash;
+    var noShake = reduced || customNoShake || shakeScale <= 0;
+    var noFlash = calmFlash || customNoFlash;
     /* Recorded even when shake is gated off, so `bias` always describes
        the last hit. A hit with no direction clears it. */
     setBias(opts.dx, opts.dy);
@@ -130,7 +136,7 @@
       /* Hits ADD. Two impacts in a row must stack, not reset — a reset
          makes the second hit feel weaker than the first, which is
          exactly backwards. */
-      trauma = Math.min(1, trauma + (opts.shake != null ? opts.shake : t.shake));
+      trauma = Math.min(1, trauma + (opts.shake != null ? opts.shake : t.shake) * shakeScale);
       buzz(tier);
     }
     if (!noFlash && t.flash) {
@@ -191,7 +197,7 @@
      itself never shakes — a shaking flash reads as a rendering fault. */
   function overlay(ctx, w, h) {
     var now = performance.now();
-    if (now >= flashUntil || reduced || customNoFlash) return;
+    if (now >= flashUntil || calmFlash || customNoFlash) return;
     var k = (flashUntil - now) / flashFrom;
     ctx.globalAlpha = Math.min(0.55, k * 0.55);
     ctx.fillStyle = flashCol;
@@ -283,17 +289,21 @@
     pop: pop, backOut: backOut, outCubic: outCubic, outElastic: outElastic,
     shakeEl: shakeEl,
     setNoShake: function (on) { customNoShake = !!on; },
+    setShakeScale: function (k) { k = +k; shakeScale = isFinite(k) ? Math.max(0, Math.min(1, k)) : 1; },
+    get shakeScale() { return shakeScale; },
     setNoFlash: function (on) { customNoFlash = !!on; },
     setNoHitstop: function (on) { customNoHitstop = !!on; },
     setNoParticles: function (on) { customNoParticles = !!on; },
     get noShake() { return customNoShake; },
-    get noFlash() { return customNoFlash; },
+    /* Every flash gate in the game reads this one: the switch OR calm flashing. */
+    get noFlash() { return customNoFlash || calmFlash; },
     get noHitstop() { return customNoHitstop; },
     get noParticles() { return customNoParticles; },
     get trauma() { return trauma; },
     /* A copy, so a caller cannot write into the live direction. */
     get bias() { return { x: bias.x, y: bias.y }; },
     get reduced() { return reduced; },
+    get calmFlash() { return calmFlash; },
     tiers: TIER,
     /* tests + the dev console */
     _reset: function () { trauma = 0; bias = { x: 0, y: 0 }; freezeUntil = 0; flashUntil = 0; }

@@ -42,7 +42,9 @@
   var NEU = window.NEU = window.NEU || {};
 
   var reduced = false;
-  try { reduced = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  try { reduced = (window.NEU && window.NEU.motion) ? window.NEU.motion.reduced() : matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  /* NEU.motion (motion.js) is the one source; it can change live. */
+  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) { reduced = r; });
 
   /* ── colour ──────────────────────────────────────────────────────── */
   function hex2rgb(h) {
@@ -793,7 +795,7 @@
      reduce-particles switch; under reduced motion nothing drifts. */
   var parts = [], wKind = null, wRoom = null, flash = 0, nextBolt = 0;
   function noParticles() { return !!(NEU.juice && NEU.juice.noParticles); }
-  function noFlash() { return reduced || !!(NEU.juice && NEU.juice.noFlash); }
+  function noFlash() { return !!(NEU.juice && NEU.juice.noFlash); }
 
   function weatherReset(kind, room) {
     parts = []; wKind = kind; wRoom = room; flash = 0; nextBolt = 4 + Math.random() * 6;

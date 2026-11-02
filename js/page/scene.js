@@ -26,7 +26,9 @@ const PATHS = {"chancery": "M0.164 0.019 0.223 0.254 0.248 0.27C0.341 0.328 0.35
 const MARK = 'palatino';
 
 const NEU    = window.NEU || { fireReady() {}, heroT: 1 };
-const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* NEU.motion (motion.js) is the one source; it can change live. */
+let reduce = NEU.motion ? NEU.motion.reduced() : matchMedia('(prefers-reduced-motion: reduce)').matches;
+NEU.motion?.on((r) => { reduce = r; });
 const canvas = document.getElementById('glassCanvas');
 const stage  = document.getElementById('glassStage');
 
@@ -323,8 +325,16 @@ function init() {
     if (!dragging) return;
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     if (Math.abs(dx) + Math.abs(dy) > 4) dragged = true;
-    velY += dx * 0.020;
-    velX += dy * 0.014;
+    if (reduce) {
+      /* Calm motion: the cube follows the hand and stays where it is
+         left. No fling, no spring, no sway — only motion the player
+         causes. It must still turn, or the door can never face you. */
+      spinY += dx * 0.012;
+      spinX = Math.max(-0.62, Math.min(0.62, spinX + dy * 0.008));
+    } else {
+      velY += dx * 0.020;
+      velX += dy * 0.014;
+    }
     lastX = e.clientX; lastY = e.clientY;
   });
 
@@ -398,7 +408,10 @@ function init() {
     }
 
     if (reduce) {
-      root.rotation.set(0, 0, 0);
+      velY = velX = 0;
+      root.rotation.set(spinX, spinY, 0);
+      root.position.y = 0;
+      if (root.scale.x !== 1) root.scale.setScalar(1);
     } else {
       if (dragging) { velY *= 0.86; velX *= 0.86; }
       else {

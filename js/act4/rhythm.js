@@ -36,7 +36,9 @@
   var LIGHT   = ['#EBB0F7', '#B0EBF7', '#C9F7D0', '#F7B0C0'];
   var DARK    = ['#5E1C75', '#1C5E75', '#2A7038', '#751C33'];
   var INK = '#0E0818';
-  var reduced = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var reduced = (window.NEU && window.NEU.motion) ? window.NEU.motion.reduced() : !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  /* NEU.motion (motion.js) is the one source; it can change live. */
+  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) { reduced = r; });
   function still() { return reduced || !!(NEU.settings && NEU.settings.reduced); }
 
   var WINDOW_MS = 160;                // PBOT1 shit edge. Past it, a miss.

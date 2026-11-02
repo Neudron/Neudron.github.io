@@ -790,6 +790,13 @@ body.is-scrolled .cue { opacity: 0; pointer-events: none; }
 
 /* a hit that lands */
 .sans.is-hit { animation: sansHit .38s steps(4, end); }
+
+/* the page jolts under you on the middle carry beat */
+html.is-jolt { animation: neuJolt .26s steps(2, end); }
+@keyframes neuJolt {
+  0%,100% { transform: translate(0,0); }
+  50%     { transform: translate(0, 6px); }
+}
 @keyframes sansHit {
   0%,100% { transform: translate(0,0); }
   20%     { transform: translate(-5px, 2px); }
@@ -890,9 +897,10 @@ body.is-scrolled .cue { opacity: 0; pointer-events: none; }
   50%      { filter: drop-shadow(0 6px 22px rgba(255,236,160,.55)); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .sword.is-carried, .keyobj.is-carried { animation: none; }
-}
+/* calm motion: html.rm is set by motion.js (device default OR the
+   settings choice), so the player can override the device. */
+html.rm .sword.is-carried, html.rm .keyobj.is-carried { animation: none; }
+
 
 
 /* ── a plain button, matching the switch's language ───────────────*/
@@ -1389,15 +1397,15 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
   100% { transform: scale(0, 0); filter: brightness(5); opacity: 0; }
 }
 @keyframes quizFade { to { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .quiz.is-on .quiz__tv { animation: none; }
-  .quiz.is-off .quiz__tv { animation: quizFade .3s forwards; }
-  .quiz__set::after { animation: none; }
+/* calm motion: html.rm is set by motion.js (device default OR the
+   settings choice), so the player can override the device. */
+html.rm .quiz.is-on .quiz__tv { animation: none; }
+html.rm .quiz.is-off .quiz__tv { animation: quizFade .3s forwards; }
+html.rm .quiz__set::after { animation: none; }
 
-  .quiz__q.is-in, .quiz__o, .quiz__o.is-right, .quiz__o.is-wrong,
-  .quiz__fin, .quiz__rank.is-stamped { animation: none; }
-  .quiz__beam { animation: none; }
-}
+html.rm .quiz__q.is-in, html.rm .quiz__o, html.rm .quiz__o.is-right, html.rm .quiz__o.is-wrong, html.rm .quiz__fin, html.rm .quiz__rank.is-stamped { animation: none; }
+html.rm .quiz__beam { animation: none; }
+
 
 /* ── through the crack ────────────────────────────────────────────*/
 .polt { position: fixed; inset: 0; z-index: 76; background: #04060A; }
@@ -1565,9 +1573,10 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 /* the hallucination. Hue rotation only — the geometry stays put,
    because moving both at once is disorienting for no gain. */
 body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) saturate(1.5); }
-@media (prefers-reduced-motion: reduce) {
-  body.is-trip .eng canvas, body.is-trip .craft { filter: saturate(1.2); }
-}
+/* calm motion: html.rm is set by motion.js (device default OR the
+   settings choice), so the player can override the device. */
+html.rm body.is-trip .eng canvas, html.rm body.is-trip .craft { filter: saturate(1.2); }
+
 
 /* ── act iv rooms ─────────────────────────────────────────────────
    Same layer as the other full-screen scenes. The chip tray (74) and
@@ -1863,32 +1872,28 @@ body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) satura
 }
 
 /* ── motion off ─────────────────────────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  *, *::before, *::after {
-    animation-duration: .001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: .001ms !important;
-  }
-  .el, .lay { transform: none !important; }
-  .rev { opacity: 1 !important; translate: none !important; }
-  .el.rev { opacity: .3 !important; }
-  .cue i { animation: none; }
-  .sw__lever { transition: none; }
-  .sw.is-broken .sw__lever,
-  .sw.is-broken .sw__plate,
-  .cat.is-on img,
-  .cat.is-pop img,
-  .pop.is-pop img { animation: none; transform: none; }
-  .sans { transition: none; }
-  .sans.is-hit { animation: none; }
-  .sword__half--blade.is-go,
-  .sword__half--key.is-go { animation: none; }
-  .chip, .panel, .swcue, .dog { transition: none; }
-  .tbox__more { animation: none; }
-  .cat.is-pop { opacity: 0; transition: opacity .3s ease; }
-  .cat img { transform: none; }
+/* calm motion: html.rm is set by motion.js (device default OR the
+   settings choice), so the player can override the device. */
+html.rm { scroll-behavior: auto; }
+html.rm *, html.rm *::before, html.rm *::after {
+  animation-duration: .001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .001ms !important;
 }
+html.rm .el, html.rm .lay { transform: none !important; }
+html.rm .rev { opacity: 1 !important; translate: none !important; }
+html.rm .el.rev { opacity: .3 !important; }
+html.rm .cue i { animation: none; }
+html.rm .sw__lever { transition: none; }
+html.rm .sw.is-broken .sw__lever, html.rm .sw.is-broken .sw__plate, html.rm .cat.is-on img, html.rm .cat.is-pop img, html.rm .pop.is-pop img { animation: none; transform: none; }
+html.rm .sans { transition: none; }
+html.rm .sans.is-hit { animation: none; }
+html.rm .sword__half--blade.is-go, html.rm .sword__half--key.is-go { animation: none; }
+html.rm .chip, html.rm .panel, html.rm .swcue, html.rm .dog { transition: none; }
+html.rm .tbox__more { animation: none; }
+html.rm .cat.is-pop { opacity: 0; transition: opacity .3s ease; }
+html.rm .cat img { transform: none; }
+
 
 /* ── juice, for the DOM half ───────────────────────────────────────
    The canvas scenes shake themselves via a ctx transform; page
@@ -1906,9 +1911,10 @@ body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) satura
   40%, 60% { transform: translate(6px, -1px) rotate(.6deg); }
   100% { transform: none; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .is-shook { animation: none; }
-}
+/* calm motion: html.rm is set by motion.js (device default OR the
+   settings choice), so the player can override the device. */
+html.rm .is-shook { animation: none; }
+
 
 /* ── settings ───────────────────────────────────────────────────────
    The accessibility panel. The backend lives in juice.js and
@@ -1925,9 +1931,14 @@ body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) satura
 .sett[hidden] { display: none; }
 .sett__box {
   position: relative;
-  width: min(440px, 100%);
+  width: min(480px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 28px;
-  background: var(--ink);
+  /* --page, not --ink: --ink does not flip in light mode, and the
+     panel used to be dark text on a dark box there. */
+  background: var(--page);
   border: 2px solid var(--edge);
   border-radius: 16px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, .5);
@@ -2003,6 +2014,52 @@ body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) satura
 .fps[data-v="over"] { background: #F0A868; }
 .fps[data-v="fail"] { background: #E86A6A; }
 .sett__note { margin: 16px 0 0; font: 400 16px/1.4 var(--font); color: var(--dim); }
+.sett__note--top { margin: 0 48px 8px 0; color: var(--text); }
+/* Section heads: the panel grew past one screen of switches, and a
+   long flat list is the thing settings guides warn about first. */
+.sett__sec {
+  margin: 24px 0 0; padding: 0;
+  font: 400 16px/1 var(--font); color: var(--accent);
+  text-transform: lowercase; letter-spacing: .04em;
+}
+.sett__row--seg { flex-wrap: wrap; }
+.sett__seg { display: flex; flex: none; border: 2px solid var(--edge); border-radius: 12px; overflow: hidden; }
+.sett__opt {
+  display: inline-flex; align-items: center; white-space: nowrap;
+  min-height: 44px; padding: 0 12px;
+  font: 400 16px/1 var(--font); color: var(--text);
+  background: transparent; border: 0; border-left: 2px solid var(--edge);
+  cursor: pointer;
+}
+.sett__opt:first-child { border-left: 0; }
+.sett__opt[aria-checked="true"] { background: var(--accent); color: var(--page); }
+.sett__opt:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
+.sett__foot { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.sett__act, .rmnote__b {
+  display: inline-flex; align-items: center;
+  min-height: 44px; padding: 0 16px;
+  font: 400 16px/1 var(--font); color: var(--text);
+  background: transparent; border: 2px solid var(--edge); border-radius: 12px;
+  cursor: pointer;
+}
+.sett__act:hover, .rmnote__b:hover { border-color: var(--accent); }
+.sett__act:focus-visible, .rmnote__b:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* ── the one-time notes (motion on the device, flashing ahead) ──────
+   z-index 93: above every scene and the thumb pad, below settings (94)
+   and the dialogue box (96). role=status, never modal: it informs,
+   it does not stand between the player and the page. */
+.rmnote {
+  position: fixed; left: 50%; bottom: 24px; z-index: 93;
+  width: min(560px, calc(100% - 32px));
+  transform: translateX(-50%);
+  padding: 16px 20px;
+  background: var(--page); color: var(--text);
+  border: 2px solid var(--accent); border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .5);
+}
+.rmnote__t { margin: 0 0 12px; font: 400 16px/1.4 var(--font); }
+.rmnote__row { display: flex; flex-wrap: wrap; gap: 12px; }
 .sett__x {
   position: absolute; top: 16px; right: 16px;
   width: 32px; height: 32px; padding: 0;
@@ -2133,9 +2190,10 @@ html.text-lg .eng { zoom: 0.8; }
   .tpad__b--a { min-width: 72px; min-height: 72px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .tpad__nub, .tpad__b { transition: none; }
-}
+/* calm motion: html.rm is set by motion.js (device default OR the
+   settings choice), so the player can override the device. */
+html.rm .tpad__nub, html.rm .tpad__b { transition: none; }
+
 
 /* ── print ───────────────────────────────────────────────────────
    Printed, the page should give you the words and not the room. The
@@ -2175,9 +2233,10 @@ body.is-portrait-fight::before {
   0%, 60% { opacity: 1; }
   100% { opacity: 0; }
 }
-@media (prefers-reduced-motion: reduce) {
-  body.is-portrait-fight::before { animation: portraitHint 4s step-end forwards; }
-}
+/* calm motion: html.rm is set by motion.js (device default OR the
+   settings choice), so the player can override the device. */
+html.rm body.is-portrait-fight::before { animation: portraitHint 4s step-end forwards; }
+
 
 /* ── the one-line error ──────────────────────────────────────────────
    main.js adds this line once when something throws. It never shows
@@ -2206,6 +2265,7 @@ body.is-portrait-fight::before {
   from { transform: translateY(100%); }
   to   { transform: none; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .errline { animation: none; }
-}
+/* calm motion: html.rm is set by motion.js (device default OR the
+   settings choice), so the player can override the device. */
+html.rm .errline { animation: none; }
+

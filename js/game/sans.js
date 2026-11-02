@@ -12,12 +12,13 @@
             scroll up to it.
      held   you have it. it tracks the cursor while you scroll back.
      swing  released over sans. totem pops on him, he says his piece,
-            and the sword goes home — so every swing costs another
-            round trip, which is the joke.
+            and the sword goes home.
 
    Releasing anywhere that is not sans also sends it home. That was a
    deliberate choice: it makes carrying the thing an actual task
-   instead of a formality.
+   instead of a formality. The FIRST trip up the page is the full one;
+   once you have missed, home moves to a ledge in the last screenful
+   you were looking at, so a miss costs a step, not a commute.
 
    Coarse pointers get a different contract — see CARRY below. You
    cannot hold a finger down and scroll with the same finger, so on
@@ -37,10 +38,17 @@
   var tmore  = document.getElementById('tboxMore');
   if (!sans || !btn || !sword || !tbox || !ttxt) return;
 
-  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  /* every sound in this file stops for reduced motion, as it always has,
-     and for the Sound switch (settings.js), read at the moment it plays */
-  function hush() { return reduced || !!(NEU.settings && NEU.settings.muted); }
+  var reduced = (window.NEU && window.NEU.motion) ? window.NEU.motion.reduced() : matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* NEU.motion (motion.js) is the one source; it can change live. */
+  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) { reduced = r; });
+  /* The device preference is a default, not a lock: motion.js owns the
+     answer so the settings panel can turn motion back on for a player
+     whose OS asks for calm, and calm back on for one whose OS does not. */
+  function calm() { return NEU.motion ? NEU.motion.reduced() : reduced; }
+  /* Sound has its own switch (settings.js, M), read at the moment it
+     plays. Reduced motion used to silence it too, which left people with
+     calm motion on their device and no sound they had never asked to lose. */
+  function hush() { return !!(NEU.settings && NEU.settings.muted); }
   var CARRY   = matchMedia('(pointer: coarse)').matches;   // tap-to-carry
 
   /* ── scene timers (F4) ──────────────────────────────────────────
@@ -479,7 +487,7 @@
   var PAL = ['#3FBF6F', '#7CE07C', '#C9A227', '#EFEBE4'];
 
   function burst() {
-    if (!pctx || reduced) return;
+    if (!pctx || calm()) return;
     var cx = pcv.width / 2, cy = pcv.height / 2;
     parts = [];
     for (var i = 0; i < 26; i++) {
@@ -694,7 +702,20 @@
   var FLY_MS = 620;
   var grabId = null, grabTap = false;
 
+  /* The ledge. A miss used to send the sword all the way back to the
+     top of the document, and the second one of those is not a joke any
+     more, it is the same climb with the punchline already spent. Once
+     you have missed, home moves to a spot in the screenful you were
+     standing in when you missed — a DOCUMENT coordinate, so it stays
+     where it was put, but one that is a scroll away rather than a page. */
+  var ledgeDoc = null;
+  function setLedge() {
+    if (ledgeDoc) return;
+    ledgeDoc = { x: innerWidth * 0.78, y: scrollY + innerHeight * 0.62 };
+  }
+
   function homeDoc() {
+    if (ledgeDoc) return ledgeDoc;
     return { x: innerWidth * 0.78, y: innerHeight * 0.30 };
   }
   function homeScreen() {
@@ -823,7 +844,51 @@
   function carrySword()   { if (sword) sword.classList.add('is-carried'); }
   function uncarrySword() { if (sword) sword.classList.remove('is-carried'); }
 
+  /* ── the carry, out loud ────────────────────────────────────────
+     The trip back is the act, and it used to be silent: nothing at all
+     between the pickup and the swing. Three beats, one every five
+     seconds, so the walk has a pulse and he is still in the room while
+     you carry his sword around it. They are scene timers (later), so
+     cancelLater() ends them with the room, and flyHome ends them with
+     the carry.
+
+     The middle beat has no line: the page jolts under you instead, which
+     is the only one of the three that is not him talking. Rule for the
+     whole file, not just here: one line per beat. */
+  var BEATS = [
+    "you know it's not the sword, right? it's the walk.",
+    "",                                       // the jolt, see jolt()
+    "still going. i'd offer to help, but i'm comfortable."
+  ];
+  var beatI = 0, beatOn = false;
+
+  function jolt() {
+    /* A 240ms nudge of the page, on the same motion gate as everything
+       else: nothing moves for a player who asked for stillness. */
+    if (calm() || (NEU.juice && NEU.juice.noShake)) return;
+    var root = document.documentElement;
+    root.classList.remove('is-jolt');
+    void root.offsetWidth;
+    root.classList.add('is-jolt');
+    setTimeout(function () { root.classList.remove('is-jolt'); }, 260);
+  }
+
+  function beatNext() {
+    if (!beatOn) return;
+    if (beatI >= BEATS.length) { beatOn = false; return; }
+    var line = BEATS[beatI++];
+    if (line) say([line]); else jolt();
+    later(beatNext, 5000);
+  }
+  function beatsStart() {
+    if (beatOn) return;
+    beatOn = true; beatI = 0;
+    later(beatNext, 5000);
+  }
+  function beatsStop() { beatOn = false; }
+
   function flyHome() {
+    beatsStop();
     uncarrySword();
     fx = px; fy = py; ft = performance.now();
     state = 'fly';
@@ -931,6 +996,7 @@
     grabId = e.pointerId; grabTap = tapCarry(e);
     if (!grabTap) sword.setPointerCapture && sword.setPointerCapture(e.pointerId);
     tellCarry('sword');
+    beatsStart();
   });
 
   addEventListener('pointermove', function (e) {
@@ -940,7 +1006,12 @@
   }, { passive: true });
 
   /* A hit lands on him, not just near him. */
+  /* A hit lands on him, not just near him. The class is the page's own
+     shake, so it obeys the same switch as the canvas one — it used to
+     run regardless of the setting, which made "reduce screen shake" a
+     promise the loudest part of the page did not keep. */
   function shake() {
+    if (calm() || (NEU.juice && NEU.juice.noShake)) return;
     sans.classList.remove('is-hit');
     void sans.offsetWidth;
     sans.classList.add('is-hit');
@@ -1284,8 +1355,19 @@
     say(BREAK);
   }
 
+  /* ── the blow ───────────────────────────────────────────────────
+     A landed swing gets the short freeze frame and the room's own tick,
+     both through juice.js so the settings panel and the OS preference
+     own the answer: calm motion drops the shake and the burst, keeps a
+     third of the stop, and says so in juice.js rather than here. */
+  function hitStop() {
+    if (NEU.juice) NEU.juice.hit('medium', { shake: 0.12 });
+    if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+  }
+
   function attempt(x, y) {
     if (state !== 'held') return;
+    beatsStop();
     uncarrySword();
     if (hilt) {                                // the hilt has one target
       var tv = tvScreenPos();
@@ -1293,13 +1375,14 @@
       else flyHome();
       return;
     }
-    if (!overSans(x, y)) { flyHome(); return; }
+    if (!overSans(x, y)) { setLedge(); flyHome(); return; }
 
     state = 'swing';
     var willBreak = swings >= LINES.length;    // nothing left to say
 
     NEU.sword.swing(
       function () {                            // on impact
+        hitStop();
         shake();
         if (willBreak) {
           snap();
@@ -2045,6 +2128,9 @@
     get keyScreenY() { return ky - scrollY; },
     get carried()    { return kstate === 'carry'; },
     get tvBroken()   { return tvBroken; },
-    get lines()   { return LINES.length; }
+    get lines()   { return LINES.length; },
+    get ledge()   { return !!ledgeDoc; },
+    get homeY()   { return homeDoc().y; },
+    get beats()   { return beatOn ? beatI : 0; }
   };
 })();

@@ -93,9 +93,10 @@
    steps (one transition, never a flash) instead of popping on. */
 @keyframes from-black { from { filter: brightness(0); } }
 .bh:not([hidden]), .dk:not([hidden]) { animation: from-black .48s steps(3) both; }
-@media (prefers-reduced-motion: reduce) {
-  .bh:not([hidden]), .dk:not([hidden]) { animation: none; }
-}
+/* calm motion: html.rm is set by motion.js (device default OR the
+   settings choice), so the player can override the device. */
+html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
+
 
 /* Act III sleep room: the props behind the sleepers (2x, like sans). */
 .sleep__rug {

@@ -222,7 +222,7 @@
   function flashAlpha() {
     var a = t - flashAt;
     if (a < 0 || a >= FLASH_LEN) return 0;
-    var peak = (rm() || (NEU.juice && NEU.juice.noFlash)) ? 0.2 : 0.55;
+    var peak = (NEU.juice && NEU.juice.noFlash) ? 0.2 : 0.55;
     return peak * (1 - a / FLASH_LEN);
   }
 
@@ -1860,7 +1860,7 @@
       } else { close(); }
       return;
     }
-    if (!running && !dying && !e.repeat &&
+    if (!running && !dying && !e.repeat && mode !== 'won' &&
         (e.key === 'z' || e.key === 'Z' || e.key === 'Enter')) {
       /* The document-level retry of the bullet minigame used to hear
          this too and restarted its own timer over the death screen. */

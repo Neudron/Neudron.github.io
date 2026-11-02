@@ -44,7 +44,9 @@
   'use strict';
 
   var NEU = window.NEU = window.NEU || {};
-  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var reduce = (window.NEU && window.NEU.motion) ? window.NEU.motion.reduced() : matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* NEU.motion (motion.js) is the one source; it can change live. */
+  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) { reduce = r; });
 
   var canvas = document.getElementById('starCanvas');
   if (!canvas) return;

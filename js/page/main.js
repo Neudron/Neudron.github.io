@@ -8,7 +8,9 @@
 (function () {
   'use strict';
 
-  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var reduce = (window.NEU && window.NEU.motion) ? window.NEU.motion.reduced() : matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* NEU.motion (motion.js) is the one source; it can change live. */
+  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) { reduce = r; });
 
   /* Firefox restores the previous scroll position on reload. On a page
      that opens with a boot sequence and a hero, that means a refresh

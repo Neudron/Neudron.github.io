@@ -6,8 +6,9 @@
 
    THE SWITCHES, PERSISTED IN THE SAVE FILE:
 
-     reduce screen shake — juice.js stops adding trauma
-     reduce flashing    — juice.js stops the white overlay
+     motion             — device / full / calm   (motion.js, localStorage)
+     flashing           — match motion / full / calm (motion.js)
+     screen shake       — 0..100 %, scales the trauma juice.js adds
      larger text        — zooms the whole page 1.25x
      reduce hit-stop    — juice.js skips the frozen frame on impacts
      reduce particles   — juice.js stops spawning impact debris
@@ -18,9 +19,12 @@
    single font-size blurs the typeface. Zooming the page scales
    EVERYTHING together and keeps the grid intact.
 
-   prefers-reduced-motion forces the first two ON and disables their
-   switches — the OS preference is the player's own statement, and
-   the panel is for people who cannot say it there.
+   prefers-reduced-motion is the DEFAULT, never a lock. Many players
+   have it on without knowing (Windows performance modes, battery
+   savers), and locking it made Act I unfinishable: the cube would not
+   turn. The device setting picks the starting point, a one-time note
+   says so in plain words with the steps for that device, and every
+   switch here stays usable (Xbox Accessibility Guidelines 117/118).
 
    Opens on Ctrl + Shift + , and from the gear button top-right.
    The dialogue box (z-index 96) stays the top layer; this panel
@@ -31,7 +35,8 @@
 
   var NEU = window.NEU = window.NEU || {};
 
-  var K_SHAKE = 'opt_noShake';
+  var K_SHAKE = 'opt_noShake';      /* legacy switch: on = shake 0 %   */
+  var K_SHAKEPCT = 'opt_shakePct';  /* 0..100, default 100              */
   var K_FLASH = 'opt_noFlash';
   var K_TEXT  = 'opt_largeText';
   var K_STOP  = 'opt_hitstop';      /* on = juice skips the held frame   */
@@ -40,7 +45,12 @@
   var K_MUSIC = 'opt_music';        /* owned by music.js; read here    */
   var K_MUTE  = 'opt_mute';         /* on = silent; the level is kept  */
 
-  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var M = NEU.motion || {
+    reduced: function () { return false; }, calmFlash: function () { return false; },
+    device: false, pref: 'auto', flashPref: 'auto', set: function () {}, on: function () {},
+    steps: function () { return ''; }, once: function () { return false; }
+  };
+  function reducedNow() { return M.reduced(); }
 
   /* ── state ──────────────────────────────────────────────────────
      Stored as save flags, same as every other decision on the site —
@@ -62,12 +72,18 @@
     return +v;
   }
 
+  function shakePct() {
+    var v = num(K_SHAKEPCT, NaN);
+    if (isNaN(v)) v = state(K_SHAKE) ? 0 : 100;   /* old saves: the switch */
+    return Math.max(0, Math.min(100, v));
+  }
+
   function apply() {
-    var shake = reduced || state(K_SHAKE);
-    var flash = reduced || state(K_FLASH);
     if (NEU.juice) {
-      NEU.juice.setNoShake(shake);
-      NEU.juice.setNoFlash(flash);
+      NEU.juice.setNoShake(shakePct() === 0);
+      if (NEU.juice.setShakeScale) NEU.juice.setShakeScale(shakePct() / 100);
+      /* Flashing now lives in motion.js; the old switch only migrates. */
+      NEU.juice.setNoFlash(false);
       NEU.juice.setNoHitstop(state(K_STOP));
       NEU.juice.setNoParticles(state(K_PART));
     }
@@ -108,7 +124,7 @@
      back to it; the gear is the fallback if it has since left the page. */
   var returnTo = null;
 
-  function row(id, label, hint, lockReduced, cb) {
+  function row(id, label, hint, cb) {
     var r = document.createElement('div');
     r.className = 'sett__row';
 
@@ -129,10 +145,6 @@
     sw.setAttribute('role', 'switch');
     sw.setAttribute('aria-labelledby', l.id);
     sw.setAttribute('aria-checked', 'false');
-    if (reduced && lockReduced) {
-      sw.disabled = true;
-      sw.setAttribute('aria-checked', 'true');
-    }
     sw.addEventListener('click', function () {
       var on = sw.getAttribute('aria-checked') === 'true';
       sw.setAttribute('aria-checked', String(!on));
@@ -147,7 +159,7 @@
   /* A range, not a mute switch plus a level. Zero IS the mute, and one
      control that goes to zero is one thing to find rather than two
      that can disagree with each other. */
-  function slider(id, label, hint, get, set_) {
+  function slider(id, label, hint, get, set_, after) {
     var r = document.createElement('div');
     r.className = 'sett__row';
 
@@ -169,17 +181,100 @@
     rg.min = '0'; rg.max = '100'; rg.step = '5';
     rg.value = String(get());
     rg.setAttribute('aria-labelledby', l.id);
-    function push() {
-      set_(+rg.value);
-      rg.setAttribute('aria-valuetext', +rg.value === 0 ? 'off' : rg.value + '%');
-    }
+    /* not called label(): a function declaration would shadow the
+       label PARAMETER above and print its own source as the row name */
+    function vtext() { rg.setAttribute('aria-valuetext', +rg.value === 0 ? 'off' : rg.value + '%'); }
+    function push() { set_(+rg.value); vtext(); }
     rg.addEventListener('input', push);
-    rg.addEventListener('change', push);
-    push();
+    rg.addEventListener('change', function () { push(); if (after) after(+rg.value); });
+    /* Label only. Building the panel must not WRITE a value: that turned
+       an old save's "no shake" into 100 % before anyone touched it. */
+    vtext();
 
     r.appendChild(l);
     r.appendChild(rg);
     return r;
+  }
+
+  /* Three choices, one of them picked: a radiogroup of buttons, arrow
+     keys move the pick (WAI-ARIA radio pattern). A switch cannot say
+     "follow my device", and that is the default most people need. */
+  function seg(id, label, hint, opts, get, set_) {
+    var r = document.createElement('div');
+    r.className = 'sett__row sett__row--seg';
+    var l = document.createElement('span');
+    l.className = 'sett__lbl';
+    l.id = id + 'L';
+    l.textContent = label;
+    var s = document.createElement('small');
+    s.textContent = hint;
+    l.appendChild(s);
+    var g = document.createElement('div');
+    g.className = 'sett__seg';
+    g.id = id;
+    g.setAttribute('role', 'radiogroup');
+    g.setAttribute('aria-labelledby', l.id);
+    var btns = [];
+    function paint() {
+      var v = get();
+      for (var i = 0; i < btns.length; i++) {
+        var on = btns[i].getAttribute('data-v') === v;
+        btns[i].setAttribute('aria-checked', String(on));
+        btns[i].tabIndex = on ? 0 : -1;
+      }
+    }
+    opts.forEach(function (o, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sett__opt';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('data-v', o[0]);
+      b.textContent = o[1];
+      b.addEventListener('click', function () { set_(o[0]); paint(); b.focus(); });
+      b.addEventListener('keydown', function (e) {
+        var d = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 :
+                (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 0;
+        if (!d) return;
+        e.preventDefault();
+        btns[(i + d + btns.length) % btns.length].click();
+      });
+      btns.push(b);
+      g.appendChild(b);
+    });
+    g._paint = paint;
+    paint();
+    r.appendChild(l);
+    r.appendChild(g);
+    return r;
+  }
+
+  function section(box, title) {
+    var h = document.createElement('h3');
+    h.className = 'sett__sec';
+    h.textContent = title;
+    box.appendChild(h);
+  }
+
+  function deviceLine() {
+    return M.device ? 'your device asks for less motion, so calm is on. ' +
+                      'pick "full" below to change it here, or on your device: ' + M.steps() :
+                      'your device does not ask for less motion.';
+  }
+
+  /* One click for people who just want it calm. Presets are what
+     God of War Ragnarök and The Last of Us Part II lead with. */
+  function calmAll() {
+    M.set('reduced', 'reduced');
+    if (NEU.save) { NEU.save.flag(K_SHAKEPCT, 0); NEU.save.flag(K_STOP, 1); NEU.save.flag(K_PART, 1); }
+    apply(); refresh();
+  }
+  function defaults() {
+    M.set('auto', 'auto');
+    if (NEU.save) {
+      NEU.save.flag(K_SHAKEPCT, 100); NEU.save.flag(K_SHAKE, 0); NEU.save.flag(K_STOP, 0);
+      NEU.save.flag(K_PART, 0); NEU.save.flag(K_TEXT, 0); NEU.save.flag(K_RELAX, 0);
+    }
+    apply(); refresh();
   }
 
   function build() {
@@ -206,61 +301,96 @@
 
     box.appendChild(h);
     box.appendChild(x);
-    box.appendChild(row('settShake', 'reduce screen shake',
-        'hits will not rock the page or the scenes', true, function (on) {
-      set(K_SHAKE, on);
-    }));
-    box.appendChild(row('settFlash', 'reduce flashing',
-        'impacts will dim instead of flashing white', true, function (on) {
-      set(K_FLASH, on);
-    }));
-    box.appendChild(row('settText', 'larger text',
-        'zooms the whole page 1.25x', false, function (on) {
-      set(K_TEXT, on);
-    }));
+
+    var st = document.createElement('p');
+    st.className = 'sett__note sett__note--top';
+    st.id = 'settDevice';
+    st.textContent = deviceLine();
+    box.appendChild(st);
+
+    section(box, 'motion & flashing');
+    box.appendChild(seg('settMotion', 'motion',
+        'calm keeps things still unless you move them. the game works either way.',
+        [['auto', 'device'], ['full', 'full'], ['reduced', 'calm']],
+        function () { return M.pref; },
+        function (v) { M.set(v, null); refresh(); }));
+    box.appendChild(seg('settFlashing', 'flashing',
+        'calm dims impacts instead of flashing the screen white.',
+        [['auto', 'match motion'], ['full', 'full'], ['reduced', 'calm']],
+        function () { return M.flashPref; },
+        function (v) { M.set(null, v); refresh(); }));
+    box.appendChild(slider('settShake', 'screen shake',
+        'how hard hits rock the scene. zero is off. calm motion turns it off too.',
+        shakePct,
+        function (v) { if (NEU.save) NEU.save.flag(K_SHAKEPCT, v); apply(); },
+        function (v) {
+          /* a small preview of the new strength, on the panel itself */
+          if (v > 0 && !reducedNow() && NEU.juice && NEU.juice.shakeEl) NEU.juice.shakeEl(box, 'small');
+        }));
     box.appendChild(row('settHitstop', 'reduce hit-stop',
-        'impacts land without the held frame', false, function (on) {
+        'impacts land without the held frame', function (on) {
       set(K_STOP, on);
     }));
     box.appendChild(row('settParticles', 'reduce particles',
-        'hits leave no debris behind', false, function (on) {
+        'hits leave no debris behind', function (on) {
       set(K_PART, on);
     }));
-    /* The quiz's clock. quiz.js reads it as each question starts, so a
-       switch thrown mid-question changes the next question, not this
-       one — the bar and the clock never disagree about one question. */
-    box.appendChild(row('settRelaxed', 'relaxed quiz timer',
-        'twenty-four seconds a question, not twelve', false, function (on) {
-      set(K_RELAX, on);
+
+    section(box, 'display');
+    box.appendChild(row('settText', 'larger text',
+        'zooms the whole page 1.25x', function (on) {
+      set(K_TEXT, on);
     }));
-    /* Thumb controls appear on their own on a touch screen. This is
-       the override for the two cases auto-detection gets wrong: a
-       laptop with a touchscreen that does not want them, and a tablet
-       with a keyboard attached that does. */
-    box.appendChild(row('settTouch', 'thumb controls',
-        'on-screen stick and buttons for the game scenes', false, function (on) {
-      if (NEU.touch) NEU.touch.set(on ? 'on' : 'off');
+
+    section(box, 'sound');
+    /* On = sound ON, the same way the lever in the corner reads. */
+    box.appendChild(row('settSound', 'sound',
+        'all sound. m turns it on and off from anywhere.', function (on) {
+      mute(!on);
     }));
-    /* The soundtrack is synthesised, so this is a real level and not a
-       "load the files or not" decision — dragging it to zero costs
-       nothing and can be undone mid-room. */
-    /* Reads the saved level, never NEU.music.volume, which is zero while
-       muted: the slider must show the number the player chose. */
+    /* The soundtrack is synthesised, so this is a real level. Reads the
+       saved level, never NEU.music.volume, which is zero while muted. */
     box.appendChild(slider('settMusic', 'music',
-        'the act IV soundtrack. drag to zero for silence.',
+        'the soundtrack. drag to zero for silence.',
         function () { return num(K_MUSIC, 55); },
         function (v) {
           if (NEU.music) NEU.music.setVolume(v);
           else if (NEU.save) NEU.save.flag(K_MUSIC, v);
         }));
 
-    if (reduced) {
-      var n = document.createElement('p');
-      n.className = 'sett__note';
-      n.textContent = 'your system already asks for reduced motion, ' +
-                      'so shake and flash are off for you.';
-      box.appendChild(n);
-    }
+    section(box, 'game');
+    /* quiz.js reads it as each question starts, so a switch thrown
+       mid-question changes the next question, not this one. */
+    box.appendChild(row('settRelaxed', 'relaxed quiz timer',
+        'twenty-four seconds a question, not twelve', function (on) {
+      set(K_RELAX, on);
+    }));
+    /* Thumb controls appear on their own on a touch screen. This is
+       the override for the cases auto-detection gets wrong. */
+    box.appendChild(row('settTouch', 'thumb controls',
+        'on-screen stick and buttons for the game scenes', function (on) {
+      if (NEU.touch) NEU.touch.set(on ? 'on' : 'off');
+    }));
+
+    var foot = document.createElement('div');
+    foot.className = 'sett__foot';
+    var calm = document.createElement('button');
+    calm.type = 'button'; calm.className = 'sett__act'; calm.id = 'settCalm';
+    calm.textContent = 'make everything calm';
+    calm.addEventListener('click', calmAll);
+    var dflt = document.createElement('button');
+    dflt.type = 'button'; dflt.className = 'sett__act'; dflt.id = 'settDefaults';
+    dflt.textContent = 'reset to defaults';
+    dflt.addEventListener('click', defaults);
+    foot.appendChild(calm);
+    foot.appendChild(dflt);
+    box.appendChild(foot);
+
+    var keys = document.createElement('p');
+    keys.className = 'sett__note';
+    keys.textContent = 'open this any time: the gear, or ctrl + shift + comma. ' +
+                       'settings save on this device.';
+    box.appendChild(keys);
 
     panel.appendChild(box);
     document.body.appendChild(panel);
@@ -290,9 +420,8 @@
   function refresh() {
     if (!panel) return;
     var rows = [
-      ['settShake', reduced || state(K_SHAKE)],
-      ['settFlash', reduced || state(K_FLASH)],
       ['settText',  state(K_TEXT)],
+      ['settSound', !state(K_MUTE)],
       ['settHitstop',   state(K_STOP)],
       ['settParticles', state(K_PART)],
       ['settRelaxed', state(K_RELAX)],
@@ -304,16 +433,24 @@
     }
     var m = document.getElementById('settMusic');
     if (m) m.value = String(num(K_MUSIC, 55));
+    var sk = document.getElementById('settShake');
+    if (sk) {
+      sk.value = String(shakePct());
+      sk.setAttribute('aria-valuetext', shakePct() === 0 ? 'off' : shakePct() + '%');
+    }
+    var dv = document.getElementById('settDevice');
+    if (dv) dv.textContent = deviceLine();
+    ['settMotion', 'settFlashing'].forEach(function (id) {
+      var g = document.getElementById(id);
+      if (g && g._paint) g._paint();
+    });
   }
 
-  /* The panel's focusables — everything EXCEPT the disabled switches.
-   Under prefers-reduced-motion the shake and flash switches are
-   disabled (the OS preference is the player's own statement), and a
-   disabled element is not focusable: focusing it is a no-op, and a
-   trap that wraps to one eats Tabs silently while nothing appears to
-   have focus. */
+  /* The panel's focusables. Disabled ones are skipped: a trap that wraps
+     to one eats Tabs silently. A radiogroup is ONE tab stop (its picked
+     option has tabIndex 0); arrows move inside it. */
   function focusables() {
-    var all = panel.querySelectorAll('button:not(:disabled), input:not(:disabled)');
+    var all = panel.querySelectorAll('button:not(:disabled):not([tabindex="-1"]), input:not(:disabled)');
     var out = [], i;
     for (i = 0; i < all.length; i++) out.push(all[i]);
     /* jsdom returns selector-list matches grouped by selector rather
@@ -336,7 +473,7 @@
     /* A single selector on purpose: a selector LIST comes back grouped
        by selector in jsdom, and the first match must be the first
        switch in DOM order, not the first element of the last group. */
-    var first = panel.querySelector('[role="switch"]:not(:disabled)');
+    var first = panel.querySelector('[role="radio"][tabindex="0"]');
     (first || panel.querySelector('.sett__x')).focus();
     requestAnimationFrame(function () { panel.classList.add('is-in'); });
   }
@@ -407,10 +544,72 @@
     }
   }, true);
 
+  /* ── notes: tell people what is on, and how to change it ─────────
+     Games put the warning up front (Xbox Accessibility Guidelines
+     118, Playdate's reduce-flashing note), but a modal before the
+     page is a wall. These are small, polite and non-blocking
+     (role=status), shown once each, and every one has the fix as a
+     button, not as instructions. */
+  var note = null;
+  function hideNote() { if (note) { note.remove(); note = null; } }
+  function showNote(text, actions) {
+    hideNote();
+    note = document.createElement('div');
+    note.className = 'rmnote';
+    note.setAttribute('role', 'status');
+    var p = document.createElement('p');
+    p.className = 'rmnote__t';
+    p.textContent = text;
+    note.appendChild(p);
+    var row = document.createElement('div');
+    row.className = 'rmnote__row';
+    actions.forEach(function (a) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rmnote__b';
+      b.textContent = a[0];
+      b.addEventListener('click', function () { hideNote(); if (a[1]) a[1](); });
+      row.appendChild(b);
+    });
+    note.appendChild(row);
+    document.body.appendChild(note);
+  }
+
+  /* First visit with the device asking for less motion: say it, once. */
+  function deviceNote() {
+    if (!M.device || M.pref !== 'auto' || !M.once('device')) return;
+    showNote('your device asks for less motion, so this site stays calm: ' +
+             'no spinning, shaking or flashing on its own. everything still works.',
+      [['keep it calm', null],
+       ['turn motion on', function () { M.set('full', null); refresh(); }],
+       ['settings', open]]);
+  }
+
+  /* Before the first game scene: the photosensitivity heads-up. */
+  function warnFlash() {
+    if (!M.once('flash')) return;
+    if (M.calmFlash() && shakePct() === 0) return;   /* already calm */
+    showNote('heads up: the game has flashing lights and screen shake. ' +
+             'you can turn them down any time with the gear (top left).',
+      [['ok', null],
+       ['make it calm', calmAll],
+       ['settings', open]]);
+  }
+
+  /* The old "reduce flashing" switch, carried over once into motion.js. */
+  function migrate() {
+    if (!state(K_FLASH)) return;
+    if (M.flashPref === 'auto') M.set(null, 'reduced');
+    if (NEU.save) NEU.save.flag(K_FLASH, 0);
+  }
+
   /* ── boot ───────────────────────────────────────────────────────*/
   if (NEU.settings) return;                    // already built (re-run)
+  migrate();
   build();
   apply();
+  M.on(function () { apply(); refresh(); });
+  setTimeout(deviceNote, 1800);
   /* The switch is in index.html's .ctl cluster, beside the light. */
   var mt = document.getElementById('muteToggle');
   if (mt) mt.addEventListener('click', function () { mute(!state(K_MUTE)); });
@@ -419,9 +618,12 @@
     open: open, close: close,
     apply: apply, set: set,
     get open_() { return open_; },
-    get reduced() { return reduced; },
-    get shake() { return reduced || state(K_SHAKE); },
-    get flash() { return reduced || state(K_FLASH); },
+    get reduced() { return reducedNow(); },
+    get shake() { return reducedNow() || shakePct() === 0; },
+    get flash() { return M.calmFlash(); },
+    get shakePct() { return shakePct(); },
+    calmAll: calmAll, defaults: defaults,
+    warnFlash: warnFlash, hideNote: hideNote,
     get text() { return state(K_TEXT); },
     get hitstop() { return state(K_STOP); },
     get particles() { return state(K_PART); },

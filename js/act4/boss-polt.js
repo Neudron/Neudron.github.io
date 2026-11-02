@@ -263,7 +263,10 @@
     return false;
   }
 
+  var STRIKE_CD = 0.18, lastHit = -1;   /* game seconds between strikes */
   function tryHit() {
+    if (!running || t - lastHit < STRIKE_CD) return;
+    lastHit = t;
     /* The clone check has to come before the boss-range guard: the
        clone mirrors the boss across the arena, so when you are close
        enough to hit it the boss is on the far side — a range guard
@@ -478,9 +481,12 @@
       } else { close(); }
       return;
     }
-    if (!running && !dying && (e.key === 'Enter' || e.key === 'z' || e.key === 'Z')) { e.preventDefault(); open(); return; }
-    /* z (or Enter) strikes before the soul looks at the key; x dashes. */
-    if (e.key === 'z' || e.key === 'Z' || (e.key === 'Enter' && running)) { e.preventDefault(); tryHit(); return; }
+    /* The win screen is over: z there must not reopen the fight and
+       hand the kill out a second time. */
+    if (!running && !dying && mode !== 'won' && (e.key === 'Enter' || e.key === 'z' || e.key === 'Z')) { e.preventDefault(); open(); return; }
+    /* z (or Enter) strikes before the soul looks at the key; x dashes.
+       A held key's auto-repeat is not a strike. */
+    if (e.key === 'z' || e.key === 'Z' || (e.key === 'Enter' && running)) { e.preventDefault(); if (!e.repeat) tryHit(); return; }
     if (running && dm.key(F, e)) { e.preventDefault(); return; }
     var n = dm.keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
   });
@@ -495,7 +501,7 @@
     if (NEU.quest) NEU.quest.lock(true);
     if (msg) msg.hidden = true;
     layout();
-    t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; dying = 0;
+    t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; keys = {}; dying = 0;
     bossMax = 30; bossHP = bossMax; phase = 1; clone = null; mode = 'fight';
     px = AX + AW / 2; py = AY + AH - 70;
     F = dm.fight(px, py);

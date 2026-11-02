@@ -634,17 +634,25 @@
      by design; the whole room is about reading the lines the ice
      gives you.
 
-     Solvable in three slides, no brute force (BFS-checked):
+     Four plates on the four ends of the ring, so the three-slide lap
+     the room teaches you is not enough: it ends on (5,8) with three
+     locks and a shut door. The fourth end is (5,3), and the only way
+     to die there is to walk round to the south band and step UP onto
+     (5,8) — the ring runs both ways, which is the whole lesson. The
+     naive lap plus the walk round is the minimum (BFS-checked over
+     position × armed-mask, see tests/fixes54.mjs):
        1. walk up to (4,3), step east onto (5,3) → slide east along the
           top row, which dies on its last ice cell (13,3) → plate locks.
        2. step south: the ice underfoot commits you again → slide down
           the east column, dying on (13,8) → plate locks.
        3. step west → slide along the bottom row, dying on (5,8)
-          → plate locks. The way opens.
+          → plate locks.
+       4. walk down to (5,9), step up onto the bottom-left corner → the
+          column carries you the other way, dying on (5,3) → opens.
      The puzzle is not "find the plates", it is "understand that the
-     ice decides where you stop". The old version was a block-push
-     with the block born on the ice; that read as a physics quirk and
-     was retired with the rest of the castle's blocks.
+     ice decides where you stop, in every direction". The old version
+     was a block-push with the block born on the ice; that read as a
+     physics quirk and was retired with the rest of the castle's blocks.
 
      LAYOUT. A frozen cloister: the ring is the same shape it always
      was, moved one cell in and down to sit under a two-row north wall
@@ -675,12 +683,13 @@
       { t: 'plate', x: 13, y: 3, slideOnly: true, skin: 'iceplate' },
       { t: 'plate', x: 13, y: 8, slideOnly: true, skin: 'iceplate' },
       { t: 'plate', x: 5, y: 8, slideOnly: true, skin: 'iceplate' },
+      { t: 'plate', x: 5, y: 3, slideOnly: true, skin: 'iceplate' },
       { t: 'sign', x: 16, y: 3, skin: 'lectern',
         lines: ['step onto the ice and you will not stop until it runs out.',
-                'let it carry you onto the plates. three slides.'] },
+                'every corner of the ring is a dead end.'] },
       { t: 'exit', x: 19, y: 6, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice', style: 'door',
         lines: ['the door is frozen into its frame.',
-                'three plates on the ice. it opens when a slide has landed on each one.'] },
+                'it opens when a slide has landed on every plate on the ice.'] },
       { t: 'exit', x: 0, y: 6, to: 'b3_braziers', spawn: 'east', style: 'arch' },
       Q('statue', 9, 5, { frozen: true }),
       Q('glow', 3, 4, { r: 46, col: '#BFE0FF' }), Q('glow', 16, 4, { r: 46, col: '#BFE0FF' }),
@@ -692,11 +701,11 @@
       c.flag('b4_seen', 1);
       say(c, ['the middle of the room is polished to a mirror.',
               'step onto the ice and you will not stop until the ice runs out.',
-              'three plates. they lock only when a slide lands on them.']);
+              'every plate on the ice has to feel a slide land on it.']);
     },
     /* The engine's default "every plate has a block" rule cannot know
-       about slides, so this room owns its win condition: all three
-       slide-only plates must be armed. */
+       about slides, so this room owns its win condition: every
+       slide-only plate must be armed. */
     solved: function (c) {
       var es = c.ents(), any = false;
       for (var i = 0; i < es.length; i++)
@@ -706,7 +715,7 @@
     onSolved: function (c) {
       c.markSolved('b4_ice');
       if (NEU.quest) NEU.quest.bump('a4_rooms', 3);
-      say(c, ['the third plate locks with a heavy clunk.',
+      say(c, ['the last plate locks with a heavy clunk.',
               'the east wall slides open.']);
     }
   });
@@ -799,7 +808,7 @@
       say(c, ['the plate under you sinks.', 'the mirror holds the other one.',
               'the door opens anyway.']);
     },
-    onReset: function () { b5face = 0; if (NEU.save) NEU.save.flag('solved:b5_two', 0); }
+    onReset: function () { b5face = 0; }
   });
 
 /* ══ B6 — the torch ═════════════════════════════════════════════
