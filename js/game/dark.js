@@ -5,7 +5,7 @@
    walk to the switch's guts and fit the part you found.
 
    Two objects in here: the grey DOOR (answers four times, then hands
-   over the clicker) and the SWITCH (the exit — stand on it, press E).
+   over the clicker) and the SWITCH (the exit — stand on it, press Z).
    Neither is near the other, so the space has to be crossed twice.
 
    Decisions worth writing down:
@@ -291,23 +291,6 @@
     }
 
     var camX = px - w / 2, camY = py - h / 2;
-    ctx.fillStyle = INK;
-    ctx.fillRect(0, 0, w, h);
-
-    /* Everything that never moves (floor, debris, door, the idle seams,
-       the lamp posts) is one half-size bake, drawn up 2x with smoothing
-       off: every sprite here is 2x art, so the pixels are identical. */
-    if (!baked) bake();
-    if (baked) ctx.drawImage(baked, (-camX) | 0, (-camY) | 0, W, H);
-
-    var dx = (DOOR.x - camX) | 0, dy = (DOOR.y - camY) | 0;
-    if (!endless && talks >= LINES.length) {
-      ctx.fillStyle = CYAN;                       /* it answered: the doorway is lit */
-      ctx.fillRect(dx + 12, dy + 12, DOOR.w - 24, DOOR.h - 18);
-    }
-
-    drawPlayer((px - camX) | 0, (py - camY) | 0);
-
     if (endless) {
       /* 132 down to a floor of 34 over ~1200 metres. The floor exists
          because a torch that reaches zero is not a challenge, it is a
@@ -315,18 +298,54 @@
       torch = Math.max(34, LIGHT - (walked / 8) * 0.08);
     }
     var rad = Math.round(endless ? torch : LIGHT);
-    if (rad !== gradR || w !== gradW || h !== gradH) {      /* rebuilt only on resize or a shrinking torch */
-      gradR = rad; gradW = w; gradH = h;
-      grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, rad);
-      grad.addColorStop(0.00, 'rgba(0,0,0,1)');
-      grad.addColorStop(0.45, 'rgba(0,0,0,1)');
-      grad.addColorStop(0.46, 'rgba(0,0,0,0.72)');
-      grad.addColorStop(0.70, 'rgba(0,0,0,0.72)');
-      grad.addColorStop(0.71, 'rgba(0,0,0,0.34)');
-      grad.addColorStop(1.00, 'rgba(0,0,0,0)');
+
+    /* Everything that never moves (floor, debris, door, the idle seams,
+       the lamp posts) is one half-size bake, drawn up 2x with smoothing
+       off: every sprite here is 2x art, so the pixels are identical. */
+    if (!baked) bake();
+
+    /* Everything up to and including the torch mask depends only on these
+       inputs. Same inputs, same pixels: reuse the finished frame instead of
+       repainting and re-masking the whole canvas. */
+    var litNow = [px, py, w, h, cv.width, cv.height, rad, face, walkFrame(walked, moving),
+                  !endless && talks >= LINES.length, !!baked].join('|');
+    if (litCv && litNow === litKey) {
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(litCv, 0, 0); ctx.restore();
+    } else {
+      litKey = litNow;
+      ctx.fillStyle = INK;
+      ctx.fillRect(0, 0, w, h);
+      if (baked) ctx.drawImage(baked, (-camX) | 0, (-camY) | 0, W, H);
+
+      var dx = (DOOR.x - camX) | 0, dy = (DOOR.y - camY) | 0;
+      if (!endless && talks >= LINES.length) {
+        ctx.fillStyle = CYAN;                       /* it answered: the doorway is lit */
+        ctx.fillRect(dx + 12, dy + 12, DOOR.w - 24, DOOR.h - 18);
+      }
+
+      drawPlayer((px - camX) | 0, (py - camY) | 0);
+
+      if (rad !== gradR || w !== gradW || h !== gradH) {      /* rebuilt only on resize or a shrinking torch */
+        gradR = rad; gradW = w; gradH = h;
+        grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, rad);
+        grad.addColorStop(0.00, 'rgba(0,0,0,1)');
+        grad.addColorStop(0.45, 'rgba(0,0,0,1)');
+        grad.addColorStop(0.46, 'rgba(0,0,0,0.72)');
+        grad.addColorStop(0.70, 'rgba(0,0,0,0.72)');
+        grad.addColorStop(0.71, 'rgba(0,0,0,0.34)');
+        grad.addColorStop(1.00, 'rgba(0,0,0,0)');
+      }
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'source-over';
+
+      /* keep the finished, masked frame for the frames that repeat it */
+      if (!litCv) litCv = document.createElement('canvas');
+      if (litCv.width !== cv.width) litCv.width = cv.width;
+      if (litCv.height !== cv.height) litCv.height = cv.height;
+      var lc = litCv.getContext && litCv.getContext('2d');
+      if (lc) { lc.drawImage(cv, 0, 0); } else { litCv = null; litKey = null; }
     }
-    ctx.globalCompositeOperation = 'destination-in';
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
     ctx.globalCompositeOperation = 'source-over';
 
     /* Drawn after the torch mask, so they read from across the room. */
@@ -385,6 +404,7 @@
   }
 
   var baked = null, grad = null, gradR = 0, gradW = 0, gradH = 0;
+  var litCv = null, litKey = null;   /* last finished masked frame, and the inputs it was drawn from */
   function bake() {
     var S = NEU.sheets || {};
     var fl = NEU.sheetReady && NEU.sheetReady(S.darkFloor);
@@ -426,7 +446,7 @@
     ctx.fillStyle = CYAN;
     ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('press E', x, y);
+    ctx.fillText('press Z', x, y);
     ctx.textAlign = 'left';
   }
 

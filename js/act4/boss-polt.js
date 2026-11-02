@@ -40,6 +40,14 @@
   var COL = { bone: '#EDE7DE', soul: '#E23B55', dim: '#8A8598',
               ecto: '#7FE3C4', ectoHi: '#C4FFF0', red: '#E04A6B', void_: '#04060A' };
 
+  /* one look per phase (index = phase): the field and rim shift so the
+     escalation reads from the arena before the health bar */
+  var PHASE_LOOK = [null,
+    { field: '#070A14', rim: COL.bone },
+    { field: '#061418', rim: COL.ecto },
+    { field: '#14070E', rim: COL.red }];
+  var VULN_COL = '#FFC46A';            /* same gold as her VULNERABLE banner */
+
   var PLAYER_R = (dm.soul && dm.soul.R) || 3.2, IFRAMES = dm.IFRAMES || 1.1, MAXHP = 6;
   /* the shared fight feel: dash, adrenaline, rage, numbers, the HUD */
   var F = dm.fight(0, 0);
@@ -49,8 +57,10 @@
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
   var bullets = [], hooks = [], phase = 1, bossHP = 30, bossMax = 30;
   var bx = 0, by = 0, bz = 0, charging = 0, glow = 0, nextFire = 0, nextCharge = 0;
-  var chargeTimer = 0;                   /* the 900ms telegraph delay — cleared on close so a
-                                            quit+reopen inside the window can't fire it into the new fight */
+  var TELE = 24 / 60;                    /* hook telegraph: 24 frames before a hook can hit */
+  /* game-clock state: every timer here is advanced by the update loop, so a
+     pause or a death holds it and open()/close() wipe it */
+  var warnAt = 0, chargePath = null, vuln = 0, sig = 0, sigDone = false, sigRing = 0, sigSpin = 0;
   var clone = null, mode = 'fight';
   var line = '', lineT = 0;
 
@@ -118,7 +128,7 @@
     hooks = [];
     for (var i = 0; i < 4; i++) {
       hooks.push({ a: i * Math.PI / 2, r: 120, x: bx, y: by, t: Math.random() * 2,
-                   free: false });
+                   free: false, warn: false });
     }
   }
 
@@ -144,9 +154,12 @@
     if (charging > 0) {
       charging -= dt;
       bx += cvx * dt; by += cvy * dt;
+      if (charging <= 0) { vuln = 1; chargePath = null; }   /* the punish window opens */
     } else {
-      bx += (px - bx) * Math.min(1, dt * chase * 0.9);
-      by += (py - by) * Math.min(1, dt * chase * 0.9);
+      if (!warnAt) {                     /* a warning holds still: the drawn path is the real one */
+        bx += (px - bx) * Math.min(1, dt * chase * 0.9);
+        by += (py - by) * Math.min(1, dt * chase * 0.9);
+      }
       bz = Math.sin(t * 0.8) * 60;
     }
     bx = Math.min(Math.max(bx, AX + 20), AX + AW - 20);
@@ -162,8 +175,10 @@
         : { x: bx + Math.cos(hk.a) * hk.r, y: by + Math.sin(hk.a) * hk.r };
       hk.x += (tgt.x - hk.x) * Math.min(1, dt * 3);
       hk.y += (tgt.y - hk.y) * Math.min(1, dt * 3);
+      hk.warn = false;
       if (hk.free) {
         hk.t -= dt;
+        hk.warn = hk.t > 0 && hk.t <= TELE;   /* the aim shows for 24 frames before it fires */
         if (hk.t <= 0) {
           hk.t = 1.5;
           var a = Math.atan2(py - hk.y, px - hk.x);
@@ -203,9 +218,23 @@
          and so does leaving the fight (close), so it outlives neither. */
       stopRise();
       riseStop = NEU.sfx && NEU.sfx.rise ? NEU.sfx.rise(900) : null;
-      chargeTimer = setTimeout(doCharge, 900);
+      warnAt = t + 0.9;                   /* game clock: a pause or a death holds it */
+      lockCharge();
     }
+    if (warnAt && t >= warnAt) { warnAt = 0; doCharge(); }
     if (glow > 0) glow -= dt;
+    if (vuln > 0) vuln -= dt;
+    if (sig > 0) {
+      sig -= dt; sigRing -= dt;
+      if (sigRing <= 0) {
+        sigRing = 1.2; sigSpin += 0.26;
+        for (var k = 0; k < 12; k++) {
+          var sa2 = sigSpin + k * Math.PI / 6;
+          shot(bx, by, Math.cos(sa2) * 170, Math.sin(sa2) * 170, 5, COL.red, 1);
+        }
+      }
+      if (sig <= 0) { sig = 0; sigDone = true; say('* it holds on. one more.'); }
+    }
 
     moveBullets(dt * dm.slow(F));
     draw(nowMs);
@@ -219,13 +248,24 @@
     if (riseStop) { riseStop(); riseStop = null; }
   }
   var cvx = 0, cvy = 0;
+  /* the direction is read at WARN time and drawn as chargePath, so the
+     telegraph is the real path. The boss holds still while it warns. */
+  function lockCharge() {
+    var a = Math.atan2(py - by, px - bx), ca = Math.cos(a), sa = Math.sin(a);
+    cvx = ca * 520; cvy = sa * 520;
+    chargePath = { x0: bx, y0: by, x1: bx + ca * 260, y1: by + sa * 260, t: warnAt };
+  }
   function doCharge() {
     stopRise();                          /* the charge fires: the telegraph's tone ends with it */
     if (!running) return;
-    var a = Math.atan2(py - by, px - bx);
-    cvx = Math.cos(a) * 520; cvy = Math.sin(a) * 520;
     charging = 0.5;
     glow = 0;
+  }
+
+  /* the signature at 1 HP: the kill is held until this has been survived */
+  function startSig() {
+    sig = 4; sigRing = 0; sigSpin = 0;
+    say('* it makes one last thing of itself.');
   }
 
   function moveBullets(dt) {
@@ -245,20 +285,20 @@
       if (b.x < AX - 50 || b.x > AX + AW + 50 || b.y < AY - 50 || b.y > AY + AH + 50) continue;
       keep.push(b);
       var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
-      if (dx * dx + dy * dy < rr * rr && hurt()) return;
+      if (dx * dx + dy * dy < rr * rr && hurt(b.vx, b.vy)) return;
     }
     bullets = keep;
     /* contact damage while charging */
-    if (charging > 0 && Math.hypot(px - bx, py - by) < 26) hurt();
+    if (charging > 0 && Math.hypot(px - bx, py - by) < 26) hurt(cvx, cvy);
   }
 
   /* One damage path; a dash or the i-frames pass through. True = dead. */
-  function hurt() {
-    if (inv > 0 || F.dashI > 0) return false;
+  function hurt(dx, dy) {
+    if (inv > 0 || F.dashI > 0 || (NEU.cheat && NEU.cheat.god)) return false;   /* dev `god` (dev.js) */
     hp--; inv = IFRAMES;
     dm.hurt(F, px, py - 12);
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
-    if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
+    if (NEU.juice) { NEU.juice.hit('medium', { dx: dx, dy: dy }); NEU.juice.burst(px, py, 10, COL.soul); }
     if (hp <= 0) { startDeath(); return true; }
     return false;
   }
@@ -276,41 +316,61 @@
       say("* the copy comes apart. the original notices.");
       return;
     }
+    if (sig > 0) { say('* not yet.'); return; }
     if (Math.hypot(px - bx, py - by) > 40) return;
-    var dmg = dm.mul(F);
+    var dmg = dm.mul(F) * (vuln > 0 ? 2 : 1);
     bossHP -= dmg;
     dm.bossHit(F, bx, by, dmg);
     if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
-    if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(bx, by, 7, COL.ectoHi); }
+    if (NEU.juice) { NEU.juice.hit('small', { dx: bx - px, dy: by - py }); NEU.juice.burst(bx, by, 7, COL.ectoHi); }
+    if (bossHP <= 0 && sigDone) { win(); return; }
+    /* the killing blow leaves him at 1 HP; the kill lands after the signature */
+    var killing = bossHP <= 0;
+    if (killing) bossHP = 1;
     var pct = bossHP / bossMax;
-    if (bossHP <= 0) { win(); return; }
     if (pct <= 0.20 && phase < 3) {
       phase = 3;
       hooks.forEach(function (h) { h.free = false; });
       clone = { x: bx, y: by, t: 2 };
       say("* it makes another one of itself.");
       if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(3);
+      if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', phase);
     } else if (pct <= 0.50 && phase < 2) {
       phase = 2;
-      hooks.forEach(function (h) { h.free = true; });
+      hooks.forEach(function (h) { h.free = true; h.t = 1.5; });
       say("* the hooks let go.");
       if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(2);
+      if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', phase);
     }
+    if (killing) startSig();
   }
 
   function win() {
     running = false; mode = 'won'; bullets = [];
+    if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', -1);
     if (NEU.juice) { NEU.juice.hit('huge', { colour: '#7FE3C4' });
                      NEU.juice.burst(bx, by, 60, COL.ecto, 260); }
     if (NEU.save) NEU.save.flag('polt_dead', 1);
     if (NEU.quest) NEU.quest.mark('a4_polt');
-    if (msg) {
-      msg.hidden = false;
-      msg.innerHTML = '<b>it stops.</b><br>' +
-        'it picks you up by a tooth, considers you, and throws you<br>' +
-        'back through the hole you came in by.<br><small>esc</small>';
-    }
     draw(performance.now());
+    /* the shatter plays AFTER the save, so a tab closed mid-beat keeps
+       the kill. Seen once, it is skippable. */
+    var seen = !!(NEU.save && NEU.save.flagged && NEU.save.flagged('polt_shatter'));
+    if (NEU.save) NEU.save.flag('polt_shatter', 1);
+    function after() {
+      if (wrap.hidden) return;
+      if (msg) {
+        msg.hidden = false;
+        msg.innerHTML = '<b>it stops.</b><br>' +
+          'it picks you up by a tooth, considers you, and throws you<br>' +
+          'back through the hole you came in by.<br><small>esc</small>';
+      }
+      draw(performance.now());
+    }
+    if (NEU.juice && NEU.juice.shatter) {
+      var dpr = cv.width / innerWidth;
+      NEU.juice.shatter({ canvas: cv, x: bx * dpr, y: by * dpr, skippable: seen, onDone: after });
+    } else after();
   }
 
   function startDeath() {
@@ -352,10 +412,25 @@
   }
 
   function frame() {
-    ctx.fillStyle = '#070A14'; ctx.fillRect(AX, AY, AW, AH);
-    ctx.fillStyle = COL.bone;
+    var look = PHASE_LOOK[phase] || PHASE_LOOK[1];
+    ctx.fillStyle = look.field; ctx.fillRect(AX, AY, AW, AH);
+    ctx.fillStyle = look.rim;
     ctx.fillRect(AX - 3, AY - 3, AW + 6, 3); ctx.fillRect(AX - 3, AY + AH, AW + 6, 3);
     ctx.fillRect(AX - 3, AY, 3, AH); ctx.fillRect(AX + AW, AY, 3, AH);
+  }
+
+  /* a free hook about to fire: red corner brackets and a dotted aim at
+     you. Static, so it reads the same under reduced motion. */
+  function drawHookWarn(x, y) {
+    var r = 14, L = 6, x0 = (x - r) | 0, y0 = (y - r) | 0, x1 = (x + r) | 0, y1 = (y + r) | 0;
+    ctx.fillStyle = COL.red;
+    ctx.fillRect(x0, y0, L, 2); ctx.fillRect(x0, y0, 2, L);
+    ctx.fillRect(x1 - L, y0, L, 2); ctx.fillRect(x1 - 2, y0, 2, L);
+    ctx.fillRect(x0, y1 - 2, L, 2); ctx.fillRect(x0, y1 - L, 2, L);
+    ctx.fillRect(x1 - L, y1 - 2, L, 2); ctx.fillRect(x1 - 2, y1 - L, 2, L);
+    var dx = px - x, dy = py - y, d = Math.hypot(dx, dy) || 1;
+    for (var j = 2; j <= 8; j++)
+      ctx.fillRect((x + dx / d * j * 12 - 1) | 0, (y + dy / d * j * 12 - 1) | 0, 2, 2);
   }
 
   function draw(nowMs) {
@@ -392,10 +467,23 @@
       }
     }
 
+    /* the locked charge path: the real line he will take, fading in as
+       the warning runs out (game clock, so a pause holds it) */
+    if (chargePath && warnAt) {
+      var cp = chargePath, ramp = 1 - Math.max(0, warnAt - t) / 0.9;
+      ctx.globalAlpha = 0.25 + 0.6 * ramp;
+      ctx.fillStyle = COL.red;
+      for (var j = 0; j <= 20; j++) {
+        var u = j / 20;
+        ctx.fillRect((cp.x0 + (cp.x1 - cp.x0) * u - 2) | 0, (cp.y0 + (cp.y1 - cp.y0) * u - 2) | 0, 4, 4);
+      }
+      ctx.globalAlpha = 1;
+    }
+
     /* depth sort: him, the clone, four hooks */
     var things = [{ x: bx, y: by, z: bz, kind: 'body' }];
     if (clone) things.push({ x: clone.x, y: clone.y, z: 20, kind: 'clone' });
-    hooks.forEach(function (h) { things.push({ x: h.x, y: h.y, z: 0, kind: 'hook' }); });
+    hooks.forEach(function (h) { things.push({ x: h.x, y: h.y, z: 0, kind: 'hook', warn: h.warn }); });
     things.sort(function (a, b) { return a.z - b.z; });
 
     things.forEach(function (o) {
@@ -406,6 +494,7 @@
           ctx.fillStyle = COL.ecto;
           ctx.fillRect((p.x - 9 * s) | 0, (p.y - 9 * s) | 0, (18 * s) | 0, (18 * s) | 0);
         }
+        if (o.warn) drawHookWarn(p.x, p.y);
         return;
       }
       /* Phase drives which glowmask stacks on. P1 body only, P2 adds
@@ -432,6 +521,13 @@
         ctx.fillStyle = COL.red;
         ctx.fillRect((p.x - w / 2 - 4) | 0, (p.y - h / 2 - 4) | 0, (w + 8) | 0, (h + 8) | 0);
         ctx.globalAlpha = 1;
+      }
+      /* the punish window: a gold frame round him, static */
+      if (o.kind === 'body' && vuln > 0 && mode !== 'won') {
+        ctx.fillStyle = VULN_COL;
+        var vx0 = (p.x - w / 2 - 6) | 0, vy0 = (p.y - h / 2 - 6) | 0, vw = (w + 12) | 0, vh = (h + 12) | 0;
+        ctx.fillRect(vx0, vy0, vw, 2); ctx.fillRect(vx0, vy0 + vh - 2, vw, 2);
+        ctx.fillRect(vx0, vy0, 2, vh); ctx.fillRect(vx0 + vw - 2, vy0, 2, vh);
       }
       if (drew) return;
       ctx.fillStyle = o.kind === 'clone' ? '#5A2A3E' : '#1E3A44';
@@ -464,6 +560,17 @@
     dm.hud(ctx, F, { w: innerWidth, h: innerHeight, AY: AY, AH: AH, name: 'polterghast',
                      hp: bossHP, max: bossMax, ticks: [0.5, 0.2],
                      php: hp, pmax: MAXHP, phase: phase });
+
+    /* the label sits outside the shake, on a dark plate (AA) */
+    if (vuln > 0 && mode !== 'won') {
+      ctx.font = '32px "Determination Mono","Pixelify Sans",monospace';
+      var lw = ctx.measureText('VULNERABLE').width || 200;
+      var lx = (AX + AW / 2 - lw / 2) | 0, ly = AY + 48;
+      ctx.globalAlpha = 0.85; ctx.fillStyle = '#000000';
+      ctx.fillRect(lx - 8, ly - 32, (lw + 16) | 0, 44);
+      ctx.globalAlpha = 1; ctx.fillStyle = VULN_COL;
+      ctx.fillText('VULNERABLE', lx, ly);
+    }
 
     if (line && nowMs - lineT < 5000) {
       ctx.fillStyle = COL.bone;
@@ -507,15 +614,18 @@
     F = dm.fight(px, py);
     bx = AX + AW / 2; by = AY + 80; bz = 0;
     charging = 0; glow = 0; nextFire = 1.4; nextCharge = 5;
+    warnAt = 0; chargePath = null; vuln = 0; sig = 0; sigDone = false;
     resetHooks();
+    if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', 1);
     say('* something in the wall has been listening the whole time.');
     running = true; last = performance.now();
     requestAnimationFrame(stepFn);
   }
   function close() {
     running = false; dying = 0;
-    if (chargeTimer) { clearTimeout(chargeTimer); chargeTimer = 0; }
+    warnAt = 0; charging = 0; vuln = 0; sig = 0; chargePath = null;
     stopRise();
+    if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', -1);
     if (NEU.activeMinigame === 'polt') NEU.activeMinigame = null;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
@@ -543,6 +653,12 @@
                get hp() { return bossHP; },
                get clone() { return !!clone; },
                get hooks() { return hooks.length; },
+               /* what a renderer draws: the locked charge path, the punish window,
+                  the signature, and each hook's telegraph */
+               get state() {
+                 return { vulnerable: vuln > 0, chargePath: chargePath, sig: sig > 0,
+                          hooks: hooks.map(function (h) { return { x: h.x, y: h.y, warn: !!h.warn }; }) };
+               },
                /* the shared feel state (core/danmaku.js), for tests */
                get feel() { return F; } };
 })();

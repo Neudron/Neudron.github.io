@@ -562,7 +562,7 @@
       c.flag('b2_seen', 1);
       say(c, ['the way east is a wall of three loose stones.',
               'each one has a word. one of them is the word.',
-              'read the riddle. press e on the stone you believe.',
+              'read the riddle. press z on the stone you believe.',
               'then push the two lane stones onto the plates above them.',
               'the loose block is a decoy. do not push it into a corner.',
               'press r if you make a mess of it. the room does not mind.']);
@@ -1076,7 +1076,7 @@
       { t: 'scalprop', v: 'skulls', x: 9, y: 11, candle: true },
       { t: 'scalprop', v: 'skulls', x: 2, y: 3 },
       /* the lore, on the north wall either side of her sigil (the brass
-         is painted into the wall; these are what you press E at) */
+         is painted into the wall; these are what you press Z at) */
       { t: 'scalprop', v: 'plaque', x: 7, y: 1,
         run: function (c) {
           say(c, ['a brass plaque, warm to the touch.',

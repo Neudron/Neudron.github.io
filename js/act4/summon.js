@@ -1093,7 +1093,7 @@
   });
 
   /* `plaque`: the brass plaques are painted into the wall; this is only
-     the thing you press E at */
+     the thing you press Z at */
   var DRAW = { altar: drawAltar, pillar: drawPillar, brazier: drawBrazier, chain: drawChain,
                skulls: drawSkulls, vent: drawVent, sconce: drawSconce, plaque: function () {} };
   KK.kind('scalprop', {

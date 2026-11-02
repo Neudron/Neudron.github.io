@@ -184,7 +184,7 @@
   var slideDead = false;  /* the direction a slide just died in — a held key must not re-commit */
 
   /* ── push blocks ────────────────────────────────────────────────
-     Walk into one and press e: it moves a whole cell in the direction
+     Walk into one and press z: it moves a whole cell in the direction
      you face, if the cell beyond is clear. Grid-snapped — a block that
      slides continuously can straddle two cells, and then "is it on the
      plate" has no honest answer. No undo; an unsolvable arrangement
@@ -690,7 +690,13 @@
     padH = measurePad();
     if (room) camClamp();
   }
-  addEventListener('resize', function () { if (running) layout(); });
+  /* A window drag fires resize dozens of times a frame; lay out once per frame. */
+  var layoutQueued = false;
+  addEventListener('resize', function () {
+    if (!running || layoutQueued) return;
+    layoutQueued = true;
+    requestAnimationFrame(function () { layoutQueued = false; if (running) layout(); });
+  });
 
   function update(dt) {
     clock += dt;
@@ -1013,12 +1019,10 @@
       }
       return;
     }
-    if (e.key === 'z' || e.key === 'Z' || e.key === 'e' || e.key === 'E') {
+    if (e.key === 'z' || e.key === 'Z') {
       e.preventDefault();
-      /* Z advances an open textbox through the same path a click takes.
-         E is the old interact key and stays exactly that: it never
-         eats a press on the textbox (a locked door re-checks at once). */
-      if ((e.key === 'z' || e.key === 'Z') && NEU.tboxOpen && NEU.tboxOpen()) { var tb = document.getElementById('tbox'); if (tb) tb.click(); return; }
+      /* Z advances an open textbox through the same path a click takes. */
+      if (NEU.tboxOpen && NEU.tboxOpen()) { var tb = document.getElementById('tbox'); if (tb) tb.click(); return; }
       if (busy) return;
       /* Interact first, push second. A block you are standing next to
          is almost never what you meant when there is an npc in reach. */

@@ -112,18 +112,26 @@
      (shake budget). Every colour below indexes BRIM. */
   var BRIM = ['#1a0000', '#5a0000', '#c0140a', '#ff3a1a', '#ff9a4a', '#fff0d0'];
   var BRIM_RGB = [[26, 0, 0], [90, 0, 0], [192, 20, 10], [255, 58, 26], [255, 154, 74], [255, 240, 208]];
+  /* palettes for the shared beam look (NEU.scalBeam.draw). brim is hers and
+     draws exactly as before (no extras, plus her ray sprites); soul is the
+     player's BRIMSTONE: soul red into white, same shape language, plus the
+     WotG extras (downscaled glow, scrolling streaks, impact sparks). */
+  var BEAM_PAL = {
+    brim: { rgb: BRIM_RGB, fx: false },
+    soul: { rgb: [[24, 0, 8], [120, 0, 24], [214, 16, 40], [255, 40, 64], [255, 168, 180], [255, 255, 255]], fx: true }
+  };
   function fx() {
-    return G.fx || (G.fx = { warn: [], mine: [], dark: 0, darkTo: 0, shk: 0, cue: {}, loud: false });
+    return G.fx || (G.fx = { warn: [], mine: [], dark: 0, darkTo: 0, shk: 0, cue: {}, loud: false, grad: {}, gn: 0 });
   }
   /* dark red -> near white as t goes 0 -> 1 (pow .6), as 'r,g,b' */
   function rampRGB(t) {
     var u = 2 + 3 * Math.pow(clamp(t, 0, 1), 0.6), i = Math.min(4, u | 0), k = u - i, a = BRIM_RGB[i], b = BRIM_RGB[i + 1];
     return ((a[0] + (b[0] - a[0]) * k) | 0) + ',' + ((a[1] + (b[1] - a[1]) * k) | 0) + ',' + ((a[2] + (b[2] - a[2]) * k) | 0);
   }
-  /* telegraph length from the attack's own pace: clamp(T*2-22, 10, 60) */
-  function teleT(T) { return clamp(T * 2 - 22, 10, 60); }
+  /* telegraph length: every telegraph is 24-30 f (60 fps), whatever pace the attack asks for */
+  function teleT(T) { return clamp(T, 24, 30); }
   /* a warning: a line (a = angle) or a ring (r = radius) that ramps up to its hit frame */
-  function warn(o) { o.at = G.fr; fx().warn.push(o); return o; }
+  function warn(o) { o.life = clamp(o.life || 24, 24, 30); o.at = G.fr; fx().warn.push(o); return o; }
   /* a bullet that starts slow and reaches sp (floor .45, cap sp): read, then go */
   function shotRamp(x, y, a, sp, k, o) {
     o = o || {};
@@ -157,25 +165,26 @@
     else A.sfx(name);
   }
   /* one flare, cached at first use: BRIM[5] core through BRIM[3] to nothing */
-  var FLARE = null;
-  function flareImg() {
-    if (FLARE !== null) return FLARE;
-    FLARE = false;
+  /* one cached flare canvas per palette (p.fl); brim's stops are the old ones */
+  function flareImg(p) {
+    p = p || BEAM_PAL.brim;
+    if (p.fl !== undefined) return p.fl;
+    p.fl = false;
     try {
       var c = document.createElement('canvas'); c.width = c.height = 64;
       var x = c.getContext && c.getContext('2d');
-      if (!x || !x.createRadialGradient) return FLARE;
-      var g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-      g.addColorStop(0, BRIM[5]); g.addColorStop(0.18, BRIM[4]); g.addColorStop(0.45, 'rgba(255,58,26,0.55)');
-      g.addColorStop(1, 'rgba(90,0,0,0)');
+      if (!x || !x.createRadialGradient) return p.fl;
+      var r = p.rgb, g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+      g.addColorStop(0, 'rgb(' + r[5].join() + ')'); g.addColorStop(0.18, 'rgb(' + r[4].join() + ')');
+      g.addColorStop(0.45, 'rgba(' + r[3].join() + ',0.55)'); g.addColorStop(1, 'rgba(' + r[1].join() + ',0)');
       x.fillStyle = g; x.fillRect(0, 0, 64, 64);
-      FLARE = c;
-    } catch (e) { FLARE = false; }
-    return FLARE;
+      p.fl = c;
+    } catch (e) { p.fl = false; }
+    return p.fl;
   }
   /* two counter-rotating blits of the cached flare, stretched along travel */
-  function twinFlare(ctx, x, y, s, rot, a) {
-    var im = flareImg();
+  function twinFlare(ctx, x, y, s, rot, a, p) {
+    var im = flareImg(p);
     if (!im) return;
     ctx.globalAlpha = a;
     for (var i = 0; i < 2; i++) {
@@ -215,10 +224,14 @@
         continue;
       }
       var ex = w.x + Math.cos(w.a) * (w.len || L), ey = w.y + Math.sin(w.a) * (w.len || L);
-      var gr = ctx.createLinearGradient ? ctx.createLinearGradient(w.x, w.y, ex, ey) : null;
-      if (gr) {
-        gr.addColorStop(0, 'rgba(' + c + ',' + ((0.3 + 0.7 * t) * fade).toFixed(2) + ')');
-        gr.addColorStop(1, 'rgba(' + c + ',0)');
+      /* the gradient depends only on the line and its quantised ramp, so it is
+         built once per (line, 1/16 step) and reused, not made per line per frame */
+      var tq = Math.round(t * 16) / 16, fq = Math.round(fade * 16) / 16, gk = [w.x, w.y, ex, ey, tq, fq].join(), gr = F.grad[gk];
+      if (!gr && ctx.createLinearGradient) {
+        if (F.gn >= 256) { F.grad = {}; F.gn = 0; }
+        gr = F.grad[gk] = ctx.createLinearGradient(w.x, w.y, ex, ey); F.gn++;
+        gr.addColorStop(0, 'rgba(' + rampRGB(tq) + ',' + ((0.3 + 0.7 * tq) * fq).toFixed(2) + ')');
+        gr.addColorStop(1, 'rgba(' + rampRGB(tq) + ',0)');
       }
       ctx.strokeStyle = gr || 'rgba(' + c + ',' + (t * fade).toFixed(2) + ')';
       ctx.lineWidth = Math.max(1, (w.w || 2) * t * 2);
@@ -228,7 +241,8 @@
       return b.fuse > 0 && b.x > A.AX - 40 && b.x < A.AX + A.AW + 40 && b.y > A.AY - 40 && b.y < A.AY + A.AH + 40;
     });
     if (F.mine.length > 240) F.mine.splice(0, F.mine.length - 240);
-    n = rm() ? 2 : 6;
+    /* LOD: past 80 mines the afterimages go (the bloom stays); otherwise 3 at most */
+    n = F.mine.length > 80 ? 0 : (rm() ? 2 : 3);
     for (i = 0; i < F.mine.length; i++) {
       m = F.mine[i];
       sp = Math.hypot(m.vx, m.vy);
@@ -541,7 +555,7 @@
     if (local >= 0 && local < 3 * 167 && local % 167 < 91 && (local % 167) % 7 === 0) {
       var off = D(L >= 3 ? 1050 : 900);
       var tx = hx(A.px + rnd(-off, off)), ty = hy(A.py + rnd(-off, off));
-      G.tele.push({ x: tx, y: ty, a: Math.atan2(ty - A.by, tx - A.bx), at: G.fr, life: 45 });
+      G.tele.push({ x: tx, y: ty, a: Math.atan2(ty - A.by, tx - A.bx), at: G.fr, life: 30 });
       later(45, (function (bx, by) {
         return function () { bomb(bx, by, 0, 0, rnd(135, 185), 12, V(6)); };
       }(tx, ty)));
@@ -958,9 +972,9 @@
   /* While the worm is up she is not parked. She orbits the soul at 140-260 px:
      the angular speed is 0.6-1.5 rad/s and reverses every 1.2-3 s; the radius
      drifts toward a new target in the band every 1.5-3 s; every 5-7 s she
-     telegraphs a reposition (a 0.6 s flicker) and jumps to a new bearing. The
+     telegraphs a reposition (a 0.5 s flicker) and jumps to a new bearing. The
      worm chases her, so its body sweeps round the soul. Every 2.5 s she throws a
-     five-dart fan at the soul, telegraphed by a red line for 0.6 s. */
+     five-dart fan at the soul, telegraphed by a red line for 0.5 s. */
   function wormOrbit(st) {
     var o = st.p.orb, f = st.f - 271;
     if (!o) o = st.p.orb = { ang: aim() + Math.PI, w: 0.9, rev: 2, r: 200, rr: 200, rt: 2, jump: 6, tele: 0, next: 0, sg: 1 };
@@ -972,16 +986,16 @@
     o.jump -= TF;
     if (o.jump <= 0 && !o.tele) {
       o.next = o.ang + o.sg * rnd(1.2, 2.4);
-      o.tele = 36; o.jump = rnd(5, 7);
+      o.tele = 30; o.jump = rnd(5, 7);
       A.anim('charge_telegraph');
-      G.tele.push({ x: A.px, y: A.py, a: o.next, at: G.fr, life: 36 });
+      G.tele.push({ x: A.px, y: A.py, a: o.next, at: G.fr, life: 30 });
     }
     if (o.tele && --o.tele === 0) { o.ang = o.next; A.anim('idle'); }
     o.ang += o.w * TF;
     A.setBoss(hx(A.px + Math.cos(o.ang) * o.r), hy(A.py + Math.sin(o.ang) * o.r));
     if (f % 150 === 60) {
       var a = aim();
-      G.tele.push({ x: A.bx, y: A.by, a: a, at: G.fr, life: 36 });
+      G.tele.push({ x: A.bx, y: A.by, a: a, at: G.fr, life: 30 });
       later(36, function () { fan(5, 0.3, 150); });
     }
   }
@@ -1036,17 +1050,17 @@
       for (i = 0; i < n; i++) {
         if ((i - g + n) % n < 2) continue;
         a = st.p.a0 + i * TAU / n + (w % 2 ? Math.PI / n : 0);
-        G.bolts.push({ x: A.bx, y: A.by, a: a, end: G.fr + 51, at: G.fr + 36,
+        G.bolts.push({ x: A.bx, y: A.by, a: a, end: G.fr + 51, at: G.fr + TIMING.BrimstoneLightning.tele,
                        segs: boltSegs(A.bx, A.by, a, Math.hypot(A.AW, A.AH) * 0.8) });
       }
       /* and one fork on the soul, unless it already stands in the gap */
       as = aim();
       if (Math.abs(((as - (st.p.a0 + (g + 0.5) * TAU / n + (w % 2 ? Math.PI / n : 0)) + 3 * Math.PI) % TAU) - Math.PI) > 1.5 * TAU / n) {
-        G.bolts.push({ x: A.bx, y: A.by, a: as, end: G.fr + 51, at: G.fr + 36,
+        G.bolts.push({ x: A.bx, y: A.by, a: as, end: G.fr + 51, at: G.fr + TIMING.BrimstoneLightning.tele,
                        segs: boltSegs(A.bx, A.by, as, Math.hypot(A.AW, A.AH) * 0.8) });
       }
     }
-    if (f % 90 === 36 && f < nw * 90) { G.lightPh++; A.shake('medium'); }
+    if (f % 90 === TIMING.BrimstoneLightning.tele && f < nw * 90) { G.lightPh++; A.shake('medium'); }
     return f >= nw * 90 - 30;
   };
 
@@ -1084,7 +1098,7 @@
      afterimage every 4 f and two wake darts every 6 f, and stops with a ring. */
   ATK.PredictiveCharge = function (st) {
     var f = st.f - (st.p.f0 || 0), k, dx, dy, L, s, pa, p, T = st.p.f0 ? 26 : 40;
-    if (f === 0) { st.p.tl = { x: A.bx, y: A.by, a: 0, at: G.fr, life: T }; G.tele.push(st.p.tl); }
+    if (f === 0) { st.p.tl = { x: A.bx, y: A.by, a: 0, at: G.fr, life: Math.min(30, T) }; G.tele.push(st.p.tl); }
     if (f < T) {
       A.anim('charge_telegraph'); A.willCharge(true);
       p = predict(A.bx, A.by, 900);
@@ -1296,7 +1310,7 @@
 
   /* Calamitous Rend (the screen cut, a WotG reality tear). She tears the arena
      with n slashes (4 in phase 3, 5 in the desperation), one every 90 f. Each
-     telegraphs for 54 f, a line growing out from the middle (G.rend, phase
+     telegraphs for 30 f, a line growing out from the middle (G.rend, phase
      'tele'). Then the rift opens for 30 f: a 12 px band that hurts, throwing
      darts out perpendicular to the cut, both ways. The slashes alternate between
      two diagonals, so they lattice the arena. The last one passes through where
@@ -1324,9 +1338,9 @@
       r = G.rend[i];
       r.t++;
       if (r.phase === 'tele') {
-        /* the approaching chime: ticks closing in, 24 -> 8 f apart */
-        if ((r.t === 16 || r.t === 40 || r.t === 48) && NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
-        if (r.t >= 54) {
+        /* the approaching chime: ticks closing in, 16 -> 8 f apart */
+        if ((r.t === 16 || r.t === 24) && NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+        if (r.t >= 30) {
           r.phase = 'rift'; r.t = 0;
           A.sfx('giga-hit'); A.shake('medium');
         }
@@ -1525,7 +1539,8 @@
         })(A.AX + A.AW * (0.1 + 0.2 * i) + (RNG() - 0.5) * 30);
       }
     }
-    if (f % 34 === 17 && p.n > 0) landingGeyser();
+    /* geysers stop at the last wave: one every 34 f would keep the bones (and the end check) alive forever */
+    if (f % 34 === 17 && p.n > 0 && f < p.t) landingGeyser();
     if (p.n >= 3 && f >= p.t && !G.bones.length) { blueOff(); return true; }
     return false;
   };
@@ -1941,6 +1956,26 @@
   var AFTER_PT = { 1: 'SummonShadowDemon', 2: 'SummonBrothers', 3: 'SummonSeekers', 4: 'DesperationPhase' };
   /* the phase gates: the HP share at which each phase starts */
   var GATE = [0.75, 0.45, 0.25, 0];
+  /* TIMING: per attack, tele = its telegraph lead in frames (24-30 at 60 fps,
+     asserted by fixes73 over a simulated fight); big = a signature pattern
+     that earns the long gap. Gaps: GAP f between attacks, GAP_BIG after big. */
+  var GAP = 72, GAP_BIG = 210;
+  var TIMING = {
+    HorizontalDarkSoulRelease: { tele: 30 }, CondemnationFanBurst: { tele: 30 }, ExplosiveCharges: { tele: 30 },
+    SummonSuicideBomberDemons: { tele: 30, big: 1 }, BrimstoneLightning: { tele: 30 }, HexCollapse: { tele: 30 },
+    PredictiveCharge: { tele: 30 }, ComboSkullRain: { tele: 30, big: 1 }, DartBurstFans: { tele: 24 },
+    SideHellbarrage: { tele: 24 }, TwinCharge: { tele: 24 }, BrimstoneWalls: { tele: 24 },
+    ShadowDemon_ReleaseExplodingShadowBlasts: { tele: 30 }, HellblastBarrage: { tele: 30 }, BrimstoneJewelBeam: { tele: 30 },
+    ConvergingSkulls: { tele: 24 }, EyeLockBeams: { tele: 30 }, ArcingEyeStarbursts: { tele: 30 },
+    ComboEyeHex: { tele: 30, big: 1 }, BrimstoneRain: { tele: 24 }, GravityOfRuin: { tele: 30, big: 1 },
+    FireblastVolley: { tele: 24 }, SkullWave: { tele: 24 }, DartWallRain: { tele: 30, big: 1 },
+    FlamePillars: { tele: 30 }, GravityBoneRush: { tele: 30 }, ShadowDemon_ShadowGigablastsAndCharges: { tele: 30 },
+    FireLaserSpin: { tele: 30 }, DarkMagicBombWalls: { tele: 30 }, GigablastCross: { tele: 24 },
+    CalamitousRend: { tele: 30, big: 1 }, DarknessLightSlashes: { tele: 30 }, ComboLaserHell: { tele: 30, big: 1 },
+    FireLaserSpinClassic: { tele: 30 }, BombBulletHell: { tele: 30, big: 1 }, RapidTeleports: { tele: 24 },
+    BecomeBerserk: { tele: 30 }, SummonShadowDemon: { tele: 30 }, SummonBrothers: { tele: 30 },
+    SummonSeekers: { tele: 30 }, SummonSepulcher: { tele: 30 }, PhaseTransition: { tele: 30 }, DesperationPhase: { tele: 30 }
+  };
   /* attacks that hold her invulnerable while they run */
   var INVULN = { PhaseTransition: 1, DesperationPhase: 1, SummonSepulcher: 1, SummonBrothers: 1, SummonSeekers: 1 };
 
@@ -1971,11 +2006,23 @@
     return G.bag.pop();
   }
 
+  /* the phase change: next level, its queue (a lightning first if the phase had none). Returns the name to begin. */
+  function gateNow() {
+    var pend = G.lightPh === 0;
+    G.lvl++;
+    G.lightPh = 0;
+    A.level(G.lvl);
+    refill();
+    if (G.lvl === 4) { G.desp = { stage: '' }; A.setHP(1); G.queue = [AFTER_PT[4]]; }
+    else G.queue = (pend ? ['BrimstoneLightning'] : []).concat([AFTER_PT[G.lvl]]);
+    return 'PhaseTransition';
+  }
+
   function fresh() {
     return { fr: 0, ev: [], last: '', queue: [], bag: null, lvl: 0, lightPh: 0, berserk: false,
              beam: null, sub: -1, desp: null, tele: [], rend: [], bolts: [], lasers: [],
              hexes: [], after: [], lanes: null, box: null, thin: false, hist: [],
-             bones: [], lava: [], ceil: null };
+             bones: [], lava: [], ceil: null, pendN: 0, wait: 0 };
   }
 
   function begin(name) {
@@ -2003,12 +2050,22 @@
     G.hist.push({ name: name, lvl: G.lvl, f: G.fr });
   }
 
+  /* the breathing room after an attack: GAP f, or GAP_BIG after a big one */
   function finish() {
     G.last = cur.name;
+    G.hist[G.hist.length - 1].end = G.fr;
     cur = null;
     G.beam = null;
-    if (A.over()) return;
-    begin(G.queue.length ? G.queue.shift() : cycleNext());
+    if (A.over()) { G.wait = Infinity; return; }
+    G.wait = TIMING[G.last] && TIMING[G.last].big ? GAP_BIG : GAP;
+  }
+  /* the next attack after the gap. A phase gate that landed while an attack
+     ran (G.pendN) starts its transition here, never in the middle of one. */
+  function launch() {
+    var name;
+    if (G.pendN > 0) { G.pendN--; name = gateNow(); }
+    else name = G.queue.length ? G.queue.shift() : cycleNext();
+    begin(name);
   }
 
   /* a hazard that holds the soul hurts her: the beam, the lasers, the bolts in
@@ -2069,7 +2126,10 @@
     for (i = 0; i < due.length; i++) due[i].fn();
     rendTick();
     hurtCheck();
-    if (!cur) return;
+    if (!cur) {
+      if (G.wait-- > 0) return;
+      launch();
+    }
     var fin = cur.fn(cur.st);
     cur.st.f++;
     if (fin) finish();
@@ -2091,28 +2151,21 @@
     },
     /* per frame: whole 60 Hz frames of the attack clock (at most four) */
     tick: function (dt) {
-      if (!G || !cur) return;
+      if (!G) return;
       K = A.AW / 2000;
       acc += dt;
       var n = 0;
-      while (acc >= TF && n < 4 && cur) { acc -= TF; n++; step(); }
+      while (acc >= TF && n < 4) { acc -= TF; n++; step(); }
       if (n === 4) acc = 0;
     },
     /* the HP gates. Each one she passes starts the phase's transition; the
        transition's next attack comes from AFTER_PT. At 0 HP, after the
        seekers, the desperation phase starts instead of a win. */
     gate: function (pct) {
-      if (!G || G.desp || pct > GATE[G.lvl]) return;
-      /* a gate that lands before this phase's lightning has struck queues it
-         first in the next phase, ahead of the transition's own attack */
-      var pend = G.lightPh === 0;
-      G.lvl++;
-      G.lightPh = 0;
-      A.level(G.lvl);
-      refill();
-      if (G.lvl === 4) { G.desp = { stage: '' }; A.setHP(1); G.queue = [AFTER_PT[4]]; }
-      else G.queue = (pend ? ['BrimstoneLightning'] : []).concat([AFTER_PT[G.lvl]]);
-      begin('PhaseTransition');
+      if (!G) return;   /* no fight (reset ran, a shot still in flight) */
+      var k = G.lvl + G.pendN;
+      if (G.desp || k >= 4 || pct > GATE[k]) return;
+      G.pendN++;
     },
     /* dev `skip`: the phase a starting HP share belongs to. Every gate at or
        above it is passed; a share of 2 % or less is the desperation (the
@@ -2153,7 +2206,9 @@
        frame (debug.history), and the lightning strikes in this phase */
     debug: {
       get history() { return G ? G.hist : []; },
-      get lightning() { return G ? G.lightPh : 0; }
+      get lightning() { return G ? G.lightPh : 0; },
+      /* the live warnings (line, ring), for fixes73: each has its life in frames */
+      get warns() { return G && G.fx ? G.fx.warn : []; }
     },
     /* the new bodies, for draw and the tests */
     beam: function () { return G ? G.beam : null; },
@@ -2527,43 +2582,119 @@
 
   /* The BrimstoneLaserbeam, WotG pass. Four additive layers, each a
      gradient brightest at the source that fades to a quarter at the far
-     end (TelegraphedPortalLaserbeam.cs:95-96 taper): a wide BRIM[1]
-     back-glow, BRIM[3], BRIM[4], a BRIM[5] core (LightSlashTelegraph.cs
-     :146-157 dark-under-bright). The width eases in over 16 f from b.on and
-     overshoots ~20 % before it settles (LightSlashTelegraph.cs:123-124).
-     Twin flares at the source and where it meets the wall, then
-     BrimstoneRayMid tiled down it. b.w scales it and the hurt band. */
-  function gradLine(ctx, x0, y0, x1, y1, i, a, w) {
-    var c = BRIM_RGB[i], rgb = c[0] + ',' + c[1] + ',' + c[2];
-    var g = ctx.createLinearGradient ? ctx.createLinearGradient(x0, y0, x1, y1) : null;
-    if (g) { g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); g.addColorStop(1, 'rgba(' + rgb + ',' + (a * 0.25).toFixed(2) + ')'); }
-    line(ctx, x0, y0, x1, y1, g || 'rgba(' + rgb + ',' + a + ')', w);
+     end (TelegraphedPortalLaserbeam.cs:95-96 taper): a wide rgb[1]
+     back-glow, rgb[3], rgb[4], an rgb[5] core (LightSlashTelegraph.cs
+     :146-157 dark-under-bright). The width eases in over 16 f
+     and overshoots ~20 % before it settles (LightSlashTelegraph.cs:123-124).
+     Twin flares at the source and where it meets the wall; brim then tiles
+     BrimstoneRayMid down it. w scales it and the hurt band.
+
+     NEU.scalBeam.draw is the ONE beam look, hers and the soul's:
+       phase 'charge' t 0-1: a thin telegraph that grows out from the
+         source (eased square over the first quarter) and widens
+       phase 'fire'   t 0-1: the 16 f width ramp (1 = settled)
+       phase 'fade'   t 0-1: shrinks and dims to nothing
+     Gradients live in the beam's own frame (0,0)-(len,0), cached per
+     palette/layer/len, so a steady beam builds none per frame. Under
+     reduced motion an fx palette is steady: no scroll, no wobble, no spin,
+     no sparks. Nothing here flashes the screen. */
+  function beamGrad(ctx, p, i, a, len) {
+    var C = p.g || (p.g = { n: 0 }), k = i + ':' + a + ':' + len, g = C[k], rgb;
+    if (g) return g;
+    rgb = p.rgb[i].join();
+    if (!ctx.createLinearGradient) return 'rgba(' + rgb + ',' + a + ')';
+    if (C.n >= 64) { C = p.g = { n: 0 }; }
+    g = C[k] = ctx.createLinearGradient(0, 0, len, 0); C.n++;
+    g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); g.addColorStop(1, 'rgba(' + rgb + ',' + (a * 0.25).toFixed(2) + ')');
+    return g;
   }
-  function beam(ctx, b) {
-    var ex = b.x + Math.cos(b.a) * b.len, ey = b.y + Math.sin(b.a) * b.len;
-    var op = ctx.globalCompositeOperation, w = b.w || 1;
-    var u = b.on === undefined ? 1 : clamp((G.fr - b.on) / 16, 0, 1);
-    var s = (Math.sin(Math.pow(u, 1.3) * Math.PI / 2) + 0.3 * Math.sin(u * Math.PI)) * w;
+  /* the downscaled glow: a 4x16 canvas, soft across the beam, stretched up
+     along it (wotg-visuals §7: heavy glow at low res, upscaled) */
+  function glowImg(p) {
+    if (p.gc !== undefined) return p.gc;
+    p.gc = false;
+    try {
+      var c = document.createElement('canvas'); c.width = 4; c.height = 16;
+      var x = c.getContext && c.getContext('2d'), y;
+      if (!x) return p.gc;
+      for (y = 0; y < 16; y++) {
+        x.fillStyle = 'rgba(' + p.rgb[3].join() + ',' + (0.55 * Math.pow(Math.sin((y + 0.5) / 16 * Math.PI), 2)).toFixed(2) + ')';
+        x.fillRect(0, y, 4, 1);
+      }
+      p.gc = c;
+    } catch (e) { p.gc = false; }
+    return p.gc;
+  }
+  function drawBeam(ctx, x0, y0, ang, len, w, t, phase, pal) {
+    var p = BEAM_PAL[pal] || BEAM_PAL.brim, op = ctx.globalCompositeOperation, calm = rm();
+    var clk = p.fx && !calm && typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
+    var fr = G ? G.fr : 0, tp = rayTip(x0, y0, ang), i, s, k = 1, D = len, im;
+    len = len | 0;
+    if (p.fx) D = Math.min(len, Math.hypot(tp.x - x0, tp.y - y0));
+    ctx.save();
+    ctx.translate(x0, y0); ctx.rotate(ang);
     ctx.lineCap = 'butt';
     ctx.globalCompositeOperation = 'lighter';
-    gradLine(ctx, b.x, b.y, ex, ey, 1, 0.7, 46 * s);
-    gradLine(ctx, b.x, b.y, ex, ey, 3, 0.5, 22 * s);
-    gradLine(ctx, b.x, b.y, ex, ey, 4, 0.7, 10 * s);
-    gradLine(ctx, b.x, b.y, ex, ey, 5, 0.95, Math.max(1, 4 * s));
-    twinFlare(ctx, b.x, b.y, 34 * s + 6, G.fr * 0.06, 0.9);
-    var tp = rayTip(b.x, b.y, b.a);
-    twinFlare(ctx, tp.x, tp.y, 20 * s + 4, -G.fr * 0.08, 0.8);
+    if (phase === 'charge') {
+      var e = Math.min(1, t / 0.25);
+      ctx.globalAlpha = 0.9 * Math.min(1, t / 0.08);
+      line(ctx, 0, 0, D * e * e, 0, beamGrad(ctx, p, 4, 0.9, len), Math.max(1, (1 + 3 * t) * w));
+      ctx.restore();
+      ctx.globalCompositeOperation = 'lighter';
+      twinFlare(ctx, x0, y0, (8 + 16 * t) * w + 4, clk * 3, 0.6 * t, p);
+      ctx.globalCompositeOperation = op; ctx.globalAlpha = 1;
+      ctx.lineCap = 'butt'; ctx.lineWidth = 1;
+      return;
+    }
+    var u = phase === 'fade' ? 1 : t;
+    if (phase === 'fade') k = 1 - clamp(t, 0, 1);
+    s = (Math.sin(Math.pow(u, 1.3) * Math.PI / 2) + 0.3 * Math.sin(u * Math.PI)) * w * k;
+    if (clk) s *= 1 + 0.05 * Math.sin(clk * 14);          /* ~2.2 Hz width breath */
+    ctx.globalAlpha = k;
+    if (p.fx && (im = glowImg(p))) ctx.drawImage(im, 0, -40 * s, D, 80 * s);
+    line(ctx, 0, 0, D, 0, beamGrad(ctx, p, 1, 0.7, len), 46 * s);
+    line(ctx, 0, 0, D, 0, beamGrad(ctx, p, 3, 0.5, len), 22 * s);
+    line(ctx, 0, 0, D, 0, beamGrad(ctx, p, 4, 0.7, len), 10 * s);
+    line(ctx, 0, 0, D, 0, beamGrad(ctx, p, 5, 0.95, len), Math.max(1, 4 * s));
+    if (p.fx && s > 0.15 && D > 1) {
+      /* streaks scrolling out along the length (static under reduced motion) */
+      ctx.fillStyle = p.st || (p.st = 'rgba(' + p.rgb[5].join() + ',0.5)');
+      for (i = 0; i < 9; i++) ctx.fillRect(((i * 137 + clk * 540) % D) | 0, (((i * 5) % 9 - 4) * s * 1.6) | 0, 22, 2);
+    }
+    ctx.restore();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 1;
+    if (p.fx) {
+      var ex = x0 + Math.cos(ang) * D, ey = y0 + Math.sin(ang) * D;
+      twinFlare(ctx, x0, y0, (34 * s + 6), clk * 3.6, 0.9 * k, p);
+      twinFlare(ctx, ex, ey, (40 * s + 8), -clk * 4.8, 0.95 * k, p);   /* impact bloom */
+      if (clk && s > 0.15) {
+        ctx.fillStyle = p.sp || (p.sp = 'rgb(' + p.rgb[4].join() + ')');
+        for (i = 0; i < 8; i++) {
+          var q = ang + Math.PI + ((i * 0.37 + clk * 2.1) % 1) * 1.8 - 0.9, d = (clk * 70 + i * 11) % 26;
+          ctx.fillRect((ex + Math.cos(q) * d) | 0, (ey + Math.sin(q) * d) | 0, 2, 2);
+        }
+      }
+      ctx.globalAlpha = 1;
+    } else {
+      twinFlare(ctx, x0, y0, 34 * s + 6, fr * 0.06, 0.9);
+      twinFlare(ctx, tp.x, tp.y, 20 * s + 4, -fr * 0.08, 0.8);
+    }
     ctx.globalCompositeOperation = op;
-    var mid = NEU.sheetReady && NEU.sheetReady(NEU.sheets.scalRay);
-    var end = NEU.sheetReady && NEU.sheetReady(NEU.sheets.scalRayEnd);
+    var mid = !p.fx && NEU.sheetReady && NEU.sheetReady(NEU.sheets.scalRay);
+    var end = mid && NEU.sheetReady(NEU.sheets.scalRayEnd);
     if (mid && s > 0.3) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, s / w);
-      ctx.translate(b.x | 0, b.y | 0); ctx.rotate(b.a - Math.PI / 2);
-      for (var y = 0; y < b.len; y += 15) ctx.drawImage(mid, 0, 0, 26, 30, -6 * w, y, 13 * w, 15);
-      if (end) ctx.drawImage(end, 0, 0, 26, 22, -6 * w, b.len | 0, 13 * w, 11);
+      ctx.translate(x0 | 0, y0 | 0); ctx.rotate(ang - Math.PI / 2);
+      for (var y = 0; y < len; y += 15) ctx.drawImage(mid, 0, 0, 26, 30, -6 * w, y, 13 * w, 15);
+      if (end) ctx.drawImage(end, 0, 0, 26, 22, -6 * w, len, 13 * w, 11);
       ctx.restore();
     }
-    ctx.lineWidth = 1;
+    ctx.lineCap = 'butt'; ctx.lineWidth = 1;
+  }
+  NEU.scalBeam = { draw: drawBeam };
+  function beam(ctx, b) {
+    drawBeam(ctx, b.x, b.y, b.a, b.len, b.w || 1, b.on === undefined ? 1 : clamp((G.fr - b.on) / 16, 0, 1), 'fire', 'brim');
   }
 }());

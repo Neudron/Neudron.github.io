@@ -893,20 +893,29 @@ html.is-jolt { animation: neuJolt .26s steps(2, end); }
    rewrites the transform on both of these every frame and would wipe
    a keyframed one out entirely. */
 .sword.is-carried, .keyobj.is-carried { animation: carried 1.7s ease-in-out infinite; }
+/* the warm glow is its own layer, so the pulse animates opacity (compositor)
+   instead of re-rasterising the sprite's filter every frame */
+.sword.is-carried, .keyobj.is-carried { filter: drop-shadow(0 6px 18px rgba(0,0,0,.5)); }
+.sword.is-carried::after, .keyobj.is-carried::after {
+  content: ''; position: absolute; inset: -8px; z-index: -1; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(255,236,160,.55) 0%, rgba(255,236,160,0) 70%);
+  animation: carried-glow 1.7s ease-in-out infinite;
+}
 /* Riding at the bottom of a phone screen, a carried thing sits right
    where the thumb scrolls. touch-action:none there meant a swipe that
    started on it moved nothing, so you could not reach the bottom of the
    page. Let the page pan through it; sans.js tells a tap from a scroll. */
 .sword.is-carried, .keyobj.is-carried { touch-action: pan-x pan-y; }
 
-@keyframes carried {
-  0%, 100% { filter: drop-shadow(0 6px 18px rgba(0,0,0,.5)); }
-  50%      { filter: drop-shadow(0 6px 22px rgba(255,236,160,.55)); }
+@keyframes carried-glow {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 1; }
 }
 
 /* calm motion: html.rm is set by motion.js (device default OR the
    settings choice), so the player can override the device. */
 html.rm .sword.is-carried, html.rm .keyobj.is-carried { animation: none; }
+html.rm .sword.is-carried::after, html.rm .keyobj.is-carried::after { animation: none; opacity: 0; }
 
 
 

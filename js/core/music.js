@@ -251,6 +251,7 @@
   var curId = null;
   var ducked = false;
   var hpMax = {};
+  var bossSec = {};                                  /* boss → section id, or 'end' */
 
   var SPB = 16;                                      /* steps per bar */
   function stepDur(tr) { return (60 / tr.bpm) / 4; } /* a 16th note   */
@@ -452,7 +453,8 @@
     curId = id;
     if (!id) { stopSoon(); return true; }
 
-    if (TRACKS[id].boss) hpMax[TRACKS[id].boss] = null;   /* new fight */
+    /* new fight, not a new boss section: sections keep the same max */
+    if (TRACKS[id].boss && id === TRACKS[id].boss) hpMax[TRACKS[id].boss] = null;
 
     var nv = makeVoice(id);
     voices.push(nv);
@@ -504,8 +506,12 @@
   /* ── director: most specific first. Rhythm game returns silence (its own tempo fights). */
   function pick() {
     if (NEU.rhythm && NEU.rhythm.running) return null;
-    if (NEU.scal && NEU.scal.running) return 'scal';
-    if (NEU.polt && NEU.polt.running) return 'polt';
+    var bs = ['scal', 'polt'], bi, bb;
+    for (bi = 0; bi < bs.length; bi++) {
+      bb = bs[bi];
+      if (!(NEU[bb] && NEU[bb].running)) { bossSec[bb] = null; continue; }
+      return bossSec[bb] === 'end' ? null : bossSec[bb] || bb;
+    }
     if (NEU.quiz && NEU.quiz.running) return 'prize';
     if (NEU.craft && NEU.craft.running) return 'home';
     if (NEU.engine && NEU.engine.running) {
@@ -541,7 +547,24 @@
     }
   });
 
+  /* ── boss sections: one derived track per phase, crossfaded by play().
+     Each phase lifts the key a tone and the tempo 6 bpm; the layers still
+     come in from the boss's own phase and HP (intensity). -1 ends it. */
+  function bossPhase(b, n) {
+    if (!TRACKS[b] || !TRACKS[b].boss) return;
+    if (n < 0) { bossSec[b] = 'end'; return; }
+    var id = b + '.' + n, src = TRACKS[b], tr = {}, k;
+    if (!TRACKS[id]) {
+      for (k in src) tr[k] = src[k];
+      tr.bpm = src.bpm + 6 * n;
+      tr.root = src.root + 2 * n;
+      TRACKS[id] = tr;
+    }
+    bossSec[b] = id;
+  }
+
   NEU.music = {
+    bossPhase: bossPhase,
     play: play,
     stop: function () { play(null); },
     duck: duck,

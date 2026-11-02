@@ -84,7 +84,11 @@
      for free. TP comes only from grazing and melee now. */
   var stripOpen = false, stripSel = 0, stripAt = 0, healCd = 0, healToast = 0;
   var meleeCd = 0, grazeAt = -9;
-  var STRIP_SCALE = 0.2, MELEE_DMG = 6, MELEE_R = 56, FIRE_DMG = 1.5, BUSTER_DMG = 40;
+  var STRIP_SCALE = 0.2, MELEE_DMG = 6, MELEE_R = 56, FIRE_DMG = 4;
+  var MINI_N = 4, MINI_DMG = 1, MINI_SPEED = 160, MINI_LIFE = 1.2;
+  /* BRIMSTONE laser: charge, fire, ticks of BEAM_TICK (10 x 7 = 70) */
+  var BEAM_CHARGE = 0.25, BEAM_FIRE = 0.95, BEAM_TICKS = 10, BEAM_TICK = 7;
+  var BEAM_TURN = 2, BEAM_LEN = 900;
   var MELEE_CD = 0.3, FIRE_CD = 1.2, FIRE_HOLD = 0.45, HEAL_CD = 30;
   /* TP, Deltarune's numbers (maps/tp.md). The wiki's scale is 0..250
      and reads as 0..100 %; tp here is 0..1. Each bullet grazed gives
@@ -124,7 +128,7 @@
   /* The player's own homing shots (V5 phase 2). Deliberately NOT
      `bullets` — NEU.scal.bullets feeds the test dodge AI, and mixing
      friendly fire into it would teach the bot to dodge its own gun. */
-  var myShots = [], charging = false, chargeF = 0, shotCd = 0;
+  var myShots = [], charging = false, chargeF = 0, shotCd = 0, myBeam = null;
   var line = '', lineT = 0;
   var bx = 0, by = 0;        // her position
   var dying = 0;
@@ -363,7 +367,21 @@
      cyan ring where it lands. */
   var rings = [];
   function shotRing(x, y, big) { if (rings.length > 16) rings.shift(); rings.push({ x: x, y: y, t: 0, big: big }); }
+  /* minis: cheap. A 3-dot trail read off the velocity (no history array),
+     one glow and a 2 px ember that jitters 1 px (still under reduced motion) */
+  var MINI_TRAIL = ['rgba(160,240,255,0.7)', 'rgba(127,230,255,0.45)', 'rgba(127,230,255,0.25)'];
+  function drawMini(s) {
+    for (var m = 0; m < 3; m++) {
+      ctx.fillStyle = MINI_TRAIL[m];
+      ctx.fillRect((s.x - s.vx * (m + 1) * 0.014) | 0, (s.y - s.vy * (m + 1) * 0.014) | 0, 2, 2);
+    }
+    if (dm.glow) dm.glow(ctx, s.x, s.y, 10, '#7FE6FF', 0.7);
+    var j = rm() ? 0 : ((s.age * 18) | 0) % 2;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect((s.x - 1 + j) | 0, (s.y - 1) | 0, 2, 2);
+  }
   function drawSoulShot(s) {
+    if (s.kind === 'mini') { drawMini(s); return; }
     var big = s.kind === 'buster', r = big ? 14 : 8;
     var a = Math.atan2(s.vy, s.vx), ca = Math.cos(a), sa = Math.sin(a);
     s.vt = s.vt || [];
@@ -516,7 +534,7 @@
     /* streaks of brimstone rain outside the arena, falling at a slant */
     var n = 18 + lv * 10, op = ctx.globalCompositeOperation, still = rm();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = 'rgba(255,70,30,' + (0.12 + lv * 0.05).toFixed(2) + ')';
+    ctx.strokeStyle = 'rgba(255,70,30,' + Math.min(0.5, 0.12 + lv * 0.05).toFixed(2) + ')';
     ctx.lineWidth = 2;
     ctx.beginPath();
     for (var i = 0; i < n; i++) {
@@ -734,7 +752,7 @@
     /* The C strip slows the whole fight to a fifth. Cooldowns below run
        on this same scaled clock, so HEAL's 30 s is fight time. */
     if (stripOpen) dt *= STRIP_SCALE;
-    t += dt;
+    t += dt; trackBanner();
     driftEmbers(dt);
     if (meleeCd > 0) meleeCd -= dt;
     if (shotCd > 0) shotCd -= dt;
@@ -776,10 +794,11 @@
     rageShown += (rage - rageShown) * ease;
     tpShown   += (tp   - tpShown)   * ease;
 
+    if (myBeam) beamUpdate(dt);
     /* the C strip holds the soul still: arrows drive the menu instead */
     if (mode !== 'intro' && mode !== 'won' && !stripOpen) {
       var ox = px, oy = py;
-      movePlayer(dt);
+      movePlayer(beamFiring() ? dt * 0.5 : dt);
       if (dt > 0) { pvx = (px - ox) / dt; pvy = (py - oy) / dt; }
     }
     if (inv > 0) inv -= dt;
@@ -942,7 +961,7 @@
       shieldT = 0;
       inv = IFRAMES;
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
-      if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(px, py, 12, '#B8E6FF'); }
+      if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(px, py, 8, '#B8E6FF'); }
       return false;
     }
     inv = IFRAMES;
@@ -951,12 +970,69 @@
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     /* Taking a hit is a MEDIUM event. The player needs to feel it
        without the screen becoming unreadable mid-pattern. */
-    if (NEU.juice) { NEU.juice.hit('medium'); NEU.juice.burst(px, py, 10, COL.soul); }
+    if (NEU.juice) { NEU.juice.hit('medium', { dx: px - bx, dy: py - by }); NEU.juice.burst(px, py, 10, COL.soul); }
     if (hp <= 0) { startDeath(); return true; }
     return false;
   }
 
   /* One funnel for every TP gain, so the caps and the MAX state agree. */
+  /* The four phases (gates at 75 / 45 / 25 % HP; the desperation stays
+     in the last). Each has its own field, rim, storm and boss-bar frame,
+     so a gate reads as a change of place, not just a flash. The music
+     hears every change (NEU.music.bossPhase, guarded: music.js may load
+     without it) and -1 when the fight ends, win, death or leave. */
+  var PHASE_LOOK = [
+    { field: '#14050A', rim: '#FF3A2A', hi: '#FFB070', storm: 0, hud: '#5A5468' },
+    { field: '#1A0408', rim: '#FF6A1A', hi: '#FFC46A', storm: 1, hud: '#B8602E' },
+    { field: '#1E0210', rim: '#E0204A', hi: '#FFA0B4', storm: 2, hud: '#D03048' },
+    { field: '#280204', rim: '#FF2A1A', hi: '#FFFFFF', storm: 3, hud: '#FFC46A' }
+  ];
+  var ph = 0, phEnded = true;
+  function setPh(n) {
+    n = Math.max(0, Math.min(3, n | 0));
+    if (n === ph && !phEnded) return;
+    ph = n; phEnded = false;
+    if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('scal', n);
+  }
+  function endPh() {
+    if (phEnded) return;
+    phEnded = true;
+    if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('scal', -1);
+  }
+
+  /* VULNERABLE / INVULNERABLE: named once, for 1.4 s, each time her
+     shield state flips. Static text on a dark plate (no flash, no
+     motion), so it stays under reduced motion; the colours clear AA
+     7:1 on the plate. */
+  var BANNER_FONT = '32px "Determination Mono","Pixelify Sans",monospace', BANNER_LEN = 1.4;
+  var shownInv = null, bannerTxt = '', bannerAt = -9;
+
+  /* Bullet and blast glows go to a half-size buffer and are added on
+     in one upscaled drawImage (wotg-visuals.md §7): a quarter of the
+     fill, and pixelated on purpose with smoothing off. */
+  var glowBuf = null;
+  function glowCtx() {
+    if (!glowBuf) glowBuf = document.createElement('canvas');
+    var gw = cv.width >> 1, gh = cv.height >> 1;
+    if (!gw || !gh) return null;
+    if (glowBuf.width !== gw || glowBuf.height !== gh) { glowBuf.width = gw; glowBuf.height = gh; }
+    var g = glowBuf.getContext && glowBuf.getContext('2d');
+    if (!g) return null;
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, gw, gh);
+    var k = gw / VW; g.setTransform(k, 0, 0, k, 0, 0);
+    return g;
+  }
+  function glowCol(b) {
+    var lk = LOOK[b.look || b.tag];
+    return lk ? lk.glow : b.k === 2 ? '#C03070' : '#FF4A2A';
+  }
+  function trackBanner() {
+    if (mode !== 'intro' && invuln !== shownInv) {
+      shownInv = invuln; bannerTxt = invuln ? 'INVULNERABLE' : 'VULNERABLE'; bannerAt = t;
+    }
+    if (bannerTxt && t - bannerAt >= BANNER_LEN) bannerTxt = '';
+  }
+
   function addTp(v) { tp = Math.min(1, tp + v); }
   /* A new graze: the outline flash (never faster than 3 Hz), a tick,
      and the point for the view to draw. */
@@ -1034,8 +1110,9 @@
   /* ── hitting her ────────────────────────────────────────────────
      Two strikes, both on Z. A tap (released before FIRE_HOLD) is the
      melee slash: 6 damage, reach MELEE_R toward the nearest target.
-     Holding Z to FIRE_HOLD and releasing throws a fireball: 1.5 damage,
-     homing, FIRE_CD cooldown. Brimstone Buster is in the C strip. */
+     Holding Z to FIRE_HOLD and releasing throws a fireball: 4 damage,
+     homing, FIRE_CD cooldown. A landed fireball splits into 4 minis.
+     BRIMSTONE, a laser, is in the C strip. */
 
   function startCharge() {
     if (charging || dying || mode === 'intro' || mode === 'won') return;
@@ -1120,26 +1197,79 @@
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
   }
 
-  /* The buster: 40 damage, piercing, owner 'soul'. Called from the strip,
-     which has already checked and paid for it. */
-  function buster() {
+  /* A landed fireball bursts into MINI_N minis, spread evenly. */
+  function splitFire(s) {
+    var base = Math.atan2(s.vy, s.vx);
+    for (var k = 0; k < MINI_N; k++) {
+      var a = base + k * Math.PI * 2 / MINI_N;
+      myShots.push({ owner: 'soul', kind: 'mini', x: s.x, y: s.y,
+                     vx: Math.cos(a) * MINI_SPEED, vy: Math.sin(a) * MINI_SPEED,
+                     r: 5, dmg: MINI_DMG, age: 0, hitRefs: [] });
+    }
+  }
+
+  /* BRIMSTONE laser, called from the strip after it has paid. Aim starts
+     at the target (or where you face); beamUpdate turns it at BEAM_TURN. */
+  function beamStart() {
     var tg = resolveTarget();
-    var ang = tg ? Math.atan2(tg.y - py, tg.x - px) : facingAng();
-    myShots.push({ owner: 'soul', kind: 'buster', x: px, y: py,
-                   vx: Math.cos(ang) * 420, vy: Math.sin(ang) * 420,
-                   r: 16, dmg: BUSTER_DMG, pierce: true, age: 0, hitRefs: [] });
+    myBeam = { x0: px, y0: py, ang: tg ? Math.atan2(tg.y - py, tg.x - px) : facingAng(),
+               len: BEAM_LEN, t: 0, charge: 0, fire: 0, w: 2, n: 0 };
     if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
+  }
+  function beamFiring() { return !!myBeam && myBeam.charge >= BEAM_CHARGE; }
+  function beamUpdate(dt) {
+    var b = myBeam;
+    if (dying) { myBeam = null; return; }
+    b.t += dt; b.x0 = px; b.y0 = py;
+    var tg = resolveTarget();
+    if (tg) {
+      var d = Math.atan2(tg.y - py, tg.x - px) - b.ang;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      var step = BEAM_TURN * dt;
+      b.ang += Math.max(-step, Math.min(step, d));
+    }
+    if (b.charge < BEAM_CHARGE) {
+      b.charge = Math.min(BEAM_CHARGE, b.charge + dt);
+      b.w = 2 + 6 * b.charge / BEAM_CHARGE;
+      return;
+    }
+    b.fire += dt; b.w = 8;
+    var due = b.fire >= BEAM_FIRE ? BEAM_TICKS : Math.floor(b.fire / (BEAM_FIRE / BEAM_TICKS));
+    for (; b.n < due; b.n++) beamHit(BEAM_TICK);
+    if (b.fire >= BEAM_FIRE) myBeam = null;
+  }
+  /* One tick: every target within reach of the line takes dmg (pierces). */
+  function beamHit(dmg) {
+    var b = myBeam, dx = Math.cos(b.ang), dy = Math.sin(b.ang);
+    function on(x, y, r) {
+      var k = Math.max(0, Math.min(b.len, (x - b.x0) * dx + (y - b.y0) * dy));
+      return Math.hypot(b.x0 + dx * k - x, b.y0 + dy * k - y) < r;
+    }
+    if (ringOn && NEU.scalSeekers && NEU.scalSeekers.alive()) {
+      var ss = NEU.scalSeekers.seekers().slice();
+      for (var s = 0; s < ss.length; s++) if (on(ss[s].x, ss[s].y, 12)) damageTarget('seeker', ss[s], dmg);
+    }
+    if (sep) {
+      var hs = hearts.slice();
+      for (var i = 0; i < hs.length; i++) if (on(hs[i].x, hs[i].y, 18)) damageTarget('heart', hs[i], dmg);
+    }
+    if (mode === 'brothers') {
+      var bs = bros.slice();
+      for (var j = 0; j < bs.length; j++) if (on(bs[j].x, bs[j].y, HB.broReach)) damageTarget('bro', bs[j], dmg);
+    }
+    if (mode === 'fight' && !invuln && on(bx, by, 40)) damageTarget('her', null, dmg);
   }
 
   function moveMyShots(dt) {
     for (var i = myShots.length - 1; i >= 0; i--) {
       var s = myShots[i];
       s.age += dt;
-      var dead = s.age > 4;
+      var dead = s.age > (s.kind === 'mini' ? MINI_LIFE : 4);
       /* dt-correct version of moveBullets' speed-preserving steering
          kernel: rotate velocity toward the target without changing its
          magnitude, so homing curves instead of snapping. */
-      if (!dead) {
+      if (!dead && (s.kind !== 'mini' || s.age > 0.3)) {
         var tg = resolveTarget();
         if (tg) {
           var dx = tg.x - s.x, dy = tg.y - s.y;
@@ -1162,14 +1292,14 @@
          stops at the first target it hits. */
       if (!dead) {
         if (ringOn && NEU.scalSeekers) {
-          if (NEU.scalSeekers.hit(s.x, s.y, s.r)) dead = true;
+          if (NEU.scalSeekers.hit(s.x, s.y, s.r)) { dead = true; s.hit = true; }
         } else if (sep) {
           for (var q = 0; q < hearts.length && !dead; q++) {
             if (s.hitRefs.indexOf(hearts[q]) >= 0) continue;
             if (Math.hypot(hearts[q].x - s.x, hearts[q].y - s.y) < 18 + s.r) {
               s.hitRefs.push(hearts[q]);
               damageTarget('heart', hearts[q], s.dmg);
-              dead = !s.pierce;
+              dead = !s.pierce; s.hit = true;
             }
           }
         } else if (mode === 'brothers') {
@@ -1178,17 +1308,21 @@
             if (Math.hypot(bros[w].x - s.x, bros[w].y - s.y) < HB.broReach + s.r) {
               s.hitRefs.push(bros[w]);
               damageTarget('bro', bros[w], s.dmg);
-              dead = !s.pierce;
+              dead = !s.pierce; s.hit = true;
             }
           }
         } else if (mode === 'fight' && !invuln && s.hitRefs.indexOf('her') < 0 &&
                    Math.hypot(bx - s.x, by - s.y) < 40 + s.r) {
           s.hitRefs.push('her');
           damageTarget('her', null, s.dmg);
-          dead = !s.pierce;
+          dead = !s.pierce; s.hit = true;
         }
       }
-      if (dead) { if (s.hitRefs.length || !s.pierce) shotRing(s.x, s.y, s.kind === 'buster'); myShots.splice(i, 1); }
+      if (dead) {
+        if (s.hit && s.kind === 'fireball') splitFire(s);
+        if (s.hitRefs.length || !s.pierce) shotRing(s.x, s.y, s.kind === 'buster');
+        myShots.splice(i, 1);
+      }
     }
   }
 
@@ -1259,19 +1393,31 @@
                      NEU.juice.burst(bx, by, 60, COL.brim, 260); }
     if (NEU.save) { NEU.save.give('ashes'); NEU.save.flag('scal_dead', 1); }
     if (NEU.quest) { NEU.quest.mark('a4_scal'); NEU.quest.mark('a4_ashes'); }
-    if (msg) {
-      msg.hidden = false;
-      msg.innerHTML = '<b>she sits back down.</b><br>' +
-        '"the small one was me. obviously."<br>' +
-        'she leaves you a handful of ash.<br>' +
-        '<small>esc to leave</small>';
+    endPh();
+    /* The shatter plays AFTER the save above, so a tab closed mid-beat
+       keeps the kill. Seen once, it is skippable. */
+    var seen = !!(NEU.save && NEU.save.flagged('scal_shatter'));
+    if (NEU.save) NEU.save.flag('scal_shatter', 1);
+    function after() {
+      if (!active) return;
+      if (msg) {
+        msg.hidden = false;
+        msg.innerHTML = '<b>she sits back down.</b><br>' +
+          '"the small one was me. obviously."<br>' +
+          'she leaves you a handful of ash.<br>' +
+          '<small>esc to leave</small>';
+      }
+      draw(performance.now());
     }
-    draw(performance.now());
+    if (NEU.juice && NEU.juice.shatter) {
+      var k = cv.width / VW;
+      NEU.juice.shatter({ canvas: cv, x: bx * k, y: by * k, skippable: seen, onDone: after });
+    } else after();
   }
 
   function startDeath() {
     running = false; dying = performance.now(); stripOpen = false;
-    clearSched();
+    clearSched(); endPh();
     if (dm.resetDeath) dm.resetDeath();
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     requestAnimationFrame(deathStep);
@@ -1309,7 +1455,7 @@
       ctx.fillStyle = 'rgba(110,12,22,0.14)';
       ctx.fillRect((AX - g * 1.6) | 0, (AY - g) | 0, (AW + g * 3.2) | 0, (AH + g * 2) | 0);
     }
-    ctx.fillStyle = '#14050A'; ctx.fillRect(AX, AY, AW, AH);
+    var PL = PHASE_LOOK[ph]; ctx.fillStyle = PL.field; ctx.fillRect(AX, AY, AW, AH);
     for (var e = 0; e < embers.length; e++) {
       var m = embers[e], ex = (m.x * w + Math.sin(m.ph) * 6) | 0, ey = (m.y * h) | 0;
       ctx.fillStyle = m.s === 3 ? '#FFB050' : '#FF5A2A';
@@ -1318,11 +1464,11 @@
     }
     ctx.globalAlpha = 1;
     var br = rm() ? 0.5 : 0.5 + 0.5 * Math.sin(t * 1.9);
-    ctx.globalAlpha = 0.1 + 0.1 * br; rect('#FF3A2A', AX - 6, AY - 6, AW + 12, AH + 12, 8);
-    ctx.globalAlpha = 0.2 + 0.15 * br; rect('#FF3A2A', AX - 3, AY - 3, AW + 6, AH + 6, 3);
+    ctx.globalAlpha = 0.1 + 0.1 * br; rect(PL.rim, AX - 6, AY - 6, AW + 12, AH + 12, 8);
+    ctx.globalAlpha = 0.2 + 0.15 * br; rect(PL.rim, AX - 3, AY - 3, AW + 6, AH + 6, 3);
     ctx.globalAlpha = 1;
-    rect('#FF3A2A', AX, AY, AW, AH, 3);
-    rect('#FFB070', AX, AY, AW, AH, 1);
+    rect(PL.rim, AX, AY, AW, AH, 3);
+    rect(PL.hi, AX, AY, AW, AH, 1);
   }
 
   function draw(now) {
@@ -1333,7 +1479,7 @@
        shake off the simulation. */
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
     var lv = despLevel();
-    if (lv) drawStorm(w, h, lv);
+    if (lv || PHASE_LOOK[ph].storm) drawStorm(w, h, lv + PHASE_LOOK[ph].storm);
     frame();
     if (lv) { ctx.fillStyle = 'rgba(120,18,0,' + (0.05 * lv).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH); }
 
@@ -1419,6 +1565,17 @@
     }
 
     NEU.scalAtk.draw(ctx);
+    var gl = dm.glow ? glowCtx() : null;
+    if (gl) {
+      for (var gi = 0; gi < bullets.length; gi++)
+        dm.glow(gl, bullets[gi].x, bullets[gi].y, Math.max(10, bullets[gi].r * 3) | 0, glowCol(bullets[gi]), 0.55);
+      for (var gb = 0; gb < booms.length; gb++)
+        dm.glow(gl, booms[gb].x, booms[gb].y, 56, '#FF5A2A', 1 - booms[gb].t / 0.8);
+      var gop = ctx.globalCompositeOperation;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(glowBuf, 0, 0, glowBuf.width, glowBuf.height, 0, 0, VW, VH);
+      ctx.globalCompositeOperation = gop;
+    }
     for (var i = 0; i < bullets.length; i++) {
       var b = bullets[i], sz = (b.r * 2) | 0;
       /* k picks the sheet; everything else is a brimstone dart. */
@@ -1432,7 +1589,6 @@
          burst pause, since both spawn and pause at vx:vy:0. */
       var brot = b.rot || 0;
       var lk = LOOK[b.look || b.tag];
-      var gc = lk ? lk.glow : b.k === 2 ? '#C03070' : '#FF4A2A';
       if (lk) {
         key = lk.key; sc = lk.sc;
         var va = Math.atan2(b.vy, b.vx);
@@ -1461,7 +1617,7 @@
         ctx.lineWidth = 1;
       }
       smoke(b);
-      if (dm.glow) dm.glow(ctx, b.x, b.y, Math.max(10, b.r * 3) | 0, gc, 0.55);
+      if (!gl && dm.glow) dm.glow(ctx, b.x, b.y, Math.max(10, b.r * 3) | 0, glowCol(b), 0.55);
       if (!sprite(key, b.x, b.y, sc, brot)) {
         ctx.fillStyle = b.c;
         ctx.fillRect((b.x - b.r) | 0, (b.y - b.r) | 0, sz, sz);
@@ -1470,12 +1626,26 @@
     }
     for (var bm = 0; bm < booms.length; bm++) {
       var o = booms[bm];
-      if (dm.glow) dm.glow(ctx, o.x, o.y, 56, '#FF5A2A', 1 - o.t / 0.8);
+      if (!gl && dm.glow) dm.glow(ctx, o.x, o.y, 56, '#FF5A2A', 1 - o.t / 0.8);
       sprite('scalBoom', o.x, o.y, 1.2, 0, false, 0, Math.min(7, (o.t / 0.1) | 0));
     }
     /* The player's homing shots (V5 phase 2). */
     for (var ms = 0; ms < myShots.length; ms++) {
       drawSoulShot(myShots[ms]);    /* soul fire: never SCal's own sheets */
+    }
+    /* BRIMSTONE: her own beam look (NEU.scalBeam.draw), soul palette.
+       Charge = growing telegraph, fire = full beam, the last 0.15 s fades.
+       Each damage tick kicks a small shake biased along the beam; juice
+       gates it off under reduced motion, and tier small never flashes. */
+    if (myBeam && NEU.scalBeam) {
+      var mb = myBeam, bph = mb.charge < BEAM_CHARGE ? 'charge' : (mb.fire > BEAM_FIRE - 0.15 ? 'fade' : 'fire');
+      NEU.scalBeam.draw(ctx, mb.x0, mb.y0, mb.ang, mb.len, 0.6,
+        bph === 'charge' ? mb.charge / BEAM_CHARGE : bph === 'fade' ? (mb.fire - BEAM_FIRE + 0.15) / 0.15 : Math.min(1, mb.fire * 60 / 16),
+        bph, 'soul');
+      if (bph !== 'charge' && mb.shook !== mb.n && NEU.juice && NEU.juice.hit) {
+        mb.shook = mb.n;
+        NEU.juice.hit('small', { dx: Math.cos(mb.ang), dy: Math.sin(mb.ang), shake: 0.06 });
+      }
     }
     drawRings(lastDt);
     if (sep && NEU.scalWorm) {
@@ -1571,6 +1741,17 @@
                      ticks: [0.75, 0.45, 0.25],
                      php: hp, pmax: MAXHP, phase: phase,
                      tp: tpShown, rage: rageShown, rageOn: rageMode > 0, AX: AX });
+    /* the phase's frame round her bar (dm.hud's bar sits at y 36) */
+    var hbw = Math.min(480, w - 160) | 0;
+    rect(PHASE_LOOK[ph].hud, (((w - hbw) / 2) | 0) - 4, 32, hbw + 8, 20, 2);
+    if (bannerTxt) {
+      ctx.font = BANNER_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      var bnw = (ctx.measureText(bannerTxt).width + 32) | 0, bnx = (AX + AW / 2) | 0;
+      ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(bnx - (bnw >> 1), AY + 16, bnw, 48);
+      ctx.fillStyle = bannerTxt === 'VULNERABLE' ? '#FFC46A' : '#B8E6FF';
+      ctx.fillText(bannerTxt, bnx, AY + 24);
+      ctx.textAlign = 'left';
+    }
     drawBroBars(w);
     if (stripOpen) drawStrip(ctx);
     if (healToast > 0) {
@@ -1650,7 +1831,7 @@
      Deltarune's TP menu. Time runs at STRIP_SCALE while it is open and
      the soul stands still. HEAL: +1 HP, no TP, 30 s of fight time
      between uses, and it stays on cooldown when the strip is reopened.
-     BRIMSTONE BUSTER: 50 % TP for a 40-damage piercing shot. SOUL
+     BRIMSTONE: 50 % TP for a 1.2 s piercing laser, 70 damage. SOUL
      SHIELD: 32 % TP for a barrier that takes one hit. RAGE: free once
      the bar is full. Using any option closes the strip. There is no
      DEFEND: a free +16 % TP on a key press was the whole TP economy. */
@@ -1670,7 +1851,7 @@
       ok: function () { return hp < MAXHP && healCd <= 0; },
       tag: function () { return 'FREE'; },
       why: function () { return healCd > 0 ? 'WAIT ' + Math.ceil(healCd) + 's' : 'HP FULL'; } },
-    { name: 'BRIMSTONE BUSTER', icon: 'buster', col: '#FF6A2A', cost: 0.5,
+    { name: 'BRIMSTONE', icon: 'buster', col: '#FF6A2A', cost: 0.5,
       ok: function () { return tp >= 0.5; },
       tag: function () { return '50% TP'; },
       why: function () { return 'NEED 50%'; } },
@@ -1703,7 +1884,7 @@
       if (NEU.juice) NEU.juice.burst(px, py, 10, '#B8FFD0');
       say('* a little warmth. one heart back.');
     } else if (i === 1) {
-      tp = Math.max(0, tp - 0.5); buster();
+      tp = Math.max(0, tp - 0.5); beamStart();
       say('* brimstone, from your own soul.');
     } else if (i === 2) {
       tp = Math.max(0, tp - 0.32); shieldT = 30;
@@ -1902,7 +2083,7 @@
     clearTag: function (tag) { bullets = bullets.filter(function (b) { return b.tag !== tag; }); },
     setBoss: function (x, y) { bx = x; by = y; },
     setHP: function (n) { bossHP = n; },
-    level: function (n) { phase = n >= 2 ? 2 : 1; phaseFlash(); },
+    level: function (n) { phase = n >= 2 ? 2 : 1; setPh(n); phaseFlash(); },
     boom: boom,
     anim: function (s) { scalAnimState = s; },
     willCharge: function (v) { willCharge = v; },
@@ -1910,8 +2091,9 @@
     shake: function (s) {
       if (!NEU.juice) return;
       /* large carries a 90 ms hit-stop and one 50 ms flash: the big beats only */
+      /* the large beats lean the camera from her toward the soul */
       if (s === 'medium') NEU.juice.hit('medium');
-      else if (s === 'large') NEU.juice.hit('large');
+      else if (s === 'large') NEU.juice.hit('large', { dx: px - bx, dy: py - by });
       else NEU.juice.hit('small');
     },
     sfx: function (n) { sfxPlay(n); },
@@ -1957,12 +2139,13 @@
     }
     layout();
     t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; booms = []; flashAt = -9;
+    shownInv = null; bannerTxt = ''; endPh(); setPh(0);
     rage = 0; tp = 0; shieldT = 0;
     rageMode = 0; rageModeT = 0;
     rageShown = 0; tpShown = 0;
     stripOpen = false; stripSel = 0; healCd = 0; healToast = 0;
     meleeCd = 0; grazeAt = -9;
-    myShots = []; charging = false; chargeF = 0; shotCd = 0;
+    myShots = []; charging = false; chargeF = 0; shotCd = 0; myBeam = null;
     willCharge = false;
     /* 540: the rework's 720 cut by a quarter. The fight runs 4-5 minutes
        before desperation, with the attack pool, the bags and the combos
@@ -2008,7 +2191,7 @@
   }
   function close() {
     active = false; running = false; dying = 0; stripOpen = false;
-    F.pops = [];
+    F.pops = []; endPh();
     var kh = document.querySelector('#bh .bh__keys');
     if (kh) { kh.__v = false; kh.style.visibility = ''; }
     clearSched();
@@ -2066,6 +2249,7 @@
                get phase() { return phase; },
                get mode() { return mode; },
                get hearts() { return hearts.length; },
+               get myBeam() { return myBeam; },
                get bros() { return bros.length; },
                /* live positions for the win-path test: it walks the
                   soul, and she and the worm move with the fight */
@@ -2100,7 +2284,7 @@
                get broPos() { return bros.map(function (b) { return { x: b.x, y: b.y }; }); },
                get broHp() { return bros.map(function (b) { return b.hp; }); },
                 get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy }; }); },
-                get myShots() { return myShots.map(function (s) { return { x: s.x, y: s.y, vx: s.vx, vy: s.vy, owner: s.owner, kind: s.kind, dmg: s.dmg, pierce: !!s.pierce }; }); },
+                get myShots() { return myShots.map(function (s) { return { x: s.x, y: s.y, vx: s.vx, vy: s.vy, r: s.r, owner: s.owner, kind: s.kind, dmg: s.dmg, pierce: !!s.pierce }; }); },
                /* A2 hooks: the strip, heal, the blue soul and the
                   melee arcs, for the tests and the view. */
                get stripOpen() { return stripOpen; },
@@ -2133,6 +2317,12 @@
                 get lastAttack() { return NEU.scalAtk.last(); },
                 get sub() { return NEU.scalAtk.sub(); },
                 get invuln() { return invuln; },
+                setInvuln: function (v) { invuln = !!v; },
+                get ph() { return ph; },
+                win: function () { win(); },
+                get phaseLook() { return PHASE_LOOK; },
+                get banner() { return bannerTxt; },
+                get ctx() { return ctx; },
                 get shots() { return shotsFired; },
                 get attacks() { return NEU.scalAtk.names(); },
                 force: function (name) { clearSpecials(); return NEU.scalAtk.force(name); },

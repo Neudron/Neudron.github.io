@@ -1294,17 +1294,29 @@
          thing up or putting it down. Anything that actually travelled is a
          throw, even a weak one: a slow drag still earns "put some shoulder
          into it" from keyHit, which is the correct answer to a bad throw. */
-      if (kGrabTap) {
-        var moved = Math.hypot(e.clientX - kGrabX, e.clientY - kGrabY);
-        if (moved < TAP_SLOP && Math.hypot(kvx, kvy) < THROW_MIN) {
-          kvx = 0; kvy = 0;
-          if (kFromCarry) { dropKey(); } else { carryKey(); }
-          return;
-        }
+      /* A click that did not travel is a tap on any pointer, a mouse
+         included: it picks up, or puts down if it was already carried. */
+      var moved = Math.hypot(e.clientX - kGrabX, e.clientY - kGrabY);
+      if (moved < TAP_SLOP && Math.hypot(kvx, kvy) < THROW_MIN) {
+        kvx = 0; kvy = 0;
+        if (kFromCarry) { dropKey(); } else { carryKey(); }
+        return;
       }
       uncarryKey();
       kstate = 'thrown'; keyHit.nagged = false;
       if (Math.hypot(kvx, kvy) > 420 && NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
+    });
+
+    /* Keyboard: Enter or Z picks the key up, the next one puts it down. */
+    kel.tabIndex = 0;
+    kel.setAttribute('role', 'button');
+    kel.setAttribute('aria-label', 'the key. press Enter to pick it up, Enter again to put it down');
+    kel.removeAttribute('aria-hidden');
+    kel.addEventListener('keydown', function (e) {
+      if (!carryKeyPressed(e)) return;
+      e.preventDefault();
+      if (kstate === 'carry') dropKey();
+      else if (kstate !== 'off' && kstate !== 'held') carryKey();
     });
 
     /* A carried key lets the page scroll through it (css: .keyobj.is-carried),
@@ -1538,6 +1550,9 @@
 
   addEventListener('pointerup', function (e) {
     var scrolled = wasScroll(e);
+    /* A mouse click that did not travel is a pickup, the same as a tap on
+       a finger. A drag still releases over sans as before. */
+    if (!grabTap && grabId !== null && e.pointerId === grabId && !scrolled) { grabTap = true; grabId = null; carrySword(); return; }
     if (grabTap && grabId !== null && e.pointerId === grabId) { grabId = null; carrySword(); return; }
     if (grabTap && state !== 'held') return;
     /* Carrying on a finger: only a TAP drops or swings. A finger that
@@ -1550,6 +1565,25 @@
        go IS letting go, wherever the cursor happens to be. */
     if (grabTap && tbox && !tbox.hidden && e.target && tbox.contains(e.target)) return;
     attempt(e.clientX, e.clientY);
+  });
+
+  /* Keyboard carry, the same contract as a tap: Enter or Z picks it up,
+     the next Enter or Z lets go where the hand is (a miss sends it home). */
+  function carryKeyPressed(e) { return e.key === 'Enter' || e.key === 'z' || e.key === 'Z'; }
+  sword.tabIndex = 0;
+  sword.setAttribute('role', 'button');
+  sword.setAttribute('aria-label', 'the sword. press Enter to pick it up, Enter again to let go');
+  sword.removeAttribute('aria-hidden');
+  sword.addEventListener('keydown', function (e) {
+    if (!carryKeyPressed(e)) return;
+    e.preventDefault();
+    if (state === 'stuck') {
+      state = 'held'; grabId = null; grabTap = true;
+      NEU.sword && NEU.sword.setPose('held');
+      carrySword(); tellCarry('sword'); beatsStart();
+    } else if (state === 'held' && grabTap && grabId === null) {
+      attempt(handX(), handY());
+    }
   });
   addEventListener('pointercancel', function (e) {
     delete downAt[e.pointerId];

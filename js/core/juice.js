@@ -297,8 +297,96 @@
     setTimeout(function () { el.classList.remove('is-pop', 'is-burst'); }, 280);
   }
 
+  /* ── screen shatter (a boss's death beat) ───────────────────────
+     Technique from Wrath of the Gods' ScreenShatterSystem, studied, not
+     copied (see neu-room/references/wotg-visuals.md §6): snapshot the
+     frame, cut ~12 radial wedges from the focal point, split each one
+     into an inner and an outer shard, and fly them out spinning while
+     they fade. Works in raw canvas pixels (identity transform), so the
+     caller's own view scale does not matter. Call it AFTER the save is
+     written: a tab closed mid-beat must not lose the kill.
+     opts: canvas, x/y (canvas px, default centre), onDone, skippable
+     (Z/X/Enter end it at once). Reduced motion: a hard cut to black,
+     held 0.6 s. Returns { shards, skip }. */
+  var SHATTER_MS = 1100, WEDGES = 12;
+  function shatter(opts) {
+    opts = opts || {};
+    var cv = opts.canvas, c = cv && cv.getContext && cv.getContext('2d');
+    var over = false, raf = 0, timer = 0;
+    function finish() {
+      if (over) return;
+      over = true;
+      removeEventListener('keydown', onKey, true);
+      if (raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      if (opts.onDone) opts.onDone();
+    }
+    function onKey(e) {
+      if (e.key === 'z' || e.key === 'Z' || e.key === 'x' || e.key === 'X' || e.key === 'Enter') {
+        e.preventDefault(); e.stopPropagation(); finish();
+      }
+    }
+    if (opts.skippable) addEventListener('keydown', onKey, true);
+    if (!c) { finish(); return { shards: 0, skip: finish }; }
+    var W = cv.width, H = cv.height;
+    function black() {
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1;
+      c.fillStyle = '#000000'; c.fillRect(0, 0, W, H); c.restore();
+    }
+    if (reduced) { black(); timer = setTimeout(finish, 600); return { shards: 0, skip: finish }; }
+    var snap = document.createElement('canvas');
+    snap.width = W; snap.height = H;
+    var sc = snap.getContext && snap.getContext('2d');
+    if (sc) sc.drawImage(cv, 0, 0);
+    var fx = opts.x != null ? opts.x : W / 2, fy = opts.y != null ? opts.y : H / 2;
+    var R = Math.sqrt(W * W + H * H), angs = [], shards = [], i;
+    for (i = 0; i < WEDGES; i++) angs.push((i + (Math.random() - 0.5) * 0.6) * Math.PI * 2 / WEDGES);
+    function at(a, r) { return [fx + Math.cos(a) * r, fy + Math.sin(a) * r]; }
+    for (i = 0; i < WEDGES; i++) {
+      var a0 = angs[i], a1 = i + 1 < WEDGES ? angs[i + 1] : angs[0] + Math.PI * 2, am = (a0 + a1) / 2;
+      var cut = R * (0.18 + Math.random() * 0.14);
+      var p0 = at(a0, cut), p1 = at(a1, cut);
+      /* inner triangle, then the outer quad beyond the cut */
+      shards.push({ pts: [[fx, fy], p0, p1], a: am, d: 0.35 });
+      shards.push({ pts: [p0, at(a0, R), at(a1, R), p1], a: am, d: 1 });
+    }
+    for (i = 0; i < shards.length; i++) {
+      var s = shards[i], sx = 0, sy = 0;
+      for (var k = 0; k < s.pts.length; k++) { sx += s.pts[k][0]; sy += s.pts[k][1]; }
+      s.cx = sx / s.pts.length; s.cy = sy / s.pts.length;
+      s.spin = (Math.random() - 0.5) * 1.6;
+      s.fly = (0.12 + Math.random() * 0.1) * R * s.d;
+    }
+    var t0 = performance.now();
+    function frame(now) {
+      if (over) return;
+      var k = Math.min(1, (now - t0) / SHATTER_MS), e = outCubic(k);
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalAlpha = 1; c.fillStyle = '#000000'; c.fillRect(0, 0, W, H);
+      c.globalAlpha = Math.max(0, 1 - k);
+      for (var j = 0; j < shards.length; j++) {
+        var q = shards[j], p = q.pts;
+        c.save();
+        c.translate(q.cx + Math.cos(q.a) * q.fly * e, q.cy + Math.sin(q.a) * q.fly * e);
+        c.rotate(q.spin * e);
+        c.scale(1 + 0.4 * e, 1 + 0.4 * e);
+        c.translate(-q.cx, -q.cy);
+        c.beginPath(); c.moveTo(p[0][0], p[0][1]);
+        for (var m = 1; m < p.length; m++) c.lineTo(p[m][0], p[m][1]);
+        c.closePath(); c.clip();
+        c.drawImage(snap, 0, 0);
+        c.restore();
+      }
+      c.restore();
+      if (k >= 1) { finish(); return; }
+      raf = requestAnimationFrame(frame);
+    }
+    raf = requestAnimationFrame(frame);
+    return { shards: shards.length, skip: finish };
+  }
+
   NEU.juice = {
-    hit: hit, frozen: frozen, pause: pause, popEl: popEl,
+    hit: hit, frozen: frozen, pause: pause, popEl: popEl, shatter: shatter,
     begin: begin, end: end, overlay: overlay,
     burst: burst, drawParts: drawParts,
     pop: pop, backOut: backOut, outCubic: outCubic, outElastic: outElastic,

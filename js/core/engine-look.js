@@ -756,23 +756,31 @@
   }
 
   /* lights: [{x, y, r, col, a, glow}] in WORLD units. */
+  /* The lightmap only changes when the camera, the lights or the darkness
+     do. lightKey is that whole input; a matching key reuses lcv as it is. */
+  var lightKey = null;
   function drawLight(ctx, w, h, ambient, night, lights, camX, camY, S) {
     if (ambient >= 0.999 && !lights.length) return;
     var g = lightCanvas(w, h);
     if (!g) return;
     var W = lcv.width, H = lcv.height;
-    g.globalCompositeOperation = 'source-over';
-    g.clearRect(0, 0, W, H);
-    g.fillStyle = rgba(night, Math.max(0, Math.min(1, 1 - ambient)));
-    g.fillRect(0, 0, W, H);
-    g.globalCompositeOperation = 'destination-out';
-    g.imageSmoothingEnabled = false;
-    var k = S / LQ, i, L;
-    for (i = 0; i < lights.length; i++) {
-      L = lights[i];
-      cutLight(g, (L.x - camX) * k, (L.y - camY) * k, L.r * k, L.a);
+    var key = [w, h, ambient, night, camX, camY, S].join('|');
+    for (var q = 0; q < lights.length; q++) key += '|' + lights[q].x + ',' + lights[q].y + ',' + lights[q].r + ',' + lights[q].a;
+    if (key !== lightKey) {
+      lightKey = key;
+      g.globalCompositeOperation = 'source-over';
+      g.clearRect(0, 0, W, H);
+      g.fillStyle = rgba(night, Math.max(0, Math.min(1, 1 - ambient)));
+      g.fillRect(0, 0, W, H);
+      g.globalCompositeOperation = 'destination-out';
+      g.imageSmoothingEnabled = false;
+      var k = S / LQ, i, L;
+      for (i = 0; i < lights.length; i++) {
+        L = lights[i];
+        cutLight(g, (L.x - camX) * k, (L.y - camY) * k, L.r * k, L.a);
+      }
+      g.globalCompositeOperation = 'source-over';
     }
-    g.globalCompositeOperation = 'source-over';
     var smooth = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(lcv, 0, 0, W * LQ, H * LQ);

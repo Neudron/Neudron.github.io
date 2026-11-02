@@ -53,7 +53,7 @@ function init() {
     return;
   }
 
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -102,6 +102,8 @@ function init() {
   let backdropTex = null;
   let backdrop = null;
   let starVersion = -1;
+  const STAR_UPLOAD_MS = 250;   // 4 Hz ceiling on canvas re-uploads
+  let starUploadAt = -Infinity;
 
   if (STARS && STARS.canvas) {
     backdropTex = new THREE.CanvasTexture(STARS.canvas);
@@ -402,8 +404,11 @@ function init() {
 
     const dt = Math.min(clock.getDelta(), 1 / 30);
 
-    if (backdropTex && STARS && STARS.version !== starVersion) {
+    /* The star canvas repaints at 16 Hz; re-upload at most every STAR_UPLOAD_MS.
+       A skipped change stays pending (starVersion not advanced) and goes up on a later frame. */
+    if (backdropTex && STARS && STARS.version !== starVersion && performance.now() - starUploadAt >= STAR_UPLOAD_MS) {
       starVersion = STARS.version;
+      starUploadAt = performance.now();
       backdropTex.needsUpdate = true;
     }
 
