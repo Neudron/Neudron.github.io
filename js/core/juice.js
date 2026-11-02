@@ -282,8 +282,23 @@
     setTimeout(function () { el.classList.remove('is-shook'); }, 420);
   }
 
+  /* ── DOM connect pop ────────────────────────────────────────────
+     A page element that lands a blow: a static colour pop always (it
+     does not move, so calm motion keeps it), plus a CSS spark burst
+     only when particles are allowed. The burst rides the particle gate,
+     not the shake gate, exactly like burst() above. */
+  function popEl(el) {
+    if (!el) return;
+    var spark = !reduced && !customNoParticles;
+    el.classList.remove('is-pop', 'is-burst');
+    void el.offsetWidth;
+    el.classList.add('is-pop');
+    if (spark) el.classList.add('is-burst');
+    setTimeout(function () { el.classList.remove('is-pop', 'is-burst'); }, 280);
+  }
+
   NEU.juice = {
-    hit: hit, frozen: frozen, pause: pause,
+    hit: hit, frozen: frozen, pause: pause, popEl: popEl,
     begin: begin, end: end, overlay: overlay,
     burst: burst, drawParts: drawParts,
     pop: pop, backOut: backOut, outCubic: outCubic, outElastic: outElastic,

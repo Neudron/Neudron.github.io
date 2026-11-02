@@ -136,6 +136,14 @@
     return { r: lerp(A_SETTLE, A_REST, k5), y: lerp(16, 0, k5), s: 1, trail: 0 };
   }
 
+  /* Every page hit lands through juice: the tick tier, the colour pop and
+     (motion allowing) the spark burst. juice.js owns every gate. */
+  function connect() {
+    if (!NEU.juice) return;
+    NEU.juice.hit('tick');
+    if (NEU.juice.popEl) NEU.juice.popEl(el);
+  }
+
   function frame(now) {
     requestAnimationFrame(frame);
     if (el.hidden) return;
@@ -143,13 +151,17 @@
     var dt = Math.min(0.05, (now - last) / 1000); last = now;
     var r, y, s = 1, trail = 0;
 
+    /* Hitstop: while juice holds the frame, slide the swing's clock
+       forward with it so the blade stays put on the blow. */
+    if (sw && NEU.juice && NEU.juice.frozen()) sw += dt * 1000;
+
     if (sw) {
       var ms = now - sw;
       var v = swingAt(ms);
       r = v.r; y = v.y; s = v.s; trail = v.trail;
 
       if (!whooshed && ms >= P_HOLD) { whooshed = true; if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh(); }
-      if (!struck  && ms >= P_HIT)   { struck = true; var f = onImpact; onImpact = null; f && f(); }
+      if (!struck  && ms >= P_HIT)   { struck = true; var f = onImpact; onImpact = null; f && f(); connect(); }
       if (ms >= P_END) { sw = 0; var d = onDone; onDone = null; d && d(); }
     } else {
       spun += pose.spin * dt;
@@ -201,7 +213,10 @@
        finished. Two callbacks, because the interesting thing happens
        in the middle of this animation, not at the end of it. */
     swing: function (impact, doneCb) {
-      if (reduced) { setTimeout(impact, 100); setTimeout(doneCb, 240); return; }
+      if (reduced) {
+        setTimeout(function () { impact && impact(); connect(); }, 100);
+        setTimeout(doneCb, 240); return;
+      }
       sw = performance.now(); struck = false; whooshed = false;
       onImpact = impact; onDone = doneCb;
     },

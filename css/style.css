@@ -1941,6 +1941,25 @@ html.rm .cat img { transform: none; }
    settings choice), so the player can override the device. */
 html.rm .is-shook { animation: none; }
 
+/* A landed page hit (juice.popEl): a static gold pop with a dark rim (reads on the black page and the lit one) that calm motion
+   keeps, plus an 8-spark pixel burst that only plays when particles are
+   on. The pop is a hard swap, not a fade, so it is one change, not a
+   flash; it lasts 280 ms, once per swing (well under 3 Hz). */
+.sword.is-pop img:not(.sword__ghost) { filter: brightness(1.35) drop-shadow(0 0 0 #FFE066) drop-shadow(2px 2px 0 #FFE066) drop-shadow(2px 2px 0 #14141C); }
+.sword.is-burst::after {
+  content: ''; position: absolute; left: 50%; top: 22%;
+  width: 4px; height: 4px; margin: -2px 0 0 -2px;
+  background: #FFE066; pointer-events: none;
+  animation: hitSparks .28s steps(4, end) both;
+}
+@keyframes hitSparks {
+  0%   { opacity: 1; box-shadow: 0 0 #FFE066, 0 0 #FFE066, 0 0 #FFE066, 0 0 #FFE066, 0 0 #8B5CF6, 0 0 #8B5CF6, 0 0 #8B5CF6, 0 0 #8B5CF6; }
+  100% { opacity: 0; box-shadow: 28px 0 #FFE066, -28px 0 #FFE066, 0 28px #FFE066, 0 -28px #FFE066,
+                                  20px 20px #8B5CF6, -20px 20px #8B5CF6, 20px -20px #8B5CF6, -20px -20px #8B5CF6; }
+}
+html.rm .sword.is-burst::after { animation: none; display: none; }
+
+
 
 /* ── settings ───────────────────────────────────────────────────────
    The accessibility panel. The backend lives in juice.js and

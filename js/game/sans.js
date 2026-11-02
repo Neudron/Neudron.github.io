@@ -567,6 +567,10 @@
     var p = shSrc(who === 'sans' ? 'sansShrug' : 'sansIdle');
     if (sansImg && p && sansImg.getAttribute('src') !== p) sansImg.setAttribute('src', p);
   }
+  /* The line waits for the player. This is only the idle fallback, so a
+     player who walks away still gets through the scene. Z/Enter/X skip
+     or advance well before it fires. */
+  var TALK_IDLE = 6000;
   function say(lines, who) {
     queue = lines.slice();
     queueV = lines.map(function (_, i) {
@@ -602,7 +606,7 @@
     if (reduced) {                       // no typing, just the line
       ttxt.textContent = line;
       if (tmore) tmore.hidden = false;
-      next.hold = setTimeout(next, 2600);
+      next.hold = setTimeout(next, TALK_IDLE);
       return;
     }
     var v = curV;
@@ -613,7 +617,7 @@
       if (i >= line.length) {
         clearInterval(typing);
         if (tmore) tmore.hidden = false;
-        next.hold = setTimeout(next, 2400);
+        next.hold = setTimeout(next, TALK_IDLE);
       }
     }, 42);
   }
@@ -640,7 +644,7 @@
       clearInterval(typing); typing = null;
       ttxt.textContent = curLine;
       if (tmore) tmore.hidden = false;
-      clearTimeout(next.hold); next.hold = setTimeout(next, 2400);
+      clearTimeout(next.hold); next.hold = setTimeout(next, TALK_IDLE);
       return;
     }
     next();
@@ -712,7 +716,9 @@
   var ledgeDoc = null;
   function setLedge() {
     if (ledgeDoc) return;
-    ledgeDoc = { x: innerWidth * 0.78, y: scrollY + innerHeight * 0.62 };
+    /* One screenful below the one you missed in: a step down the page,
+       never a dead end, and the sword is always reachable by scrolling. */
+    ledgeDoc = { x: innerWidth * 0.78, y: scrollY + innerHeight * 1.4 };
   }
 
   function homeDoc() {
@@ -747,10 +753,17 @@
          vy = (ty - y) / T - ½·g·T
      which is why it arcs up, slows, and arrives instead of sliding
      there in a straight line. */
-  var SP_HOLD = 900, SP_DIP = 1120, SP_GO = 1560;
+  var SP_HOLD = 600, SP_DIP = 800, SP_GO = 1100;
   var spawnT0 = 0, launched = false;
   var slast = performance.now();
   var cue = document.getElementById('swordCue'), cueDone = false;
+  /* A click or Z ends the presentation early: the throw jumps to its
+     exit. Never more than SP_GO of waiting, and it never blocks input. */
+  function skipThrow() { if (state === 'spawn') spawnT0 = performance.now() - SP_GO; }
+  addEventListener('pointerdown', skipThrow);
+  addEventListener('keydown', function (e) {
+    if (e.key === 'z' || e.key === 'Z' || e.key === 'Enter') skipThrow();
+  });
 
   function loop(now) {
     requestAnimationFrame(loop);
@@ -1377,6 +1390,19 @@
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
   }
 
+  /* hit: red rim (no-flash gated). miss: sidestep (motion gated). */
+  function hurtTint() {
+    if (!sans || (NEU.juice && NEU.juice.noFlash)) return;
+    sans.style.filter = 'drop-shadow(2px 0 0 #C2405F) drop-shadow(-2px 0 0 #C2405F)';
+    setTimeout(function () { sans.style.filter = ''; }, 220);
+  }
+  function missBeat() {
+    if (NEU.juice) NEU.juice.hit('tick');
+    if (!sans || !sans.animate || calm() || (NEU.juice && NEU.juice.noShake)) return;
+    sans.animate([{ transform: 'none' }, { transform: 'translateX(-12px)' }, { transform: 'none' }],
+                 { duration: 420, easing: 'steps(3, end)' });
+  }
+
   function attempt(x, y) {
     if (state !== 'held') return;
     beatsStop();
@@ -1387,7 +1413,7 @@
       else flyHome();
       return;
     }
-    if (!overSans(x, y)) { setLedge(); flyHome(); return; }
+    if (!overSans(x, y)) { setLedge(); say(["swing and a miss. classic."]); missBeat(); flyHome(); return; }
 
     state = 'swing';
     var willBreak = swings >= LINES.length;    // nothing left to say
@@ -1396,6 +1422,7 @@
       function () {                            // on impact
         hitStop();
         shake();
+        hurtTint();
         if (willBreak) {
           snap();
           NEU.sword.breakApart(gainKey);       // cancels the follow-through
@@ -1451,6 +1478,18 @@
      The chip is the actual answer to "there's no way back in". The
      unlocked door is the consistent one. */
   var doorOpened = false;
+  /* The "inside" chip is built here, not in index.html, so this file
+     owns the whole re-entry path. Chips tray is #chips. */
+  var insideChip = document.createElement('button');
+  insideChip.className = 'chip chip--btn';
+  insideChip.id = 'insideChip';
+  insideChip.hidden = true;
+  var insideTxt = document.createElement('span');
+  insideTxt.textContent = 'inside';
+  insideChip.appendChild(insideTxt);
+  insideChip.addEventListener('click', function () { if (doorOpened) openPanel(); });
+  var chipTray = document.getElementById('chips');
+  if (chipTray) chipTray.appendChild(insideChip);
 
   function unlockDoor() {
     if (doorOpened) return;
@@ -1458,6 +1497,7 @@
     NEU.doorOpen = true;
     if (NEU.doorGlow) NEU.doorGlow(true);   // stays lit: it is usable, not locked
     if (NEU.quest) NEU.quest.mark('door');
+    showChip(insideChip, true);             // the way back in, for good
   }
 
   NEU.tryDoor = function () {
@@ -1816,7 +1856,7 @@
          "i'm gonna go lie down. don't wait up."]
       : ["huh. it fits. again.",
          "you really like that hammer."]);
-    if (first) later(goUp, 2600);
+    if (first) later(goUp, 1500);
   }
 
   /* main.js asks this before doing anything with the switch. Returning
@@ -2132,7 +2172,7 @@
         kel.hidden = false;
       }
     }
-    if (has('door')) { doorOpened = true; NEU.doorOpen = true; if (NEU.doorGlow) NEU.doorGlow(true); }
+    if (has('door')) { doorOpened = true; NEU.doorOpen = true; if (NEU.doorGlow) NEU.doorGlow(true); showChip(insideChip, true); }
 
     /* the cosmolight: the hammer stage, the jam, the smash, the blackout */
     if (has('hammer')) dogTalks = DOGTALK.length;

@@ -45,6 +45,44 @@
   var DOOR = { x: 2060, y: 1360, w: 72, h: 104 };   /* darkDoor 36x52 at 2x */
   var LIGHT = 132;
 
+  /* ── landmarks and hazards ──────────────────────────────────────
+     The ~2000 px walk from the drop point to the door is a straight
+     diagonal, so everything sits on or beside that line.
+
+     LANDMARKS glow from beyond the torch in three different hues, so
+     you can tell them apart from across the room: lilac where you land,
+     green halfway, magenta at the door. Reaching one records it.
+
+     HAZARDS are floor seams. Idle they are dim cracks baked into the
+     floor (only the torch shows them). Then the exact square that will
+     hurt is outlined in red, brightening, for 0.8 s (WotG gives 0.4 s
+     minimum; this is a walking room, so twice that). Then it fills for
+     0.8 s. Touching a filled seam is the fail state, and it is gentle:
+     you are put back at the last landmark you reached, never at the
+     start. Staggered offsets so the three never fire together. */
+  var LANDMARKS = [
+    { x: 420,  y: 380,  col: '#B892FF', name: 'lilac lamp' },
+    { x: 1174, y: 844,  col: '#7BE38A', name: 'green lamp' },
+    { x: 2096, y: 1412, col: '#FF3FD0', name: 'door' }
+  ];
+  var HAZARDS = [
+    { x: 923,  y: 690,  s: 64, off: 0 },
+    { x: 1459, y: 1020, s: 72, off: 1200 },
+    { x: 1845, y: 1257, s: 64, off: 2400 }
+  ];
+  var HZ_PERIOD = 3600, HZ_TELE = 1800, HZ_LIVE = 2600, HZ_END = 3400;
+  var HZ_COL = '#FF5A3C';
+  function hazardPhase(i, t) {
+    var k = ((t + HAZARDS[i].off) % HZ_PERIOD + HZ_PERIOD) % HZ_PERIOD;
+    return k < HZ_TELE ? 'idle' : k < HZ_LIVE ? 'tele' : k < HZ_END ? 'live' : 'idle';
+  }
+  /* 0..1 through the telegraph, for the outline's brightness */
+  function teleK(i, t) {
+    var k = ((t + HAZARDS[i].off) % HZ_PERIOD + HZ_PERIOD) % HZ_PERIOD;
+    return (k - HZ_TELE) / (HZ_LIVE - HZ_TELE);
+  }
+  var lastMark = 0, knocks = 0;
+
   /* Two modes share this file because they share the character and its
      walk cycle. 'dark' is the black field with the grey door in it;
      'walk' drops the same character onto the REAL PAGE, over the top of
@@ -151,6 +189,14 @@
     say('nothing else in here.');
   }
 
+  function knockBack(h) {
+    var L = LANDMARKS[lastMark];
+    if (NEU.juice) NEU.juice.hit('small', { dx: L.x - h.x, dy: L.y - h.y });
+    if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
+    px = L.x; py = L.y + 36; face = 'down';
+    if (!knocks++) say('the floor bites. you come to by the ' + L.name + '.');
+  }
+
   function step(now) {
     if (!running) return;
     requestAnimationFrame(step);
@@ -178,6 +224,15 @@
     } else {
       px = Math.min(Math.max(px + dx, 20), W - 20);
       py = Math.min(Math.max(py + dy, 20), H - 20);
+      for (var m = 0; m < LANDMARKS.length; m++) {
+        if (Math.hypot(px - LANDMARKS[m].x, py - LANDMARKS[m].y) < 110) lastMark = m;
+      }
+      for (var hz = 0; hz < HAZARDS.length; hz++) {
+        var H0 = HAZARDS[hz];
+        if (Math.abs(px - H0.x) < H0.s && Math.abs(py - H0.y) < H0.s && hazardPhase(hz, now) === 'live') {
+          knockBack(H0); break;
+        }
+      }
     }
     walked += Math.hypot(dx, dy);
 
@@ -239,24 +294,13 @@
     ctx.fillStyle = INK;
     ctx.fillRect(0, 0, w, h);
 
-    /* floor: the real tile, at a third strength so the torch still reads as
-       the only light in here */
-    var fl = NEU.sheetReady && NEU.sheetReady(NEU.sheets.darkFloor);
-    if (fl) {
-      ctx.globalAlpha = 0.35;
-      for (var ty = Math.max(0, Math.floor(camY / TILE) * TILE); ty < Math.min(H, camY + h); ty += TILE)
-        for (var tx = Math.max(0, Math.floor(camX / TILE) * TILE); tx < Math.min(W, camX + w); tx += TILE)
-          ctx.drawImage(fl, (tx - camX) | 0, (ty - camY) | 0, TILE, TILE);
-      ctx.globalAlpha = 1;
-    }
-
-    for (var i = 0; i < debris.length; i++) {
-      var d = debris[i];
-      NEU.sheetDraw(ctx, 'darkDebris', (d.x - camX) | 0, (d.y - camY) | 0, { frame: d.f, scale: 2 });
-    }
+    /* Everything that never moves (floor, debris, door, the idle seams,
+       the lamp posts) is one half-size bake, drawn up 2x with smoothing
+       off: every sprite here is 2x art, so the pixels are identical. */
+    if (!baked) bake();
+    if (baked) ctx.drawImage(baked, (-camX) | 0, (-camY) | 0, W, H);
 
     var dx = (DOOR.x - camX) | 0, dy = (DOOR.y - camY) | 0;
-    NEU.sheetDraw(ctx, 'darkDoor', dx + DOOR.w / 2, dy + DOOR.h / 2, { scale: 2 });
     if (!endless && talks >= LINES.length) {
       ctx.fillStyle = CYAN;                       /* it answered: the doorway is lit */
       ctx.fillRect(dx + 12, dy + 12, DOOR.w - 24, DOOR.h - 18);
@@ -270,27 +314,112 @@
          black screen. */
       torch = Math.max(34, LIGHT - (walked / 8) * 0.08);
     }
-    var g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, endless ? torch : LIGHT);
-    g.addColorStop(0.00, 'rgba(0,0,0,1)');
-    g.addColorStop(0.45, 'rgba(0,0,0,1)');
-    g.addColorStop(0.46, 'rgba(0,0,0,0.72)');
-    g.addColorStop(0.70, 'rgba(0,0,0,0.72)');
-    g.addColorStop(0.71, 'rgba(0,0,0,0.34)');
-    g.addColorStop(1.00, 'rgba(0,0,0,0)');
+    var rad = Math.round(endless ? torch : LIGHT);
+    if (rad !== gradR || w !== gradW || h !== gradH) {      /* rebuilt only on resize or a shrinking torch */
+      gradR = rad; gradW = w; gradH = h;
+      grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, rad);
+      grad.addColorStop(0.00, 'rgba(0,0,0,1)');
+      grad.addColorStop(0.45, 'rgba(0,0,0,1)');
+      grad.addColorStop(0.46, 'rgba(0,0,0,0.72)');
+      grad.addColorStop(0.70, 'rgba(0,0,0,0.72)');
+      grad.addColorStop(0.71, 'rgba(0,0,0,0.34)');
+      grad.addColorStop(1.00, 'rgba(0,0,0,0)');
+    }
     ctx.globalCompositeOperation = 'destination-in';
-    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
     ctx.globalCompositeOperation = 'source-over';
 
-    /* Only the door glows now. There is nothing else in here. */
-    var gd = Math.hypot(px - (DOOR.x + DOOR.w / 2), py - (DOOR.y + DOOR.h / 2));
-    if (gd > LIGHT * 0.6) {
-      ctx.globalAlpha = Math.max(0, (0.10 + 0.045 * Math.sin(now / 420)) * Math.min(1, 900 / gd));
-      ctx.fillStyle = MAG;
-      ctx.fillRect(dx - 8, dy - 8, DOOR.w + 16, DOOR.h + 16);
-      ctx.globalAlpha = 1;
+    /* Drawn after the torch mask, so they read from across the room. */
+    var calm = !!(NEU.motion && NEU.motion.reduced && NEU.motion.reduced());
+    var breathe = calm ? 0 : 0.045 * Math.sin(now / 420);   /* ~2.6 s, never a flash */
+    for (var m = 0; m < LANDMARKS.length; m++) {
+      var L = LANDMARKS[m];
+      if (m === 2 && endless) continue;
+      var gd = Math.hypot(px - L.x, py - L.y);
+      if (gd < LIGHT * 0.6) continue;
+      var fade = Math.min(1, 900 / gd);
+      ctx.fillStyle = L.col;
+      if (m === 2) {
+        ctx.globalAlpha = Math.max(0, (0.16 + breathe) * fade);
+        ctx.fillRect(dx - 8, dy - 8, DOOR.w + 16, DOOR.h + 16);
+        continue;
+      }
+      /* stepped halo, two rings, then a solid beacon you can steer by */
+      var lx = (L.x - camX) | 0, ly = (L.y - camY - 42) | 0;
+      ctx.globalAlpha = Math.max(0, (0.08 + breathe * 0.5) * fade);
+      ctx.fillRect(lx - 36, ly - 36, 72, 72);
+      ctx.globalAlpha = Math.max(0, (0.18 + breathe) * fade);
+      ctx.fillRect(lx - 18, ly - 18, 36, 36);
+      ctx.globalAlpha = Math.max(0.5, 0.9 * fade);
+      ctx.fillRect(lx - 4, ly - 4, 8, 8);
     }
+    ctx.globalAlpha = 1;
+
+    for (var z = 0; z < HAZARDS.length; z++) {
+      var ph = hazardPhase(z, now);
+      if (ph === 'idle') continue;
+      var Z = HAZARDS[z];
+      var zx = (Z.x - Z.s - camX) | 0, zy = (Z.y - Z.s - camY) | 0, zs = Z.s * 2;
+      if (zx > w || zy > h || zx + zs < 0 || zy + zs < 0) continue;
+      ctx.fillStyle = HZ_COL;
+      if (ph === 'tele') {
+        /* the exact square that will hurt, outlined, brightening in
+           three hard steps (stepped like the torch, no smooth fade) */
+        var k = teleK(z, now);
+        /* 0.45 floor: at 0.3 the first step was ~1.5:1 on the indigo,
+           too faint to read as a warning; the last step clears 3:1 */
+        ctx.globalAlpha = calm ? 0.75 : (k < 0.34 ? 0.45 : k < 0.67 ? 0.65 : 0.9);
+        ctx.fillRect(zx, zy, zs, 3); ctx.fillRect(zx, zy + zs - 3, zs, 3);
+        ctx.fillRect(zx, zy, 3, zs); ctx.fillRect(zx + zs - 3, zy, 3, zs);
+      } else {
+        ctx.globalAlpha = 0.45;
+        ctx.fillRect(zx, zy, zs, zs);
+        ctx.globalAlpha = 1;
+        ctx.fillRect(zx, zy, zs, 3); ctx.fillRect(zx, zy + zs - 3, zs, 3);
+        ctx.fillRect(zx, zy, 3, zs); ctx.fillRect(zx + zs - 3, zy, 3, zs);
+      }
+    }
+    ctx.globalAlpha = 1;
 
     if (near(DOOR)) prompt(w / 2, h / 2 - 56);
+  }
+
+  var baked = null, grad = null, gradR = 0, gradW = 0, gradH = 0;
+  function bake() {
+    var S = NEU.sheets || {};
+    var fl = NEU.sheetReady && NEU.sheetReady(S.darkFloor);
+    if (!fl || !NEU.sheetReady(S.darkDebris) || !NEU.sheetReady(S.darkDoor)) return;
+    var c = document.createElement('canvas');
+    c.width = W / 2; c.height = H / 2;
+    var b = c.getContext && c.getContext('2d');
+    if (!b) return;
+    b.imageSmoothingEnabled = false;
+    b.fillStyle = INK; b.fillRect(0, 0, W / 2, H / 2);
+    /* the real tile, at a third strength so the torch is the only light */
+    b.globalAlpha = 0.35;
+    for (var ty = 0; ty < H / 2; ty += TILE / 2)
+      for (var tx = 0; tx < W / 2; tx += TILE / 2) b.drawImage(fl, tx, ty, TILE / 2, TILE / 2);
+    b.globalAlpha = 1;
+    for (var i = 0; i < debris.length; i++) {
+      var d = debris[i];
+      NEU.sheetDraw(b, 'darkDebris', (d.x / 2) | 0, (d.y / 2) | 0, { frame: d.f, scale: 1 });
+    }
+    NEU.sheetDraw(b, 'darkDoor', (DOOR.x + DOOR.w / 2) / 2, (DOOR.y + DOOR.h / 2) / 2, { scale: 1 });
+    /* idle seams: a dim cracked square, only ever seen inside the torch */
+    b.fillStyle = '#3a1410';
+    for (var z = 0; z < HAZARDS.length; z++) {
+      var Z = HAZARDS[z], x0 = ((Z.x - Z.s) / 2) | 0, y0 = ((Z.y - Z.s) / 2) | 0, s = Z.s | 0;
+      b.fillRect(x0, y0, s, 1); b.fillRect(x0, y0 + s - 1, s, 1);
+      b.fillRect(x0, y0, 1, s); b.fillRect(x0 + s - 1, y0, 1, s);
+      for (var j = 4; j < s - 4; j += 3) b.fillRect(x0 + j, y0 + ((j * 7) % (s - 8)) + 4, 2, 1);
+    }
+    /* lamp posts for the two open-floor landmarks */
+    for (var m = 0; m < 2; m++) {
+      var L = LANDMARKS[m];
+      b.fillStyle = '#2a2640'; b.fillRect((L.x / 2 - 1) | 0, (L.y / 2 - 18) | 0, 2, 18);
+      b.fillStyle = L.col;     b.fillRect((L.x / 2 - 3) | 0, (L.y / 2 - 24) | 0, 6, 6);
+    }
+    baked = c;
   }
 
   function prompt(x, y) {
@@ -347,7 +476,8 @@
     endless = !!(opts && opts.endless);
     mode = 'dark';
     torch = LIGHT;
-    if (endless) { talks = 0; through = false; walked = 0; px = 420; py = 380; }
+    if (endless) { talks = 0; through = false; walked = 0; px = 420; py = 380; lastMark = 0; }
+    knocks = 0;
     routeUntil = 0; idleSince = performance.now(); presence = 0;
     wrap.classList.remove('is-walk');
     wrap.hidden = false;
@@ -383,6 +513,7 @@
     talks = 0; through = false; fixed = false; found = false;
     routeUntil = 0; idleSince = 0; presence = 0;
     px = 420; py = 380; walked = 0; face = 'down';
+    lastMark = 0; knocks = 0;
     if (wrap) wrap.classList.remove('is-walk');
   }
 
@@ -398,6 +529,10 @@
       if (r) { px = r.left + r.width / 2; py = r.top + r.height / 2; }
     },
     interact: interact, walkFrame: walkFrame,
+    hazards: HAZARDS, landmarks: LANDMARKS, hazardPhase: hazardPhase,
+    get lastLandmark() { return lastMark; },
+    get pos() { return { x: px, y: py }; },
+    _at: function (x, y) { px = x; py = y; },   /* tests */
     get running() { return running; },
     get endless() { return endless; },
     get talks() { return talks; },

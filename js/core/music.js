@@ -1,15 +1,7 @@
-/* music.js — the Act IV soundtrack. Synthesised, not sampled.
-   ──────────────────────────────────────────────────────────────────
-   No audio files: 8 zones at 96 kbps is ~10 MB, this is a phone site,
-   and Act IV is 3 hours in. Oscillators + one noise buffer at runtime.
-   A recorded loop cannot answer the game — this does: layers on
-   boss HP, ducks under dialogue, no restart between same-zone rooms.
-
-   Polls, never called — a 250ms tick reads the scene + engine
-   tileset. The tileset name IS the track name (no room→zone map to
-   drift). Timing from AudioContext.currentTime, not setInterval. No
-   sound before a user gesture. prefers-reduced-motion is NOT silenced
-   (vestibular, not audio). Volume slider in settings → zero.        */
+/* music.js — synthesised soundtrack (no audio files). Act IV zones and
+   bosses; quiet beds for Acts I-III and the bullet room.
+   Polled every 250ms. Timing from AudioContext.currentTime. No sound
+   before a user gesture. Volume slider and sound switch silence it.  */
 
 (function () {
   'use strict';
@@ -28,10 +20,7 @@
   var FADE = 1.1;                /* crossfade between zones             */
   var DUCK = 0.34;               /* bed level while the textbox is up   */
 
-  /* ── scales ─────────────────────────────────────────────────────
-     Semitones from the root. Phrygian's flat second is doing all the
-     gothic work in the castle; the harmonic minor's raised seventh is
-     what makes Calamitas sound like she means it. */
+  /* ── scales: semitones from the root ───────────────────────── */
   var AEOL = [0, 2, 3, 5, 7, 8, 10];
   var PHRY = [0, 1, 3, 5, 7, 8, 10];
   var DORI = [0, 2, 3, 5, 7, 9, 10];
@@ -39,14 +28,7 @@
   var HARM = [0, 2, 3, 5, 7, 8, 11];
   var PHDM = [0, 1, 4, 5, 7, 8, 10];
 
-  /* ── the patterns ───────────────────────────────────────────────
-     Sixteen characters, one bar, one character per 16th note. '.' is
-     a rest; a digit (or 'a'/'b' for 10 and 11) is a scale degree
-     ABOVE that bar's chord root, so one pattern moves with the
-     harmony instead of needing four copies of itself.
-
-     Written as strings because a bar of music should be legible as a
-     bar of music. Nested arrays of nulls are not. */
+  /* ── patterns: 16 chars = one bar; '.' rest, digit/a/b = degree above the chord root */
   function pat(s) {
     var a = [], i, c;
     for (i = 0; i < s.length; i++) {
@@ -56,12 +38,7 @@
     return a;
   }
 
-  /* ── the tracks ─────────────────────────────────────────────────
-     `chords` is one scale degree per bar — the root the whole bar is
-     built on. `base` is the resting intensity: which layers are
-     audible when nothing is escalating. Bosses override it.
-
-     Six of these are named after tilesets and must stay that way. */
+  /* ── tracks: `chords` = root per bar, `base` = resting intensity. Zone names match tilesets. */
   var TRACKS = {
 
     /* zone a — the woods. Sparse and unhurried; you have just walked
@@ -142,12 +119,27 @@
       lead: { wave: 'square',   gain: 0.038, oct: 12,  pat: pat('0.4.7.4.b.7.4.2.') },
       perc: { gain: 0.095, pat: pat0('khhkshhkkhhkshhh') },
       boss: 'polt'
-    }
+    },
+
+    /* Acts I-III and the bullet room: quiet beds, own key and tempo. */
+    page:    { bpm: 72, root: 53, scale: DORI, chords: [0, 3, 0, 4], base: 0.4,
+      pad: { wave: 'triangle', gain: 0.02, oct: 0 },
+      bass: { wave: 'sine', gain: 0.05, oct: -12, pat: pat('0.......4...2...') },
+      lead: { wave: 'triangle', gain: 0.025, oct: 12, pat: pat('..4...2...0...7.') } },
+    dark:    { bpm: 60, root: 45, scale: PHRY, chords: [0, 0, 1, 0], base: 0.3,
+      pad: { wave: 'sine', gain: 0.02, oct: -12 },
+      bass: { wave: 'sine', gain: 0.06, oct: -12, pat: pat('0.......0.......') } },
+    console: { bpm: 112, root: 57, scale: MAJR, chords: [0, 3, 4, 0], base: 0.4,
+      pad: { wave: 'triangle', gain: 0.018, oct: 0 },
+      bass: { wave: 'triangle', gain: 0.04, oct: -12, pat: pat('0...4...2...4...') },
+      lead: { wave: 'square', gain: 0.02, oct: 12, pat: pat('0.2.4.2.7.4.2.0.') } },
+    bullet:  { bpm: 132, root: 50, scale: AEOL, chords: [0, 5, 3, 4], base: 0.6,
+      pad: { wave: 'sawtooth', gain: 0.012, oct: -12 },
+      bass: { wave: 'square', gain: 0.04, oct: -12, pat: pat('0.0.4.4.2.2.4.4.') },
+      lead: { wave: 'triangle', gain: 0.03, oct: 12, pat: pat('4.2.0.2.4.2.7.4.') } }
   };
 
-  /* Percussion patterns are letters, not degrees — k kick, s snare,
-     h hat — so they get their own parser. Hoisted, hence a function
-     declaration rather than the var above. */
+  /* Percussion patterns: letters (k, s, h). Function declaration, hoisted. */
   function pat0(s) {
     var a = [], i, c;
     for (i = 0; i < s.length; i++) {
@@ -157,9 +149,7 @@
     return a;
   }
 
-  /* ── which layers are audible at a given intensity ──────────────
-     Pad and bass are the bed and never leave; taking the floor out
-     from under a track reads as a dropout, not as a dynamic. */
+  /* ── layers audible per intensity. Pad and bass never leave. */
   var GATE = { pad: 0, bass: 0, lead: 0.34, perc: 0.66 };
 
   /* ── audio plumbing ─────────────────────────────────────────────*/
@@ -214,19 +204,13 @@
     return actx;
   }
 
-  /* ── the gesture gate ───────────────────────────────────────────
-     No sound before a user gesture; a site that makes noise
-     unprompted is a site people close. The context is not built
-     until then either, so nothing holds an audio device open on a
-     page that is only being read. */
+  /* ── gesture gate: no context, no sound, until a user gesture. */
   function arm() {
     var fresh = !armed;
     if (fresh) {
       armed = true;
       build();
-      /* Web Audio sits on the ringer channel unless told otherwise;
-         'playback' moves it to media. Safari 16.4+ only, and the
-         guard is the feature check. */
+      /* Safari: move Web Audio off the ringer channel. */
       try { if (navigator.audioSession)
               navigator.audioSession.type = 'playback'; } catch (e) {}
     }
@@ -262,12 +246,7 @@
     pending = null; curId = null; play(p);
   }
 
-  /* ── voices ─────────────────────────────────────────────────────
-     A voice is one track, playing. Two exist only during a crossfade:
-     the outgoing one keeps its own step counter and its own gain and
-     is dropped when it reaches silence. Reusing one voice and swapping
-     its track mid-bar puts the new track's notes on the old track's
-     grid, which sounds exactly as bad as it reads. */
+  /* ── voices: one per track. Two only during a crossfade (own step counter each). */
   var voices = [];
   var curId = null;
   var ducked = false;
@@ -380,14 +359,7 @@
     return v;
   }
 
-  /* ── intensity ──────────────────────────────────────────────────
-     Zones sit at their resting value. Bosses climb: a step for the
-     phase change, then a smooth ramp on health lost, so the drums do
-     not arrive on a hard boundary the player can hear coming.
-
-     Maximum HP is not exposed by either boss, and it does not need to
-     be — both reset to full in open(), so the first reading after a
-     fight starts IS the maximum. Captured when the track changes. */
+  /* ── intensity: zones rest; bosses climb with phase and HP lost. Max HP = first reading. */
   function intensity(v) {
     var tr = v.tr;
     if (!tr.boss) return tr.base;
@@ -435,12 +407,7 @@
       if (v.dead) { voices.splice(i, 1); continue; }
       if (!v.g) continue;
 
-      /* A backgrounded tab stops firing this interval while the audio
-         clock keeps running. Without this the while-loop below would
-         "catch up" by scheduling every missed step at once, which is
-         not a stall — it is every note of the last four minutes
-         arriving in the same tenth of a second. Realign to the next
-         bar and carry on. */
+      /* Background tabs stall the interval: realign to the next bar, don't catch up. */
       if (v.at < now - 0.5) {
         v.at = now + 0.06;
         v.step = Math.ceil(v.step / SPB) * SPB;
@@ -534,10 +501,7 @@
     if (duckG) ramp(duckG.gain, on ? DUCK : 1, on ? 0.12 : 0.5);
   }
 
-  /* ── the director ───────────────────────────────────────────────
-     Ordered most-specific first. The rhythm game is FIRST and returns
-     silence: it is a call-and-response chart at its own BPM, and a
-     second tempo underneath it does not layer, it fights. */
+  /* ── director: most specific first. Rhythm game returns silence (its own tempo fights). */
   function pick() {
     if (NEU.rhythm && NEU.rhythm.running) return null;
     if (NEU.scal && NEU.scal.running) return 'scal';
@@ -548,7 +512,13 @@
       var z = NEU.engine.zone ? NEU.engine.zone() : null;
       return z && TRACKS[z] ? z : null;
     }
-    return null;
+    /* Acts I-III, bullet room. Silent at zero volume or sound off. */
+    if (vol() === 0) return null;
+    if (NEU.dark && NEU.dark.running) return 'dark';
+    if (NEU.bullet && NEU.bullet.running) return 'bullet';
+    if (NEU.deck && NEU.deck.running) return 'console';
+    var sans = document.getElementById('sans');
+    return sans && !sans.hidden ? 'page' : null;
   }
 
   function sync() {

@@ -969,6 +969,19 @@
     if (k === 'ArrowDown'  || k === 's' || k === 'S') return 'down';
     return null;
   }
+  /* Page dialogue skip (Acts I–III and the rest of the page). A line still
+     typing completes; the next press advances. Z, Enter and X all do the
+     same thing, through NEU.talk.ff. Act IV keeps its own keys below. */
+  addEventListener('keydown', function (e) {
+    if (running || NEU.activeMinigame || !NEU.talk || !NEU.talk.ff) return;
+    if (!NEU.tboxOpen || !NEU.tboxOpen()) return;
+    var t = document.activeElement;
+    if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+    if (e.key === 'z' || e.key === 'Z' || e.key === 'Enter' || e.key === 'x' || e.key === 'X') {
+      e.preventDefault();
+      NEU.talk.ff();
+    }
+  });
   addEventListener('keydown', function (e) {
     if (!running) return;
     /* A minigame owns the page while it is open. */

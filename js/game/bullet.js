@@ -44,8 +44,22 @@
   var BORDER = 4;              // Undertale's white box edge
   var TELE = 1.0;              // a phase's line shows this long before it fires
 
-  var COL = { bone: '#EDE7DE', lilac: '#B892FF', blood: '#C2405F',
-              dim: '#8A8598', soul: '#E23B55', void_: '#08080B', elec: '#4FC3F7' };
+  /* PAL is the room's palette, in one place. A visual pass restyles it;
+     every draw call below reads from it. Values are the shipped look. */
+  var PAL = { bg: 'rgba(8,8,11,0.92)', box: '#FFFFFF', inner: '#000000',
+              bone: '#FFFFFF', blaster: '#FFFFFF', elecCore: '#CFF3FF',
+              ui: '#EDE7DE', lilac: '#B892FF', blood: '#C2405F', dim: '#8A8598',
+              soul: '#E23B55', void_: '#08080B', elec: '#4FC3F7',
+              panel: '#1B1B24', slot: '#22222E', full: '#7BE38A', meter: '#5CF08C' };
+  /* Act III's variant: a warm amber console screen, so the room reads as
+     a different visit and the strong blue blaster is the one cold thing
+     in it. Every bullet colour is >= 4.5:1 on `inner` (fixes68). */
+  var PAL_II = PAL, PAL_III = {
+              bg: 'rgba(18,9,4,0.94)', box: '#FFB547', inner: '#0E0805',
+              bone: '#FFE2B0', blaster: '#FFE2B0', elecCore: '#D6E8FF',
+              ui: '#F6E6C8', lilac: '#FF9F43', blood: '#FF5D73', dim: '#D9A066',
+              soul: '#E23B55', void_: '#0E0805', elec: '#2E8BFF',
+              panel: '#24170F', slot: '#2E1F14', full: '#7BE38A', meter: '#FFC447' };
   var FONT = '16px "Determination Mono","Pixelify Sans",monospace';
 
   /* Each phase: where it starts, the soul it wants, its line, and its
@@ -65,17 +79,18 @@
      blue-tinted copy made once the sheet loads, and keeps the bolt on
      its brow so it reads without colour too. */
   var GB_W = 43, GB_H = 57;
-  var gb = null, gbBlue = null;
+  var gb = null, gbBlue = null, gbTint = '';
   function sheet() {
     if (!gb) { gb = new Image(); gb.src = 'img/act4/undertale/gasterblaster.png'; }
-    if (!gbBlue && gb.complete && gb.naturalWidth) {
+    if (gbTint !== PAL.elec && gb.complete && gb.naturalWidth) {
+      gbTint = PAL.elec;
       gbBlue = document.createElement('canvas');
       gbBlue.width = gb.naturalWidth; gbBlue.height = gb.naturalHeight;
       var g = gbBlue.getContext && gbBlue.getContext('2d');
       if (g) {
         g.drawImage(gb, 0, 0);
         g.globalCompositeOperation = 'source-atop';
-        g.fillStyle = 'rgba(79,195,247,0.6)';
+        g.globalAlpha = 0.6; g.fillStyle = PAL.elec;
         g.fillRect(0, 0, gbBlue.width, gbBlue.height);
       }
     }
@@ -90,6 +105,15 @@
 
   var blasters = [], bones = [];
   var BL_CHARGE = 0.85, BL_FIRE = 0.42;
+  /* The beam's ghost: the last TELE_LEAD s of the charge show the real
+     beam's width as a soft fill, faded in, held, faded out right before
+     it fires. Low alpha and one per blaster, so it never reads as a flash. */
+  var TELE_LEAD = 0.45, TELE_FADE = 0.1, TELE_PEAK = 0.3;
+  function teleAlpha(bt) {
+    var u = bt - (BL_CHARGE - TELE_LEAD);
+    if (u < 0 || bt >= BL_CHARGE) return 0;
+    return TELE_PEAK * Math.min(1, u / TELE_FADE, (BL_CHARGE - bt) / TELE_FADE);
+  }
 
   /* ── the electric blaster ─────────────────────────────────────────
      Its rule is INVERTED and that is the whole point: in the blue
@@ -119,6 +143,9 @@
   var dying = 0;
 
   var running = false, won = false;
+  /* Act III variant: a seeded plan of blocks, and the graze meter. */
+  var variant = false, plan = null, qi = 0, attempt = 0;
+  var meter = 0, lastGz = -9;
   var t = 0, hp = 3, inv = 0, last = 0;
   var F = dm.fight(0, 0), keys = {};
   var bullets = [], emitters = [], phase = 0, phaseAt = 0;
@@ -151,16 +178,75 @@
   /* Endless loops the three phases every twenty seconds. */
   function phaseFor() {
     var lt = endless ? t % SURVIVE : t, p = 0;
-    for (var i = 0; i < PHASES.length; i++) if (lt >= PHASES[i].at) p = i;
+    var T = table();
+    for (var i = 0; i < T.length; i++) if (lt >= T[i].at) p = i;
     return p + 1;
   }
+  function table() { return variant ? plan.phases : PHASES; }
   function enterPhase(n) {
-    var P = PHASES[n - 1];
+    var P = table()[n - 1];
     phase = n; phaseAt = t;
     dm.soulMode(F, P.mode);
     emitters = [];
-    for (var i = 0; i < P.em.length; i++)
+    for (var i = 0; i < (P.em || []).length; i++)
       emitters.push({ kind: P.em[i][0], every: P.em[i][1], next: t + TELE + i * 0.3, ang: 0 });
+  }
+
+  /* ── Act III variant: the plan ────────────────────────────────────
+     A seeded timeline of blocks. Each block owns its own stretch of
+     time and the next starts after it ends, so a blue blaster's beam
+     can never land inside a bone run. The seed is the attempt count:
+     each retry deals the middle blocks in a new order.
+     Escalation: a red warm-up, a blue middle (pair, bone run, a plain
+     blaster), a faster blue last-but-one (triple, pair), and a short
+     red final pattern to the twenty-second mark. */
+  var VGAP = 0.3, GRAZE_R = 7, GRAZE_GAIN = 4, GRAZE_GAP = 0.4;
+  var VBLOCK = {
+    ring:    { dur: 2.4, at: [0.5, 1.8], kind: 'ring' },
+    aimed:   { dur: 2.4, at: [0.5, 1.1, 1.7, 2.3], kind: 'aimed' },
+    pair:    { dur: 2.4, at: [0.5, 1.1], kind: 'elec' },
+    bone:    { dur: 4.5, at: [0.5, 1.2, 1.9], kind: 'bone' },
+    blaster: { dur: 2.0, at: [0.6], kind: 'blaster' },
+    triple:  { dur: 3.0, at: [0.5, 1.1, 1.7], kind: 'elec' }
+  };
+  function rng(seed) {
+    var s = (seed * 7919 + 13) % 233280;
+    return function () { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  }
+  function shuffle(list, r) {
+    var a = list.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = (r() * (i + 1)) | 0, x = a[i];
+      a[i] = a[j]; a[j] = x;
+    }
+    return a;
+  }
+  function buildPlan(seed) {
+    var r = rng(seed), at = 0, events = [], phases = [];
+    var LINES = ['* twenty seconds. it will not be quiet.',
+                 '* your SOUL is blue. the electric one wants a charge.',
+                 '* faster. the bones do not wait for you.',
+                 '* the last few seconds. stay in the open.'];
+    function blocks(names) {
+      for (var i = 0; i < names.length; i++) {
+        var B = VBLOCK[names[i]], o = { kind: B.kind, ang: 0 };
+        for (var j = 0; j < B.at.length; j++)
+          events.push({ t: at + B.at[j], e: o, blk: names[i], start: at, end: at + B.dur });
+        at += B.dur + VGAP;
+      }
+    }
+    phases.push({ at: 0, mode: 'red', line: LINES[0], em: [] });
+    blocks(shuffle(['ring', 'aimed'], r).slice(0, 1));
+    phases.push({ at: at, mode: 'blue', line: LINES[1], em: [] });
+    blocks(shuffle(['pair', 'bone', 'blaster'], r));
+    phases.push({ at: at, mode: 'blue', line: LINES[2], em: [] });
+    blocks(shuffle(['triple', 'pair'], r));
+    phases.push({ at: at, mode: 'red', line: LINES[3], em: [] });
+    var fin = { kind: 'spiral', ang: 0 }, wall = { kind: 'wall', ang: 0 };
+    events.push({ t: at + 0.6, e: wall, blk: 'final', start: at, end: SURVIVE });
+    for (var s = at + 0.2; s < SURVIVE - 0.2; s += 0.4)
+      events.push({ t: s, e: fin, blk: 'final', start: at, end: SURVIVE });
+    return { phases: phases, events: events };
   }
 
   /* A blaster lines up on an edge, offset from where you are RIGHT NOW,
@@ -189,7 +275,7 @@
       for (var i = 0; i < n; i++) {
         var a = e.ang + i * (Math.PI * 2 / n);
         add(cx + Math.cos(a) * 14, cy + Math.sin(a) * 14,
-            Math.cos(a) * sp, Math.sin(a) * sp, 4, COL.lilac);
+            Math.cos(a) * sp, Math.sin(a) * sp, 4, PAL.lilac);
       }
     } else if (e.kind === 'aimed') {
       /* From a random edge point, spread around you: what stops you
@@ -203,14 +289,14 @@
       var cnt = 3 + Math.round(k * 3), spd = 128 + k * 92;
       for (var j = 0; j < cnt; j++) {
         var o = (j - (cnt - 1) / 2) * 0.17;
-        add(sx, sy, Math.cos(base + o) * spd, Math.sin(base + o) * spd, 4, COL.bone);
+        add(sx, sy, Math.cos(base + o) * spd, Math.sin(base + o) * spd, 4, PAL.ui);
       }
     } else if (e.kind === 'spiral') {
       e.ang += 0.42;
       var arms = 2 + Math.round(k * 2), s2 = 96 + k * 44;
       for (var m = 0; m < arms; m++) {
         var a2 = e.ang + m * (Math.PI * 2 / arms);
-        add(cx, cy, Math.cos(a2) * s2, Math.sin(a2) * s2, 3, COL.blood);
+        add(cx, cy, Math.cos(a2) * s2, Math.sin(a2) * s2, 3, PAL.blood);
       }
     } else if (e.kind === 'blaster') {
       /* Blue: only from above, so the floor stays yours. */
@@ -233,10 +319,10 @@
         if (Math.abs(f - gap) < 0.13) continue;
         if (vertical) {
           var fromTop = Math.random() < 0.5;
-          add(AX + f * AW, fromTop ? AY - 14 : AY + AH + 14, 0, fromTop ? sp3 : -sp3, 4, COL.dim);
+          add(AX + f * AW, fromTop ? AY - 14 : AY + AH + 14, 0, fromTop ? sp3 : -sp3, 4, PAL.dim);
         } else {
           var fromLeft = Math.random() < 0.5;
-          add(fromLeft ? AX - 14 : AX + AW + 14, AY + f * AH, fromLeft ? sp3 : -sp3, 0, 4, COL.dim);
+          add(fromLeft ? AX - 14 : AX + AW + 14, AY + f * AH, fromLeft ? sp3 : -sp3, 0, 4, PAL.dim);
         }
       }
     }
@@ -249,7 +335,7 @@
     dm.hurt(F, F.x, F.y - 12);
     /* MEDIUM: felt, but never enough to make the pattern unreadable on
        the frame you most need to read it. Leans the way the hit went. */
-    if (NEU.juice) { NEU.juice.hit('medium', { dx: dx, dy: dy }); NEU.juice.burst(F.x, F.y, 10, COL.soul); }
+    if (NEU.juice) { NEU.juice.hit('medium', { dx: dx, dy: dy }); NEU.juice.burst(F.x, F.y, 10, PAL.soul); }
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     if (hp <= 0) { startDeath(); return true; }
     return false;
@@ -272,6 +358,9 @@
     dm.tick(F, dt, null);
     var bdt = dt * dm.slow(F);           // adrenaline's first beat slows the room
 
+    if (variant) {
+      while (qi < plan.events.length && t >= plan.events[qi].t) fire(plan.events[qi++].e);
+    }
     for (var i = 0; i < emitters.length; i++) {
       var e = emitters[i];
       if (t >= e.next) { e.next = t + e.every; fire(e); }
@@ -281,6 +370,13 @@
     bullets = dm.step(bullets, bdt, { AX: AX, AY: AY, AW: AW, AH: AH });
     var b = dm.hits(bullets, F.x, F.y, PLAYER_R);
     if (b && hitPlayer(b.vx, b.vy)) return;
+    /* graze: a bullet that passes close without touching fills the meter */
+    for (var g = 0; g < bullets.length; g++) {
+      var gbl = bullets[g];
+      if (gbl.gz) continue;
+      var gd = Math.sqrt((gbl.x - F.x) * (gbl.x - F.x) + (gbl.y - F.y) * (gbl.y - F.y)) - gbl.r;
+      if (gd >= PLAYER_R && gd < PLAYER_R + GRAZE_R) { gbl.gz = true; grazed(); }
+    }
 
     var floor = AY + AH, kbo = [];
     for (var n = 0; n < bones.length; n++) {
@@ -313,7 +409,7 @@
         keepCharge();
         chargeFx = performance.now();
         if (NEU.juice) { NEU.juice.hit('large', { colour: '#4FC3F7' });
-                         NEU.juice.burst(F.x, F.y, 26, COL.elec, 190); }
+                         NEU.juice.burst(F.x, F.y, 26, PAL.elec, 190); }
         if (NEU.quest) NEU.quest.bump('charge', charge / 50);
         if (NEU.tvState) NEU.tvState();
       } else if (held) {
@@ -339,11 +435,11 @@
 
   /* ── drawing ──────────────────────────────────────────────────────*/
   function box() {
-    ctx.fillStyle = 'rgba(8,8,11,0.92)';
+    ctx.fillStyle = PAL.bg;
     ctx.fillRect(0, 0, innerWidth, innerHeight);
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = PAL.box;
     ctx.fillRect(AX - BORDER, AY - BORDER, AW + BORDER * 2, AH + BORDER * 2);
-    ctx.fillStyle = '#000000';
+    ctx.fillStyle = PAL.inner;
     ctx.fillRect(AX, AY, AW, AH);
   }
 
@@ -355,14 +451,14 @@
     var x = AX, y = AY - BORDER - 34;
     if (!carrying()) {
       if (emptyFx && performance.now() - emptyFx < 2200) {
-        ctx.fillStyle = COL.dim;
+        ctx.fillStyle = PAL.dim;
         ctx.fillText('nothing on you to charge', x, y + 6);
       }
       return;
     }
     var w = 74, h = 26;
     ctx.fillStyle = '#1B1B24'; ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = COL.elec; ctx.fillRect(x, y, w, 2);
+    ctx.fillStyle = PAL.elec; ctx.fillRect(x, y, w, 2);
     ctx.fillStyle = '#0B0B10'; ctx.fillRect(x + 12, y + 5, w - 24, h - 10);
     ctx.fillStyle = '#2A2A38';
     ctx.fillRect(x + 2, y + 4, 8, h - 8);
@@ -370,11 +466,35 @@
     /* Red under 50: the dock wants 100 and half is a fail state. */
     var iw = w - 28, ih = h - 14, ix = x + 14, iy = y + 7;
     ctx.fillStyle = '#22222E'; ctx.fillRect(ix, iy, iw, ih);
-    ctx.fillStyle = charge >= 100 ? '#7BE38A' : (charge >= 50 ? COL.elec : COL.blood);
+    ctx.fillStyle = charge >= 100 ? '#7BE38A' : (charge >= 50 ? PAL.elec : PAL.blood);
     ctx.fillRect(ix, iy, (iw * charge / 100) | 0, ih);
-    ctx.fillStyle = COL.bone;
+    ctx.fillStyle = PAL.ui;
     ctx.fillText(charge + '%' + (charge < 100 ? '  stay on the ground in the blue one' : ''),
                  x + w + 8, y + 5, Math.max(40, AW - w - 8));
+  }
+
+  /* Graze feedback. The meter is the same in Act II and III; the outline
+     flash is one short pulse per GRAZE_GAP (about 2.5 Hz at most) and is
+     skipped under reduced motion or the no-flash setting. */
+  function reducedFx() {
+    return !!((NEU.motion && NEU.motion.reduced && NEU.motion.reduced()) ||
+              (NEU.juice && NEU.juice.noFlash));
+  }
+  function grazed() {
+    meter = Math.min(100, meter + GRAZE_GAIN);
+    if (t - lastGz >= GRAZE_GAP) {
+      lastGz = t;
+      if (!reducedFx()) F.grazeFlashT = 0.12;
+    }
+  }
+  function drawGraze() {
+    var x = AX + AW - 120, y = AY - BORDER - 34;
+    ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+    ctx.fillStyle = PAL.ui;
+    ctx.fillText('graze', x - 64, y + 4);
+    ctx.fillStyle = PAL.slot; ctx.fillRect(x, y + 7, 100, 12);
+    ctx.fillStyle = meter >= 100 ? PAL.full : PAL.meter;
+    ctx.fillRect(x, y + 7, meter, 12);
   }
 
   function drawBlaster(bl) {
@@ -392,20 +512,31 @@
       x = bl.lane | 0; rot = bl.from === 't' ? 0 : Math.PI;
       y = bl.from === 't' ? AY - BORDER - reach - slide : AY + AH + BORDER + reach + slide;
     }
-    var ec = bl.elec ? COL.elec : '#FFFFFF';
+    var ec = bl.elec ? PAL.elec : PAL.blaster;
 
     if (charging) {
       /* the telegraph line: an untelegraphed beam is unreadable */
-      ctx.fillStyle = bl.elec ? 'rgba(79,195,247,0.35)' : 'rgba(237,231,222,0.25)';
+      ctx.fillStyle = ec;
+      ctx.globalAlpha = bl.elec ? 0.45 : 0.3;
       if (bl.horiz) ctx.fillRect(AX, (bl.lane - 1) | 0, AW, 2);
       else          ctx.fillRect((bl.lane - 1) | 0, AY, 2, AH);
+      var ga = teleAlpha(bl.t);
+      if (ga > 0) {
+        ctx.globalAlpha = ga;                       // the beam's own footprint
+        if (bl.horiz) ctx.fillRect(AX, (bl.lane - BL_HALF) | 0, AW, BL_HALF * 2);
+        else          ctx.fillRect((bl.lane - BL_HALF) | 0, AY, BL_HALF * 2, AH);
+        ctx.globalAlpha = Math.min(1, ga * 2.5);    // and its edges, crisper
+        if (bl.horiz) { ctx.fillRect(AX, (bl.lane - BL_HALF) | 0, AW, 2); ctx.fillRect(AX, (bl.lane + BL_HALF - 2) | 0, AW, 2); }
+        else          { ctx.fillRect((bl.lane - BL_HALF) | 0, AY, 2, AH); ctx.fillRect((bl.lane + BL_HALF - 2) | 0, AY, 2, AH); }
+      }
+      ctx.globalAlpha = 1;
     } else {
       var f = 1 - (bl.t - BL_CHARGE) / BL_FIRE;      // beam narrows as it dies
       var hh = (BL_HALF * f) | 0, core = Math.max(2, (hh / 1.5) | 0);
       ctx.fillStyle = ec;
       if (bl.horiz) ctx.fillRect(Math.min(x, AX), (bl.lane - hh) | 0, Math.max(x, AX + AW) - Math.min(x, AX), hh * 2);
       else          ctx.fillRect((bl.lane - hh) | 0, Math.min(y, AY), hh * 2, Math.max(y, AY + AH) - Math.min(y, AY));
-      ctx.fillStyle = bl.elec ? '#CFF3FF' : '#FFFFFF';
+      ctx.fillStyle = bl.elec ? PAL.elecCore : PAL.blaster;
       if (bl.horiz) ctx.fillRect(AX, (bl.lane - core / 2) | 0, AW, core);
       else          ctx.fillRect((bl.lane - core / 2) | 0, AY, core, AH);
     }
@@ -427,10 +558,13 @@
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
     box();
 
+    /* blasters first: their telegraph and beam must never hide a bullet */
+    for (var q = 0; q < blasters.length; q++) drawBlaster(blasters[q]);
+
     var floor = AY + AH;
     ctx.save();                          // bones and bullets stay inside the box
     ctx.beginPath(); ctx.rect(AX, AY, AW, AH); ctx.clip();
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = PAL.bone;
     for (var n = 0; n < bones.length; n++) {
       var bo = bones[n], bx = bo.x | 0;
       ctx.fillRect(bx - 3, floor - bo.h, 6, bo.h);
@@ -446,15 +580,13 @@
     }
     ctx.restore();
 
-    for (var q = 0; q < blasters.length; q++) drawBlaster(blasters[q]);
-
     dm.drawFX(ctx, F, inv);
 
     /* the phase's line, Undertale-style, inside the box */
     if (phase && t - phaseAt < TELE + 0.6) {
       ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(PHASES[phase - 1].line, AX + 16, AY + 16, AW - 32);
+      ctx.fillText(table()[phase - 1].line, AX + 16, AY + 16, AW - 32);
     }
 
     if (NEU.juice) { NEU.juice.drawParts(ctx, 1 / 60);
@@ -468,9 +600,11 @@
                      name: endless ? t.toFixed(1) + 's, endless' : 'twenty seconds',
                      hp: endless ? 1 - ramp() / 2.4 : SURVIVE - t,
                      max: endless ? 1 : SURVIVE,
-                     ticks: endless ? null : [1 - 7 / SURVIVE, 1 - 13 / SURVIVE],
+                     ticks: endless ? null : variant ? plan.phases.slice(1).map(function (p) { return 1 - p.at / SURVIVE; })
+                                                     : [1 - 7 / SURVIVE, 1 - 13 / SURVIVE],
                      php: hp, pmax: 3, phase: phase, rage: 0, rageOn: false });
     drawCarried();
+    drawGraze();
 
     /* the charge cutscene: centre screen, unmissable, ~1.6s */
     if (chargeFx && performance.now() - chargeFx < 1600) {
@@ -478,14 +612,14 @@
       var bw2 = 210, bh2 = 96;
       var bx2 = ((w - bw2) / 2) | 0, by2 = ((h - bh2) / 2) | 0;
       ctx.globalAlpha = e2 > 0.8 ? (1 - e2) / 0.2 : 1;
-      ctx.fillStyle = COL.void_;  ctx.fillRect(bx2 - 10, by2 - 10, bw2 + 20, bh2 + 46);
-      ctx.fillStyle = COL.elec;
+      ctx.fillStyle = PAL.void_;  ctx.fillRect(bx2 - 10, by2 - 10, bw2 + 20, bh2 + 46);
+      ctx.fillStyle = PAL.elec;
       ctx.fillRect(bx2 - 10, by2 - 10, bw2 + 20, 3);
       ctx.fillRect(bx2 - 10, by2 + bh2 + 33, bw2 + 20, 3);
-      ctx.fillStyle = '#22222E'; ctx.fillRect(bx2, by2, bw2, bh2);
-      ctx.fillStyle = COL.elec;
+      ctx.fillStyle = PAL.slot; ctx.fillRect(bx2, by2, bw2, bh2);
+      ctx.fillStyle = PAL.elec;
       ctx.fillRect(bx2 + 6, by2 + 6, ((bw2 - 12) * (charge / 100) * Math.min(1, e2 * 3)) | 0, bh2 - 12);
-      ctx.fillStyle = COL.bone;
+      ctx.fillStyle = PAL.ui;
       ctx.font = FONT; ctx.textBaseline = 'top';
       ctx.textAlign = 'center';
       ctx.fillText('CHARGING  ' + charge + '%', w / 2, by2 + bh2 + 12);
@@ -503,6 +637,9 @@
     layout();
     F.x = AX + AW / 2; F.y = AY + AH - 60;
     bullets = []; blasters = []; bones = [];
+    meter = 0; lastGz = -9;
+    plan = variant ? buildPlan(attempt++) : null; qi = 0;
+    PAL = variant ? PAL_III : PAL_II;
     enterPhase(1);
     keys = {};
     sheet();
@@ -529,7 +666,7 @@
     if (!dying || wrap.hidden) return;
     var ms = now - dying;
     box();
-    if (!dm.death(ctx, F.x, F.y, ms, F.mode === 'blue' ? '#3C6BFF' : COL.soul)) { dying = 0; finish(false, true); return; }
+    if (!dm.death(ctx, F.x, F.y, ms, F.mode === 'blue' ? '#3C6BFF' : PAL.soul)) { dying = 0; finish(false, true); return; }
     requestAnimationFrame(deathStep);
   }
 
@@ -611,6 +748,10 @@
     if (NEU.settings && NEU.settings.warnFlash) NEU.settings.warnFlash();
     if (running) return;                 /* already mid-run — never stack a second loop */
     endless = !!(opts && opts.endless);
+    /* Act III passes { variant: true }. With no option the room asks the
+       quest: once the console's step is done, this is the Act III room. */
+    variant = !endless && (opts && 'variant' in opts ? !!opts.variant
+                                                    : !!(NEU.quest && NEU.quest.has && NEU.quest.has('console')));
     NEU.activeMinigame = 'bullet';
     wrap.hidden = false;
     document.body.classList.add('is-playing');
@@ -642,5 +783,7 @@
 
   NEU.bullet = { open: open, close: close, get endless() { return endless; }, get running() { return running; },
                  get won() { return won; }, get phase() { return phase; }, get soul() { return F; },
+                 get variant() { return variant; }, get plan() { return plan; }, get meter() { return meter; },
+                 buildPlan: buildPlan, teleAlpha: teleAlpha, chargeTime: BL_CHARGE, get pal() { return PAL; },
                  set t(v) { t = +v || 0; } };   /* dev/screenshots: jump the clock */
 })();

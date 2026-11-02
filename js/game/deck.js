@@ -158,17 +158,17 @@
     { id: 'skele', title: 'skeleton simulator',
       meta: '0.2 hrs on record · 340 GB',
       a: '#EDE7DE', b: '#3A3A46', ink: '#2A2A33', hi: '#7A6ACF',
-      err: 'update required. the update server is asleep.' },
+      err: 'the update server is asleep. try again later.' },
 
     { id: 'wax', title: 'wax tycoon',
       meta: 'never played · 12 MB',
       a: '#E4C46A', b: '#4A3A14', ink: '#3A2C0C', hi: '#FFF3C4',
-      err: 'missing executable: wax.exe' },
+      err: 'still setting. the wax has not cooled.' },
 
     { id: 'dog2', title: 'dog 2',
       meta: 'never played · 1.1 GB',
       a: '#7BE38A', b: '#153A1E', ink: '#0E2A15', hi: '#FFF0F4',
-      err: 'not compatible with this device.' },
+      err: 'not for this device. not for any device yet.' },
 
     { id: 'neu', title: 'neu.ac',
       meta: '1 hr on record · running',
@@ -278,7 +278,7 @@
     }
     /* It fails. Loudly, in the way that particular thing would fail. */
     if (elErr) {
-      elErr.textContent = 'error: ' + g.err;
+      elErr.textContent = g.err;
       elErr.hidden = false;
       elErr.classList.remove('is-shake');
       void elErr.offsetWidth;
