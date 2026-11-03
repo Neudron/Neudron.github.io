@@ -37,32 +37,11 @@
   var PLAYER_R = (dm.soul && dm.soul.R) || 6, IFRAMES = dm.IFRAMES || 1.1;
   var MAXHP = 8;
 
-  /* Fair hitboxes: every enemy projectile's collision radius, derived
-     from the REAL Terraria hitbox each `.cs` declares (sheets.js's
-     `hitRadius`), converted through the same 150/224 Terraria-to-site
-     ratio the burst-proximity trigger already uses, with a light 0.85
-     inset kept for forgiveness. These used to be hand-picked constants
-     with no tie to the drawn art at all, and drifted in both
-     directions — hellblast drew 27x22 on screen with a hit radius of 5
-     (a ratio of 2.2, meaning a dart could visibly pass through the
-     soul with no hit), gigablast the same at 1.6x. Real numbers now
-     replace every guess. Falls back to the old hand-picked constants
-     only if sheets.js failed to load. */
   var HB = {
     dart:      (NEU.hitRadius && NEU.hitRadius('dart', 0.85))      || 4,
     hellblast: (NEU.hitRadius && NEU.hitRadius('hellblast', 0.85)) || 5,
     fireblast: (NEU.hitRadius && NEU.hitRadius('fireblast', 0.85)) || 8,
     gigablast: (NEU.hitRadius && NEU.hitRadius('gigablast', 0.85)) || 12,
-    /* the brothers' STRIKE reach (the player's own hit check against
-       them), from their real 120x120 Terraria hitbox — both
-       SupremeCataclysm.cs and SupremeCatastrophe.cs declare it. This one
-       needs to grow, not shrink: they used to draw as their own 50x22 /
-       67x20 thrown-attack sprites (see the brother body-sprite fix
-       below) with a 28px reach that was already too small for THAT art;
-       now that they draw their real ~80px body, 28px would only let a
-       strike land near their exact centre. No inset — a full-inset
-       generous reach on the PLAYER's own attack is a fairness feature,
-       matching how Calamitas's own 40px strike reach already works. */
     broReach:  (NEU.hitRadius && NEU.hitRadius('cataclysm', 1))    || 28
   };
 
@@ -70,18 +49,8 @@
 
   var running = false, last = 0, t = 0, lastDt = 1 / 60;
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
-  /* U1/U2: your two resources. Rage builds while you are missing
-     hearts and is SPENT by z — a full bar buys eight seconds of
-     doubled strikes. TP builds by grazing bullets and spends itself
-     as a barrier that takes one hit (x). Both are the fight rewarding
-     you for doing what the fight already asked you to do. */
   var rage = 0, tp = 0, shieldT = 0;
   var rageMode = 0, rageModeT = 0;
-  /* A2 combat state. stripOpen: the C menu (time runs at STRIP_SCALE).
-     healCd: seconds of fight time until HEAL is ready again. meleeCd: the
-     slash cooldown. There is no DEFEND: it handed out +16 % TP for a key
-     press, so spamming it (under the menu's slowed clock) filled the bar
-     for free. TP comes only from grazing and melee now. */
   var stripOpen = false, stripSel = 0, stripAt = 0, healCd = 0, healToast = 0;
   var meleeCd = 0, grazeAt = -9;
   var STRIP_SCALE = 0.2, MELEE_DMG = 6, MELEE_R = 56, FIRE_DMG = 4;

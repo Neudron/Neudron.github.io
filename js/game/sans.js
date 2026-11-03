@@ -1147,14 +1147,9 @@
       if (kstate === 'thrown') keyHit(fromX, fromY);
     }
 
-    /* A resting key builds the same string every frame, and an assignment
-       costs even when it changes nothing, so write only when the string
-       moved. kel.__tf is the last string written here. Nothing else writes
-       the key's transform and kel is never re-created, so it cannot go stale. */
-    var kt = 'translate3d(' + Math.round(kx) + 'px,' +
-             Math.round(ky - scrollY) + 'px,0) translate(-50%,-50%) rotate(' +
-             krot.toFixed(1) + 'deg)';
-    if (kel.__tf !== kt) { kel.__tf = kt; kel.style.transform = kt; }
+    kel.style.transform = 'translate3d(' + Math.round(kx) + 'px,' +
+                          Math.round(ky - scrollY) + 'px,0) translate(-50%,-50%) rotate(' +
+                          krot.toFixed(1) + 'deg)';
   }
 
   /* A hit only counts against a door you can actually see — doorScreenPos
@@ -2129,7 +2124,8 @@
        can't close doors, so replay is safe. */
     /* The show opens over the room and clears the box as it does, so
        the replay goes straight in rather than saying a line nobody sees. */
-    if (tvBroken && NEU.save && NEU.save.flagged('quiz_rank') && NEU.quiz) {
+    /* Not gated on quiz_rank: a first leave saves none. */
+    if (tvBroken && NEU.quiz) {
       NEU.quiz.open(); return;
     }
     if (docked || docking) {

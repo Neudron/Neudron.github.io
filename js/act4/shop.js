@@ -69,7 +69,7 @@
         if (n === sel) row.classList.add('is-sel');
         if (item.glow) row.classList.add('is-glow');
         row.setAttribute('role', 'listitem');
-        row.innerHTML = '<b>' + item.name + '</b><span class="shop__p">' + item.price + '</span>';
+        row.innerHTML = '<b>' + item.name + '</b><span class="shop__p">' + item.price + '</span><small class="shop__q">' + item.quip + '</small>';
         row.addEventListener('click', function () { sel = n; render(); select(); });
         row.addEventListener('mouseenter', function () { sel = n; render(); });
         /* A row that takes focus becomes the cursor. Enter buys the row the

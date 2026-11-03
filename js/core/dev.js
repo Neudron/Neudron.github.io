@@ -163,6 +163,24 @@
       log('heal   soul back to full (in the fight)');
       log('tp     tp <0-100> sets the soul\'s tp (in the fight)');
       log('close  esc also works');
+      log('── tenna (tv time) ──');
+      log('tenna            open the show          (aliases: tv, quiz)');
+      log('tenna skip       jump to the finale screen');
+      log('tenna seed <n>   seed the next deal');
+      log('tenna fast [off] fast mode on, or "off"');
+      log('tenna rank <R>   set the rank flag: A A– B B– C C– Z');
+      log('tenna state      running, phase, question, score');
+      log('── state ──');
+      log('where            current room and spawn');
+      log('cheat            show god / damage / start fraction');
+      log('scal             phase, hp, mode, hearts, booms (in the fight)');
+      log('mark <id>        mark one quest step done');
+      log('bump <id> <n>    raise a counted step to n');
+      log('flag <k> [v]     read or set a save flag (number or text)');
+      log('give <item>      add an item to the pack');
+      log('take <item>      remove an item from the pack');
+      log('vol <0-100>      music volume');
+      log('clear            empty this console (alias: cls)');
     },
     sans: function () {
       if (NEU.devSkip) { NEU.devSkip(); log('skipped. key is yours, door is live.'); }
@@ -321,7 +339,87 @@
       hide();
       if (NEU.engine.enter(room)) log('now in ' + room + '.');
       else log('no room "' + room + '". try the list.');
-    }
+    },
+
+    /* ── tenna: the TV quiz. Every call goes through NEU.quiz's own
+       exports, so the show runs exactly as it does in play. ─────── */
+    tenna: function (arg) {
+      var p = String(arg || '').trim().split(/\s+/), sub = (p[0] || '').toLowerCase();
+      var q = NEU.quiz;
+      if (!q || !q.open) { log('quiz.js not loaded'); return; }
+      if (!sub || sub === 'open') { hide(); q.open(); log('tv time. good luck.'); return; }
+      if (sub === 'skip') { q.skip(); log('skip only lands on the finale screen.'); return; }
+      if (sub === 'seed') {
+        var n = parseInt(p[1], 10);
+        if (isNaN(n)) { log('usage: tenna seed <n>'); return; }
+        q.seed(n); log('next deal seeded with ' + n + '.');
+        return;
+      }
+      if (sub === 'fast') { var on = p[1] !== 'off'; q.fast(on); log('fast ' + (on ? 'on' : 'off') + '.'); return; }
+      if (sub === 'state') {
+        log('running ' + q.running + '  phase ' + q.phase + '  question ' + q.index + '  score ' + q.score);
+        return;
+      }
+      if (sub === 'rank') {
+        var r = String(p[1] || '').toUpperCase();
+        var ranks = ['A', 'A–', 'B', 'B–', 'C', 'C–', 'Z'];
+        if (ranks.indexOf(r) < 0) { log('usage: tenna rank <A|A–|B|B–|C|C–|Z>'); return; }
+        if (!NEU.save) { log('save.js not loaded'); return; }
+        NEU.save.flag('quiz_rank', r); NEU.save.flag('rank:' + r, 1);
+        log('rank ' + r + ' set. reload to see it take effect.');
+        return;
+      }
+      log('tenna: open · skip · seed <n> · fast [off] · rank <R> · state');
+    },
+
+    /* ── state readouts and direct edits ───────────────────────────── */
+    cheat: function () {
+      log('god ' + NEU.cheat.god + '  damage x' + NEU.cheat.dmgMul + '  start frac ' + NEU.cheat.startFrac);
+    },
+    where: function () {
+      var w = NEU.engine && NEU.engine.where ? NEU.engine.where() : null;
+      log(w ? 'room ' + w.room + '  spawn ' + w.spawn : 'not in a room (page)');
+    },
+    scal: function () {
+      if (!NEU.scal || !NEU.scal.active) { log('the soul is not on screen. go into the fight first.'); return; }
+      var s = NEU.scal;
+      log('phase ' + s.phase + '  mode ' + s.mode + '  boss hp ' + s.hp + '  soul hp ' + s.soulHP +
+          '  hearts ' + s.hearts + '  booms ' + s.booms + '  rage ' + s.rage);
+    },
+    mark: function (id) {
+      if (!NEU.quest) { log('quest.js not loaded'); return; }
+      if (!id) { log('usage: mark <step id>'); return; }
+      NEU.quest.mark(id); log('marked ' + id + '.');
+    },
+    bump: function (arg) {
+      var p = String(arg || '').trim().split(/\s+/);
+      if (!NEU.quest || !p[0] || isNaN(parseInt(p[1], 10))) { log('usage: bump <count id> <n>'); return; }
+      NEU.quest.bump(p[0], parseInt(p[1], 10)); log('bumped ' + p[0] + ' to ' + p[1] + '.');
+    },
+    flag: function (arg) {
+      if (!NEU.save) { log('save.js not loaded'); return; }
+      var p = String(arg || '').trim().split(/\s+/), k = p[0];
+      if (!k) { log('usage: flag <name> [value]'); return; }
+      if (p.length < 2) { log(k + ' = ' + NEU.save.flag(k)); return; }
+      var v = p.slice(1).join(' '), n = Number(v);
+      var val = isNaN(n) ? v : n;
+      NEU.save.flag(k, val); log(k + ' set to ' + val + '.');
+    },
+    give: function (item) {
+      if (!NEU.save || !item) { log('usage: give <item>'); return; }
+      NEU.save.give(item); log('gave ' + item + '.');
+    },
+    take: function (item) {
+      if (!NEU.save || !item) { log('usage: take <item>'); return; }
+      NEU.save.take(item); log('took ' + item + '.');
+    },
+    vol: function (arg) {
+      if (!NEU.music || !NEU.music.setVolume) { log('music.js not loaded'); return; }
+      var v = parseInt(arg, 10);
+      if (isNaN(v)) { log('volume ' + NEU.music.volume + '. usage: vol <0-100>'); return; }
+      log('volume ' + NEU.music.setVolume(v) + '.');
+    },
+    clear: function () { out.innerHTML = ''; }
   };
 
   /* The overlay. Its own element rather than a canvas inside the dev
@@ -386,6 +484,9 @@
   };
 
   CMDS.k = CMDS.key = CMDS.sans;     // aliases, because typing is the cost
+  CMDS.tv = CMDS.quiz = CMDS.tenna;
+  CMDS.cls = CMDS.clear;
+  CMDS.h = CMDS['?'] = CMDS.help;
 
   /* Arguments, because `sheet` and `goto` need one. The command word is
      lowercased; the rest is passed through verbatim, since sheet names
@@ -419,6 +520,8 @@
       panel.hidden ? show() : hide();
       return;
     }
+    /* A minigame or the shop owns Escape while it is open: let it reach that owner. */
+    if (NEU.activeMinigame && e.key === 'Escape') return;
     if (!panel.hidden && e.key === 'Escape') {
       e.preventDefault();
       e.stopImmediatePropagation();          /* the console ate this key — the room must not also read it as leave */
@@ -427,6 +530,7 @@
   }, true);
 
   input.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && NEU.activeMinigame) return;   // shop/minigame closes on it, not the console
     e.stopPropagation();                       // don't drive the game from in here
     if (e.key === 'Enter') { run(input.value); input.value = ''; }
     else if (e.key === 'Escape') hide();
