@@ -69,8 +69,8 @@
     { id: 'scal desp', scene: { room: 'b8_arena', spawn: 'west' }, frac: 0.01 },
     { id: 'quiz', marks: ['a4_scal', 'a4_ashes', 'a4_recall', 'a4_home', 'a4_told',
                          'a4_smash', 'a4_tenna', 'a4_rank'],
-      flags: { scal_dead: 1, home_seen: 1, tv_breakable: 1, tv_broken: 1, quiz_rank: 'A',
-               'rank:A': 1, 'rank:A–': 1, 'rank:B': 1, 'rank:B–': 1,
+      flags: { scal_dead: 1, home_seen: 1, tv_breakable: 1, tv_broken: 1, quiz_rank: 'T',
+               'rank:T': 1, 'rank:S': 1, 'rank:A': 1, 'rank:A–': 1, 'rank:B': 1, 'rank:B–': 1,
                'rank:C': 1, 'rank:C–': 1, 'rank:Z': 1 },
       items: ['ashes'], scene: { room: 'a1_clearing', spawn: 'default' } },
     { id: 'axe', marks: ['a4_nutz', 'a4_trip', 'a4_axe'], counts: { a4_prizes: 9 },
@@ -168,7 +168,7 @@
       log('tenna skip       jump to the finale screen');
       log('tenna seed <n>   seed the next deal');
       log('tenna fast [off] fast mode on, or "off"');
-      log('tenna rank <R>   set the rank flag: A A– B B– C C– Z');
+      log('tenna rank <R>   set the rank flag: T S A A– B B– C C– Z');
       log('tenna state      running, phase, question, score');
       log('── state ──');
       log('where            current room and spawn');
@@ -357,16 +357,19 @@
       }
       if (sub === 'fast') { var on = p[1] !== 'off'; q.fast(on); log('fast ' + (on ? 'on' : 'off') + '.'); return; }
       if (sub === 'state') {
-        log('running ' + q.running + '  phase ' + q.phase + '  question ' + q.index + '  score ' + q.score);
+        log('running ' + q.running + '  phase ' + q.phase + '  question ' + q.index + '  score ' + q.score +
+            '  rank ' + ((NEU.save && NEU.save.flag('quiz_rank')) || '-'));
         return;
       }
       if (sub === 'rank') {
         var r = String(p[1] || '').toUpperCase();
-        var ranks = ['A', 'A–', 'B', 'B–', 'C', 'C–', 'Z'];
-        if (ranks.indexOf(r) < 0) { log('usage: tenna rank <A|A–|B|B–|C|C–|Z>'); return; }
+        var ranks = ['T', 'S', 'A', 'A–', 'B', 'B–', 'C', 'C–', 'Z'];
+        if (ranks.indexOf(r) < 0) { log('usage: tenna rank <T|S|A|A–|B|B–|C|C–|Z>'); return; }
         if (!NEU.save) { log('save.js not loaded'); return; }
-        NEU.save.flag('quiz_rank', r); NEU.save.flag('rank:' + r, 1);
-        log('rank ' + r + ' set. reload to see it take effect.');
+        var opened = (q.opens ? q.opens(r) : [r]);
+        NEU.save.flag('quiz_rank', r);
+        opened.forEach(function (x) { NEU.save.flag('rank:' + x, 1); });
+        log('rank ' + r + ' set · opens ' + opened.length + ' door' + (opened.length === 1 ? '' : 's') + ': ' + opened.join(' ') + '. reload to see it.');
         return;
       }
       log('tenna: open · skip · seed <n> · fast [off] · rank <R> · state');
