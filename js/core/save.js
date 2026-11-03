@@ -50,6 +50,32 @@
              quiz: null, best: {}, stamp: 0 };
   }
 
+  /* Merge defaults so partial/old saves never crash downstream code. */
+  function normalise(s) {
+    if (!s || typeof s !== 'object') s = blank();
+    if (typeof s.v !== 'number' || isNaN(s.v)) s.v = VERSION;
+    if (typeof s.act !== 'number') s.act = 3;
+    if (s.room === undefined) s.room = null;
+    if (s.spawn === undefined) s.spawn = null;
+    if (!s.flags || typeof s.flags !== 'object') s.flags = {};
+    if (!Array.isArray(s.items)) s.items = [];
+    if (!s.quest || typeof s.quest !== 'object') s.quest = { done: {}, counts: {} };
+    if (!s.quest.done || typeof s.quest.done !== 'object') s.quest.done = {};
+    if (!s.quest.counts || typeof s.quest.counts !== 'object') s.quest.counts = {};
+    if (s.quiz !== null && (typeof s.quiz !== 'object' || !s.quiz)) s.quiz = null;
+    if (!s.best || typeof s.best !== 'object') s.best = {};
+    if (typeof s.stamp !== 'number') s.stamp = 0;
+    return {
+      v: s.v, act: s.act, room: s.room, spawn: s.spawn,
+      flags: Object.assign({}, s.flags),
+      items: s.items.slice(),
+      quest: { done: Object.assign({}, s.quest.done), counts: Object.assign({}, s.quest.counts) },
+      quiz: s.quiz ? Object.assign({}, s.quiz) : null,
+      best: Object.assign({}, s.best),
+      stamp: s.stamp
+    };
+  }
+
   function store() {
     /* Touching localStorage at all throws in some privacy modes, so
        even the existence check is guarded. */
@@ -123,7 +149,7 @@
       warn("your save file was unreadable. starting fresh.");
       return null;
     }
-    return migrate(s);
+    return normalise(migrate(s));
   }
 
   /* ── write ──────────────────────────────────────────────────────*/
@@ -137,7 +163,8 @@
        our copy. Writing ours would silently throw its progress away. */
     try {
       var theirs = JSON.parse(st.getItem(KEY));
-      if (theirs && theirs.stamp > mem.stamp) {
+      var theirStamp = theirs && typeof theirs.stamp === 'number' ? theirs.stamp : 0;
+      if (theirStamp > (mem.stamp || 0)) {
         warn('this game is open in another tab, which has newer progress. reload to save here.');
         return;
       }
@@ -222,13 +249,14 @@
 
     /* Apply a loaded file to the live game. */
     apply: function (s) {
-      mem = s;
-      if (NEU.quest && NEU.quest.restore) NEU.quest.restore(s.quest);
+      mem = normalise(s);
+      if (NEU.quest && NEU.quest.restore) NEU.quest.restore(mem.quest);
       write(true);
       return mem;
     },
 
     wipe: function () {
+      clearTimeout(timer); timer = null; dirty = false;
       mem = blank();
       var st = store();
       try { if (st) st.removeItem(KEY); } catch (e) {}
@@ -258,8 +286,8 @@
   (function () {
     var s = read();
     if (!s) return;
-    mem = s;
-    if (NEU.quest && NEU.quest.restore) NEU.quest.restore(s.quest);
+    mem = normalise(s);
+    if (NEU.quest && NEU.quest.restore) NEU.quest.restore(mem.quest);
     write(true);
   })();
 })();

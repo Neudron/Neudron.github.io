@@ -125,8 +125,12 @@
        or double-count. */
     mark: function (id) {
       if (done[id]) return;
+      var st = null;
+      for (var i = 0; i < STEPS.length; i++) if (STEPS[i].id === id) st = STEPS[i];
       done[id] = true;
+      if (st && st.count) counts[id] = st.count;
       render(); flash();
+      if (NEU.save && NEU.save.capture) NEU.save.capture();
     },
     bump: function (id, to) {
       var s = null;
@@ -135,6 +139,7 @@
       counts[id] = Math.max(counts[id] || 0, to);
       if (counts[id] >= (s.count || 1)) { done[id] = true; flash(); }
       render();
+      if (NEU.save && NEU.save.capture) NEU.save.capture();
     },
     has: function (id) { return !!done[id]; },
 
@@ -175,6 +180,7 @@
     replay: function (ids) {
       for (var i = 0; i < ids.length; i++) { delete done[ids[i]]; delete counts[ids[i]]; }
       render();
+      if (NEU.save && NEU.save.capture) NEU.save.capture();
     },
     reset: function () { done = {}; counts = {}; render(); },
 
@@ -190,8 +196,8 @@
     },
     restore: function (s) {
       if (!s) return;
-      done = s.done || {};
-      counts = s.counts || {};
+      done = s.done ? JSON.parse(JSON.stringify(s.done)) : {};
+      counts = s.counts ? JSON.parse(JSON.stringify(s.counts)) : {};
       render();
     }
   };

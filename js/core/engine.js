@@ -710,7 +710,7 @@
     if ((padPoll -= dt) <= 0) { padPoll = 0.5; var ph = measurePad(); if (ph !== padH) padH = ph; }
     if (!room) return;
 
-    if (!busy) { move(dt); walkExits(); } else { vx = 0; vy = 0; moving = false; }
+    if (!busy) { if (!NEU.activeMinigame) move(dt); walkExits(); } else { vx = 0; vy = 0; moving = false; }
     camFollow(dt);
     var decay = Math.exp(-14 * dt);
     kickX *= decay; kickY *= decay;
