@@ -484,6 +484,7 @@
   function pickStone(c, word) {
     if (b2picked) return;   /* one press per attempt; r to try again */
     b2picked = word;
+    c.flag('b2_ash', word === 'ash' ? 1 : 0);
     var es = c.ents();
     for (var i = 0; i < es.length; i++)
       if (es[i].t === 'npc' && es[i].stone)
@@ -557,7 +558,7 @@
       Q('glow', 10, 4, { r: 72, col: '#D8C8FF', g: 0.08 })
     ]).concat(columns([2, 3, 18, 3, 2, 8, 18, 8])),
     onEnter: function (c) {
-      b2picked = c.flagged('solved:b2_blocks') ? 'ash' : '';
+      b2picked = c.flagged('b2_ash') || c.flagged('solved:b2_blocks') ? 'ash' : '';
       if (c.flagged('b2_seen')) return;
       c.flag('b2_seen', 1);
       say(c, ['the way east is a wall of three loose stones.',
@@ -567,7 +568,9 @@
               'the loose block is a decoy. do not push it into a corner.',
               'press ' + (NEU.keys ? NEU.keys.label('r') : 'r') + ' if you make a mess of it. the room does not mind.']);
     },
-    onReset: function () { b2picked = ''; resetHint('b2_blocks'); },
+    /* the riddle is part of the win: plates alone never open the door */
+    solved: function (c) { return !!c.flagged('b2_ash') && !!c.entHere(6, 3, 'block') && !!c.entHere(14, 3, 'block'); },
+    onReset: function () { b2picked = ''; if (NEU.save) NEU.save.flag('b2_ash', 0); resetHint('b2_blocks'); },
     onSolved: function (c) {
       c.markSolved('b2_blocks');
       if (NEU.quest) NEU.quest.bump('a4_rooms', 1);
@@ -870,6 +873,7 @@
     if (b6lit) { c.say(['the socket is lit. it has been lit since you were last here.'], 'narr'); return; }
     if (!b6carry) { c.say(['a socket in the wall, empty.', 'it is waiting for a light.'], 'narr'); return; }
     b6carry = false; b6lit = true;
+    c.flag('b6_lit', 1);
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
     c.say(['it fits. light pours back into the room.'], 'narr');
   }
@@ -909,7 +913,7 @@
     ]),
     onEnter: function (c) {
       b6carry = false;
-      b6lit = !!c.flagged('solved:b6_dark');
+      b6lit = !!(c.flagged('solved:b6_dark') || c.flagged('b6_lit'));
       /* the torch went into the socket for good; it does not hang on the wall again */
       if (b6lit) { var es = c.ents(); for (var i = 0; i < es.length; i++) if (es[i].torch) es[i].dead = true; }
       if (c.flagged('b6_seen')) return;
@@ -925,7 +929,9 @@
       if (NEU.quest) NEU.quest.bump('a4_rooms', 5);
       say(c, ['the second stone settles.', 'the crypt lights itself. the gate lifts.']);
     },
-    onReset: function () { b6carry = false; b6lit = false; resetHint('b6_dark'); }
+    /* the torch is part of the win: the socket must be lit, and the plates alone do not open the gate */
+    solved: function (c) { return !!c.flagged('b6_lit') && !!c.entHere(2, 2, 'block') && !!c.entHere(17, 10, 'block'); },
+    onReset: function () { b6carry = false; b6lit = false; if (NEU.save) NEU.save.flag('b6_lit', 0); resetHint('b6_dark'); }
   });
 
   /* ══ B7 — the altar ══════════════════════════════════════════════
