@@ -2196,6 +2196,13 @@
     /* The show opens over the room and clears the box as it does, so
        the replay goes straight in rather than saying a line nobody sees. */
     /* Not gated on quiz_rank: a first leave saves none. */
+    /* After the show has run at least once, the broken TV re-opens
+       it — unless the player has already reached rank T, in which case
+       the set has nothing left to show and the television stays fixed. */
+    if (tvBroken && NEU.save && NEU.save.flagged('rank:T')) {
+      if (NEU.talk) NEU.talk(['the television has nothing left to show you.', 'it is fixed now.'], 'narr');
+      return;
+    }
     if (tvBroken && NEU.quiz) {
       NEU.quiz.open(); return;
     }

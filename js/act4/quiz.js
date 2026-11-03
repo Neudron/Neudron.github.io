@@ -649,12 +649,27 @@
         '<p class="quiz__rank" id="quizRank"></p>' +
         '<p class="quiz__doors" id="quizDoors"></p>' +
         '<button type="button" class="quiz__go" id="quizGoBtn">to the doors →</button>' +
+        (runRank === 'Z' ? '<button type="button" class="quiz__go" id="quizCheatBtn" style="margin-top:8px;opacity:.55">cheat (you didn\'t see this)</button>' : '') +
         '<p class="quiz__small">the show takes you there on its own. enter or a tap goes now.</p>';
       var go_ = $('quizGoBtn');
       if (go_) {
         go_.addEventListener('click', skip);
         /* Off the dead option buttons, onto the one thing to press. */
         if (go_.focus) go_.focus();
+      }
+      var cheat_ = $('quizCheatBtn');
+      if (cheat_) {
+        cheat_.addEventListener('click', function () {
+          if (NEU.save) {
+            NEU.save.flag('quiz_rank', 'T');
+            NEU.save.flag('rank:T', 1); NEU.save.flag('rank:S', 1); NEU.save.flag('rank:A', 1);
+            NEU.save.data.quiz = { rank: 'T', score: 20 };
+            NEU.save.capture();
+          }
+          if (NEU.quest) NEU.quest.mark('a4_rank');
+          if (NEU.talk) NEU.talk(['you cheated. tenna would be furious.', 'you are now rank T.'], 'narr');
+          skip();
+        });
       }
     }
     wrap.classList.add('is-finale');

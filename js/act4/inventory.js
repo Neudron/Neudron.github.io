@@ -26,9 +26,9 @@
     for (var i = 0; i < items.length; i++) {
       if (/^mush\d+$/.test(items[i])) { mush++; continue; }
       var f = INFO[items[i]] || [items[i], null, ['* ' + items[i] + '.']];
-      out.push({ name: f[0], sheet: f[1], say: f[2], n: 1 });
+      out.push({ id: items[i], name: f[0], sheet: f[1], say: f[2], n: 1 });
     }
-    if (mush) out.push({ name: INFO.mush[0], sheet: INFO.mush[1], say: INFO.mush[2], n: mush });
+    if (mush) out.push({ id: 'mush', name: INFO.mush[0], sheet: INFO.mush[1], say: INFO.mush[2], n: mush });
     return out;
   }
 
@@ -103,6 +103,10 @@
     }
     if (k === 'ArrowUp' || k === 'w' || k === 'W') pick(sel - 1);
     else if (k === 'ArrowDown' || k === 's' || k === 'S') pick(sel + 1);
+    else if ((k === 'Enter' || k === 'z' || k === 'Z') && rows[sel] && rows[sel].id === 'soup' && NEU.act4 && NEU.act4.wake) {
+      if (NEU.save) NEU.save.take('soup');
+      close(); NEU.act4.wake();
+    }
     else if ((k === 'Enter' || k === 'z' || k === 'Z') && rows[sel] && NEU.talk) NEU.talk(rows[sel].say, 'narr');
     else if (/^(Escape|c|C|x|X)$/.test(k)) close();
     /* Tab: focus stays on the box, the trap is the box itself */

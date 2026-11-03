@@ -61,6 +61,11 @@
      one legible "next thing". */
   function reachable(i) {
     if (i === 0) return true;
+    /* show a little further ahead so the chain reads as a chain, not
+       a single next step — the objectives tab used to stop at soup */
+    var last = -1;
+    for (var k = 0; k < STEPS.length; k++) if (done[STEPS[k].id]) last = k;
+    if (last >= 0 && i <= last + 4) return true;
     return !!done[STEPS[i - 1].id] || !!done[STEPS[i].id];
   }
 

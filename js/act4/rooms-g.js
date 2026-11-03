@@ -248,7 +248,8 @@
           /* the prize: an npc in every way but its drawing */
           { t: 'prizenpc', v: 'prize' + n, x: set.at[0], y: set.at[1], solid: true, colour: '#B892FF', lines: [p[1], p[2]] },
           { t: 'exit', x: mid, y: h - 1, to: 'g0_hall', spawn: 'back' + n, style: 'curtain' }
-        ])
+        ]).concat(n === 0 ? [{ t: 'exit', x: 1, y: 1, to: 'a1_clearing', spawn: 'default', style: 'door',
+                                lines: ['a door back to the forest. it was always here.'] }] : [])
         .concat(last ? [{ t: 'exit', x: 0, y: 5, to: 'h1_storm', spawn: 'top', style: 'stairs' }] : []),
       onEnter: function (c) {
         if (NEU.quest) NEU.quest.bump('a4_prizes', n + 1);

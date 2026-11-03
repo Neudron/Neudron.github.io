@@ -5,10 +5,10 @@
    draw a grid rather than a list.
 
    THE RECIPE IS A BOWL:
-       . . .
        M . M
-       . M .
-   Three mushrooms in a V. It is discoverable because the pot in the
+       . . .
+       M M M
+   Five mushrooms: the two sides and the bottom. It is discoverable because the pot in the
    room is drawn as that shape, and nobody says so.
 
    Two rules that keep it from being annoying:
@@ -36,7 +36,7 @@
   var grid = [null,null,null, null,null,null, null,null,null];
   var held = 0;              // mushrooms still in the tray
 
-  var RECIPE = [null,null,null, 'M',null,'M', null,'M',null];
+  var RECIPE = ['M',null,'M', null,null,null, 'M','M','M'];
 
   function matches() {
     for (var i = 0; i < 9; i++) if ((grid[i] || null) !== RECIPE[i]) return false;
