@@ -575,7 +575,7 @@
     if (line && nowMs - lineT < 5000) {
       ctx.fillStyle = COL.bone;
       ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
-      ctx.fillText(line, AX, AY + AH + 80);
+      ctx.fillText(line, AX, AY + AH + 80, AW);
     }
   }
 

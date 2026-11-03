@@ -82,12 +82,19 @@
        there the arena keeps its old size and the pad sits over its
        bottom corners, as it did before. */
     var full = Math.min(maxH || 520, winH - 190);
-    var above = Math.min(maxH || 520, winH - padHeight() - 190);
-    if (above < full && above >= full * 0.6) winH -= padHeight();
+    var ph = padHeight();
+    var above = Math.min(maxH || 520, winH - ph - 190);
+    var hasPad = ph > 0 && above >= full * 0.6;
+    if (hasPad) winH -= ph;
     var AW = Math.min(maxW || 760, winW - 48);
     var AH = Math.min(maxH || 520, winH - 190);
     var AX = ((winW - AW) / 2) | 0;
     var AY = ((winH - AH) / 2 + (padY !== undefined ? padY : 22)) | 0;
+    /* SCal prints her dialogue line 96px under the arena (boss-scal dialY,
+       16px type), so on a padded phone the arena shifts up to keep the
+       line clear of the pad's TP button instead of sliding under it. */
+    if (hasPad)
+      AY = Math.max(36, Math.min(AY, winH - AH - 96));
     return { AX: AX, AY: AY, AW: AW, AH: AH };
   }
 
@@ -500,14 +507,20 @@
     ctx.textAlign = 'left';
   }
 
+  /* one width for every boss bar: clears the esc button with a gap
+     down to 390 px. Takes the viewport width (number) or an object o.w. */
+  function barW(o) {
+    var w = typeof o === 'number' ? o : (o && o.w) || 0;
+    return Math.min(480, w - 200) | 0;
+  }
+
   function hud(ctx, F, o) {
     ctx.font = FONT; ctx.textBaseline = 'top';
     var r = Math.max(0, Math.min(1, o.hp / o.max));
     var d = Math.max(0, F.clock - F.hudAt); F.hudAt = F.clock;
     if (r > F.chip) F.chip = r;
     else if (F.clock - F.hitAt > 0.4) F.chip = Math.max(r, F.chip - d * 0.6);
-    /* 160 keeps the bar clear of the esc button in the top-right corner */
-    var bw = Math.min(480, o.w - 160) | 0, bx = ((o.w - bw) / 2) | 0, by = 36;
+    var bw = barW(o.w), bx = ((o.w - bw) / 2) | 0, by = 36;
     ctx.fillStyle = '#05050A'; ctx.fillRect(bx - 4, by - 4, bw + 8, 20);
     ctx.fillStyle = '#5A5468'; ctx.fillRect(bx - 2, by - 2, bw + 4, 16);
     ctx.fillStyle = '#1A0A0E'; ctx.fillRect(bx, by, bw, 12);
@@ -517,7 +530,11 @@
     ctx.fillStyle = '#EDE7DE';
     for (var i = 0; o.ticks && i < o.ticks.length; i++)
       ctx.fillRect(bx + Math.round(bw * o.ticks[i]), by - 2, 2, 16);
-    ctx.textAlign = 'left'; ctx.fillText(o.name, bx, by - 24);
+    /* Glitch: the last phase look shivers her name at 2 Hz (two pinned
+       positions per second, none under reduced motion). */
+    var still = !!(NEU.settings && NEU.settings.reduced);
+    var glx = (o.glitch && !still) ? ((Math.floor(F.clock * 2) & 1) ? 2 : -2) : 0;
+    ctx.textAlign = 'left'; ctx.fillText(o.name, bx + glx, by - 24);
     ctx.textAlign = 'right'; ctx.fillText(Math.ceil(r * 100) + '%', bx + bw, by - 24);
 
     var pw = Math.min(300, o.w - 64), ph = 48;
@@ -563,7 +580,7 @@
     fight: fight, move: move, dash: dash, tap: tap, key: key, keyName: keyName,
     tick: tick, hurt: hurt, mul: mul, slow: slow, pop: pop, bossHit: bossHit,
     adrenaline: adrenaline, rage: rage, soulMode: soulMode,
-    glow: glow, drawFX: drawFX, drawFlash: drawFlash, hud: hud,
+    glow: glow, drawFX: drawFX, drawFlash: drawFlash, hud: hud, barW: barW,
     DASH_CD: DASH_CD, ADREN_ON: ADREN_ON,
     TAP: 0,      /* double-tap window, s; 0 = off: X is the only dash */
     soul: {

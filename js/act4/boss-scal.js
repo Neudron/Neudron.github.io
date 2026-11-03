@@ -316,7 +316,7 @@
   /* their own bars, under hers: name, HP, enraged tag */
   function drawBroBars(w) {
     if (mode !== 'brothers' || !bros.length) return;
-    var bw = Math.min(480, w - 160) | 0, x0 = ((w - bw) / 2) | 0, half = ((bw - 16) / 2) | 0;
+    var bw = dm.barW ? dm.barW(w) : Math.min(480, w - 200), x0 = ((w - bw) / 2) | 0, half = ((bw - 16) / 2) | 0;
     ctx.font = FONT_UI; ctx.textBaseline = 'top';
     var order = ['slash', 'fist'];
     for (var i = 0; i < 2; i++) {
@@ -1413,7 +1413,9 @@
           'she leaves you a handful of ash.<br>' +
           '<small>esc to leave</small>';
       }
-      draw(performance.now());
+      /* 'static smash': stinger, no new audio file. */
+      if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(3);
+      requestAnimationFrame(winStep);
     }
     if (NEU.juice && NEU.juice.shatter) {
       var k = cv.width / VW;
@@ -1423,6 +1425,9 @@
 
   function startDeath() {
     running = false; dying = performance.now(); stripOpen = false;
+    /* No state survives the death beat: bullets and hazards gone. */
+    dropBullets();
+    if (NEU.scalAtk && NEU.scalAtk.reset) NEU.scalAtk.reset();
     clearSched(); endPh();
     if (dm.resetDeath) dm.resetDeath();
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
@@ -1443,6 +1448,19 @@
     }
     }
     requestAnimationFrame(deathStep);
+  }
+
+  /* The verdict: red on the void, still — draw is not running here. */
+  function winStep(now) {
+    if (!active) return;
+    if (!NEU.perf || NEU.perf.paced(now)) {
+      ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, VW, VH);
+      frame();
+      ctx.font = BANNER_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#FF1E12';
+      ctx.fillText('THE CALAMITY ENDS', (AX + AW / 2) | 0, (AY + AH / 2 - 10) | 0);
+    }
+    requestAnimationFrame(winStep);
   }
 
   /* ── draw ───────────────────────────────────────────────────────*/
@@ -1747,13 +1765,13 @@
        Ticks sit at every phase gate in damageTarget. */
     dm.hud(ctx, F, { w: w, h: h, AY: AY, AH: AH,
                      /* her Infernum title; a phone's 230 px bar holds only her name */
-                     name: (w < 560 ? 'Calamitas' : 'Supreme Witch, Calamitas') + (invuln ? ' — shielded' : ''),
+                     name: (w < 560 ? 'Calamitas' : 'Supreme Witch, Calamitas') + (invuln && w >= 560 ? ' — shielded' : ''),
                      hp: bossHP, max: bossMax, invuln: invuln,
-                     ticks: HUD_TICKS,
+                     glitch: ph >= 3, ticks: HUD_TICKS,
                      php: hp, pmax: MAXHP, phase: phase,
                      tp: tpShown, rage: rageShown, rageOn: rageMode > 0, AX: AX });
     /* the phase's frame round her bar (dm.hud's bar sits at y 36) */
-    var hbw = Math.min(480, w - 160) | 0;
+    var hbw = dm.barW ? dm.barW(w) : Math.min(480, w - 200);
     rect(PHASE_LOOK[ph].hud, (((w - hbw) / 2) | 0) - 4, 32, hbw + 8, 20, 2);
     if (bannerTxt) {
       ctx.font = BANNER_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -1781,7 +1799,7 @@
     if (talking) {
       ctx.fillStyle = COL.bone;
       ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
-      ctx.fillText(line, AX, dialY);
+      ctx.fillText(line, AX, dialY, AW);
     }
 
     /* F3 hitbox debug */

@@ -1336,6 +1336,46 @@
     }
     return f >= (n - 1) * 72 + 84;
   };
+  /* Judgement Cut (WotG's JudgementCut: shape and timing only). Straight light
+     lines cross the arena at spread angles, JC.lines[L] of them, each drawn as
+     a CalamitousRend telegraph (G.rend, phase 'tele'). Line k appears
+     JC.stagger f after line 0; its own 30 f telegraph then turns the same
+     segment into a slash for 30 f (the rift band, no darts). Volley 2 (phase 2+)
+     comes 96 f after the first. Line 0 of a volley runs through the soul where
+     it stood at the volley's start. Dodge: a gap between the lines. */
+  var JC = { lines: [6, 7, 8, 9, 10], stagger: [3, 3, 3, 3, 2] };
+  /* line k of volley v through (cx, cy), angle spread over pi by n lines */
+  function jcLine(k, n, v, sx, sy) {
+    var W = A.AW, H = A.AH, cx = sx, cy = sy, u, w, a, ca, sa, L2 = Math.hypot(W, H);
+    if (k) {
+      u = k * 0.618 + 0.1 * v; w = k * 0.382 + 0.37 * v;
+      cx = A.AX + W * (0.12 + 0.76 * (u - Math.floor(u)));
+      cy = A.AY + H * (0.12 + 0.76 * (w - Math.floor(w)));
+    }
+    a = 0.2 + 0.4 * v + k * Math.PI / n;
+    ca = Math.cos(a); sa = Math.sin(a);
+    return { x1: cx - ca * L2, y1: cy - sa * L2, x2: cx + ca * L2, y2: cy + sa * L2,
+             cx: cx, cy: cy, ang: a, t: 0, phase: 'tele', jc: 1 };
+  }
+  ATK.JudgementCut = function (st) {
+    var L = Math.min(G.lvl, 4), n = JC.lines[L], s = JC.stagger[L], vols = G.lvl >= 2 ? 2 : 1, f = st.f, v, d, k;
+    move(A.AX + A.AW / 2, A.AY + A.AH * 0.2, 0.05);
+    if (f === 0) A.anim('casting');
+    v = (f / 96) | 0; d = f - 96 * v;
+    if (v < vols && d % s === 0 && d / s < n) {
+      k = d / s;
+      if (k === 0) { st.p.x = A.px; st.p.y = A.py; }
+      G.rend.push(jcLine(k, n, v, st.p.x, st.p.y));
+    }
+    return f >= 96 * (vols - 1) + s * (n - 1) + 61;
+  };
+  /* a Judgement Cut lands: its beat, at most three a second (20 f apart) */
+  function jcHit() {
+    if (G.fr - (G.jcHit || -99) < 20) return;
+    G.jcHit = G.fr;
+    A.sfx('giga-hit'); A.shake('medium');
+  }
+
   /* the cuts' clock, once per step: telegraph, then rift, then gone */
   function rendTick() {
     var i, r, u, p, sa, ca;
@@ -1347,11 +1387,11 @@
         if ((r.t === 16 || r.t === 24) && NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
         if (r.t >= 30) {
           r.phase = 'rift'; r.t = 0;
-          A.sfx('giga-hit'); A.shake('medium');
+          if (r.jc) jcHit(); else { A.sfx('giga-hit'); A.shake('medium'); }
         }
         continue;
       }
-      if (r.t % 4 === 0) {
+      if (r.t % 4 === 0 && !r.jc) {
         u = (RNG() - 0.5) * Math.hypot(A.AW, A.AH) * 0.8;
         p = { x: r.cx + Math.cos(r.ang) * u, y: r.cy + Math.sin(r.ang) * u };
         sa = Math.sin(r.ang); ca = Math.cos(r.ang);
@@ -1932,6 +1972,53 @@
   /* the spin's beam sweeps while hellblasts cross it; both at half cadence */
   ATK.ComboLaserHell = combo('FireLaserSpin', 'HellblastBarrage');
 
+  /* PortalLaserbeams (WotG's PerpendicularPortalLaserbeams: shape and timing
+     only). Each dash cycle: her reposition dash to a third of the arena, then
+     portals open along the dash path PORTAL.every[L] f apart, and each fires a
+     beam perpendicular to the dash from its edge. Beams are telegraphed for the
+     attack's tele, then live for beamLife f. Dodge: stand between two beams. */
+  var PORTAL = { count: [3, 4, 5, 5, 6], every: [18, 15, 12, 12, 10], beamLife: [40, 44, 48, 48, 52],
+                 bothWays: [0, 0, 1, 1, 1], dashes: [1, 2, 2, 2, 3] };
+  var PORTAL_DASH = 12;   /* f of the reposition dash itself */
+  /* her dash to a third of the arena at her hover height. The path is
+     telegraphed as a warn line from where she stands, then she slides along it
+     in PORTAL_DASH f, leaving afterimages. p keeps the path for the portals. */
+  function repositionDash(p, c, lf) {
+    var TL = TIMING.PortalLaserbeams.tele;
+    if (lf === 0) {
+      p.x0 = A.bx; p.y0 = A.by;
+      p.x1 = hx(A.AX + A.AW * (c % 2 ? 1 / 6 : 5 / 6)); p.y1 = hy(A.by);
+      p.ang = Math.atan2(p.y1 - p.y0, p.x1 - p.x0);
+      warn({ x: p.x0, y: p.y0, a: p.ang, len: Math.hypot(p.x1 - p.x0, p.y1 - p.y0), w: 2, life: TL });
+    }
+    if (lf >= TL && lf < TL + PORTAL_DASH) {
+      var u = (lf - TL + 1) / PORTAL_DASH;
+      A.setBoss(p.x0 + (p.x1 - p.x0) * u, p.y0 + (p.y1 - p.y0) * u);
+      if ((lf - TL) % 2 === 0) G.after.push({ x: A.bx, y: A.by, at: G.fr });
+    }
+  }
+  ATK.PortalLaserbeams = function (st) {
+    var L = Math.min(G.lvl, 4), P = PORTAL, n = P.count[L], every = P.every[L], life = P.beamLife[L];
+    var TL = TIMING.PortalLaserbeams.tele, PR = D(40), cyc = TL + PORTAL_DASH + (n - 1) * every + TL + life;
+    var c = Math.floor(st.f / cyc), lf = st.f - c * cyc, p = st.p, k, i, j, px, py, a, dirs;
+    repositionDash(p, c, lf);
+    /* portal i opens once the dash is done, every[L] f after the one before */
+    k = lf - TL - PORTAL_DASH;
+    if (k >= 0 && k % every === 0 && k / every < n) {
+      i = k / every;
+      px = p.x0 + (p.x1 - p.x0) * (i + 1) / (n + 1);
+      py = p.y0 + (p.y1 - p.y0) * (i + 1) / (n + 1);
+      warn({ x: px, y: py, r: PR, w: 2, life: TL });
+      a = p.ang + Math.PI / 2;
+      dirs = P.bothWays[L] ? [a, a + Math.PI] : [i % 2 ? a + Math.PI : a];
+      for (j = 0; j < dirs.length; j++) {
+        G.lasers.push({ x: px + Math.cos(dirs[j]) * PR, y: py + Math.sin(dirs[j]) * PR, a: dirs[j],
+                        len: beamLen(), at: G.fr + TL, end: G.fr + TL + life });
+      }
+    }
+    return st.f + 1 >= P.dashes[L] * cyc;
+  };
+
   /* ── the cycles (SupremeCalamitas.cs:188-241, in source order) ──────── */
   /* The pools, one per phase (phase 3 and 4 share the third). Each attack is
      one entry, and each pool holds BrimstoneLightning, so every phase has it
@@ -1949,12 +2036,12 @@
     ['CondemnationFanBurst', 'ShadowDemon_ReleaseExplodingShadowBlasts', 'HellblastBarrage', 'BrimstoneJewelBeam',
      'ExplosiveCharges', 'HorizontalDarkSoulRelease', 'SummonSuicideBomberDemons', 'BrimstoneLightning',
      'ConvergingSkulls', 'EyeLockBeams', 'ArcingEyeStarbursts', 'ComboEyeHex', 'BrimstoneRain', 'PredictiveCharge', 'GravityOfRuin',
-     'FireblastVolley', 'SkullWave', 'DartWallRain', 'FlamePillars', 'GravityBoneRush', 'BrimstoneWalls'],
+     'FireblastVolley', 'SkullWave', 'DartWallRain', 'FlamePillars', 'GravityBoneRush', 'BrimstoneWalls', 'JudgementCut', 'PortalLaserbeams'],
     ['ShadowDemon_ShadowGigablastsAndCharges', 'FireLaserSpin', 'DarkMagicBombWalls', 'CondemnationFanBurst',
      'BrimstoneJewelBeam', 'ExplosiveCharges', 'BecomeBerserk', 'BrimstoneLightning', 'GigablastCross',
      'PredictiveCharge', 'CalamitousRend', 'DarknessLightSlashes', 'ComboSkullRain', 'ComboEyeHex', 'ComboLaserHell',
      'FireLaserSpinClassic', 'BombBulletHell', 'RapidTeleports', 'HellblastBarrage', 'ShadowDemon_ReleaseExplodingShadowBlasts',
-     'GravityOfRuin', 'GravityBoneRush', 'FireblastVolley', 'SkullWave', 'BrimstoneWalls', 'TwinCharge']
+     'GravityOfRuin', 'GravityBoneRush', 'FireblastVolley', 'SkullWave', 'BrimstoneWalls', 'TwinCharge', 'JudgementCut', 'PortalLaserbeams']
   ];
   /* SelectNextAttack after BecomeBerserk: one of these three, uniformly */
   var BERSERK_PICK = ['CondemnationFanBurst', 'ExplosiveCharges', 'HellblastBarrage'];
@@ -1978,6 +2065,7 @@
     FlamePillars: { tele: 30 }, GravityBoneRush: { tele: 30 }, ShadowDemon_ShadowGigablastsAndCharges: { tele: 30 },
     FireLaserSpin: { tele: 30 }, DarkMagicBombWalls: { tele: 30 }, GigablastCross: { tele: 24 },
     CalamitousRend: { tele: 30, big: 1 }, DarknessLightSlashes: { tele: 30 }, ComboLaserHell: { tele: 30, big: 1 },
+    JudgementCut: { tele: 30, big: 1 }, PortalLaserbeams: { tele: 30 },
     FireLaserSpinClassic: { tele: 30 }, BombBulletHell: { tele: 30, big: 1 }, RapidTeleports: { tele: 24 },
     BecomeBerserk: { tele: 30 }, SummonShadowDemon: { tele: 30 }, SummonBrothers: { tele: 30 },
     SummonSeekers: { tele: 30 }, SummonSepulcher: { tele: 30 }, PhaseTransition: { tele: 30 }, DesperationPhase: { tele: 30 }
