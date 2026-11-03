@@ -144,6 +144,13 @@
     var back = returnTo;
     returnTo = null;
     if (back && back.focus && document.contains(back)) back.focus();
+    /* The shop paused the engine (rooms-d.js calls c.leave() before open).
+       Bring it back now, so closing the board (Esc or the quit button)
+       resumes the room instead of leaving a dead game behind. */
+    if (NEU.engine && !NEU.engine.running) {
+      var w = NEU.engine.where ? NEU.engine.where() : null;
+      if (w && w.room) NEU.engine.enter(w.room, w.spawn);
+    }
   }
 
   /* Tab stays on the board. This is a CAPTURE listener that stops the press,
@@ -168,7 +175,7 @@
   /* keyboard */
   addEventListener('keydown', function (e) {
     if (wrap.hidden || !active) return;
-    if (e.key === 'Escape') { close(); e.preventDefault(); return; }
+    if (e.key === 'Escape') { close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
       sel = (sel - 1 + STOCK.length) % STOCK.length; render(); e.preventDefault(); return;
     }
@@ -180,7 +187,7 @@
 
   /* quit button */
   var quitBtn = document.getElementById('shopQuit');
-  if (quitBtn) quitBtn.addEventListener('click', close);
+  if (quitBtn) quitBtn.addEventListener('click', function (e) { if (e) { e.preventDefault(); e.stopPropagation(); } close(); });
 
   NEU.shop = {
     open: open, close: close,

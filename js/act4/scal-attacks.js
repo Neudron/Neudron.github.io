@@ -2177,6 +2177,16 @@
      i-frames, dash). */
   function hurtCheck() {
     var b = G.beam, i, k, s, bo, r, h = A.AY + A.AH - 7 - A.py;
+    /* Arena Shrink: the playable box is the only safe ground. Standing
+       outside it drains HP until death (i-frames gate the pace). */
+    A.box = null;
+    if (G.box && cur && (cur.name === 'ArenaShrinkFlameWalls' ||
+        (cur.name === 'DesperationPhase' && G.desp && G.desp.stage === 'final'))) {
+      var bx_ = G.box;
+      var inside = (A.px >= bx_.x + 4 && A.px <= bx_.x + bx_.w - 4 &&
+                    A.py >= bx_.y + 4 && A.py <= bx_.y + bx_.h - 4);
+      if (!inside) { A.hit(); A.box = bx_; }
+    }
     for (i = 0; i < G.bones.length; i++) {
       bo = G.bones[i];
       if (G.fr < bo.at) continue;

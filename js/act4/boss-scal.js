@@ -1493,6 +1493,10 @@
     ctx.globalAlpha = 1;
     rect(PL.rim, AX, AY, AW, AH, 3);
     rect(PL.hi, AX, AY, AW, AH, 1);
+    if (NEU.scal && (ob = NEU.scal.box)) {
+      ctx.globalAlpha = 0.45+0.4*Math.sin(t*9); ctx.strokeStyle = '#FF1E12'; ctx.lineWidth = 3;
+      ctx.strokeRect(ob.x, ob.y, ob.w, ob.h); ctx.globalAlpha = 1;
+    }
   }
 
   /* Frame mapping from the mod source (SupremeCalamitas.cs): the
