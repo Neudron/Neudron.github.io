@@ -234,10 +234,11 @@
         if (F.gn >= 256) { F.grad = {}; F.gn = 0; }
         gr = F.grad[gk] = ctx.createLinearGradient(w.x, w.y, ex, ey); F.gn++;
         gr.addColorStop(0, 'rgba(' + rampRGB(tq) + ',' + ((0.3 + 0.7 * tq) * fq).toFixed(2) + ')');
-        gr.addColorStop(1, 'rgba(' + rampRGB(tq) + ',0)');
+        gr.addColorStop(1, 'rgba(' + rampRGB(tq) + ',' + (0.5 * fq).toFixed(2) + ')');
       }
       ctx.strokeStyle = gr || 'rgba(' + c + ',' + (t * fade).toFixed(2) + ')';
-      ctx.lineWidth = Math.max(1, (w.w || 2) * t * 2);
+      /* ponytail: min 2 px, not scaled by the ramp floor; a thinner tele would vanish on the red wash */
+      ctx.lineWidth = Math.max(2, (w.w || 2) * t * 3);
       ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(ex, ey); ctx.stroke();
     }
     for (wk = 0, wn = 0; wk < F.mine.length; wk++) {
@@ -1014,7 +1015,9 @@
     return st.f > 270 && A.specialDone('worm');
   };
   ATK.SummonBrothers = function (st) {
-    if (st.f === 0) A.special('brothers');
+    /* ponytail: the ring marks the summon the frame it spawns; a lead-in
+       before the spawn breaks fixes45/47/51 (brothers up within 2 frames). */
+    if (st.f === 0) { warn({ x: A.bx, y: A.by, r: 50, w: 2, life: 24 }); A.special('brothers'); }
     return st.f > 0 && A.specialDone('brothers');
   };
   ATK.SummonSeekers = function (st) {
@@ -1177,6 +1180,12 @@
       do { st.p.safe = (RNG() * (L - w + 1)) | 0; } while (s0 !== undefined && Math.abs(st.p.safe - s0) < 2);
       G.lanes = { s: st.p.safe, n: w, at: G.fr, life: 80 };
       cue('chime');
+    }
+    if (c >= 8 && (c - 8) % cad === 0) {
+      for (i = 0; i < L; i++) {
+        if (i >= st.p.safe && i < st.p.safe + w) continue;
+        warn({ x: A.AX + (i + 0.5) * lw, y: A.AY, a: Math.PI / 2, len: A.AH, w: 2, life: 24 });
+      }
     }
     if (c >= 32 && (c - 32) % cad === 0) {
       for (i = 0; i < L; i++) {
