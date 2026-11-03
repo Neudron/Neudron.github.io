@@ -1871,16 +1871,9 @@
       tag: function () { return 'FREE'; },
       why: function () { return rageMode ? 'BURNING' : Math.floor(rage * 100) + '% FULL'; } }
   ];
-  function arrowName(e) {
-    var k = e.key;
-    if (k === 'ArrowLeft') return 'left';
-    if (k === 'ArrowRight') return 'right';
-    if (k === 'ArrowUp') return 'up';
-    if (k === 'ArrowDown') return 'down';
-    /* Shift is focus: the shared mover reads keys.focus and slows the soul */
-    if (k === 'Shift') return 'focus';
-    return null;
-  }
+  /* the shared map (danmaku.js), as bullet and polt use it: arrows or wasd
+     move, Shift is focus. A moved key reaches here under its default name. */
+  var arrowName = dm.keyName;
   function useStrip(i) {
     var o = STRIP[i];
     if (!o.ok()) {
@@ -1908,9 +1901,9 @@
   }
   var stripShake = -1e9;
   function stripKey(e) {
-    var k = e.key;
-    if (k === 'ArrowUp' || k === 'ArrowLeft') stripSel = (stripSel + STRIP.length - 1) % STRIP.length;
-    else if (k === 'ArrowDown' || k === 'ArrowRight') stripSel = (stripSel + 1) % STRIP.length;
+    var k = e.key, d = arrowName(e);
+    if (d === 'up' || d === 'left') stripSel = (stripSel + STRIP.length - 1) % STRIP.length;
+    else if (d === 'down' || d === 'right') stripSel = (stripSel + 1) % STRIP.length;
     else if (k === 'z' || k === 'Z' || k === 'Enter') { useStrip(stripSel); return; }
     else if (k === 'x' || k === 'X' || k === 'c' || k === 'C') { stripOpen = false; return; }
     else return;
@@ -2014,7 +2007,7 @@
       }
     }
     ctx.textAlign = 'left'; ctx.fillStyle = COL.dim;
-    ctx.fillText('z use  ·  x back', bx + 24, fy + 64);
+    ctx.fillText(kn('z') + ' use  ·  ' + kn('x') + ' back', bx + 24, fy + 64);
     ctx.textAlign = 'right'; ctx.fillStyle = '#5A5668';
     ctx.fillText('graze bullets for TP', bx + bw - 24, fy + 64);
     ctx.textAlign = 'left';
@@ -2154,7 +2147,8 @@
     keysHint = keysEl;
     if (keysEl) {
       if (keysOrig === null) keysOrig = keysEl.innerHTML;
-      keysEl.innerHTML = 'arrows move &middot; ' + kn('z') + ' slash (tap) / fireball (hold) &middot; ' +
+      keysEl.innerHTML = 'arrows / ' + kn('w') + kn('a') + kn('s') + kn('d') + ' move &middot; ' +
+        kn('z') + ' slash (tap) / fireball (hold) &middot; ' +
         kn('x') + ' dash &middot; ' + kn('Shift') + ' focus &middot; ' + kn('c') + ' menu &middot; esc to leave';
     }
     layout();
