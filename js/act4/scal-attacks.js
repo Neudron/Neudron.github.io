@@ -546,6 +546,8 @@
     var f = st.f, L = G.lvl;
     move(A.AX + A.AW / 2, A.AY + A.AH * 0.15, 0.05);
     var cad = L >= 3 ? 16 : 20;
+    if (f >= 111 && f < 441 && (f - 111) % cad === 0)
+      warn({ x: A.px, y: A.py, r: 40, w: 2, life: 24 });
     if (f >= 135 && f < 465 && (f - 135) % cad === 0) {
       var n = L >= 3 ? 5 : 3, a0 = rnd(0, TAU);
       for (var k = 0; k < n; k++) {
@@ -1006,6 +1008,7 @@
   }
   ATK.SummonSepulcher = function (st) {
     /* the opening lead-in: she is quiet for 270 f (SupremeCalamitas.cs:341) */
+    if (st.f === 240) warn({ x: A.bx, y: A.by, r: 60, w: 2, life: 30 });
     if (st.f === 270) A.special('worm');
     if (st.f > 270) wormOrbit(st);
     return st.f > 270 && A.specialDone('worm');
@@ -1141,6 +1144,7 @@
     var f = st.f, cx = A.AX + A.AW / 2, cy = A.AY + A.AH / 2, cad = G.thin ? 12 : 6, k, r, q, x, y, ia;
     var arms = !G.thin && G.lvl >= 2 ? 3 : 2, dr = 110 + 10 * Math.min(G.lvl, 3);
     move(cx, cy, 0.06);
+    if (f === 0) warn({ x: cx, y: cy, r: 180, w: 2, life: 30 });
     if (f >= 30 && f < 210 && (f - 30) % cad === 0) {
       r = Math.max(40, 330 - (f - 30) * 1.6);
       for (k = 0; k < arms; k++) {
@@ -1826,6 +1830,7 @@
     }
     if (s < len - 60 && s % 18 === 0) {
       var sp = V(rnd(8, 17)), la = -Math.PI / 2 + rnd(-0.73, 0.73);
+      warn({ x: A.bx, y: A.by, a: la, w: 2, life: 24 });
       var b = A.shot(A.bx, A.by, Math.cos(la) * sp, Math.sin(la) * sp, 0, { tag: 'soul', fuse: 230 / 60 });
       if (b) { tracked(b); (p.ls = p.ls || []).push({ b: b, t: 0 }); }
     }
