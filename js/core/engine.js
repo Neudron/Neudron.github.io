@@ -1109,7 +1109,7 @@
       '<div style="display:flex;gap:16px;justify-content:center;margin:0 0 20px;">' +
         confirmOpt('yes') + confirmOpt('no') +
       '</div>' +
-      '<div style="font:14px monospace;color:#555;">Progress will be lost.</div></div>';
+      '<div style="font:16px monospace;color:#8A8598;">This run won\'t count. Your save is kept.</div></div>';
     document.body.appendChild(overlay);
     /* Focus moves INTO the prompt (C11) — onto the dialog itself, not a
        button. The highlight is the only selection: `sel` drives both the

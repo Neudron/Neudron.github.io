@@ -91,7 +91,7 @@
   --font-display: "Determination Sans", "Determination Mono", "Pixelify Sans", "Determination Sans Fallback", ui-monospace, monospace;
 
   --bounce: cubic-bezier(.34, 1.36, .64, 1);
-  --gutter: clamp(24px, 7vw, 120px);
+  --gutter: clamp(42px, 7vw, 120px);
 }
 
 /* the joke: a goth site with a light mode */
@@ -122,6 +122,7 @@ button { touch-action: manipulation; }
 [hidden] { display: none !important; }
 
 html { scroll-behavior: smooth; }
+html { overflow-x: clip; }
 
 body {
   margin: 0;
@@ -207,7 +208,7 @@ html { scrollbar-color: #3A3548 #14141C; scrollbar-width: thin; }
   transition: right .25s linear;
 }
 .boot__pct {
-  font-family: "VT323", monospace; font-size: 15px;
+  font-family: "VT323", monospace; font-size: 16px;
   color: var(--ghost); letter-spacing: .22em;
   -webkit-font-smoothing: antialiased;
 }
@@ -1213,6 +1214,7 @@ body.is-blackout::before {
   background: #000;
   transform-origin: 50% 50%;
 }
+@media (pointer: coarse) { .quiz__tv { padding-bottom: 200px; } }
 
 /* Deltarune's 640x480 split: a 2:1 stage over the dialog box, laid out in
    percentages of the 640x320 picture (x / 6.4, y / 3.2). */
@@ -1365,7 +1367,7 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 /* the answer keys mean nothing now; the go button says what does */
 .quiz.is-finale .bh__keys { visibility: hidden; }
 /* On a phone the line names keys there are none of, and the pad sits on it. */
-@media (pointer: coarse) { .quiz .bh__keys { display: none; } }
+@media (pointer: coarse) { .bh__keys { display: none; } }
 .quiz__end {
   position: absolute; z-index: 3; inset: 0; overflow: auto;
   display: grid; justify-items: center; align-content: center; gap: 8px;
@@ -1564,7 +1566,7 @@ html.rm .quiz__beam { animation: none; }
 .shop__row::before { content: "\2665"; color: var(--shop-heart); visibility: hidden; }
 .shop__row b { font: inherit; color: inherit; font-weight: 400; }
 .shop__p { justify-self: end; font: inherit; color: var(--shop-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.shop__q { grid-column: 2 / 4; display: none; font: 400 14px/1.35 var(--font); color: var(--shop-dim); }
+.shop__q { grid-column: 2 / 4; display: none; font: 400 16px/1.35 var(--font); color: var(--shop-dim); }
 .shop__row.is-sel { color: var(--shop-text); border-color: var(--shop-gold); background: rgba(228,196,106,.08); }
 .shop__row.is-sel::before { visibility: visible; }
 .shop__row.is-sel .shop__p { color: var(--shop-gold); }
@@ -1595,12 +1597,13 @@ html.rm .quiz__beam { animation: none; }
   .shop__say { font-size: 16px; }
   .shop__row { font-size: 16px; padding: 8px; }
   .shop__row b { overflow-wrap: anywhere; }
-  .shop__q { font-size: 13px; }
+  .shop__q { font-size: 16px; }
   .shop__keys { display: none; }
 }
 @media (max-width: 359px) {
   .shop__p { grid-column: 2; justify-self: start; }
 }
+@media (pointer: coarse) { .shop__win { max-height: calc(100dvh - 232px); } }
 
 /* ── the pot ──────────────────────────────────────────────────────
    A crafting grid is a spatial idea, so it is a real grid of real
@@ -2058,7 +2061,7 @@ html.rm .sword.is-burst::after { animation: none; display: none; }
   border-top: 1px solid var(--rule);
 }
 .sett__lbl { font: 400 16px/1.4 var(--font); color: var(--text); cursor: pointer; }
-.sett__lbl small { display: block; margin-top: 4px; color: var(--dim); }
+.sett__lbl small { display: block; margin-top: 4px; color: var(--dim); font-size: 16px; }
 .sett__sw {
   position: relative; flex: none;
   width: 52px; height: 30px; padding: 0;
@@ -2331,7 +2334,7 @@ html.rm .tpad__nub, html.rm .tpad__b { transition: none; }
    stays the same length and is cut instead of faded.                */
 body.is-portrait-fight::before {
   content: "turn your phone sideways for more room";
-  position: fixed; top: 12px; left: 50%;
+  position: fixed; top: 72px; left: 50%;
   transform: translateX(-50%);
   z-index: 95;
   pointer-events: none;

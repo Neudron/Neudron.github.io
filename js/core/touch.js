@@ -355,7 +355,7 @@
      put two competing targets on screen and cover the words. */
   function talking() {
     var t = document.getElementById('tbox');
-    return !!(t && !t.hidden);
+    return !!(t && !t.hidden) || !!document.querySelector('.rmnote');
   }
 
   function sync() {
@@ -388,7 +388,7 @@
       stick.hidden = !p.stick;
       pad.setAttribute('data-scene', p.id);
     }
-    pad.hidden = false;
+    if (pad.hidden) { pad.hidden = false; window.dispatchEvent(new Event('resize')); }
   }
 
   /* Poll. Scenes open and close from a dozen places and none of them
