@@ -578,6 +578,10 @@ body.is-scrolled .cue { opacity: 0; pointer-events: none; }
   transition: color .3s, transform .4s var(--bounce);
 }
 .links a:hover { color: var(--accent); transform: translateX(10px); }
+/* install button (D6) and the saveData boot, where scene.js never loads three (K4) */
+.install { font: 700 32px/1.5 var(--font-display); color: inherit; background: none; border: 0; padding: 0; cursor: pointer; transition: color .3s, transform .4s var(--bounce); }
+.install:hover { color: var(--accent); transform: translateX(10px); }
+html.is-lite .glass { display: none; }
 
 .colophon { color: var(--dim); font-size: 16px; margin: 0; }
 

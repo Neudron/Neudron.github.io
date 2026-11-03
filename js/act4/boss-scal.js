@@ -123,12 +123,17 @@
   function preloadSfx() {
     SFX = {};
     var names = ['hellblast', 'fireblast', 'fireblast-hit', 'giga', 'giga-hit', 'maelstrom'];
+    /* integrated LUFS per file (ffmpeg ebur128, 2026-11-03); each clip is
+       trimmed to TARGET so the voice sits at one loudness */
+    var LUFS = { hellblast: -21.4, fireblast: -22.2, 'fireblast-hit': -18.0,
+                 giga: -18.7, 'giga-hit': -16.8, maelstrom: -18.7 }, TARGET = -19;
     for (var n = 0; n < names.length; n++) {
       var pool = [];
       try {
         for (var i = 0; i < 4; i++) {
           var a = new Audio('audio/act4/' + names[n] + '.ogg');
-          a.preload = 'auto'; a.volume = 0.5;
+          a.preload = 'auto';
+          a.volume = Math.min(1, 0.5 * Math.pow(10, (TARGET - LUFS[names[n]]) / 20));
           pool.push(a);
         }
       } catch (e) { pool = []; }
@@ -1374,7 +1379,7 @@
     if (invuln || mode !== 'fight') return false;
     bossHP -= eff;
     dm.bossHit(F, bx, by, eff);
-    if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
+    if (NEU.sfx && NEU.sfx.hit) NEU.sfx.hit();
     /* Landing one is SMALL — it happens often, and shaking hard on
        every strike would drown out the phase transitions. */
     if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(bx, by, 7, COL.brimHi); }

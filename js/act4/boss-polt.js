@@ -321,7 +321,7 @@
     var dmg = dm.mul(F) * (vuln > 0 ? 2 : 1);
     bossHP -= dmg;
     dm.bossHit(F, bx, by, dmg);
-    if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
+    if (NEU.sfx && NEU.sfx.hit) NEU.sfx.hit();
     if (NEU.juice) { NEU.juice.hit('small', { dx: bx - px, dy: by - py }); NEU.juice.burst(bx, by, 7, COL.ectoHi); }
     if (bossHP <= 0 && sigDone) { win(); return; }
     /* the killing blow leaves him at 1 HP; the kill lands after the signature */

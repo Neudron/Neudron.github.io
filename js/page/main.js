@@ -570,3 +570,30 @@
     showBrokenLine();
   });
 })();
+
+/* ── install (D6) ───────────────────────────────────────────────
+   Chrome and Edge offer one beforeinstallprompt. Keep it and show the
+   footer button; hide it again once installed, or when already standalone. */
+(function install() {
+  var btn = document.getElementById('installBtn');
+  if (!btn) return;
+  var deferred = null;
+  function standalone() {
+    return !!((window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone);
+  }
+  function drop() { deferred = null; btn.hidden = true; }
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    if (standalone()) return;
+    deferred = e;
+    btn.hidden = false;
+  });
+  btn.addEventListener('click', function () {
+    if (!deferred) return;
+    var e = deferred;
+    e.prompt();
+    if (e.userChoice && e.userChoice.then) e.userChoice.then(drop, drop);
+    else drop();
+  });
+  window.addEventListener('appinstalled', drop);
+})();

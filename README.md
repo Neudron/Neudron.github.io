@@ -157,6 +157,20 @@ you cannot see. Clone it and you get the lot.
 | `memory/assets.md` | every sprite and sound, and where it came from |
 | `memory/build-notes.md` | the old 772-line README, kept whole |
 
+## Roadmap
+
+The public half. The private plan lives in `memory/` and stays there,
+because it names the parts of the site that are meant to be found.
+
+- **Real phones.** A walk through every page on Android Chrome and iOS
+  Safari, portrait and landscape, by hand.
+- **Field numbers.** Core Web Vitals from real visits once there are
+  enough of them; the lab numbers (LCP about 0.1–0.2 s, CLS 0) are not
+  the same thing.
+- **Upkeep.** A dependency review every three months: three.js, the test
+  tools and the deploy actions, one bump at a time, gate green after each.
+- **More work in the list** as it gets finished.
+
 ## Credit
 
 The sprites are Toby Fox's (Undertale, Deltarune) and the Calamity Mod team's,

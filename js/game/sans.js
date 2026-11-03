@@ -251,8 +251,9 @@
                  tSample.canPlayType('audio/ogg; codecs="vorbis"') !== '';
     tSample.src = canOgg ? 'audio/totem.ogg' : 'audio/totem.mp3';
     tSample.preload = 'auto';
-    tSample.volume = 0.40;        /* the real file is mastered loud — it is
-                                     a "you nearly died" cue, not a ui blip */
+    /* a "you nearly died" cue, deliberately 3 dB above the -19 LUFS target
+       (-16 LUFS; the file measures -10.7 LUFS, ebur128, 2026-11-03) */
+    tSample.volume = 0.5 * Math.pow(10, (-16 - -10.7) / 20);
     tSample.addEventListener('error', function () { tSampleOk = false; });
   } catch (e) { tSampleOk = false; }
 
@@ -473,8 +474,78 @@
     } catch (e) {}
   }
 
+  /* The boss-hit one-shot: three layers struck together. A square click
+     (the transient, 6 ms), a triangle that falls 180 -> 90 Hz (the body),
+     and a sine at 55 Hz that rings out (the tail). Peaks scale with w and
+     stay quiet at w = 1. ±5 % pitch on every layer so no two hits match.
+     A call within 50 ms of the last one is dropped, so a volley reads as
+     one hit. */
+  var lastHit = -1e9;
+  function voice(a, type, f0, f1, dur, peak) {
+    var t = a.currentTime, o = a.createOscillator(), g = a.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(t); o.stop(t + dur + 0.01);
+  }
+  function hit(w) {
+    if (hush()) return;
+    var now = Date.now();
+    if (now - lastHit < 50) return;
+    lastHit = now;
+    w = Math.max(0.01, Math.min(1, w === undefined ? 0.6 : w));
+    try {
+      var a = ctx(), j = 1 + (Math.random() * 0.1 - 0.05);
+      voice(a, 'square', 3000 * j, 0, 0.006, 0.06 * w);
+      voice(a, 'triangle', 180 * j, 90 * j, 0.06, 0.09 * w);
+      voice(a, 'sine', 55 * j, 0, 0.25, 0.06 * w);
+    } catch (e) {}
+  }
+
+  /* UI tones: hover is a short high sine, press a sine gliding down a
+     fifth. Quiet enough to sit under every menu sound. */
+  function ui(kind) {
+    if (hush()) return;
+    try {
+      var a = ctx();
+      if (kind === 'hover') voice(a, 'sine', 1320, 0, 0.025, 0.02);
+      else voice(a, 'sine', 880, 660, 0.045, 0.035);
+    } catch (e) {}
+  }
+
   NEU.sfx = { whoosh: whoosh, snap: snap, locked: locked, tick: tick,
-              rise: rise, stinger: stinger, heart: heart };
+              rise: rise, stinger: stinger, heart: heart, hit: hit, ui: ui };
+
+  /* ── UI tones (B11) ─────────────────────────────────────────────
+     One delegated listener per gesture, not one per button. A hover
+     plays once per element until the pointer or focus moves to another
+     one. Only the menu controls in UI_SEL make a sound. */
+  var UI_SEL = '.sett button, .shop__row, .shop__quit, #confirmExit button, .quiz__o, .bh__quit';
+  var lastUi = null;
+  function uiEl(e) {
+    var t = e.target;
+    if (!t || !t.closest) return null;
+    return t.closest(UI_SEL);
+  }
+  function uiHover(e) {
+    var el = uiEl(e);
+    if (!el || el === lastUi) return;
+    lastUi = el; NEU.sfx.ui('hover');
+  }
+  document.addEventListener('pointerover', function (e) {
+    if (!e.pointerType || e.pointerType === 'mouse') uiHover(e);
+  });
+  document.addEventListener('focusin', uiHover);
+  document.addEventListener('pointerdown', function (e) {
+    if (uiEl(e)) NEU.sfx.ui('press');
+  });
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && uiEl(e)) NEU.sfx.ui('press');
+  });
 
   /* ── the particles ──────────────────────────────────────────────
      Drawn as integer-aligned fillRects, never circles — this page is

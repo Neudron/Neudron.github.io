@@ -13,10 +13,19 @@
    winding order and turns every face inside out.
    ═══════════════════════════════════════════════════════════════════ */
 
-import * as THREE from 'three';
-import { SVGLoader }          from 'three/addons/loaders/SVGLoader.js';
-import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { RoomEnvironment }    from 'three/addons/environments/RoomEnvironment.js';
+const lite = !!(navigator.connection && navigator.connection.saveData);
+/* ponytail: parked module. The await never resolves, so nothing below runs
+   and three.js is never fetched; fireReady releases the boot screen now. */
+const park = () => { window.NEU && window.NEU.fireReady && window.NEU.fireReady(); return new Promise(() => {}); };
+if (lite) { document.documentElement.classList.add('is-lite'); await park(); }
+/* fetched together (a static import did the same); a CDN that is down or
+   blocked leaves the hero without its cube, quietly, as it always did */
+let mods;
+try {
+  mods = await Promise.all([import('three'), import('three/addons/loaders/SVGLoader.js'),
+    import('three/addons/geometries/RoundedBoxGeometry.js'), import('three/addons/environments/RoomEnvironment.js')]);
+} catch (e) { await park(); }
+const [THREE, { SVGLoader }, { RoundedBoxGeometry }, { RoomEnvironment }] = mods;
 
 const PATHS = {"palatino": "M0.024 0.388 0.031 0.368 0.063 0.389C0.102 0.414 0.103 0.414 0.11 0.414C0.121 0.414 0.128 0.404 0.128 0.389C0.128 0.337 0.087 0.146 0.046 0.002L0.053 -0.009C0.078 -0.002 0.101 0.004 0.123 0.008C0.142 0.134 0.163 0.199 0.209 0.269C0.264 0.352 0.338 0.414 0.383 0.414C0.394 0.414 0.4 0.406 0.4 0.39C0.4 0.371 0.397 0.352 0.389 0.319L0.337 0.107C0.328 0.069 0.324 0.047 0.324 0.031C0.324 0.006 0.335 -0.009 0.354 -0.009C0.379 -0.009 0.418 0.014 0.514 0.085L0.504 0.103L0.478 0.086C0.448 0.066 0.427 0.056 0.417 0.056C0.41 0.056 0.404 0.065 0.404 0.076C0.404 0.082 0.405 0.091 0.406 0.096L0.472 0.372C0.479 0.402 0.483 0.428 0.483 0.446C0.483 0.469 0.472 0.482 0.452 0.482C0.41 0.482 0.341 0.444 0.282 0.389C0.244 0.354 0.216 0.32 0.164 0.247L0.202 0.408C0.206 0.427 0.208 0.438 0.208 0.449C0.208 0.471 0.2 0.482 0.185 0.482C0.164 0.482 0.126 0.461 0.052 0.408Z M0.884 0.111 0.86 0.094C0.807 0.056 0.759 0.036 0.723 0.036C0.675 0.036 0.647 0.073 0.647 0.134C0.647 0.16 0.649 0.185 0.655 0.214L0.737 0.234C0.754 0.238 0.781 0.248 0.806 0.259C0.89 0.296 0.93 0.342 0.93 0.404C0.93 0.451 0.897 0.482 0.846 0.482C0.781 0.482 0.67 0.413 0.631 0.349C0.601 0.299 0.571 0.181 0.571 0.113C0.571 0.036 0.614 -0.011 0.686 -0.011C0.744 -0.011 0.798 0.016 0.892 0.092ZM0.669 0.274C0.686 0.343 0.706 0.386 0.735 0.412C0.753 0.428 0.784 0.44 0.808 0.44C0.837 0.44 0.856 0.42 0.856 0.389C0.856 0.344 0.821 0.297 0.769 0.272C0.741 0.259 0.703 0.246 0.66 0.237Z M1.278 0.097C1.271 0.072 1.267 0.047 1.267 0.031C1.267 0.006 1.278 -0.009 1.297 -0.009C1.322 -0.009 1.361 0.013 1.457 0.085L1.447 0.103L1.421 0.086C1.396 0.07 1.372 0.059 1.36 0.059C1.352 0.059 1.347 0.066 1.347 0.076C1.347 0.084 1.348 0.094 1.352 0.11L1.353 0.116C1.376 0.227 1.407 0.357 1.437 0.473L1.43 0.482L1.362 0.465L1.352 0.414C1.337 0.336 1.312 0.268 1.281 0.221C1.221 0.129 1.145 0.059 1.104 0.059C1.095 0.059 1.091 0.068 1.091 0.085C1.091 0.1 1.092 0.111 1.098 0.137L1.155 0.408C1.158 0.424 1.16 0.438 1.16 0.451C1.16 0.471 1.152 0.482 1.138 0.482C1.117 0.482 1.079 0.461 1.005 0.408L0.977 0.388L0.984 0.368L1.016 0.389C1.044 0.407 1.055 0.412 1.064 0.412C1.074 0.412 1.081 0.403 1.081 0.392C1.081 0.387 1.08 0.379 1.079 0.374L1.016 0.077C1.014 0.067 1.012 0.045 1.012 0.03C1.012 0.007 1.027 -0.011 1.047 -0.011C1.111 -0.011 1.231 0.101 1.315 0.239Z"};
 
