@@ -562,10 +562,10 @@
       c.flag('b2_seen', 1);
       say(c, ['the way east is a wall of three loose stones.',
               'each one has a word. one of them is the word.',
-              'read the riddle. press z on the stone you believe.',
+              'read the riddle. press ' + (NEU.keys ? NEU.keys.label('z') : 'z') + ' on the stone you believe.',
               'then push the two lane stones onto the plates above them.',
               'the loose block is a decoy. do not push it into a corner.',
-              'press r if you make a mess of it. the room does not mind.']);
+              'press ' + (NEU.keys ? NEU.keys.label('r') : 'r') + ' if you make a mess of it. the room does not mind.']);
     },
     onReset: function () { b2picked = ''; resetHint('b2_blocks'); },
     onSolved: function (c) {

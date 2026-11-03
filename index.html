@@ -144,7 +144,7 @@
      far end is already aiming.</p>
   <p>Twenty seconds. That's the whole ask.</p>
   <p><button class="btn" id="bhStart">step in</button></p>
-  <p class="panel__note">arrows or wasd &middot; x to dash &middot; shift to focus &middot;
+  <p class="panel__note">arrows or <kbd data-k="w,a,s,d">wasd</kbd> &middot; <kbd data-k="x">x</kbd> to dash &middot; <kbd data-k="Shift">shift</kbd> to focus &middot;
      three hits and you're out</p>
 
   <!-- Only when you are actually carrying it. The blue blaster in
@@ -167,7 +167,7 @@
   <canvas id="bhCanvas"></canvas>
   <div class="bh__msg" id="bhMsg" hidden></div>
   <button class="bh__quit" id="bhQuit">esc</button>
-  <p class="bh__keys">arrows / wasd &middot; x dash &middot; shift focus &middot; survive 20s</p>
+  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &middot; <kbd data-k="x">x</kbd> dash &middot; <kbd data-k="Shift">shift</kbd> focus &middot; survive 20s</p>
 </div>
 <!-- The HP is drawn on the canvas, which a screen reader cannot read.
      This line carries the same number as text, and only the bullet-hell
@@ -209,7 +209,7 @@
 <div class="dk" id="dk" hidden>
   <canvas id="dkCanvas"></canvas>
   <button class="bh__quit" id="dkQuit">esc</button>
-  <p class="bh__keys">arrows / wasd &nbsp;&middot;&nbsp; z to interact</p>
+  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> to interact</p>
 </div>
 
 <!-- ═══ tenna ══════════════════════════════════════════════════════
@@ -243,7 +243,7 @@
   </div>
   <canvas class="quiz__fx" id="quizFx" aria-hidden="true"></canvas>
   <button class="bh__quit" id="quizQuit">esc</button>
-  <p class="bh__keys">a b c d &nbsp;&middot;&nbsp; or 1 2 3 4 &nbsp;&middot;&nbsp; z to answer &nbsp;&middot;&nbsp; esc to leave</p>
+  <p class="bh__keys">a b c d &nbsp;&middot;&nbsp; or 1 2 3 4 &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> to answer &nbsp;&middot;&nbsp; esc to leave</p>
 </div>
 
 <!-- ═══ through the crack ══════════════════════════════════════════ -->
@@ -251,7 +251,7 @@
   <canvas id="poltCanvas"></canvas>
   <div class="bh__msg" id="poltMsg" hidden></div>
   <button class="bh__quit" id="poltQuit">esc</button>
-  <p class="bh__keys">arrows / wasd &nbsp;&middot;&nbsp; z or enter to strike &nbsp;&middot;&nbsp; x to dash &nbsp;&middot;&nbsp; shift to focus</p>
+  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> or enter to strike &nbsp;&middot;&nbsp; <kbd data-k="x">x</kbd> to dash &nbsp;&middot;&nbsp; <kbd data-k="Shift">shift</kbd> to focus</p>
 </div>
 
 <!-- ═══ the argument ═══════════════════════════════════════════════ -->
@@ -259,7 +259,7 @@
   <canvas id="fnfCanvas"></canvas>
   <div class="fnf__msg" id="fnfMsg" role="status" hidden></div>
   <button class="bh__quit" id="fnfQuit">esc</button>
-  <p class="bh__keys">arrows / wasd &nbsp;&middot;&nbsp; hit them when they land</p>
+  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; hit them when they land</p>
 </div>
 
 <!-- ═══ the stall ═════════════════════════════════════════════════════ -->
@@ -296,7 +296,7 @@
 <div class="eng" id="eng" hidden>
   <canvas id="engCanvas"></canvas>
   <button class="bh__quit" id="engQuit">esc</button>
-  <p class="bh__keys">arrows / wasd &nbsp;&middot;&nbsp; z to interact &nbsp;&middot;&nbsp; esc to leave</p>
+  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> to interact &nbsp;&middot;&nbsp; esc to leave</p>
 </div>
 
 <!-- ═══ objectives ═════════════════════════════════════════════════ -->
@@ -335,7 +335,7 @@
     </div>
   </div>
 
-  <p class="bh__keys">&larr; &rarr; to browse &nbsp;&middot;&nbsp; z to play &nbsp;&middot;&nbsp; esc to put it down</p>
+  <p class="bh__keys">&larr; &rarr; to browse &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> to play &nbsp;&middot;&nbsp; esc to put it down</p>
   <button class="bh__quit" id="deckQuit">esc</button>
 </div>
 
@@ -511,6 +511,7 @@
      reports into them. -->
 <script src="js/core/quest.js"></script>
 <script src="js/core/save.js"></script>
+<script src="js/core/keys.js"></script>
 <script src="js/core/juice.js"></script>
 <script src="js/core/danmaku.js"></script>
 <script src="js/data/sheets.js"></script>

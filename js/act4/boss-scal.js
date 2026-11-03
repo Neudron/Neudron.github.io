@@ -22,6 +22,7 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
+  function kn(d) { return NEU.keys ? NEU.keys.label(d) : d; }
 
   var wrap = document.getElementById('bh');          // reuses the room's canvas
   var cv   = document.getElementById('bhCanvas');
@@ -1432,7 +1433,7 @@
     if (!playing) {
       dying = 0;
       if (msg) { msg.hidden = false;
-        msg.innerHTML = '<b>she waits.</b><br>press Z to try again &middot; esc to leave'; }
+        msg.innerHTML = '<b>she waits.</b><br>press ' + kn('z').toUpperCase() + ' to try again &middot; esc to leave'; }
       return;
     }
     }
@@ -2153,7 +2154,8 @@
     keysHint = keysEl;
     if (keysEl) {
       if (keysOrig === null) keysOrig = keysEl.innerHTML;
-      keysEl.innerHTML = 'arrows move &middot; z slash (tap) / fireball (hold) &middot; x dash &middot; shift focus &middot; c menu &middot; esc to leave';
+      keysEl.innerHTML = 'arrows move &middot; ' + kn('z') + ' slash (tap) / fireball (hold) &middot; ' +
+        kn('x') + ' dash &middot; ' + kn('Shift') + ' focus &middot; ' + kn('c') + ' menu &middot; esc to leave';
     }
     layout();
     t = 0; hp = MAXHP; inv = 0; dropBullets(); keys = {}; booms = []; flashAt = -9;

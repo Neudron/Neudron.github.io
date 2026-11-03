@@ -446,7 +446,7 @@
     ctx.fillStyle = CYAN;
     ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('press Z', x, y);
+    ctx.fillText('press ' + (NEU.keys ? NEU.keys.label('z') : 'z').toUpperCase(), x, y);
     ctx.textAlign = 'left';
   }
 

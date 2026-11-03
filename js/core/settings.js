@@ -277,6 +277,49 @@
     apply(); refresh();
   }
 
+  /* One line per row from keys.js. A click asks for the next key; the
+     answer is a swap or a refusal, and the note says which. */
+  function drawKeys() {
+    var host = document.getElementById('settKeys');
+    if (!host || !NEU.keys) return;
+    host.textContent = '';
+    NEU.keys.rows().forEach(function (r) {
+      var line = document.createElement('div');
+      line.className = 'sett__row';
+      var l = document.createElement('span');
+      l.className = 'sett__lbl';
+      l.textContent = r.label;
+      line.appendChild(l);
+      if (r.fixed) {
+        var k = document.createElement('kbd');
+        k.textContent = r.key;
+        line.appendChild(k);
+      } else {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'sett__key';
+        b.textContent = r.key;
+        b.addEventListener('click', function () {
+          var note = document.getElementById('settKeyNote');
+          b.textContent = 'press a key…';
+          NEU.keys.capture(function (k) {
+            if (k !== null) {
+              var res = NEU.keys.set(r.def, k);
+              var other = res.swapped && NEU.keys.rows().filter(function (x) {
+                return x.def === res.swapped;
+              })[0];
+              note.textContent = !res.ok ? res.why :
+                other ? 'swapped with ' + other.label + '.' : '';
+            }
+            drawKeys();
+          });
+        });
+        line.appendChild(b);
+      }
+      host.appendChild(line);
+    });
+  }
+
   function build() {
     panel = document.createElement('div');
     panel.className = 'sett';
@@ -372,6 +415,29 @@
       if (NEU.touch) NEU.touch.set(on ? 'on' : 'off');
     }));
 
+    /* Rebind here. Rows come from keys.js, so a verb the player has not
+       met stays ??? until it is revealed. */
+    if (NEU.keys) {
+      section(box, 'controls');
+      var kh = document.createElement('div');
+      kh.id = 'settKeys';
+      box.appendChild(kh);
+      var kn = document.createElement('p');
+      kn.className = 'sett__note';
+      kn.id = 'settKeyNote';
+      kn.setAttribute('aria-live', 'polite');
+      box.appendChild(kn);
+      var kr = document.createElement('button');
+      kr.type = 'button'; kr.className = 'sett__act'; kr.id = 'settKeysReset';
+      kr.textContent = 'reset controls';
+      kr.addEventListener('click', function () {
+        NEU.keys.reset();
+        kn.textContent = 'controls back to default.';
+        drawKeys();
+      });
+      box.appendChild(kr);
+    }
+
     var foot = document.createElement('div');
     foot.className = 'sett__foot';
     var calm = document.createElement('button');
@@ -465,6 +531,7 @@
     open_ = true;
     returnTo = document.activeElement;
     refresh();
+    drawKeys();
     panel.hidden = false;
     /* Settings opens over live rooms too — remember whether the room
        owned is-playing so close() hands it back instead of stealing it. */

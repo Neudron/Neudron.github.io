@@ -911,6 +911,12 @@
     ctx.fillStyle = OUT;
     if (touch) {
       ctx.fillRect(x + 2 * u, y + 4 * u, u, u); ctx.fillRect(x + 4 * u, y + 4 * u, u, u); ctx.fillRect(x + 6 * u, y + 4 * u, u, u);
+    } else if (NEU.keys && NEU.keys.get('z') !== 'z') {
+      /* a moved key draws its own letter; the bitmap stays for the default */
+      ctx.font = '16px "Determination Mono",monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(NEU.keys.label('z').toUpperCase(), Math.round(x + w / 2), Math.round(y + h / 2 - u));
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     } else {
       for (var r = 0; r < 5; r++) for (var c = 0; c < 3; c++)
         if (GLYPH_Z[r][c] === '1') ctx.fillRect(x + (3 + c) * u, y + (1 + r) * u, u, u);
