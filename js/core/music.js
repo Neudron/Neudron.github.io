@@ -267,6 +267,9 @@
     return tr.root + tr.scale[((deg % L) + L) % L] + 12 * oct;
   }
 
+  /* Every note is a fresh oscillator and gain. Once it has stopped, cut both
+     out of the layer they were summed into, or each note leaves one more
+     input behind on that layer for the rest of the track. */
   function tone(dest, wave, f, t, dur, peak, detune) {
     try {
       var o = actx.createOscillator(), g = actx.createGain();
@@ -277,10 +280,12 @@
       g.gain.exponentialRampToValueAtTime(peak, t + 0.014);
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       o.connect(g); g.connect(dest);
+      o.onended = function () { try { o.disconnect(); g.disconnect(); } catch (e) {} };
       o.start(t); o.stop(t + dur + 0.03);
     } catch (e) {}
   }
 
+  /* Same rule as tone(): a hit's nodes are cut out when its source ends. */
   function drum(dest, kind, t, gain) {
     try {
       /*jitter noise pitch so hits don't stack.*/
@@ -292,6 +297,7 @@
         g.gain.setValueAtTime(gain, t);
         g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
         o.connect(g); g.connect(dest);
+        o.onended = function () { try { o.disconnect(); g.disconnect(); } catch (e) {} };
         o.start(t); o.stop(t + 0.17);
         return;
       }
@@ -305,6 +311,7 @@
       ng.gain.setValueAtTime(gain * (kind === 's' ? 0.9 : 0.34), t);
       ng.gain.exponentialRampToValueAtTime(0.0001, t + len);
       s.connect(f); f.connect(ng); ng.connect(dest);
+      s.onended = function () { try { s.disconnect(); f.disconnect(); ng.disconnect(); } catch (e) {} };
       s.start(t); s.stop(t + len + 0.02);
     } catch (e) {}
   }

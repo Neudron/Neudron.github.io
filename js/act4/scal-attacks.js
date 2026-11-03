@@ -197,7 +197,7 @@
   /* drawn first in draw(): the blackout, then the ramped warnings, then the
      tracked bullets' bloom and 6-tap afterimages (offset -v * i * 0.56 f) */
   function drawFx(ctx) {
-    var F = G.fx, i, w, t, fade, op = ctx.globalCompositeOperation, L = beamLen(), c, s, m, sp, rot, n;
+    var F = G.fx, i, w, t, fade, op = ctx.globalCompositeOperation, L = beamLen(), c, s, m, sp, rot, n, wk, wn;
     if (!F) return;
     F.dark += (F.darkTo - F.dark) * 0.08;
     if (F.dark > 0.01) {
@@ -206,7 +206,10 @@
     }
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
-    F.warn = F.warn.filter(function (o) { return G.fr - o.at < o.life; });
+    /* compacted in place: the same survivors in the same order as filter(),
+       with no new array every frame */
+    for (wk = 0, wn = 0; wk < F.warn.length; wk++) if (G.fr - F.warn[wk].at < F.warn[wk].life) F.warn[wn++] = F.warn[wk];
+    F.warn.length = wn;
     for (i = 0; i < F.warn.length; i++) {
       w = F.warn[i];
       t = clamp((G.fr - w.at) / Math.max(1, w.life), 0, 1);
@@ -226,7 +229,7 @@
       var ex = w.x + Math.cos(w.a) * (w.len || L), ey = w.y + Math.sin(w.a) * (w.len || L);
       /* the gradient depends only on the line and its quantised ramp, so it is
          built once per (line, 1/16 step) and reused, not made per line per frame */
-      var tq = Math.round(t * 16) / 16, fq = Math.round(fade * 16) / 16, gk = [w.x, w.y, ex, ey, tq, fq].join(), gr = F.grad[gk];
+      var tq = Math.round(t * 16) / 16, fq = Math.round(fade * 16) / 16, gk = w.x + ',' + w.y + ',' + ex + ',' + ey + ',' + tq + ',' + fq, gr = F.grad[gk];
       if (!gr && ctx.createLinearGradient) {
         if (F.gn >= 256) { F.grad = {}; F.gn = 0; }
         gr = F.grad[gk] = ctx.createLinearGradient(w.x, w.y, ex, ey); F.gn++;
@@ -237,9 +240,11 @@
       ctx.lineWidth = Math.max(1, (w.w || 2) * t * 2);
       ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(ex, ey); ctx.stroke();
     }
-    F.mine = F.mine.filter(function (b) {
-      return b.fuse > 0 && b.x > A.AX - 40 && b.x < A.AX + A.AW + 40 && b.y > A.AY - 40 && b.y < A.AY + A.AH + 40;
-    });
+    for (wk = 0, wn = 0; wk < F.mine.length; wk++) {
+      m = F.mine[wk];
+      if (m.fuse > 0 && m.x > A.AX - 40 && m.x < A.AX + A.AW + 40 && m.y > A.AY - 40 && m.y < A.AY + A.AH + 40) F.mine[wn++] = m;
+    }
+    F.mine.length = wn;
     if (F.mine.length > 240) F.mine.splice(0, F.mine.length - 240);
     /* LOD: past 80 mines the afterimages go (the bloom stays); otherwise 3 at most */
     n = F.mine.length > 80 ? 0 : (rm() ? 2 : 3);
@@ -1649,10 +1654,11 @@
       if (p.w) { p.w.x = A.bx; p.w.y = A.by; if (p.t - f > 6) p.w.a = aim(); }
       return false;
     }
-    if (f === p.t) { p.a = p.w ? p.w.a : aim(); A.willCharge(false); A.anim('charging'); kick('small'); A.sfx('fireblast'); }
+    /* p.ang, not p.a: st.p.a / st.p.b are a combo's sub-states (combo(), drawEyes), and a number there crashed every drawn frame */
+    if (f === p.t) { p.ang = p.w ? p.w.a : aim(); A.willCharge(false); A.anim('charging'); kick('small'); A.sfx('fireblast'); }
     var k = f - p.t;
     if (k < 33) {
-      A.setBoss(hx(A.bx + Math.cos(p.a) * 7), hy(A.by + Math.sin(p.a) * 7));
+      A.setBoss(hx(A.bx + Math.cos(p.ang) * 7), hy(A.by + Math.sin(p.ang) * 7));
       if (k % 4 === 0) G.after.push({ x: A.bx, y: A.by, at: G.fr });
       if (Math.hypot(A.px - A.bx, A.py - A.by) < 26) A.hit();
       return false;
@@ -2033,6 +2039,11 @@
       G.hexes = []; G.after = []; G.lanes = null; G.box = null; G.thin = false;
       if (G.fx) { G.fx.warn = []; G.fx.mine = []; G.fx.loud = false; }
     }
+    /* every attack starts with nothing owning the screen: a beam or a
+       blackout left by an attack that was cut short (a gate, a force, a
+       death) must not carry into the next one */
+    G.beam = null;
+    if (G.fx) { G.fx.loud = false; G.fx.darkTo = 0; }
     /* a blue section cut short (a gate, a force) does not leak into the
        next: the soul goes red and its bones, lava and ceiling go with it */
     if (NEU.scalSoul && (NEU.scalSoul.platforms || (NEU.scalSoul.mode && NEU.scalSoul.mode() === 'blue'))) {
@@ -2108,20 +2119,25 @@
     }
   }
 
+  /* same survivors in the same order as .filter(), without a new array and
+     closure every 60 Hz step */
+  function keepLive(list, fr) { for (var i = 0, n = 0; i < list.length; i++) if (fr - list[i].at < list[i].life) list[n++] = list[i]; list.length = n; }
+  function keepBefore(list, fr) { for (var i = 0, n = 0; i < list.length; i++) if (fr < list[i].end) list[n++] = list[i]; list.length = n; }
+  function keepYoung(list, fr, age) { for (var i = 0, n = 0; i < list.length; i++) if (fr - list[i].at < age) list[n++] = list[i]; list.length = n; }
   function step() {
     G.fr++;
     var due = [], keep = [], i, fr = G.fr;
     for (i = 0; i < G.ev.length; i++) (G.ev[i].f <= fr ? due : keep).push(G.ev[i]);
     G.ev = keep;
-    G.tele = G.tele.filter(function (t) { return fr - t.at < t.life; });
-    G.hexes = G.hexes.filter(function (h) { return fr - h.at < h.life; });
-    G.after = G.after.filter(function (a) { return fr - a.at < 24; });
-    G.bolts = G.bolts.filter(function (b) { return fr < b.end; });
-    G.lasers = G.lasers.filter(function (l) { return fr < l.end; });
+    keepLive(G.tele, fr);
+    keepLive(G.hexes, fr);
+    keepYoung(G.after, fr, 24);
+    keepBefore(G.bolts, fr);
+    keepBefore(G.lasers, fr);
     if (G.lanes && fr - G.lanes.at >= G.lanes.life) G.lanes = null;
-    G.bones = G.bones.filter(function (b) { return fr < b.end; });
+    keepBefore(G.bones, fr);
     for (i = 0; i < G.bones.length; i++) if (fr >= G.bones[i].at) G.bones[i].x = G.bones[i].x0 + G.bones[i].vx * (fr - G.bones[i].at) / 60;
-    G.lava = G.lava.filter(function (l) { return fr < l.end; });
+    keepBefore(G.lava, fr);
     if (G.ceil && fr >= G.ceil.end) G.ceil = null;
     for (i = 0; i < due.length; i++) due[i].fn();
     rendTick();
@@ -2251,21 +2267,24 @@
       var i, t, L = beamLen();
       /* lines and the beam stop at the forcefield */
       ctx.save();
-      ctx.beginPath(); ctx.rect(A.AX, A.AY, A.AW, A.AH); ctx.clip();
-      drawFx(ctx);
-      /* DemonicTelegraphLine.PreDraw: Color.Red, width lerp(0.3, 3) over
-         a 0-1-0 bump, opacity three times the bump, capped at 1 */
-      for (i = 0; i < G.tele.length; i++) {
-        t = G.tele[i];
-        var k = Math.sin(Math.PI * (G.fr - t.at) / t.life), c = Math.cos(t.a), sn = Math.sin(t.a);
-        line(ctx, t.x - c * L, t.y - sn * L, t.x + c * L, t.y + sn * L,
-             'rgba(255,0,0,' + Math.min(1, k * 3).toFixed(2) + ')', Math.max(1, Math.round(lerp(0.3, 3, k))));
-      }
-      if (G.beam) beam(ctx, G.beam);
-      drawNew(ctx);
-      drawEyes(ctx);
-      drawSparks(ctx);
-      ctx.restore();
+      /* a throw between save and restore used to leave the arena clip on the
+         context for the rest of the fight (the TwinCharge crash) */
+      try {
+        ctx.beginPath(); ctx.rect(A.AX, A.AY, A.AW, A.AH); ctx.clip();
+        drawFx(ctx);
+        /* DemonicTelegraphLine.PreDraw: Color.Red, width lerp(0.3, 3) over
+           a 0-1-0 bump, opacity three times the bump, capped at 1 */
+        for (i = 0; i < G.tele.length; i++) {
+          t = G.tele[i];
+          var k = Math.sin(Math.PI * (G.fr - t.at) / t.life), c = Math.cos(t.a), sn = Math.sin(t.a);
+          line(ctx, t.x - c * L, t.y - sn * L, t.x + c * L, t.y + sn * L,
+               'rgba(255,0,0,' + Math.min(1, k * 3).toFixed(2) + ')', Math.max(1, Math.round(lerp(0.3, 3, k))));
+        }
+        if (G.beam) beam(ctx, G.beam);
+        drawNew(ctx);
+        drawEyes(ctx);
+        drawSparks(ctx);
+      } finally { ctx.restore(); }
     }
   };
 
@@ -2279,6 +2298,19 @@
     line(ctx, x0, y0, x1, y1, 'rgba(255,70,36,' + (0.5 * k).toFixed(2) + ')', core * 2.6);
     line(ctx, x0, y0, x1, y1, 'rgba(255,190,140,' + (0.85 * k).toFixed(2) + ')', core * 1.2);
     line(ctx, x0, y0, x1, y1, 'rgba(255,255,255,' + (0.9 * k).toFixed(2) + ')', Math.max(1, core * 0.45));
+  }
+  /* glowLine over a whole bolt, layer by layer: four strokeStyle sets per
+     bolt, not four per segment. Every layer is added ('lighter'), so the
+     order cannot change a pixel; each segment stays its own stroke (one
+     path would lose the bright joints). */
+  function glowSegs(ctx, segs, k, core) {
+    var cols = ['rgba(150,16,24,' + (0.35 * k).toFixed(2) + ')', 'rgba(255,70,36,' + (0.5 * k).toFixed(2) + ')',
+                'rgba(255,190,140,' + (0.85 * k).toFixed(2) + ')', 'rgba(255,255,255,' + (0.9 * k).toFixed(2) + ')'];
+    var ws = [core * 5, core * 2.6, core * 1.2, Math.max(1, core * 0.45)], l, j, sg;
+    for (l = 0; l < 4; l++) {
+      ctx.strokeStyle = cols[l]; ctx.lineWidth = ws[l];
+      for (j = 0; j < segs.length; j++) { sg = segs[j]; ctx.beginPath(); ctx.moveTo(sg.x0, sg.y0); ctx.lineTo(sg.x1, sg.y1); ctx.stroke(); }
+    }
   }
   function glowAt(ctx, x, y, r, col, a) {
     if (NEU.danmaku && NEU.danmaku.glow) NEU.danmaku.glow(ctx, x, y, r, col, a);
@@ -2337,18 +2369,16 @@
       bo = G.bolts[i];
       if (G.fr < bo.at) {
         k = 1 - (bo.at - G.fr) / 36;
+        var tcol = 'rgba(255,40,40,' + (0.25 + 0.5 * k).toFixed(2) + ')';
         for (j = 0; j < bo.segs.length; j++) {
           sg = bo.segs[j];
-          line(ctx, sg.x0, sg.y0, sg.x1, sg.y1, 'rgba(255,40,40,' + (0.25 + 0.5 * k).toFixed(2) + ')', 1);
+          line(ctx, sg.x0, sg.y0, sg.x1, sg.y1, tcol, 1);
         }
         continue;
       }
       k = Math.max(0, 1 - (G.fr - bo.at) / 15);
       ctx.globalCompositeOperation = 'lighter';
-      for (j = 0; j < bo.segs.length; j++) {
-        sg = bo.segs[j];
-        glowLine(ctx, sg.x0, sg.y0, sg.x1, sg.y1, 0.4 + 0.6 * k, 3);
-      }
+      glowSegs(ctx, bo.segs, 0.4 + 0.6 * k, 3);
       ctx.globalCompositeOperation = op;
       sg = bo.segs[bo.segs.length - 1];
       if (k > 0.5) glowAt(ctx, sg.x1, sg.y1, 26, '#FFD0A0', k);
@@ -2534,14 +2564,15 @@
   }
   /* the three EyeLock / ArcingEyeStarbursts eyes: each attack keeps them in
      its st.p.eyes; a combo keeps them on a sub-state (st.p.a / st.p.b).
+     Only a combo does that: any other attack's p.a / p.b is skipped.
      Shut until their open time, then a socket that heats up; hot through
      the lock beam, dark again after. Red palette only, additive core. */
   function drawEyes(ctx) {
     if (!cur) return;
     var s = cur.st, sets = [], i, k, e, t, op;
     if (s.p.eyes) sets.push(s.p.eyes);
-    if (s.p.a && s.p.a.p.eyes) sets.push(s.p.a.p.eyes);
-    if (s.p.b && s.p.b.p.eyes) sets.push(s.p.b.p.eyes);
+    if (s.p.a && s.p.a.p && s.p.a.p.eyes) sets.push(s.p.a.p.eyes);
+    if (s.p.b && s.p.b.p && s.p.b.p.eyes) sets.push(s.p.b.p.eyes);
     if (!sets.length) return;
     op = ctx.globalCompositeOperation;
     for (i = 0; i < sets.length; i++) for (k = 0; k < sets[i].length; k++) {

@@ -757,17 +757,27 @@
 
   /* lights: [{x, y, r, col, a, glow}] in WORLD units. */
   /* The lightmap only changes when the camera, the lights or the darkness
-     do. lightKey is that whole input; a matching key reuses lcv as it is. */
-  var lightKey = null;
+     do. lightIn keeps those inputs as of the last rebuild, as numbers in a
+     flat array: comparing them each frame builds no strings. */
+  var lightIn = [], lightInN = -1;
+  /* true when the inputs match lightIn; otherwise stores them and says no */
+  function lightSame(w, h, ambient, night, camX, camY, S, lights) {
+    var p = lightIn, n = 7 + lights.length * 4, i, j, L;
+    var same = lightInN === n && p[0] === w && p[1] === h && p[2] === ambient && p[3] === night &&
+               p[4] === camX && p[5] === camY && p[6] === S;
+    for (i = 0, j = 7; same && i < lights.length; i++, j += 4) { L = lights[i]; same = p[j] === L.x && p[j + 1] === L.y && p[j + 2] === L.r && p[j + 3] === L.a; }
+    if (same) return true;
+    p[0] = w; p[1] = h; p[2] = ambient; p[3] = night; p[4] = camX; p[5] = camY; p[6] = S;
+    for (i = 0, j = 7; i < lights.length; i++, j += 4) { L = lights[i]; p[j] = L.x; p[j + 1] = L.y; p[j + 2] = L.r; p[j + 3] = L.a; }
+    p.length = n; lightInN = n;
+    return false;
+  }
   function drawLight(ctx, w, h, ambient, night, lights, camX, camY, S) {
     if (ambient >= 0.999 && !lights.length) return;
     var g = lightCanvas(w, h);
     if (!g) return;
     var W = lcv.width, H = lcv.height;
-    var key = [w, h, ambient, night, camX, camY, S].join('|');
-    for (var q = 0; q < lights.length; q++) key += '|' + lights[q].x + ',' + lights[q].y + ',' + lights[q].r + ',' + lights[q].a;
-    if (key !== lightKey) {
-      lightKey = key;
+    if (!lightSame(w, h, ambient, night, camX, camY, S, lights)) {
       g.globalCompositeOperation = 'source-over';
       g.clearRect(0, 0, W, H);
       g.fillStyle = rgba(night, Math.max(0, Math.min(1, 1 - ambient)));

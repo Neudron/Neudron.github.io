@@ -417,17 +417,19 @@
     return Math.max(0, Math.min(1, 1 - g / (3 * TILE)));
   }
 
+  /* The four steps off an exit cell. Module scope because exitSide runs
+     for every door on every frame; it only reads this table. */
+  var EXIT_D = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
   /* 'n' | 's' | 'e' | 'w': the side of the exit cell that faces walkable
      floor. When several do, the one pointing most toward the room's
      interior; when none does, toward the interior anyway. */
   function exitSide(e) {
     if (!room) return 's';
-    var D = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
     var ccx = room.w / 2 - 0.5, ccy = room.h / 2 - 0.5;
     var vx_ = ccx - e.x, vy_ = ccy - e.y, best = null, bs = -Infinity, any = null, as = -Infinity;
-    for (var k in D) {
-      var nx = e.x + D[k][0], ny = e.y + D[k][1];
-      var score = D[k][0] * vx_ + D[k][1] * vy_;
+    for (var k in EXIT_D) {
+      var nx = e.x + EXIT_D[k][0], ny = e.y + EXIT_D[k][1];
+      var score = EXIT_D[k][0] * vx_ + EXIT_D[k][1] * vy_;
       if (score > as) { as = score; any = k; }
       if (nx < 0 || ny < 0 || ny >= room.h || nx >= room.grid[ny].length) continue;
       if (solidAt(nx, ny)) continue;
@@ -845,6 +847,21 @@
     return { S: S, sx: 0, sy: 0, now: now, api: API, room: room, entHere: entHere };
   }
 
+  /* Floors that paint every pixel of the room opaque (the look modules'
+     room paints). They are drawn right after the baked layer and the
+     animated tiles and hide both, so neither is drawn under them. */
+  var OPAQUE_FLOOR = { woodsfloor: 1, castlefloor: 1, scalfloor: 1, cityfloor: 1, prizefloor: 1 };
+  function floorHidesLayer(K) {
+    if (!K) return false;
+    for (var i = 0; i < ents.length; i++) {
+      var e = ents[i];
+      if (e.dead || !OPAQUE_FLOOR[e.t]) continue;
+      var k = K.get(e);
+      if (k && k.floor && k.draw) return true;
+    }
+    return false;
+  }
+
   function draw(now) {
     var w = innerWidth, h = innerHeight;
     ctx.fillStyle = '#050507'; ctx.fillRect(0, 0, w, h);
@@ -862,11 +879,16 @@
 
     var layer = layers[room.id];
     if (layer && L) {
-      var smooth = ctx.imageSmoothingEnabled;
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(layer, -ox, -oy, layer.width * S, layer.height * S);
-      ctx.imageSmoothingEnabled = smooth;
-      L.drawAnimated(ctx, room, tilesets[room.tileset], room.tileset, camSX, camSY, S, now, v);
+      /* PERF: the floor pass below paints over the whole room, so when a
+         floor does, this layer and its tiles would be painted under it
+         and never seen. Skip them. */
+      if (!floorHidesLayer(K)) {
+        var smooth = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(layer, -ox, -oy, layer.width * S, layer.height * S);
+        ctx.imageSmoothingEnabled = smooth;
+        L.drawAnimated(ctx, room, tilesets[room.tileset], room.tileset, camSX, camSY, S, now, v);
+      }
     } else drawFlat(camSX, camSY, v);
 
     var d = drawCtx(now);

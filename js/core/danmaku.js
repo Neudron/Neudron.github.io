@@ -26,11 +26,14 @@
   function stamp(ctx, rows, cx, cy, s, on, off) {
     var h = rows.length, w = rows[0].length;
     var x0 = (cx - w * s / 2) | 0, y0 = (cy - h * s / 2) | 0;
+    /* One colour for the whole sprite unless an off colour can change a
+       cell. Same pixels as before, with fewer fillStyle writes. */
+    if (!off) ctx.fillStyle = on;
     for (var r = 0; r < h; r++) {
       for (var c = 0; c < w; c++) {
         var ch = rows[r][c];
         if (ch === '.') continue;
-        ctx.fillStyle = (ch === 'o' && off) ? off : on;
+        if (off) ctx.fillStyle = ch === 'o' ? off : on;
         ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
       }
     }
@@ -220,7 +223,7 @@
   /* o.dashCd: this fight's dash cooldown (default DASH_CD). swings and
      grazes are the view's event lists: melee arcs and graze points. */
   function fight(x, y, o) {
-    return { x: x, y: y, vy: 0, mode: 'red', modeT: 0, ground: false,
+    return { x: x, y: y, vy: 0, mode: 'red', modeT: 0, ground: false, focus: false,
              fx: 0, fy: -1, dvx: 0, dvy: 0, dashT: 0, dashI: 0, dashCd: 0,
              dashCdMax: (o && o.dashCd) || DASH_CD,
              trail: [], tapK: '', tapAt: -9, clock: 0,
@@ -245,7 +248,8 @@
     return true;
   }
 
-  /* Double-tap a direction to dash (Terraria's Shield of Cthulhu). */
+  /* Double-tap a direction to dash (Terraria's Shield of Cthulhu). Off now:
+     TAP is 0 and the dash is X only. Kept so an old caller cannot break. */
   function tap(F, k) {
     var dbl = F.tapK === k && F.clock - F.tapAt < NEU.danmaku.TAP;
     F.tapK = dbl ? '' : k; F.tapAt = F.clock;
@@ -263,7 +267,9 @@
     if (F.dashCd > 0) F.dashCd -= dt;
     if (F.dashI > 0) F.dashI -= dt;
     if (F.modeT > 0) F.modeT -= dt;
-    var y0 = F.y, sp = NEU.danmaku.SPEED;
+    /* Shift held: the soul's slow, precise speed. The dash has its own. */
+    var y0 = F.y, sp = keys.focus ? NEU.danmaku.FOCUS : NEU.danmaku.SPEED;
+    F.focus = !!keys.focus;
     var up = keys.up || keys.jump;
     if (F.dashT > 0) {
       F.dashT -= dt;
@@ -315,16 +321,16 @@
     if (k === 'ArrowRight' || k === 'd' || k === 'D') return 'right';
     if (k === 'ArrowUp'    || k === 'w' || k === 'W') return 'up';
     if (k === 'ArrowDown'  || k === 's' || k === 'S') return 'down';
+    if (k === 'Shift') return 'focus';
     return null;
   }
-  /* The soul's keys: X dashes, an arrow double-tap dashes. Returns 'dash'
-     or '' (not ours). Adrenaline and rage fill and burn on their own;
-     they have no key. */
+  /* The soul's keys: X dashes, and only X. An arrow is for moving, so a
+     double-tap no longer dashes. Shift is a held key, read through keyName
+     as 'focus'. Returns 'dash' or '' (not ours). Adrenaline and rage fill
+     and burn on their own; they have no key. */
   function key(F, e) {
     var k = e.key;
     if (k === 'x' || k === 'X') { dash(F); return 'dash'; }
-    var d = keyName(e);
-    if (d && !e.repeat) tap(F, d);
     return '';
   }
 
@@ -420,6 +426,8 @@
        stray blue-white line stuck to the heart; it now lives in the HUD
        panel (hud, DASH). Nothing but the heart is drawn on the soul. */
     drawSoul(ctx, F.x, F.y, F.dashI > 0 ? 0 : inv, col);
+    /* focus (Shift) shows the true hitbox: three pixels of bone at the centre */
+    if (F.focus) { ctx.fillStyle = COL_BONE; ctx.fillRect((F.x - 1) | 0, (F.y - 1) | 0, 3, 3); }
     ctx.font = FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     for (var j = 0; j < F.pops.length; j++) {
       var p = F.pops[j], px = Math.round(p.x), py = Math.round(p.y);
@@ -557,7 +565,7 @@
     adrenaline: adrenaline, rage: rage, soulMode: soulMode,
     glow: glow, drawFX: drawFX, drawFlash: drawFlash, hud: hud,
     DASH_CD: DASH_CD, ADREN_ON: ADREN_ON,
-    TAP: 0.25,      /* double-tap window, s; 0 turns tap-dash off */
+    TAP: 0,      /* double-tap window, s; 0 = off: X is the only dash */
     soul: {
       draw: drawSoul,
       R: 3.2,
@@ -570,6 +578,7 @@
     death: death,
     resetDeath: resetDeath,
     IFRAMES: 1.1,
-    SPEED: 250
+    SPEED: 250,
+    FOCUS: 108    /* Shift held: the soul's slow, precise speed */
   };
 })();

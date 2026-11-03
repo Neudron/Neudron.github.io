@@ -1147,9 +1147,14 @@
       if (kstate === 'thrown') keyHit(fromX, fromY);
     }
 
-    kel.style.transform = 'translate3d(' + Math.round(kx) + 'px,' +
-                          Math.round(ky - scrollY) + 'px,0) translate(-50%,-50%) rotate(' +
-                          krot.toFixed(1) + 'deg)';
+    /* A resting key builds the same string every frame, and an assignment
+       costs even when it changes nothing, so write only when the string
+       moved. kel.__tf is the last string written here. Nothing else writes
+       the key's transform and kel is never re-created, so it cannot go stale. */
+    var kt = 'translate3d(' + Math.round(kx) + 'px,' +
+             Math.round(ky - scrollY) + 'px,0) translate(-50%,-50%) rotate(' +
+             krot.toFixed(1) + 'deg)';
+    if (kel.__tf !== kt) { kel.__tf = kt; kel.style.transform = kt; }
   }
 
   /* A hit only counts against a door you can actually see — doorScreenPos

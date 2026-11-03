@@ -755,32 +755,51 @@
       var room = roomOf(d);
       if (!room || !room.grid) return;
       var sa = typeof room.shade === 'function' ? room.shade(d.api) : room.shade;
-      if (sa > 0) A.drawShade(g, e, d, A.shadeFor(room, sa, lampsOf(room)));
+      /* PERF: the lamps are only read when the shade is first built, so they
+         are passed as a function, not gathered here every frame */
+      if (sa > 0) A.drawShade(g, e, d, A.shadeFor(room, sa, function () { return lampsOf(room); }));
       if (FX[room.id]) FX[room.id](g, e, d);
       if (!room.shafts) return;
       var c = fxCache[room.id];
       if (!c) {
         var cv = A.mkCanvas(room.w * T, room.h * T), gg = cv.getContext && cv.getContext('2d');
-        c = fxCache[room.id] = { cv: cv };
+        c = fxCache[room.id] = { cv: cv, box: null };
         if (gg) {
           var sh = room.shafts;
+          /* the bounds of every rect painted, for the blit box below */
+          var bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+          var grow = function (x, y, w, h) {
+            var lx = Math.min(x, x + w), ly = Math.min(y, y + h), hx = Math.max(x, x + w), hy = Math.max(y, y + h);
+            if (lx < bx0) bx0 = lx;
+            if (ly < by0) by0 = ly;
+            if (hx > bx1) bx1 = hx;
+            if (hy > by1) by1 = hy;
+          };
           for (var i = 0; i < sh.length; i++) {
             /* [tile x, length px, width px, slant, colour] from the north wall down */
             var bx = sh[i][0] * T + 8, len = sh[i][1], w = sh[i][2], sl = sh[i][3] || 0.3, col = sh[i][4] || '#BFD3FF';
             for (var s = 0; s < len; s += 2) {
               var k = s / len, cx = Math.round(bx + s * sl), y = T + 10 + s;
               gg.globalAlpha = 0.09 * (1 - k * 0.7);
-              gg.fillStyle = col; gg.fillRect(cx - (w >> 1), y, w, 2);
+              gg.fillStyle = col; gg.fillRect(cx - (w >> 1), y, w, 2); grow(cx - (w >> 1), y, w, 2);
               gg.globalAlpha = 0.06 * (1 - k);
-              gg.fillStyle = '#FFFFFF'; gg.fillRect(cx - (w >> 2), y, w >> 1, 2);
+              gg.fillStyle = '#FFFFFF'; gg.fillRect(cx - (w >> 2), y, w >> 1, 2); grow(cx - (w >> 2), y, w >> 1, 2);
             }
+          }
+          /* PERF: the shafts are a few thin rects in a canvas that is otherwise
+             clear, so the frame blits this rect only. Padded a px so a cut
+             edge lands on clear pixels. Null when nothing was painted. */
+          if (bx1 > bx0 && by1 > by0) {
+            var bxa = Math.max(0, Math.floor(bx0) - 1), bya = Math.max(0, Math.floor(by0) - 1);
+            var bxb = Math.min(cv.width, Math.ceil(bx1) + 1), byb = Math.min(cv.height, Math.ceil(by1) + 1);
+            if (bxb > bxa && byb > bya) c.box = { x: bxa, y: bya, w: bxb - bxa, h: byb - bya };
           }
         }
       }
       var S = d.S, ox = d.sx - (e.x + 0.5) * T * S, oy = d.sy - (e.y + 1) * T * S;
       var sm = g.imageSmoothingEnabled;
       g.imageSmoothingEnabled = false;
-      g.drawImage(c.cv, ox, oy, c.cv.width * S, c.cv.height * S);
+      if (c.box) g.drawImage(c.cv, c.box.x, c.box.y, c.box.w, c.box.h, ox + c.box.x * S, oy + c.box.y * S, c.box.w * S, c.box.h * S);
       g.imageSmoothingEnabled = sm;
     },
     width: function () { return 0; }

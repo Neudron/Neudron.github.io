@@ -59,6 +59,14 @@ function init() {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearAlpha(0);
 
+  /* Whether the picture can have changed since the last draw. Anything that
+     alters what the camera sees sets it, and tick() draws the glass only
+     when it is set or the pose has moved. Declared up here because paintEtch()
+     and resize() set it during init, and a let used before its declaration
+     throws. */
+  let dirty = true;
+  let lastRX = NaN, lastRY = NaN, lastPY = NaN, lastS = NaN;   // pose at the last draw
+
   const scene  = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
   camera.position.set(0, 0, 7.4);
@@ -147,6 +155,7 @@ function init() {
     ex.textBaseline = 'middle';
     ex.fillText('neu', 512, 512);
     if (etchTex) etchTex.needsUpdate = true;
+    dirty = true;
   }
 
   let etchTex = null;
@@ -268,6 +277,7 @@ function init() {
   }
   NEU.doorGlow = function (on) {
     holeMat.emissive.setHex(on ? 0x6b5010 : 0x241b06);
+    dirty = true;
   };
 
   /* Where the door is ON SCREEN, so sans.js can tell whether a thrown
@@ -299,6 +309,7 @@ function init() {
     glass.color.setRGB(on ? 0.16 : 0.06, on ? 0.16 : 0.06, on ? 0.19 : 0.075);
     markMat.color.setHex(on ? 0x1a1a24 : 0x0a0a10);
     if (STARS && STARS.setLit) STARS.setLit(on);
+    dirty = true;
   };
 
   /* ── interaction ──────────────────────────────────────────────────
@@ -380,6 +391,8 @@ function init() {
     camera.fov = w2 < 720 ? 44 : 32;
     fitCamera();
     fitBackdrop();
+    /* Resizing the canvas clears its drawing buffer, so it stays blank until the next draw. */
+    dirty = true;
   }
   addEventListener('resize', resize, { passive: true });
   resize();
@@ -392,7 +405,10 @@ function init() {
      body.is-playing): on software GL the frames it drew behind the
      quiz starved the arena's timer until the dodge round never ended. */
   let visible = !document.hidden;
-  document.addEventListener('visibilitychange', () => { visible = !document.hidden; });
+  document.addEventListener('visibilitychange', () => { visible = !document.hidden; if (visible) dirty = true; });
+  /* A restored WebGL context comes back with an empty canvas, and nothing else
+     would draw it until the cube moved. */
+  canvas.addEventListener('webglcontextrestored', () => { dirty = true; });
 
   const clock = new THREE.Clock();
 
@@ -410,6 +426,7 @@ function init() {
       starVersion = STARS.version;
       starUploadAt = performance.now();
       backdropTex.needsUpdate = true;
+      dirty = true;
     }
 
     if (reduce) {
@@ -446,6 +463,14 @@ function init() {
       }
     }
 
+    /* Render only when the picture can have changed: a WebGL canvas keeps
+       its last frame, and an idle cube used to redraw the most expensive
+       thing on the page every vsync. float32 is what the GPU gets, so an
+       unchanged fround is an unchanged frame. */
+    const rx = Math.fround(root.rotation.x), ry = Math.fround(root.rotation.y);
+    const ry0 = Math.fround(root.position.y), sc = Math.fround(root.scale.x);
+    if (!dirty && rx === lastRX && ry === lastRY && ry0 === lastPY && sc === lastS) return;
+    dirty = false; lastRX = rx; lastRY = ry; lastPY = ry0; lastS = sc;
     renderer.render(scene, camera);
   }
 

@@ -12,11 +12,11 @@
                        its beam and it charges what you carry
      3  the last six   a spiral, walls with one gap, blasters, aimed
 
-   Movement, dash (X or a double-tap), the HUD and the
+   Movement, dash (X), the HUD and the
    screen-reader line all come from danmaku.js, shared with the bosses.
    Bullets spawn OUTSIDE the box and are culled well beyond it, so
-   nothing ever pops into existence on top of you. There is no focus
-   key.                                                                */
+   nothing ever pops into existence on top of you. Shift focuses:
+   slower, and the true hitbox shows.                                  */
 
 (function () {
   'use strict';
@@ -738,6 +738,9 @@
     var n = dm.keyName(e);
     if (n) keys[n] = false;
   });
+  /* A key let go outside the tab never sends keyup, so a Shift released
+     there would leave the soul slow. Losing focus drops every held key. */
+  addEventListener('blur', function () { keys = {}; });
 
   /* ── endless ──────────────────────────────────────────────────────
      Launched from the console's library it has no cap: the phases loop,

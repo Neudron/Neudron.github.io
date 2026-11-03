@@ -178,9 +178,13 @@
      stepped bands. One canvas per room and level, one drawImage a frame;
      the engine's own light layer still adds the live glow on top. */
   var shades = {};
-  function shadeFor(room, alpha, lamps) {
+  /* `lampsArg` is the lamp array, or a function that gathers it. A function
+     is only called on a cache miss, so a caller that asks every frame does
+     not rebuild the lamp list every frame. */
+  function shadeFor(room, alpha, lampsArg) {
     var key = room.id + ':' + alpha.toFixed(2), c = shades[key];
     if (c) return c;
+    var lamps = typeof lampsArg === 'function' ? lampsArg() : lampsArg;
     var cv = mkCanvas(room.w * T, room.h * T), g = cv.getContext && cv.getContext('2d');
     shades[key] = cv;
     if (!g) return cv;
@@ -715,9 +719,18 @@
     var c = fxCache[room.id];
     if (c) return c;
     var cv = mkCanvas(room.w * T, room.h * T), g = cv.getContext && cv.getContext('2d');
-    c = fxCache[room.id] = { cv: cv, mist: null };
+    c = fxCache[room.id] = { cv: cv, mist: null, box: null };
     if (!g) return c;
-    var R = function (x, y, w, h, col) { g.fillStyle = col; g.fillRect(x, y, w, h); };
+    /* the bounds of every rect painted into cv, for the blit box below */
+    var bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+    var R = function (x, y, w, h, col) {
+      g.fillStyle = col; g.fillRect(x, y, w, h);
+      var lx = Math.min(x, x + w), ly = Math.min(y, y + h), hx = Math.max(x, x + w), hy = Math.max(y, y + h);
+      if (lx < bx0) bx0 = lx;
+      if (ly < by0) by0 = ly;
+      if (hx > bx1) bx1 = hx;
+      if (hy > by1) by1 = hy;
+    };
     var beams = room.beams || [];
     for (var i = 0; i < beams.length; i++) {
       var b = beams[i], bx = b[0] * T + 8, by = b[1] * T + 8, len = b[2] || 80, w = b[3] || 18;
@@ -731,6 +744,14 @@
       }
     }
     g.globalAlpha = 1;
+    /* PERF: the beams are a few thin shafts in a canvas that is otherwise
+       clear, so the frame blits this rect only. Padded a px so a cut edge
+       lands on clear pixels. Null when nothing was painted. */
+    if (bx1 > bx0 && by1 > by0) {
+      var x0 = Math.max(0, Math.floor(bx0) - 1), y0 = Math.max(0, Math.floor(by0) - 1);
+      var x1 = Math.min(cv.width, Math.ceil(bx1) + 1), y1 = Math.min(cv.height, Math.ceil(by1) + 1);
+      if (x1 > x0 && y1 > y0) c.box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    }
     /* a mist strip: soft stepped puffs, 128px wider than the room so a
        slow drift can be a source-rect offset (nothing drawn outside) */
     var mw = room.w * T + 128, mc = mkCanvas(mw, 16), mg = mc.getContext && mc.getContext('2d');
@@ -754,7 +775,9 @@
       var ox = d.sx - (e.x + 0.5) * T * S, oy = d.sy - (e.y + 1) * T * S;
       var sm = g.imageSmoothingEnabled;
       g.imageSmoothingEnabled = false;
-      g.drawImage(c.cv, ox, oy, c.cv.width * S, c.cv.height * S);
+      /* PERF: blit the beams' rect only. Every other pixel of cv is clear,
+         and a clear pixel draws nothing, so the frame is the same. */
+      if (c.box) g.drawImage(c.cv, c.box.x, c.box.y, c.box.w, c.box.h, ox + c.box.x * S, oy + c.box.y * S, c.box.w * S, c.box.h * S);
       if (c.mist && room.mist) {
         var rows = room.mist, rw = room.w * T;
         for (var i = 0; i < rows.length; i++) {

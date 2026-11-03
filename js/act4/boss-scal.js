@@ -469,6 +469,9 @@
     ctx.globalAlpha = 1; ctx.lineWidth = 1;
   }
 
+  /* the smoke's four fills, built once rather than per circle per frame */
+  var SMOKE = [];
+  for (var si = 1; si <= 4; si++) SMOKE[si] = 'rgba(30,6,8,' + (0.32 - si * 0.06).toFixed(2) + ')';
   /* Brimstone, hers: a dark core and a smoke trail behind the big ones */
   function smoke(b) {
     if (b.k !== 2 && b.k !== 3 && b.k !== 5) return;
@@ -476,7 +479,7 @@
     if (sp < 1) return;
     var ux = b.vx / sp, uy = b.vy / sp;
     for (var i = 1; i <= 4; i++) {
-      ctx.fillStyle = 'rgba(30,6,8,' + (0.32 - i * 0.06).toFixed(2) + ')';
+      ctx.fillStyle = SMOKE[i];
       ctx.beginPath(); ctx.arc(b.x - ux * i * b.r * 0.9, b.y - uy * i * b.r * 0.9, b.r * (0.8 + i * 0.15), 0, Math.PI * 2); ctx.fill();
     }
   }
@@ -545,12 +548,18 @@
     ctx.stroke();
     ctx.globalCompositeOperation = op; ctx.lineWidth = 1;
   }
+  /* the vignette's gradient is rebuilt only when its size or strength changes */
+  var vgGrad = null, vgKey = '';
   function drawVignette(w, h, lv) {
-    var r0 = Math.max(w, h) * (0.62 - lv * 0.07);
-    var g = ctx.createRadialGradient(w / 2, h / 2, r0 * 0.45, w / 2, h / 2, r0);
-    g.addColorStop(0, 'rgba(0,0,0,0)');
-    g.addColorStop(1, 'rgba(20,0,2,' + (0.45 + lv * 0.1).toFixed(2) + ')');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    var key = w + '|' + h + '|' + lv;
+    if (key !== vgKey) {
+      var r0 = Math.max(w, h) * (0.62 - lv * 0.07);
+      vgGrad = ctx.createRadialGradient(w / 2, h / 2, r0 * 0.45, w / 2, h / 2, r0);
+      vgGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      vgGrad.addColorStop(1, 'rgba(20,0,2,' + (0.45 + lv * 0.1).toFixed(2) + ')');
+      vgKey = key;
+    }
+    ctx.fillStyle = vgGrad; ctx.fillRect(0, 0, w, h);
   }
   function drawAura(lv) {
     if (!dm.glow) return;
@@ -644,6 +653,12 @@
     return b;
   }
 
+  /* Drop every bullet at once. Each fuse goes to 0 first: scal-attacks keeps
+     its own list of tracked bullets for their flares and lets one go only
+     when its fuse runs out, so a bullet dropped without that kept glowing,
+     frozen, for the rest of the phase. */
+  function dropBullets() { for (var i = 0; i < bullets.length; i++) bullets[i].fuse = 0; bullets = []; }
+
   var willCharge = false;
   var scalAnimState = 'idle', scalAnimFrame = 0, scalAnimTimer = 0, scalAnimPrevState = 'idle';
 
@@ -706,7 +721,7 @@
   var ringOn = false;
   function startSeekers() {
     if (!NEU.scalSeekers) return;         /* module absent: skip the phase */
-    ringOn = true; invuln = true; bullets = [];
+    ringOn = true; invuln = true; dropBullets();
     clearSched();
     bx = AX + AW / 2; by = AY + AH * 0.34;
     NEU.scalSeekers.spawn();
@@ -720,7 +735,7 @@
   /* the dev `skip` share this fight opened at (0 = a normal fight) */
   var skipFrac = 0;
   function startBrothers() {
-    mode = 'brothers'; invuln = true; bullets = [];
+    mode = 'brothers'; invuln = true; dropBullets();
     clearSched();
     bros = [
       { side: -1, x: broX('slash', -1), y: AY + AH / 2, hp: 90, t: 0, kind: 'slash', n: 0, dash: 0, dashTo: 0, enraged: false },
@@ -743,9 +758,25 @@
     lastDt = dt;
     /* Hit-stop: hold the frame, keep rendering. Skipping the render
        too would read as a dropped frame rather than a held one. */
-    if (NEU.juice && NEU.juice.frozen()) { draw(now); return; }
+    if (NEU.juice && NEU.juice.frozen()) { drawSafe(now); return; }
     update(dt);
-    draw(now);
+    drawSafe(now);
+  }
+  /* One bad frame must not end the fight. A draw that threw between a
+     save() and its restore() (TwinCharge, scal-attacks.js) left the arena
+     clip and the shake on this context for good: the HUD, her name and
+     the dialogue never drew again. Setting the width drops every saved
+     state; the view transform goes back on. */
+  var drawFailed = false;
+  function drawSafe(now) {
+    try { draw(now); }
+    catch (e) {
+      cv.width = cv.width;
+      var dpr = Math.min(devicePixelRatio || 1, 2);
+      ctx.setTransform(dpr * VS, 0, 0, dpr * VS, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      if (!drawFailed) { drawFailed = true; if (window.console && console.error) console.error(e); }
+    }
   }
 
   function update(dt) {
@@ -1383,7 +1414,7 @@
   }
 
   function win() {
-    mode = 'won'; running = false; bullets = []; stripOpen = false;
+    mode = 'won'; running = false; dropBullets(); stripOpen = false;
     /* the ring cannot outlive her: drop it so nothing ticks or draws
        into the victory lap */
     if (NEU.scalSeekers) NEU.scalSeekers.clear();
@@ -1471,6 +1502,63 @@
     rect(PL.hi, AX, AY, AW, AH, 1);
   }
 
+  /* Frame mapping from the mod source (SupremeCalamitas.cs): the
+     sheet is 21 rows x 2 columns and frame.Y = frameCounter(0-5) +
+     FrameType*6, so each FrameType is a 6-frame band that wraps
+     into column 1 when it crosses row 20. Bands:
+       0 UpwardDraft (idle)         — col 0 rows 0-5
+       1 FasterUpwardDraft (dash)   — col 0 rows 6-11
+       2 Casting                    — col 0 rows 12-17
+       3 BlastCast (gigablast)      — col 0 rows 18-20, col 1 rows 0-2
+       4 BlastPunchCast (P2 giga)   — col 1 rows 3-8
+       5 OutwardHandCast (hellblast)— col 1 rows 9-14
+       6 PunchHandCast (P2 hell)    — col 1 rows 15-20
+     The old mapping here was invented from the row count alone and
+     showed the wrong poses for every state. */
+  function getScalAnim() {
+    if (scalAnimState !== scalAnimPrevState) {
+      scalAnimTimer = 0;
+      scalAnimPrevState = scalAnimState;
+    }
+    /* Was a fixed 1/60 regardless of real frame time, so animation
+       speed silently drifted with the display's actual refresh rate
+       instead of following the simulation's own dt. */
+    scalAnimTimer += lastDt;
+    var st = scalAnimState;
+    if (st === 'gigablast' && phase === 2) st = 'gigablast_p2';
+    if (st === 'hellblast' && phase === 2) st = 'hellblast_p2';
+    var b = BANDS[st] || BANDS.idle;
+    var c = b.rev
+      ? 5 - Math.floor(scalAnimTimer * b.fps) % 6
+      : Math.floor(scalAnimTimer * b.fps) % 6;
+    var fy = b.t * 6 + c;             // frame.Y, 0-41
+    return { frame: fy % 21, col: (fy / 21) | 0 };
+  }
+  var BANDS = {
+    idle:            { t: 0, fps: 4 },
+    idle_fast:       { t: 1, fps: 6 },
+    /* SupremeCalamitas.cs: the whole charging state — telegraph
+       through dash — is one continuous FrameType.FasterUpwardDraft
+       (confirmed in-file), band 1, the same band the dash itself
+       uses. The telegraph used to sit on band 0 (idle), so the
+       wind-up before every dash showed her standing still — the
+       tracker's "melee attack sprites aren't used" for the half of
+       the charge a player actually has time to read. Same band as
+       `charging`, slower fps so the wind-up still reads as distinct
+       from the dash it leads into. */
+    charge_telegraph:{ t: 1, fps: 8 },
+    charging:        { t: 1, fps: 16 },
+    charge_recovery: { t: 1, fps: 8, rev: true },
+    casting:         { t: 2, fps: 10 },
+    gigablast:       { t: 3, fps: 10 },
+    gigablast_p2:    { t: 4, fps: 10 },
+    hellblast:       { t: 5, fps: 10 },
+    hellblast_p2:    { t: 6, fps: 10 }
+  };
+
+  /* the bar's phase ticks: one at each gate in damageTarget */
+  var HUD_TICKS = [0.75, 0.45, 0.25];
+
   function draw(now) {
     var w = VW, h = VH;
     ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, w, h);
@@ -1482,60 +1570,6 @@
     if (lv || PHASE_LOOK[ph].storm) drawStorm(w, h, lv + PHASE_LOOK[ph].storm);
     frame();
     if (lv) { ctx.fillStyle = 'rgba(120,18,0,' + (0.05 * lv).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH); }
-
-    /* Frame mapping from the mod source (SupremeCalamitas.cs): the
-       sheet is 21 rows x 2 columns and frame.Y = frameCounter(0-5) +
-       FrameType*6, so each FrameType is a 6-frame band that wraps
-       into column 1 when it crosses row 20. Bands:
-         0 UpwardDraft (idle)         — col 0 rows 0-5
-         1 FasterUpwardDraft (dash)   — col 0 rows 6-11
-         2 Casting                    — col 0 rows 12-17
-         3 BlastCast (gigablast)      — col 0 rows 18-20, col 1 rows 0-2
-         4 BlastPunchCast (P2 giga)   — col 1 rows 3-8
-         5 OutwardHandCast (hellblast)— col 1 rows 9-14
-         6 PunchHandCast (P2 hell)    — col 1 rows 15-20
-       The old mapping here was invented from the row count alone and
-       showed the wrong poses for every state. */
-    function getScalAnim() {
-      if (scalAnimState !== scalAnimPrevState) {
-        scalAnimTimer = 0;
-        scalAnimPrevState = scalAnimState;
-      }
-      /* Was a fixed 1/60 regardless of real frame time, so animation
-         speed silently drifted with the display's actual refresh rate
-         instead of following the simulation's own dt. */
-      scalAnimTimer += lastDt;
-      var st = scalAnimState;
-      if (st === 'gigablast' && phase === 2) st = 'gigablast_p2';
-      if (st === 'hellblast' && phase === 2) st = 'hellblast_p2';
-      var b = BANDS[st] || BANDS.idle;
-      var c = b.rev
-        ? 5 - Math.floor(scalAnimTimer * b.fps) % 6
-        : Math.floor(scalAnimTimer * b.fps) % 6;
-      var fy = b.t * 6 + c;             // frame.Y, 0-41
-      return { frame: fy % 21, col: (fy / 21) | 0 };
-    }
-    var BANDS = {
-      idle:            { t: 0, fps: 4 },
-      idle_fast:       { t: 1, fps: 6 },
-      /* SupremeCalamitas.cs: the whole charging state — telegraph
-         through dash — is one continuous FrameType.FasterUpwardDraft
-         (confirmed in-file), band 1, the same band the dash itself
-         uses. The telegraph used to sit on band 0 (idle), so the
-         wind-up before every dash showed her standing still — the
-         tracker's "melee attack sprites aren't used" for the half of
-         the charge a player actually has time to read. Same band as
-         `charging`, slower fps so the wind-up still reads as distinct
-         from the dash it leads into. */
-      charge_telegraph:{ t: 1, fps: 8 },
-      charging:        { t: 1, fps: 16 },
-      charge_recovery: { t: 1, fps: 8, rev: true },
-      casting:         { t: 2, fps: 10 },
-      gigablast:       { t: 3, fps: 10 },
-      gigablast_p2:    { t: 4, fps: 10 },
-      hellblast:       { t: 5, fps: 10 },
-      hellblast_p2:    { t: 6, fps: 10 }
-    };
 
     /* her */
     if (mode !== 'won') {
@@ -1565,7 +1599,9 @@
     }
 
     NEU.scalAtk.draw(ctx);
-    var gl = dm.glow ? glowCtx() : null;
+    /* No glows, no buffer work: the clear and the full blit used to run
+       every frame even when nothing glowed (adding clear pixels changed nothing). */
+    var gl = (dm.glow && (bullets.length || booms.length)) ? glowCtx() : null;
     if (gl) {
       for (var gi = 0; gi < bullets.length; gi++)
         dm.glow(gl, bullets[gi].x, bullets[gi].y, Math.max(10, bullets[gi].r * 3) | 0, glowCol(bullets[gi]), 0.55);
@@ -1738,7 +1774,7 @@
                      /* her Infernum title; a phone's 230 px bar holds only her name */
                      name: (w < 560 ? 'Calamitas' : 'Supreme Witch, Calamitas') + (invuln ? ' — shielded' : ''),
                      hp: bossHP, max: bossMax, invuln: invuln,
-                     ticks: [0.75, 0.45, 0.25],
+                     ticks: HUD_TICKS,
                      php: hp, pmax: MAXHP, phase: phase,
                      tp: tpShown, rage: rageShown, rageOn: rageMode > 0, AX: AX });
     /* the phase's frame round her bar (dm.hud's bar sits at y 36) */
@@ -1765,7 +1801,7 @@
     /* the key hint (#bhMsg) sits on the same line; it steps aside while
        she is talking so the two never print over each other */
     var talking = !!(line && now - lineT < 5200);
-    var kh = document.querySelector('#bh .bh__keys');
+    var kh = keysHint || (keysHint = document.querySelector('#bh .bh__keys'));
     if (kh && kh.__v !== talking) { kh.__v = talking; kh.style.visibility = talking ? 'hidden' : ''; }
     if (talking) {
       ctx.fillStyle = COL.bone;
@@ -1818,13 +1854,14 @@
   /* One blitter for the whole site, in data/sheets.js — see the note
      there. The local copy this replaces pinned source x at 0, which is
      why her two-column sheet drew as two overlapping women. */
+  /* one options object for every sprite: sheetDraw reads it before it
+     returns and keeps nothing, so the same object serves each call */
+  var SPR = { scale: 1, rot: 0, glow: false, col: 0, frame: 0, alpha: undefined, glowKeys: undefined, now: 0 };
   function sprite(key, x, y, scale, rot, glow, col, frame, alpha, glowKeys) {
     if (!NEU.sheetDraw) return false;
-    return NEU.sheetDraw(ctx, key, x, y, {
-      scale: scale, rot: rot, glow: glow, col: col, frame: frame,
-      alpha: alpha, glowKeys: glowKeys,
-      now: performance.now()
-    });
+    SPR.scale = scale; SPR.rot = rot; SPR.glow = glow; SPR.col = col; SPR.frame = frame;
+    SPR.alpha = alpha; SPR.glowKeys = glowKeys; SPR.now = performance.now();
+    return NEU.sheetDraw(ctx, key, x, y, SPR);
   }
   /* ── input ──────────────────────────────────────────────────────*/
   /* ── the C strip ───────────────────────────────────────────────
@@ -1870,6 +1907,8 @@
     if (k === 'ArrowRight') return 'right';
     if (k === 'ArrowUp') return 'up';
     if (k === 'ArrowDown') return 'down';
+    /* Shift is focus: the shared mover reads keys.focus and slows the soul */
+    if (k === 'Shift') return 'focus';
     return null;
   }
   function useStrip(i) {
@@ -2068,6 +2107,9 @@
     var d = arrowName(e); if (d) keys[d] = false;
     if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); release(); }
   });
+  /* A Shift (or arrow) let go outside the tab never sends its keyup, so the
+     soul stayed slow, or kept walking, until the next press. */
+  addEventListener('blur', function () { keys = {}; });
 
   /* ── the attack machine's hands (scal-attacks.js) ─────────────────
      Everything she does reaches the fight through this object. The getters
@@ -2079,8 +2121,8 @@
     get AX() { return AX; }, get AY() { return AY; },
     get AW() { return AW; }, get AH() { return AH; },
     shot: spawn,
-    clearAll: function () { bullets = []; },
-    clearTag: function (tag) { bullets = bullets.filter(function (b) { return b.tag !== tag; }); },
+    clearAll: function () { dropBullets(); },
+    clearTag: function (tag) { bullets = bullets.filter(function (b) { if (b.tag === tag) { b.fuse = 0; return false; } return true; }); },
     setBoss: function (x, y) { bx = x; by = y; },
     setHP: function (n) { bossHP = n; },
     level: function (n) { phase = n >= 2 ? 2 : 1; setPh(n); phaseFlash(); },
@@ -2123,7 +2165,13 @@
   /* ── open / close ───────────────────────────────────────────────*/
   var active = false;
   var keysOrig = null;
+  /* the hint row, looked up once per open: the draw loop used to query it every frame */
+  var keysHint = null;
   function open() {
+    /* a retry starts from a clean attack machine: the last attempt's beam,
+       warnings and flares must not draw through the intro. startLead()
+       builds the fresh one once the intro is over. */
+    NEU.scalAtk.reset();
     active = true;
     NEU.activeMinigame = 'scal';
     wrap.hidden = false;
@@ -2133,12 +2181,13 @@
     /* This wrapper's hint belongs to the bullet minigame ("survive 20s")
        and she shares the wrapper with it — say what this fight does. */
     var keysEl = document.querySelector('#bh .bh__keys');
+    keysHint = keysEl;
     if (keysEl) {
       if (keysOrig === null) keysOrig = keysEl.innerHTML;
-      keysEl.innerHTML = 'arrows move &middot; z slash (tap) / fireball (hold) &middot; x dash &middot; c menu &middot; esc to leave';
+      keysEl.innerHTML = 'arrows move &middot; z slash (tap) / fireball (hold) &middot; x dash &middot; shift focus &middot; c menu &middot; esc to leave';
     }
     layout();
-    t = 0; hp = MAXHP; inv = 0; bullets = []; keys = {}; booms = []; flashAt = -9;
+    t = 0; hp = MAXHP; inv = 0; dropBullets(); keys = {}; booms = []; flashAt = -9;
     shownInv = null; bannerTxt = ''; endPh(); setPh(0);
     rage = 0; tp = 0; shieldT = 0;
     rageMode = 0; rageModeT = 0;
@@ -2180,7 +2229,8 @@
                              target: function () { return { x: bx, y: by }; } });
       seekersReady = true;
     }
-    preloadSfx();
+    /* built once: every open() used to make 24 new Audio elements */
+    if (!SFX) preloadSfx();
     mode = 'intro';
     px = AX + AW / 2; py = AY + AH - 60;
     F = dm.fight(px, py, { dashCd: 0.8 });

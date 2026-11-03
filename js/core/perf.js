@@ -58,8 +58,16 @@
      random: the stutter, on a core pinned at 100%+. Rendering at most
      twice per 60 Hz step (8.33 ms, an integer divisor of 240/144)
      halves the work and puts the misses back on the even grid. A 60 Hz
-     panel clears PACE every frame and never notices. */
+     panel clears PACE every frame and never notices.
+
+     THE SLACK. rAF timestamps are coarsened to 0.1 ms, so some of the
+     8.33 ms gaps on a 120 Hz panel read 8.3, fall short of PACE by a
+     hair, and are skipped at random: the 60-120 fps stutter. One
+     millisecond of slack keeps a 120 Hz panel on every vsync and a
+     240 Hz one on every other one; 60, 144 and 165 Hz land where they
+     did. */
   var PACE = 1000 / 120;
+  var SLACK = 1;
   var pacedLast = 0, pacedNow = -1, pacedOk = true;
   /* ONE VERDICT PER VSYNC. Every rAF callback of a frame is handed the
      same `now`, and more than one loop asks (the engine's room draw and
@@ -72,7 +80,7 @@
   function paced(now) {
     if (now === pacedNow) return pacedOk;
     pacedNow = now;
-    if (now - pacedLast < PACE) return (pacedOk = false);
+    if (now - pacedLast < PACE - SLACK) return (pacedOk = false);
     pacedLast = now;
     return (pacedOk = true);
   }

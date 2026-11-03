@@ -600,6 +600,9 @@
   addEventListener('keyup', function (e) {
     var n = dm.keyName(e); if (n) keys[n] = false;
   });
+  /* A key let go outside the tab never sends keyup, so a Shift released
+     there would leave the soul slow. Losing focus drops every held key. */
+  addEventListener('blur', function () { keys = {}; });
 
   function open() {
     wrap.hidden = false;

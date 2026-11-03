@@ -170,19 +170,29 @@
       y = reduced ? 0 : Math.sin((now - t0) / 1000 * 1.7) * pose.bob;
     }
 
+    /* An assignment costs even when it changes nothing, and the ghosts sit
+       at '0.000' for every frame outside a swing. So each element keeps the
+       last string it was given (__op / __tf) and is only written when that
+       string changes. Any other code that writes these properties must
+       clear the memo, or this loop skips a write the element needs. */
     var ss = spawnScale(now);
-    if (spawnT) art.style.opacity = Math.min(1, (now - spawnT) / 120).toFixed(2);
-    art.style.transform = 'translateY(' + y.toFixed(2) + 'px) rotate(' + r.toFixed(2) +
-                          'deg) scale(' + (s * ss * boost).toFixed(3) + ')';
+    if (spawnT) {
+      var aop = Math.min(1, (now - spawnT) / 120).toFixed(2);
+      if (art.__op !== aop) { art.__op = aop; art.style.opacity = aop; }
+    }
+    var ats = 'translateY(' + y.toFixed(2) + 'px) rotate(' + r.toFixed(2) +
+              'deg) scale(' + (s * ss * boost).toFixed(3) + ')';
+    if (art.__tf !== ats) { art.__tf = ats; art.style.transform = ats; }
 
     hist[hp] = { r: r, y: y }; hp = (hp + 1) % HIST;
     for (var i = 0; i < ghosts.length; i++) {
       var h = hist[(hp - 1 - (i + 1) * LAG + HIST * 2) % HIST];
       var o = trail * (1 - (i + 1) / (GH + 1)) * 0.55;
-      ghosts[i].style.opacity = o.toFixed(3);
+      var os = o.toFixed(3);
+      if (ghosts[i].__op !== os) { ghosts[i].__op = os; ghosts[i].style.opacity = os; }
       if (o > 0.004) {
-        ghosts[i].style.transform =
-          'translateY(' + h.y.toFixed(2) + 'px) rotate(' + h.r.toFixed(2) + 'deg)';
+        var gts = 'translateY(' + h.y.toFixed(2) + 'px) rotate(' + h.r.toFixed(2) + 'deg)';
+        if (ghosts[i].__tf !== gts) { ghosts[i].__tf = gts; ghosts[i].style.transform = gts; }
       }
     }
   }
@@ -224,8 +234,10 @@
        decode hitch at the exact moment you want the timing tight. */
     breakApart: function (cb) {
       sw = 0;
-      art.style.opacity = '0';
-      for (var i = 0; i < ghosts.length; i++) ghosts[i].style.opacity = '0';
+      art.style.opacity = '0'; art.__op = undefined;
+      for (var i = 0; i < ghosts.length; i++) {
+        ghosts[i].style.opacity = '0'; ghosts[i].__op = undefined;
+      }
       if (half && key) {
         half.hidden = false; key.hidden = false;
         void half.offsetWidth;
@@ -236,7 +248,7 @@
           half.hidden = true; key.hidden = true;
           half.classList.remove('is-go'); key.classList.remove('is-go');
         }
-        art.style.opacity = '';
+        art.style.opacity = ''; art.__op = undefined;
         cb && cb();
       }, reduced ? 300 : 1500);
     },
@@ -244,8 +256,8 @@
     /* Called the instant it appears in his hand, so it grows out of
        nothing instead of blinking into existence at full size. */
     materialise: function () {
-      if (reduced) { art.style.opacity = '1'; return; }
-      spawnT = performance.now(); art.style.opacity = '0';
+      if (reduced) { art.style.opacity = '1'; art.__op = undefined; return; }
+      spawnT = performance.now(); art.style.opacity = '0'; art.__op = undefined;
     },
     hide: function () { el.hidden = true; }
   };
