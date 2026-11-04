@@ -170,7 +170,9 @@
     arrow: { key: 'scalArrow', sc: 0.6, spin: Math.PI / 2, glow: '#FF2A1A' },
     flame: { key: 'scalFlame', sc: 0.5, spin: null, glow: '#FF4A8A' },
     demon: { key: 'scalDemon', sc: 0.6, spin: 0, glow: '#FF3A2A' },
-    soul:  { key: 'scalSoul',  sc: 0.5, spin: 0, glow: '#D0203A' }
+    soul:  { key: 'scalSoul',  sc: 0.5, spin: 0, glow: '#D0203A' },
+    fist:  { key: 'cataclysmFist', sc: 0.3, spin: 0, glow: '#FF3AA0' },
+    slash: { key: 'catastropheSlash', sc: 0.25, spin: 0, glow: '#9A86FF' }
   };
   var embers = [];
   function seedEmbers() {
@@ -304,6 +306,9 @@
     } else if (pose.pat === 'dash') {
       var to = broX(br.kind, br.x < AX + AW / 2 ? 1 : -1);
       ctx.beginPath(); ctx.moveTo(br.x, br.y); ctx.lineTo(to, br.y); ctx.stroke();
+      ctx.fillStyle = 'rgba(170,150,255,' + (0.12 + 0.3 * k).toFixed(2) + ')';
+      ctx.fillRect(AX, py - 4, px - 40 - AX, 8); ctx.fillRect(px + 40, py - 4, AX + AW - px - 40, 8);
+      ctx.setLineDash([8, 6]); ctx.strokeStyle = '#5FF2FF'; ctx.strokeRect(px - 40, py - 8, 80, 16); ctx.setLineDash([]);
     } else if (pose.pat === 'ring') {
       for (i = 0; i < 10; i++) {
         a = i * Math.PI / 5 + t * 0.5;
@@ -725,9 +730,6 @@
     if (!running) return;   /* startDeath() owns the death loop; handing off here started a second one */
     requestAnimationFrame(stepFn);
     if (held) return;
-    /* the pace cap (perf.js): no redraws faster than one logic step's
-       worth. `last` only advances on drawn frames, so dt covers the
-       skipped vsyncs and every sim stays dt-true. */
     if (NEU.perf && !NEU.perf.paced(now)) return;
     var dt = Math.min(0.033, (now - last) / 1000); last = now;
     lastDt = dt;
@@ -870,48 +872,46 @@
      between them, and every third volley both fire together: a pincer from
      the two walls. */
   var BRO_PATS = { fist: ['pound', 'rocket', 'uppercut'], slash: ['crescent', 'dash', 'ring'] };
-  function ringBurst(x, y, n, sp, a0) {
+  function ringBurst(x, y, n, sp, a0, lk) {
     for (var i = 0; i < n; i++) {
       var a = a0 + i * Math.PI * 2 / n;
-      spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0);
+      spawn(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0, { look: lk });
     }
   }
   /* the crescent turns back once, from where its fuse ended */
-  function boomerang(b) { spawn(b.x, b.y, -b.vx * 0.9, -b.vy * 0.9, 0, { fuse: 0.8 }); }
+  function boomerang(b) { spawn(b.x, b.y, -b.vx * 0.9, -b.vy * 0.9, 0, { fuse: 0.8, look: 'slash' }); }
   function broAttack(b, pat) {
-    var a = Math.atan2(py - b.y, px - b.x), i, k, q, gx;
+    var a = Math.atan2(py - b.y, px - b.x), i, k, q, gx, n, x, e = b.enraged ? 1 : 0;
     if (pat === 'pound') {
       /* ground pound: a ring of darts, then a slower one behind it */
-      ringBurst(b.x, b.y, 14, 220, 0);
-      later(function () { ringBurst(b.x, b.y, 8, 130, Math.PI / 8); }, 400);
+      ringBurst(b.x, b.y, 14 + 4 * e, 220, 0, 'fist');
+      later(function () { ringBurst(b.x, b.y, 8 + 4 * e, 130, Math.PI / 8, 'fist'); }, 400 - 100 * e);
     } else if (pat === 'rocket') {
       /* rocket fist: one fast bolt that bounces off the arena walls */
-      spawn(b.x, b.y, Math.cos(a) * 340, Math.sin(a) * 340, 0, { bounce: 3, fuse: 6 });
+      spawn(b.x, b.y, Math.cos(a) * 340, Math.sin(a) * 340, 0, { bounce: 2 + e, fuse: 3.5 + e, look: 'fist' });
     } else if (pat === 'uppercut') {
       /* flame pillars: a column of darts rising where the soul is going */
       gx = px + pvx * 0.5;
-      for (i = 0; i < 5; i++) spawn(gx, AY + AH - 10 - i * 36, 0, -120, 0, { fuse: 1.1 });
+      for (i = 0; i < 5 + 2 * e; i++) spawn(gx, AY + AH - 10 - i * 36, 0, -120, 0, { fuse: 1.1, look: 'fist' });
     } else if (pat === 'crescent') {
       /* crescent wave: seven slashes in an arc; each comes back once */
-      for (k = -3; k <= 3; k++)
+      for (k = -(3 + e); k <= 3 + e; k++)
         spawn(b.x, b.y, Math.cos(a + k * 0.14) * 260, Math.sin(a + k * 0.14) * 260, 0,
-              { fuse: 0.8, onEnd: boomerang });
+              { fuse: 0.8, onEnd: boomerang, look: 'slash' });
     } else if (pat === 'dash') {
-      /* blade dash across to the far wall; then a cross-cut of darts along
-         the soul's row, with a gap where the soul was */
+      /* blade dash across to the far wall; the cross-cut of darts lands on
+         the soul's row now, with a gap where the soul is */
       b.dashTo = broX(b.kind, b.x < AX + AW / 2 ? 1 : -1);
       b.dash = 0.35;
-      gx = px; q = py;
-      later(function () {
-        for (var x = AX + 10; x < AX + AW - 10; x += 26)
-          if (Math.abs(x - gx) > 40) spawn(x, q, 0, 0, 0, { fuse: 0.7 });
-      }, 450);
+      for (x = AX + 10; x < AX + AW - 10; x += 26)
+        if (Math.abs(x - px) > 40) spawn(x, py, 0, 0, 0, { fuse: 0.7 });
     } else if (pat === 'ring') {
       /* spinning swords: ten on a circle about the brother, closing in over 2.6 s */
-      for (i = 0; i < 10; i++) {
-        q = i * Math.PI * 2 / 10;
+      n = 10 + 2 * e;
+      for (i = 0; i < n; i++) {
+        q = i * Math.PI * 2 / n;
         spawn(b.x + Math.cos(q) * 150, b.y + Math.sin(q) * 150, 0, 0, 0,
-              { fuse: 2.6, orb: { cx: b.x, cy: b.y, a0: q, r0: 150, r1: 30, w: 2.2, T: 2.6 } });
+              { fuse: 2.6, look: 'slash', orb: { cx: b.x, cy: b.y, a0: q, r0: 150, r1: 30, w: 2.2, T: 2.6 } });
       }
     }
   }
@@ -941,10 +941,13 @@
     for (i = bros.length - 1; i >= 0; i--) {
       if (bros[i].hp <= 0) {
         var dead = bros.splice(i, 1)[0];
-        if (NEU.juice) NEU.juice.burst(dead.x, dead.y, 15, dead.kind === 'fist' ? COL.brimHi : COL.brim, 1.5);
+        if (NEU.juice) { NEU.juice.hit('large', { dx: dead.x - px, dy: dead.y - py }); NEU.juice.burst(dead.x, dead.y, 22, dead.kind === 'fist' ? COL.brimHi : COL.brim, 1.5); }
         /* Survivor enrages */
         if (bros.length === 1) {
           bros[0].enraged = true;
+          if (NEU.juice) NEU.juice.hit('medium');
+          if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(1);
+          dropBullets();
           say(dead.kind === 'fist' ? "* the brawler falls. the blade rages." : "* the blade falls. the brawler rages.");
         }
       }
@@ -1597,8 +1600,6 @@
     }
 
     NEU.scalAtk.draw(ctx);
-    /* No glows, no buffer work: the clear and the full blit used to run
-       every frame even when nothing glowed (adding clear pixels changed nothing). */
     var gl = (dm.glow && (bullets.length || booms.length)) ? glowCtx() : null;
     if (gl) {
       for (var gi = 0; gi < bullets.length; gi++)
@@ -1617,10 +1618,6 @@
               : (b.k === 3 || b.k === 5) ? 'hellblast' : 'dart';
       var sc = b.k === 1 ? 0.65 : b.k === 2 ? 0.75
             : (b.k === 3 || b.k === 5) ? 0.5 : 0.55;
-      /* b.rot tracks real travel (set in moveBullets, seeded at spawn
-         for k1/k2) — NOT a live atan2(vy,vx) here, which used to lock
-         to a single angle for every homing blast's entire wind-up and
-         burst pause, since both spawn and pause at vx:vy:0. */
       var brot = b.rot || 0;
       var lk = LOOK[b.look || b.tag];
       if (lk) {
@@ -1702,16 +1699,6 @@
         ctx.fillRect((hx - 7) | 0, (hy - 7) | 0, 14, 14);
       }
     }
-    /* Their BODIES, not their thrown attacks. This used to draw
-       'fist'/'slashTop' — SupremeCataclysmFist.png and
-       SupremeCatastropheSlashAlt.png, the projectiles each brother
-       THROWS — because SupremeCataclysm.png / SupremeCatastrophe.png
-       (their real NPC art, both confirmed 636x1872/9 rows and
-       800x1840/8 rows in the mod's own .cs) were never copied into the
-       manifest at all. Their real thrown-attack sprites stay in the
-       manifest under cataclysmFist/catastropheSlash for the projectile
-       switch below, correctly used there. Glow masks stack the same way
-       Polterghast's already do (glowKeys, additive). */
     /* the brothers, BRO_H tall, aura, trail and the wind-up pose of
        the volley about to fire (broNext) */
     var poses = broNext() || [];
@@ -2326,7 +2313,7 @@
                get seekerDarts() { return NEU.scalSeekers ? NEU.scalSeekers.darts() : []; },
                get broPos() { return bros.map(function (b) { return { x: b.x, y: b.y }; }); },
                get broHp() { return bros.map(function (b) { return b.hp; }); },
-                get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy }; }); },
+                get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy, look: b.look }; }); },
                 get myShots() { return myShots.map(function (s) { return { x: s.x, y: s.y, vx: s.vx, vy: s.vy, r: s.r, owner: s.owner, kind: s.kind, dmg: s.dmg, pierce: !!s.pierce }; }); },
                /* A2 hooks: the strip, heal, the blue soul and the
                   melee arcs, for the tests and the view. */
@@ -2337,6 +2324,8 @@
                get swings() { return F.swings.map(function (s) { return { x: s.x, y: s.y, ang: s.ang, t: s.t, dur: s.dur, hit: s.hit }; }); },
                get grazes() { return F.grazes.slice(); },
                get soulY() { return py; },
+               get soulX() { return px; },
+               get broDash() { return bros.map(function (b) { return b.dash; }); },
                get floorY() { return AY + AH - 7; },
                /* test-only: place the soul and her, and make the fight
                   strikeable (mode 'fight', not invulnerable) */
@@ -2378,6 +2367,7 @@
                 hurtBoss: function (n) { damageTarget('her', null, n); },
                 /* test-only: put the soul where a test needs it */
                 placeSoul: function (x, y) { px = x; py = y; },
+                hurtBro: function (i, n) { if (bros[i]) bros[i].hp -= n; },
                 /* dev console (dev.js): set the soul's HP, its TP, or top it up */
                 setHp: function (n) { hp = Math.max(0, Math.min(MAXHP, n | 0)); },
                 setTp: function (n) { tp = Math.max(0, Math.min(100, +n || 0)) / 100; },
