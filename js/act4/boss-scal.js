@@ -196,12 +196,12 @@
   }
   /* the phase flash: one per gate, never closer than 0.34 s (3 Hz), and
      a fifth as bright under reduced motion or the no-flash setting */
-  var flashAt = -9, FLASH_LEN = 0.35;
+  var flashAt = -9, FLASH_LEN = 0.15;
   function phaseFlash() { if (t - flashAt >= 0.34) flashAt = t; }
   function flashAlpha() {
     var a = t - flashAt;
     if (a < 0 || a >= FLASH_LEN) return 0;
-    var peak = (NEU.juice && NEU.juice.noFlash) ? 0.2 : 0.55;
+    var peak = (NEU.juice && NEU.juice.noFlash) ? 0.2 : 0.35;
     return peak * (1 - a / FLASH_LEN);
   }
 

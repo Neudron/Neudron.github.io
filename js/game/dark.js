@@ -403,7 +403,9 @@
                   !endless && talks >= LINES.length, !!baked, lit.join(''),
                   bk === 'tele' ? Math.floor(now / 150) : ''].join('|');
     if (litCv && litNow === litKey) {
-      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(litCv, 0, 0); ctx.restore();
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, cv.width, cv.height);      /* else last frames' overlays stack up */
+      ctx.drawImage(litCv, 0, 0); ctx.restore();
     } else {
       litKey = litNow;
       ctx.fillStyle = INK;
