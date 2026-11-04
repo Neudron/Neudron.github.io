@@ -410,7 +410,7 @@
 
   function draw(now) {
     if (!ctx || !spawned) return;
-    var i, b, key, frame, d;
+    var i, b, key, frame, d, s, side, tdx, tdy, tl, tux, tuy, tpx, tpy, prog;
 
     /* the crossing line — telegraph promise and the dash itself */
     if (actName === 'telegraph' || actName === 'dash') {
@@ -455,6 +455,33 @@
         ctx.beginPath();
         ctx.arc(b.x, b.y, 16, 0, Math.PI * 2);
         ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    /* dart path: a 10px tick every 4th bead spacing along the crossing,
+       alternating side from the side the next volley leaves on */
+    if (actName === 'telegraph') {
+      tdx = dashTo.x - dashFrom.x;
+      tdy = dashTo.y - dashFrom.y;
+      tl = Math.sqrt(tdx * tdx + tdy * tdy) || 1;
+      tux = tdx / tl; tuy = tdy / tl;
+      tpx = -tuy; tpy = tux;
+      prog = clamp(1 - stepT / (SCRIPT[stepIdx].t || 1), 0, 1);
+      ctx.save();
+      ctx.globalAlpha = 0.2 + 0.7 * prog;
+      for (s = 0, i = 0; s <= tl; s += SEG_SPACING * 4, i++) {
+        side = (i % 2 ? -1 : 1) * dartSide;
+        var tx = dashFrom.x + tux * s, ty = dashFrom.y + tuy * s;
+        ctx.beginPath();
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(tx + tpx * 10 * side, ty + tpy * 10 * side);
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.strokeStyle = '#FF6A50';
+        ctx.lineWidth = 2;
+        ctx.stroke();
       }
       ctx.restore();
     }
