@@ -65,23 +65,65 @@
     { x: 1174, y: 844,  col: '#7BE38A', name: 'green lamp' },
     { x: 2096, y: 1412, col: '#FF3FD0', name: 'door' }
   ];
-  var HAZARDS = [
-    { x: 923,  y: 690,  s: 64, off: 0 },
-    { x: 1459, y: 1020, s: 72, off: 1200 },
-    { x: 1845, y: 1257, s: 64, off: 2400 }
+  /* D1: three zones of three seams, each pushed 90 px off the line, the
+     side alternating. Later zones cycle faster and stay live longer. */
+  var HZ_ZONE = [
+    { per: 3600, live: 800,  t: [0.2, 0.3, 0.4] },
+    { per: 3000, live: 900,  t: [0.5, 0.6, 0.7] },
+    { per: 2400, live: 1000, t: [0.8, 0.86, 0.92] }
   ];
-  var HZ_PERIOD = 3600, HZ_TELE = 1800, HZ_LIVE = 2600, HZ_END = 3400;
-  var HZ_COL = '#FF5A3C';
-  function hazardPhase(i, t) {
-    var k = ((t + HAZARDS[i].off) % HZ_PERIOD + HZ_PERIOD) % HZ_PERIOD;
-    return k < HZ_TELE ? 'idle' : k < HZ_LIVE ? 'tele' : k < HZ_END ? 'live' : 'idle';
-  }
-  /* 0..1 through the telegraph, for the outline's brightness */
-  function teleK(i, t) {
-    var k = ((t + HAZARDS[i].off) % HZ_PERIOD + HZ_PERIOD) % HZ_PERIOD;
-    return (k - HZ_TELE) / (HZ_LIVE - HZ_TELE);
-  }
+  var HZ_TELE = 800, HZ_COL = '#FF5A3C';
+  var HAZARDS = [], SWEEPS = [];
+  (function () {
+    /* unit route direction and its normal; the normal is the push */
+    var LEN = Math.hypot(1676, 1032), ux = 1676 / LEN, uy = 1032 / LEN;
+    for (var z = 0; z < 3; z++) for (var k = 0; k < 3; k++) {
+      var i = z * 3 + k, t = HZ_ZONE[z].t[k], sg = i % 2 ? -1 : 1;
+      /* ponytail: offsets are k*per/2, not /3: at /3 zone 2 (live 1000 of 2400) overlaps itself */
+      HAZARDS.push({ x: 420 + 1676 * t - sg * 90 * uy, y: 380 + 1032 * t + sg * 90 * ux,
+                     s: 64, per: HZ_ZONE[z].per, live: HZ_ZONE[z].live,
+                     tele: HZ_TELE, off: k * HZ_ZONE[z].per / 2 });
+    }
+    /* D2: two sweepers cross the route, perpendicular, 360 px long */
+    var ts = [0.65, 0.89];
+    for (var q = 0; q < 2; q++) {
+      var cx = 420 + 1676 * ts[q], cy = 380 + 1032 * ts[q];
+      SWEEPS.push({ x0: cx + 180 * uy, y0: cy - 180 * ux, x1: cx - 180 * uy, y1: cy + 180 * ux,
+                    speed: 90, len: 56 });
+    }
+  })();
+  var FDIR = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  var BO_X = 420 + 1676 * 0.75;          /* D3: blackouts start past the line's t = 0.75 */
+  var lit = [false, false, false];       /* D6: landmarks relit this run */
+  var watch = { on: false, x: 0, y: 0, fadeAt: 0 };   /* D4 */
+  var motes = [];                        /* D8, filled by seedDebris */
   var lastMark = 0, knocks = 0;
+  var ax = 420, ay = 380;                /* D4: where the idle clock last reset */
+  var flashUntil = 0, fadeUntil = 0, bkStep = -1, hzBurst = [];
+
+  /* D9: periods stretch with distance walked in endless, never below 55% */
+  function hzScale() { return endless ? Math.max(0.55, 1 - walked / 8 / 1500) : 1; }
+  /* ms into the hazard's cycle, 0..period */
+  function hazardK(i, t) {
+    var H0 = HAZARDS[i], P = H0.per * hzScale();
+    return ((t + H0.off) % P + P) % P;
+  }
+  function hazardPhase(i, t) {
+    var k = hazardK(i, t), H0 = HAZARDS[i];
+    return k < H0.tele ? 'tele' : k < H0.tele + H0.live ? 'live' : 'idle';
+  }
+  /* D2: ping-pong along the segment at 90 px/s */
+  function sweepPos(i, t) {
+    var S = SWEEPS[i], L = Math.hypot(S.x1 - S.x0, S.y1 - S.y0), d = (t / 1000 * S.speed) % (2 * L);
+    if (d > L) d = 2 * L - d;
+    return { x: S.x0 + (S.x1 - S.x0) * d / L, y: S.y0 + (S.y1 - S.y0) * d / L };
+  }
+  /* D3: 'tele' 600 ms before every 'dark' (torch at 34 px for 1.2 s, each 7 s) */
+  function blackout(t) {
+    if (endless ? walked / 8 <= 300 : px <= BO_X) return null;
+    var k = t % 7000;
+    return k < 1200 ? 'dark' : k >= 6400 ? 'tele' : null;
+  }
 
   /* Two modes share this file because they share the character and its
      walk cycle. 'dark' is the black field with the grey door in it;
@@ -114,6 +156,7 @@
     for (var i = 0; i < 90; i++) {
       debris.push({ x: rnd() * W, y: rnd() * H, f: rnd() < 0.25 ? 0 : 1 });   /* 0 hole, 1 pebbles */
     }
+    for (var m = 0; m < 28; m++) motes.push({ x: rnd() * 2600, y: rnd() * 1800 });
   })();
 
   var LINES = [
@@ -189,12 +232,31 @@
     say('nothing else in here.');
   }
 
-  function knockBack(h) {
+  /* D7: a hit is a medium shake, a 14-spark burst, a 250 ms red flash
+     (unless calm or noFlash), then a 400 ms fade up from ink at the lamp */
+  function unwatch(now) { if (watch.on) { watch.on = false; watch.fadeAt = now; } }
+  function knockBack(h, now) {
     var L = LANDMARKS[lastMark];
-    if (NEU.juice) NEU.juice.hit('small', { dx: L.x - h.x, dy: L.y - h.y });
+    if (NEU.juice) {
+      NEU.juice.hit('medium', { dx: L.x - h.x, dy: L.y - h.y });
+      NEU.juice.burst(innerWidth / 2, innerHeight / 2, 14, HZ_COL, 180);
+    }
+    if (!(NEU.motion && NEU.motion.calmFlash && NEU.motion.calmFlash()) && !(NEU.juice && NEU.juice.noFlash))
+      flashUntil = now + 250;
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
-    px = L.x; py = L.y + 36; face = 'down';
+    px = L.x; py = L.y + 36; face = 'down'; fadeUntil = now + 400;
+    ax = px; ay = py; idleSince = now; unwatch(now);
     if (!knocks++) say('the floor bites. you come to by the ' + L.name + '.');
+  }
+  /* D6: first arrival at a lamp relights it with a checkpoint hit */
+  function relight(m) {
+    var L = LANDMARKS[m];
+    lit[m] = true;
+    if (NEU.juice) {
+      NEU.juice.hit('small');
+      NEU.juice.burst(innerWidth / 2 + L.x - px, innerHeight / 2 + L.y - py, 24, L.col, 180);
+    }
+    if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
   }
 
   function step(now) {
@@ -225,13 +287,36 @@
       px = Math.min(Math.max(px + dx, 20), W - 20);
       py = Math.min(Math.max(py + dy, 20), H - 20);
       for (var m = 0; m < LANDMARKS.length; m++) {
-        if (Math.hypot(px - LANDMARKS[m].x, py - LANDMARKS[m].y) < 110) lastMark = m;
+        if (Math.hypot(px - LANDMARKS[m].x, py - LANDMARKS[m].y) < 110) {
+          lastMark = m;
+          if (!lit[m]) relight(m);
+        }
       }
       for (var hz = 0; hz < HAZARDS.length; hz++) {
         var H0 = HAZARDS[hz];
         if (Math.abs(px - H0.x) < H0.s && Math.abs(py - H0.y) < H0.s && hazardPhase(hz, now) === 'live') {
-          knockBack(H0); break;
+          knockBack(H0, now); break;
         }
+      }
+      for (var sw = 0; sw < SWEEPS.length; sw++) {
+        var hp = sweepPos(sw, now);
+        if (Math.abs(px - hp.x) < 28 && Math.abs(py - hp.y) < 28) { knockBack(hp, now); break; }
+      }
+      /* D4: any movement dismisses the watcher; stillness for 2.5 s brings it */
+      if (moving || Math.hypot(px - ax, py - ay) > 40) { idleSince = now; ax = px; ay = py; unwatch(now); }
+      else if (!watch.on && now - idleSince > 2500) {
+        var rr = (endless ? torch : LIGHT) + 20, fv = FDIR[face];
+        watch.on = true; watch.x = px - fv[0] * rr; watch.y = py - fv[1] * rr;
+      }
+      if (watch.on) {
+        var wd = Math.hypot(px - watch.x, py - watch.y);
+        if (wd < 12) knockBack(watch, now);
+        else { watch.x += (px - watch.x) / wd * 60 * dt; watch.y += (py - watch.y) / wd * 60 * dt; }
+      }
+      /* D8: dust drifts down and wraps */
+      for (var mo = 0; mo < motes.length; mo++) {
+        motes[mo].y += 6 * dt;
+        if (motes[mo].y > H) motes[mo].y -= H;
       }
     }
     walked += Math.hypot(dx, dy);
@@ -297,7 +382,14 @@
          black screen. */
       torch = Math.max(34, LIGHT - (walked / 8) * 0.08);
     }
-    var rad = Math.round(endless ? torch : LIGHT);
+    var bk = blackout(now), rad = Math.round(endless ? torch : LIGHT);
+    if (bk === 'dark') rad = 34;
+    else if (bk === 'tele') {
+      /* the flicker: 132, 96, 132, 96, one step per 150 ms, with a tick */
+      var bs = ((now % 7000 - 6400) / 150) | 0;
+      rad = bs % 2 ? 96 : 132;
+      if (bs !== bkStep) { bkStep = bs; if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick(); }
+    }
 
     /* Everything that never moves (floor, debris, door, the idle seams,
        the lamp posts) is one half-size bake, drawn up 2x with smoothing
@@ -308,7 +400,8 @@
        inputs. Same inputs, same pixels: reuse the finished frame instead of
        repainting and re-masking the whole canvas. */
     var litNow = [px, py, w, h, cv.width, cv.height, rad, face, walkFrame(walked, moving),
-                  !endless && talks >= LINES.length, !!baked].join('|');
+                  !endless && talks >= LINES.length, !!baked, lit.join(''),
+                  bk === 'tele' ? Math.floor(now / 150) : ''].join('|');
     if (litCv && litNow === litKey) {
       ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(litCv, 0, 0); ctx.restore();
     } else {
@@ -374,30 +467,101 @@
     }
     ctx.globalAlpha = 1;
 
+    /* D5 and D2/D4/D6/D8: additive, after the mask, so they read from across
+       the room. The route is always drawn so the way stays findable. */
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = HZ_COL; ctx.lineWidth = 2; ctx.globalAlpha = 0.35;
+    if (ctx.setLineDash) ctx.setLineDash([4, 8]);
+    ctx.beginPath();
+    ctx.moveTo(LANDMARKS[0].x - camX, LANDMARKS[0].y - camY);
+    ctx.lineTo(LANDMARKS[2].x - camX, LANDMARKS[2].y - camY);
+    ctx.stroke();
+    if (ctx.setLineDash) ctx.setLineDash([]);
+
+    for (var pl = 0; pl < LANDMARKS.length; pl++) {
+      if (!lit[pl]) continue;
+      var PL = LANDMARKS[pl], pr = [160, 100, 50], pa = [0.10, 0.18, 0.28];
+      ctx.fillStyle = PL.col;
+      for (var q = 0; q < 3; q++) {
+        ctx.globalAlpha = pa[q]; ctx.beginPath();
+        ctx.arc(PL.x - camX, PL.y - camY, pr[q], 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    var nearD = 1e9, sr = [28, 18, 8], sa = [0.15, 0.35, 0.9];
+    ctx.fillStyle = HZ_COL;
+    for (var sw = 0; sw < SWEEPS.length; sw++) {
+      var hp = sweepPos(sw, now);
+      nearD = Math.min(nearD, Math.hypot(px - hp.x, py - hp.y));
+      for (var g = 0; g < 3; g++) {
+        ctx.globalAlpha = sa[g]; ctx.beginPath();
+        ctx.arc(hp.x - camX, hp.y - camY, sr[g], 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
     for (var z = 0; z < HAZARDS.length; z++) {
       var ph = hazardPhase(z, now);
       if (ph === 'idle') continue;
       var Z = HAZARDS[z];
       var zx = (Z.x - Z.s - camX) | 0, zy = (Z.y - Z.s - camY) | 0, zs = Z.s * 2;
+      var dz = Math.hypot(px - Z.x, py - Z.y), fd = Math.min(1, 900 / dz);
+      if (ph === 'live') nearD = Math.min(nearD, dz);
       if (zx > w || zy > h || zx + zs < 0 || zy + zs < 0) continue;
       ctx.fillStyle = HZ_COL;
       if (ph === 'tele') {
-        /* the exact square that will hurt, outlined, brightening in
-           three hard steps (stepped like the torch, no smooth fade) */
-        var k = teleK(z, now);
+        /* stepped halo, then the exact square that will hurt, outlined,
+           brightening in three hard steps (no smooth fade) */
+        ctx.globalAlpha = 0.12 * fd; ctx.fillRect(zx - 12, zy - 12, zs + 24, zs + 24);
+        ctx.globalAlpha = 0.22 * fd; ctx.fillRect(zx - 6, zy - 6, zs + 12, zs + 12);
+        var kk = hazardK(z, now) / Z.tele;
         /* 0.45 floor: at 0.3 the first step was ~1.5:1 on the indigo,
            too faint to read as a warning; the last step clears 3:1 */
-        ctx.globalAlpha = calm ? 0.75 : (k < 0.34 ? 0.45 : k < 0.67 ? 0.65 : 0.9);
+        ctx.globalAlpha = (calm ? 0.75 : kk < 0.34 ? 0.45 : kk < 0.67 ? 0.65 : 0.9) * fd;
         ctx.fillRect(zx, zy, zs, 3); ctx.fillRect(zx, zy + zs - 3, zs, 3);
         ctx.fillRect(zx, zy, 3, zs); ctx.fillRect(zx + zs - 3, zy, 3, zs);
       } else {
-        ctx.globalAlpha = 0.45;
-        ctx.fillRect(zx, zy, zs, zs);
-        ctx.globalAlpha = 1;
-        ctx.fillRect(zx, zy, zs, 3); ctx.fillRect(zx, zy + zs - 3, zs, 3);
-        ctx.fillRect(zx, zy, 3, zs); ctx.fillRect(zx + zs - 3, zy, 3, zs);
+        ctx.globalAlpha = 0.55; ctx.fillRect(zx, zy, zs, zs);
+        ctx.fillStyle = '#FFE08A';
+        for (var j = 0; j < 4; j++) {
+          var fh = 20 + 12 * Math.sin(now / 60 + j);
+          ctx.fillRect(zx + 16 + j * 28, zy + zs - fh, 6, fh);
+        }
+        ctx.fillStyle = HZ_COL;
+        if (now - (hzBurst[z] || 0) >= 180 && NEU.juice) {
+          hzBurst[z] = now; NEU.juice.burst(zx + zs / 2, zy + zs / 2, 3, HZ_COL, 120);
+        }
       }
     }
+
+    if (nearD < 160) {
+      ctx.globalAlpha = 0.5 * (1 - nearD / 160); ctx.fillStyle = HZ_COL;
+      ctx.fillRect(0, 0, w, 6); ctx.fillRect(0, h - 6, w, 6);
+      ctx.fillRect(0, 0, 6, h); ctx.fillRect(w - 6, 0, 6, h);
+    }
+
+    /* D4: the watcher, two eyes with pupils, fading out over 300 ms after a reset */
+    var wa = watch.on ? 1 : Math.max(0, 1 - (now - watch.fadeAt) / 300);
+    if (wa > 0) {
+      var wx = (watch.x - camX) | 0, wy = (watch.y - camY) | 0;
+      ctx.globalAlpha = wa; ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(wx - 7, wy - 2, 4, 4); ctx.fillRect(wx + 3, wy - 2, 4, 4);
+      ctx.fillStyle = MAG;
+      ctx.fillRect(wx - 6, wy, 2, 2); ctx.fillRect(wx + 4, wy, 2, 2);
+    }
+
+    /* D8: dust motes, only inside the torch, never with reduced motion */
+    if (!calm) {
+      for (var mo = 0; mo < motes.length; mo++) {
+        var M = motes[mo], md = Math.hypot(M.x - px, M.y - py);
+        if (md >= rad) continue;
+        ctx.globalAlpha = 0.5 * (1 - md / rad); ctx.fillStyle = '#D8C8FF';
+        ctx.fillRect((M.x - camX) | 0, (M.y - camY) | 0, 2, 2);
+      }
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+    if (flashUntil > now) { ctx.globalAlpha = 0.35; ctx.fillStyle = HZ_COL; ctx.fillRect(0, 0, w, h); }
+    if (fadeUntil > now) { ctx.globalAlpha = (fadeUntil - now) / 400; ctx.fillStyle = INK; ctx.fillRect(0, 0, w, h); }
     ctx.globalAlpha = 1;
 
     if (near(DOOR)) prompt(w / 2, h / 2 - 56);
@@ -496,9 +660,10 @@
     endless = !!(opts && opts.endless);
     mode = 'dark';
     torch = LIGHT;
-    if (endless) { talks = 0; through = false; walked = 0; px = 420; py = 380; lastMark = 0; }
+    if (endless) { talks = 0; through = false; walked = 0; px = 420; py = 380; lastMark = 0; lit = [false, false, false]; }
     knocks = 0;
     routeUntil = 0; idleSince = performance.now(); presence = 0;
+    ax = px; ay = py; watch.on = false;
     wrap.classList.remove('is-walk');
     wrap.hidden = false;
     NEU.activeMinigame = 'dark';        /* the room underneath must not move or take Escape */
@@ -533,7 +698,7 @@
     talks = 0; through = false; fixed = false; found = false;
     routeUntil = 0; idleSince = 0; presence = 0;
     px = 420; py = 380; walked = 0; face = 'down';
-    lastMark = 0; knocks = 0;
+    lastMark = 0; knocks = 0; lit = [false, false, false]; watch.on = false;
     if (wrap) wrap.classList.remove('is-walk');
   }
 
@@ -550,6 +715,9 @@
     },
     interact: interact, walkFrame: walkFrame,
     hazards: HAZARDS, landmarks: LANDMARKS, hazardPhase: hazardPhase,
+    sweeps: SWEEPS, sweepPos: sweepPos, blackout: blackout,
+    get watcher() { return watch; },
+    get lit() { return lit; },
     get lastLandmark() { return lastMark; },
     get pos() { return { x: px, y: py }; },
     _at: function (x, y) { px = x; py = y; },   /* tests */
