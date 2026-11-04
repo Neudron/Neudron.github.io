@@ -157,14 +157,14 @@
        uses for its phase glows. */
     cataclysm:     { src: IMG + 'calamity/SupremeCataclysm.png',
                  from: 'NPCs/SupremeCalamitas/SupremeCataclysm.cs',
-                 w: 636, h: 1872, frames: 9, cols: 3, fw: 212, fh: 208, fps: 10,
+                 w: 636, h: 1872, frames: 9, cols: 3, fw: 212, fh: 208, fps: 10, lin: true, idle: 12, atk: [12, 21],
                  hitTerraria: { w: 120, h: 120 } },
     cataclysmGlow: { src: IMG + 'calamity/SupremeCataclysmGlow.png',
                  from: 'NPCs/SupremeCalamitas/SupremeCataclysmGlow.png',
                  w: 636, h: 1872, frames: 9, cols: 3, fw: 212, fh: 208, fps: 10 },
     catastrophe:     { src: IMG + 'calamity/SupremeCatastrophe.png',
                  from: 'NPCs/SupremeCalamitas/SupremeCatastrophe.cs',
-                 w: 800, h: 1840, frames: 8, cols: 2, fw: 400, fh: 230, fps: 10,
+                 w: 800, h: 1840, frames: 8, cols: 2, fw: 400, fh: 230, fps: 10, lin: true, idle: 6, atk: [6, 15],
                  hitTerraria: { w: 120, h: 120 } },
     catastropheGlow: { src: IMG + 'calamity/SupremeCatastropheGlow.png',
                  from: 'NPCs/SupremeCalamitas/SupremeCatastropheGlow.png',
@@ -453,19 +453,26 @@
     var im = NEU.sheetReady(sh);
     if (!im) return false;
     var n = sh.frames || 1;
-    var fr = (o.frame === undefined || o.frame === null)
-      ? (sh.fps ? ((((o.now === undefined ? Date.now() : o.now) / (1000 / sh.fps)) | 0) % n) : 0)
-      : (((o.frame % n) + n) % n);
+    var cols = sh.cols || 1;
+    var clock = sh.fps ? (((o.now === undefined ? Date.now() : o.now) / (1000 / sh.fps)) | 0) : 0;
     /* cols is the whole point: source x moves across the sheet instead
        of being pinned at 0 */
-    var cols = sh.cols || 1;
-    var col = ((o.col || 0) % cols + cols) % cols;
+    var col = ((o.col || 0) % cols + cols) % cols, fr, L;
+    if (sh.lin) {
+      /* column-major cells: frame L runs down column 0, then column 1 */
+      L = (o.frame === undefined || o.frame === null) ? (clock % sh.idle) : (o.frame | 0);
+      col = ((L / n) | 0) % cols; fr = L % n;
+    } else {
+      fr = (o.frame === undefined || o.frame === null) ? clock % n : (((o.frame % n) + n) % n);
+    }
     var sxi = col * sh.fw, syi = fr * sh.fh;
-    var sc = o.scale || 1;
+    var sc = o.scale || 1, fl = sc < 0;
+    if (fl) sc = -sc;
     var dw = sh.fw * sc, dh = sh.fh * sc;
     ctx.save();
     ctx.translate(x, y);
     if (o.rot) ctx.rotate(o.rot);
+    if (fl) ctx.scale(-1, 1);
     if (o.alpha !== undefined) ctx.globalAlpha = o.alpha;
     var dx = (-dw / 2) | 0;
     var dy = (o.anchor === 'feet' ? -dh : -dh / 2) | 0;
@@ -486,7 +493,7 @@
         var gs = NEU.sheets[o.glowKeys[g]], gi = NEU.sheetReady(gs);
         if (!gi) continue;
         ctx.globalAlpha = 0.55;
-        ctx.drawImage(gi, ((o.col || 0) % (gs.cols || 1)) * gs.fw,
+        ctx.drawImage(gi, (col % (gs.cols || 1)) * gs.fw,
                       (fr % (gs.frames || 1)) * gs.fh, gs.fw, gs.fh,
                       dx, dy, dw | 0, dh | 0);
       }

@@ -215,7 +215,7 @@
   /* the brothers: drawn BRO_H tall from their real sheets */
   var BRO_H = 168;
   var BRO_NAME = { slash: 'Supreme Catastrophe', fist: 'Supreme Cataclysm' };
-  var BRO_COL = { fist:  { aura: '#FF4A14', hot: '#FFB040', bar: '#FF6A2A', ink: '#FFC890' },
+  var BRO_COL = { fist:  { aura: '#FF2A8A', hot: '#FFB0E0', bar: '#FF4AA0', ink: '#FFC8E8' },
                   slash: { aura: '#7A5CFF', hot: '#C8D4FF', bar: '#9A86FF', ink: '#D8D0FF' } };
   function broW(kind) {
     var sh = NEU.sheets && NEU.sheets[kind === 'fist' ? 'cataclysm' : 'catastrophe'];
@@ -260,14 +260,17 @@
     var bKey = br.kind === 'fist' ? 'cataclysm' : 'catastrophe';
     var bSh = NEU.sheets && NEU.sheets[bKey];
     var bSc = bSh ? BRO_H / bSh.fh : 1;
+    /* the body faces left in the art: mirror it to face the soul, rot 0 */
+    var face = px > br.x ? -bSc : bSc;
+    var atkF = bSh && k ? bSh.atk[0] + Math.round(k * (bSh.atk[1] - bSh.atk[0])) : undefined;
     for (var i = 0; i < br.vt.length - 1; i++) {
       var g = br.vt[i];
       if (Math.abs(g.x - br.x) + Math.abs(g.y - br.y) < 6) continue;
-      sprite(bKey, g.x, g.y + lift, bSc, rot, false, undefined, undefined, 0.08 * (i + 1));
+      sprite(bKey, g.x, g.y + lift, face, 0, false, undefined, undefined, 0.08 * (i + 1));
       if (dm.glow) dm.glow(ctx, g.x, g.y, 40, c.aura, 0.12 * (i + 1));
     }
     var glowK = [br.kind === 'fist' ? 'cataclysmGlow' : 'catastropheGlow'];
-    if (!sprite(bKey, br.x, br.y + lift, bSc, rot, k > 0.6, undefined, undefined, undefined, glowK)) {
+    if (!sprite(bKey, br.x, br.y + lift, face, 0, k > 0.6, undefined, atkF, undefined, glowK)) {
       ctx.fillStyle = br.kind === 'fist' ? '#5A1A0A' : '#241A40';
       ctx.fillRect((br.x - bw / 2) | 0, (br.y + lift - BRO_H / 2) | 0, bw, BRO_H);
       ctx.fillStyle = c.bar;
@@ -290,7 +293,7 @@
     var k = pose.k, i, a, op = ctx.globalCompositeOperation;
     ctx.save();
     ctx.lineWidth = 1 + Math.round(2 * k);
-    ctx.strokeStyle = 'rgba(' + (br.kind === 'fist' ? '255,120,40' : '170,150,255') + ',' + (0.35 + 0.5 * k).toFixed(2) + ')';
+    ctx.strokeStyle = 'rgba(' + (br.kind === 'fist' ? '255,60,150' : '170,150,255') + ',' + (0.35 + 0.5 * k).toFixed(2) + ')';
     if (pose.pat === 'pound') {
       ctx.beginPath(); ctx.arc(br.x, br.y, 30 + 90 * k, 0, Math.PI * 2); ctx.stroke();
     } else if (pose.pat === 'rocket' || pose.pat === 'crescent') {
@@ -301,7 +304,7 @@
       }
     } else if (pose.pat === 'uppercut') {
       var gx = px + pvx * 0.5;
-      ctx.fillStyle = 'rgba(255,90,30,' + (0.12 + 0.25 * k).toFixed(2) + ')';
+      ctx.fillStyle = 'rgba(255,60,150,' +(0.12 + 0.25 * k).toFixed(2) + ')';
       ctx.fillRect((gx - 10) | 0, AY, 20, AH);
     } else if (pose.pat === 'dash') {
       var to = broX(br.kind, br.x < AX + AW / 2 ? 1 : -1);
@@ -2353,6 +2356,7 @@
                 get ph() { return ph; },
                 win: function () { win(); },
                 get phaseLook() { return PHASE_LOOK; },
+                get broCol() { return BRO_COL; },
                 get banner() { return bannerTxt; },
                 get ctx() { return ctx; },
                 get shots() { return shotsFired; },
