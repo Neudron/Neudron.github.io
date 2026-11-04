@@ -216,12 +216,34 @@
       /* Keep the exact attack shape readable, then let it disappear
          before impact. The old ramp only brightened until the hit. */
       fade = clamp((1 - t) / 0.22, 0, 1) * clamp(t / 0.14, 0, 1);
-      c = rampRGB(t);
-      if (w.r !== undefined) {
-        /* a ring closes from 1.6x onto its burst radius as it ramps */
+      c = rampRGB(0.45 + 0.55 * t);
+      if (w.kind === 'rect') {
+        /* a telegraphed box: fill .2, 2 px edge */
         ctx.globalAlpha = fade;
-        ctx.strokeStyle = 'rgba(' + c + ',' + (0.25 + 0.75 * t).toFixed(2) + ')';
-        ctx.lineWidth = Math.max(1, (w.w || 2) * t * 2);
+        ctx.fillStyle = 'rgba(' + c + ',.2)'; ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.strokeStyle = 'rgba(' + c + ',.85)'; ctx.lineWidth = 2; ctx.strokeRect(w.x, w.y, w.w, w.h);
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      if (w.kind === 'fan') {
+        /* a sector from a0 to a1 at radius r, filled .16, with its two edge lines */
+        ctx.globalAlpha = fade;
+        ctx.fillStyle = 'rgba(' + c + ',.16)';
+        ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.arc(w.x, w.y, w.r, w.a0, w.a1); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(' + c + ',.85)'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(w.x, w.y); ctx.lineTo(w.x + Math.cos(w.a0) * w.r, w.y + Math.sin(w.a0) * w.r);
+        ctx.moveTo(w.x, w.y); ctx.lineTo(w.x + Math.cos(w.a1) * w.r, w.y + Math.sin(w.a1) * w.r);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      if (w.r !== undefined) {
+        /* a ring closes from 1.6x onto its burst radius as it ramps; rFill shows the final radius */
+        ctx.globalAlpha = fade;
+        if (w.rFill) { ctx.fillStyle = 'rgba(' + c + ',.15)'; ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, TAU); ctx.fill(); }
+        ctx.strokeStyle = 'rgba(' + c + ',' + Math.max(0.5, 0.25 + 0.75 * t).toFixed(2) + ')';
+        ctx.lineWidth = Math.max(2, (w.w || 2) * t * 2);
         ctx.beginPath(); ctx.arc(w.x, w.y, w.r * (1.6 - 0.6 * t), 0, TAU); ctx.stroke();
         ctx.globalAlpha = 1;
         continue;
@@ -233,12 +255,25 @@
       if (!gr && ctx.createLinearGradient) {
         if (F.gn >= 256) { F.grad = {}; F.gn = 0; }
         gr = F.grad[gk] = ctx.createLinearGradient(w.x, w.y, ex, ey); F.gn++;
-        gr.addColorStop(0, 'rgba(' + rampRGB(tq) + ',' + ((0.3 + 0.7 * tq) * fq).toFixed(2) + ')');
-        gr.addColorStop(1, 'rgba(' + rampRGB(tq) + ',' + (0.5 * fq).toFixed(2) + ')');
+        gr.addColorStop(0, 'rgba(' + rampRGB(0.45 + 0.55 * tq) + ',' + ((0.3 + 0.7 * tq) * fq).toFixed(2) + ')');
+        gr.addColorStop(1, 'rgba(' + rampRGB(0.45 + 0.55 * tq) + ',' + (0.85 * fq).toFixed(2) + ')');
       }
+      /* core width never collapses to 0 as t does; bw draws the real hitbox band under it */
+      var core = Math.max(3, (w.w || 2) * (1.2 + 1.8 * t));
+      if (w.bw) {
+        ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.a);
+        ctx.fillStyle = 'rgba(' + c + ',' + (0.18 * fade).toFixed(3) + ')';
+        ctx.fillRect(0, -w.bw, w.len || L, 2 * w.bw);
+        ctx.restore();
+      }
+      /* contrast under-stroke (source-over) so the core reads on the red wash */
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = 'rgba(0,0,0,' + (0.55 * fade).toFixed(2) + ')';
+      ctx.lineWidth = core + 4;
+      ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(ex, ey); ctx.stroke();
+      ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = gr || 'rgba(' + c + ',' + (t * fade).toFixed(2) + ')';
-      /* ponytail: min 2 px, not scaled by the ramp floor; a thinner tele would vanish on the red wash */
-      ctx.lineWidth = Math.max(2, (w.w || 2) * t * 3);
+      ctx.lineWidth = core;
       ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(ex, ey); ctx.stroke();
     }
     for (wk = 0, wn = 0; wk < F.mine.length; wk++) {
@@ -366,7 +401,7 @@
   function tracked(b) { if (b) fx().mine.push(b); return b; }
   ATK.HorizontalDarkSoulRelease = function (st) {
     var f = st.f, k, T, a0, v2;
-    if (f === 0) st.side = A.bx < A.px ? -1 : 1;
+    if (f === 0) { st.side = A.bx < A.px ? -1 : 1; st.ox = A.bx; st.oy = A.by; }
     move(A.px + st.side * D(820), A.AY + A.AH * 0.2, 0.08);
     var on = (f >= 60 && f < 240) ? 60 : (f >= 300 && f < 480) ? 300 : -1;
     var rate = G.berserk ? 4 : (G.lvl >= 1 ? 5 : 7);
@@ -377,10 +412,10 @@
     T = Math.max(24, teleT(rate * 4));
     if (f === 60 - T || f === 300 - T) {
       st.p.w = [];
-      for (k = 0; k < 3; k++) st.p.w.push(warn({ x: A.bx, y: A.by, a: a0 + lerp(-0.67, 0.67, k / 2), life: T, w: 3, len: D(1500) }));
+      /* from the fixed origin captured at f0: the boss is faded out while these show */
+      for (k = 0; k < 3; k++) st.p.w.push(warn({ x: st.ox, y: st.oy, a: a0 + lerp(-0.67, 0.67, k / 2), life: T, w: 3, len: D(1500) }));
       cue('chime'); kick('small');
     }
-    pinTo(st.p.w);
     if (on >= 0 && (f - on) % rate === 0) {
       var a = a0 + lerp(-0.67, 0.67, (st.n++ % 3) / 2) + rnd(-0.25, 0.25);
       shotRamp(A.bx, A.by, a, V(8.5), 0, { tag: 'soul', fuse: 6 });
@@ -420,8 +455,8 @@
       st.dir = i ? -st.dir : (RNG() < 0.5 ? -1 : 1);
     }
     if (lf === chg - T) {
-      st.p.w = [warn({ x: A.bx, y: A.by, a: st.aim - st.dir * spread / 2, life: T, w: 4, len: D(1500) }),
-                warn({ x: A.bx, y: A.by, a: st.aim + st.dir * spread / 2, life: T, w: 1.5, len: D(1500) })];
+      /* one sector over the arc the arrows sweep (aim +- spread/2, whichever way dir runs) */
+      st.p.w = [warn({ x: A.bx, y: A.by, kind: 'fan', a0: st.aim - spread / 2, a1: st.aim + spread / 2, r: D(1500), life: T })];
       cue('chime');
     }
     if (lf < chg) pinTo(st.p.w);
@@ -512,7 +547,9 @@
     if (f === 0) { st.side = A.px < A.AX + A.AW / 2 ? 1 : -1; A.sfx('hellblast'); }
     /* the stream's lane shows teleT(60) f before the first hellblast fires */
     if (f === 105 - teleT(60)) {
-      warn({ x: A.bx, y: A.by, a: st.side === 1 ? Math.PI : 0, life: teleT(60), w: 4, len: D(1500) });
+      /* the lane is locked at the warn frame: the stream fires that way even if the soul crosses */
+      st.dir = A.px < A.bx ? -1 : 1;
+      warn({ x: A.bx, y: A.by, a: st.dir < 0 ? Math.PI : 0, life: teleT(60), w: 4, len: D(1500), bw: D(14) });
       cue('chime');
     }
     var amp = 330 + (L >= 1 ? 20 : 0) + (L >= 3 ? 50 : 0) + (B ? 50 : 0);
@@ -522,8 +559,7 @@
     if (f < 105 || f >= 465) return f >= 555;
     var iv = ((L >= 1 ? 12 : 14) - (B ? 3 : 0)) * (G.thin ? 2 : 1);
     if ((f - 105) % iv !== 0) return false;
-    var dir = A.px < A.bx ? -1 : 1;
-    A.shot(A.bx, A.by, dir * V(15), 0, 3, { tag: 'hell', fuse: 6 });
+    A.shot(A.bx, A.by, st.dir * V(15), 0, 3, { tag: 'hell', fuse: 6 });
     if (++st.n % 5 === 0 && !G.thin) {
       var base = aim(), dsp = V(8.4 + (L >= 3 ? 2.5 : L >= 1 ? 1.36 : 0));
       for (var j = 0; j < 7; j++) {
@@ -1063,6 +1099,7 @@
         a = st.p.a0 + i * TAU / n + (w % 2 ? Math.PI / n : 0);
         G.bolts.push({ x: A.bx, y: A.by, a: a, end: G.fr + 51, at: G.fr + TIMING.BrimstoneLightning.tele,
                        segs: boltSegs(A.bx, A.by, a, Math.hypot(A.AW, A.AH) * 0.8) });
+        warn({ x: A.bx, y: A.by, a: a, len: beamLen(), w: 2, bw: 6, life: teleT(TIMING.BrimstoneLightning.tele) });
       }
       /* and one fork on the soul, unless it already stands in the gap */
       as = aim();
@@ -1312,7 +1349,7 @@
       for (k = 0; k < n; k++) {
         var y = y0 + k * 64;
         if (y < A.AY + 6 || y > A.AY + A.AH - 6) continue;
-        warn({ x: dir ? A.AX + A.AW : A.AX, y: y, a: dir ? Math.PI : 0, life: 30, w: 4, len: A.AW });
+        warn({ x: dir ? A.AX + A.AW : A.AX, y: y, a: dir ? Math.PI : 0, life: 30, w: 4, len: A.AW, bw: 65 });
         (function (d, ly) {
           later(30, function () {
             G.lasers.push({ x: d ? A.AX + A.AW : A.AX, y: ly, a: 0, len: 130, at: G.fr, end: G.fr + 70,
@@ -1378,7 +1415,11 @@
     if (v < vols && d % s === 0 && d / s < n) {
       k = d / s;
       if (k === 0) { st.p.x = A.px; st.p.y = A.py; }
-      G.rend.push(jcLine(k, n, v, st.p.x, st.p.y));
+      var seg = jcLine(k, n, v, st.p.x, st.p.y);
+      G.rend.push(seg);
+      /* one warn per slash: the same segment, shown ahead with the rift's half-width */
+      warn({ x: seg.x1, y: seg.y1, a: Math.atan2(seg.y2 - seg.y1, seg.x2 - seg.x1),
+             len: Math.hypot(seg.x2 - seg.x1, seg.y2 - seg.y1), w: 3, bw: D(20), life: 24 });
     }
     return f >= 96 * (vols - 1) + s * (n - 1) + 61;
   };
@@ -1618,14 +1659,21 @@
     move(A.px, A.py - 170, 0.1);
     if (s >= 3) return true;
     if (lf === 6) { warn({ x: A.bx, y: A.by, r: 30, w: 2, life: 24 }); cue('chime'); }
+    /* 24 f ahead of each burst (burst k fires at 30 + 20k): its fan and the aim line through it */
+    if (lf >= 6 && lf < 6 + nb * 20 && (lf - 6) % 20 === 0) {
+      k = (lf - 6) / 20;
+      var n = 8 + (L >= 2 ? 2 : 0), dist = Math.max(60, Math.hypot(A.px - A.bx, A.py - A.by));
+      var base = aim() + (k % 3 - 1) * 0.18, rot = Math.min(0.35, 12 * (n - 1) / (2 * dist));
+      var hole = (k * 3 + s * 2) % n;
+      st.dart = { n: n, base: base, rot: rot, hole: hole, sp: 180 + 35 * L };
+      warn({ x: A.bx, y: A.by, kind: 'fan', a0: base - rot, a1: base + rot, r: dist, life: 24 });
+      warn({ x: A.bx, y: A.by, a: base, len: dist, life: 24, w: 2, bw: D(14) });
+    }
     if (lf >= 30 && lf < 30 + nb * 20 && (lf - 30) % 20 === 0) {
-      k = (lf - 30) / 20;
-      var n = 8, hole = (k * 3 + s * 2) % n, base = aim() + (k % 3 - 1) * 0.18;
-      var dist = Math.max(60, Math.hypot(A.px - A.bx, A.py - A.by));
-      var rot = Math.min(0.35, 12 * (n - 1) / (2 * dist)), sp = 180 + 35 * L;
-      for (var j = 0; j < n; j++) {
-        if (j === hole) continue;
-        shotRamp(A.bx, A.by, base + (j / (n - 1) * 2 - 1) * rot, sp, 0, { tag: 'brim', fuse: 4 });
+      var d = st.dart;
+      for (var j = 0; j < d.n; j++) {
+        if (j === d.hole) continue;
+        shotRamp(A.bx, A.by, d.base + (j / (d.n - 1) * 2 - 1) * d.rot, d.sp, 0, { tag: 'brim', fuse: 4 });
       }
       A.anim('charging'); kick('small');
     }
@@ -1663,7 +1711,11 @@
     if (f === 0) st.side = A.bx < A.px ? -1 : 1;
     for (i = 0; i < n + g; i++) {
       var at = 30 + i * 45 + (i >= n ? 30 : 0);
-      if (f === at - 24) warn({ x: A.bx, y: A.by, r: i >= n ? 40 : 26, w: 2, life: 24 });
+      if (f === at - 24) {
+        warn({ x: A.bx, y: A.by, r: i >= n ? 40 : 26, w: 2, life: 24 });
+        warn({ x: A.bx, y: A.by, kind: 'fan', a0: aim() - 0.3, a1: aim() + 0.3, r: beamLen() * 0.25, life: 24 });
+        warn({ x: A.bx, y: A.by, a: aim(), len: beamLen() * 0.25, w: 2, bw: D(14), life: 24 });
+      }
       if (f === at) homer(st, i >= n, i >= n ? 150 : (L >= 1 ? 230 : 190));
     }
     homers(st);
