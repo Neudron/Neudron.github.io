@@ -509,6 +509,10 @@
     }
     if (p.c < n && f === p.t0 - Tw) {
       p.w = warn({ x: A.bx, y: A.by, a: aim(), life: Tw, w: 5, len: D(1600) });
+      /* the bomb's landing ring, shown at the dash start: the predicted spot
+         (drag ignored, half the free flight) and the burst's first-second reach */
+      var la = aim(), ld = bombSp * (fuse / 60) * 0.5;
+      warn({ x: A.bx + Math.cos(la) * ld, y: A.by + Math.sin(la) * ld, r: V(6), rFill: true, w: 3, life: 24 });
       cue('chime');
     }
     if (p.w && f < p.t0) { p.w.x = A.bx; p.w.y = A.by; if (p.t0 - f > 6) p.w.a = aim(); }
@@ -599,7 +603,8 @@
     if (local >= 0 && local < 3 * 167 && local % 167 < 91 && (local % 167) % 7 === 0) {
       var off = D(L >= 3 ? 1050 : 900);
       var tx = hx(A.px + rnd(-off, off)), ty = hy(A.py + rnd(-off, off));
-      G.tele.push({ x: tx, y: ty, a: Math.atan2(ty - A.by, tx - A.bx), at: G.fr, life: 30 });
+      G.tele.push({ x: tx, y: ty, a: Math.atan2(ty - A.by, tx - A.bx), at: G.fr, life: 30, bw: 24,
+        len: Math.hypot(tx - A.bx, ty - A.by) + 40 });
       later(45, (function (bx, by) {
         return function () { bomb(bx, by, 0, 0, rnd(135, 185), 12, V(6)); };
       }(tx, ty)));
@@ -748,10 +753,14 @@
     if (f % 6 === 0 && f < 6 * nd) {
       var q = (f / 6) * TAU / nd;
       (function (sx, sy) {
-        warn({ x: sx, y: sy, r: 14, w: 2, life: 24 });
+        warn({ x: sx, y: sy, r: 20, w: 2, life: 24 });
         later(24, function () {
           var d = A.shot(sx, sy, 0, 0, 3, { tag: 'demon', fuse: 7, prox: 12, onEnd: demonBurst });
-          if (d) { st.p.demons.push({ b: d, t: G.fr, v: 0 }); fx().mine.push(d); }
+          if (d) {
+            /* the blast ring rides on its demon until the fuse runs out */
+            d.ring = warn({ x: sx, y: sy, r: V(6), rFill: true, w: 3, life: 24 });
+            st.p.demons.push({ b: d, t: G.fr, v: 0 }); fx().mine.push(d);
+          }
         });
       })(A.bx + Math.cos(q) * D(225), A.by + Math.sin(q) * D(225));
       if (f === 0) cue('chime');
@@ -759,6 +768,8 @@
     var list = st.p.demons;
     for (i = 0; i < list.length; i++) {
       var m = list[i], b = m.b;
+      /* the ring re-arms every 24 f (warn caps life at 30) and ends with its fuse */
+      if (b.ring) { b.ring.x = b.x; b.ring.y = b.y; if (G.fr - b.ring.at >= 24) b.ring.at = G.fr; if (b.fuse <= 0) b.ring.life = 0; }
       if (b.fuse <= 0 || G.fr - m.t < 45) continue;
       m.v = Math.min(m.v + V(0.25), V(7));
       var ha = Math.atan2(A.py - b.y, A.px - b.x);
@@ -804,8 +815,8 @@
   ATK.BecomeBerserk = function (st) {
     var f = st.f, w = st.p.w;
     if (f === 0) {
-      loud(true, 0.45); cue('chime'); A.anim('charge_telegraph');
-      w = st.p.w = warn({ x: 0, y: 0, r: 60, w: 3, life: 96 });
+      loud(true, 0.25); cue('chime'); A.anim('charge_telegraph');
+      w = st.p.w = warn({ x: 0, y: 0, r: 60, w: 4, rFill: true, life: 96 });
     }
     if (f < 75) { w.x = hx(A.px); w.y = hy(A.py - D(450)); }
     if (f === 95) {
@@ -813,7 +824,7 @@
       A.setBoss(w.x, w.y);
       A.anim('idle');
       ringRamp(A.bx, A.by, 12, V(10), 0);
-      kick('large', true);
+      kick(rm() ? 'medium' : 'large', true);
       A.sfx('maelstrom');
       later(14, function () { ringRamp(A.bx, A.by, 12, V(13), TAU / 24); });
       later(40, function () { loud(false); });
@@ -866,7 +877,7 @@
   function shadowWave(sp, a0, rn, rsp) {
     for (var i = 0; i < 8; i++) {
       var a = a0 + i * TAU / 8, vx = Math.cos(a) * sp, vy = Math.sin(a) * sp;
-      warn({ x: A.bx + vx * 32 / 60, y: A.by + vy * 32 / 60, r: 20, w: 2, life: 32 });
+      warn({ x: A.bx + vx * 32 / 60, y: A.by + vy * 32 / 60, r: rsp, rFill: true, w: 3, life: 32 });
       var b = A.shot(A.bx, A.by, vx, vy, 5, { tag: 'shadow', fuse: 32 / 60,
         onEnd: function (b) { ringRamp(b.x, b.y, rn, rsp, a0); kick('small'); } });
       if (b) fx().mine.push(b);
@@ -894,7 +905,7 @@
     var f = st.f, i;
     for (i = 0; i < 3; i++) if (f === [0, 26, 46][i]) (function (i) {
       var a = aim(), x = A.bx, y = A.by, T = Math.max(24, teleT(26 - 6 * i)), sp = V(9.4) * (1 + 0.15 * i) * (busy() ? 0.8 : 1);
-      warn({ x: x, y: y, a: a, w: 3, life: T });
+      warn({ x: x, y: y, a: a, w: 3, bw: i === 0 ? 24 : 16, life: T });
       if (!i) cue('chime');
       later(T, function () {
         shotRamp(x, y, a, sp, 2, { tag: 'gig', fuse: 1.6 });
@@ -903,7 +914,7 @@
     })(i);
     if (f === 84) {
       var b = aim(); st.dx = Math.cos(b); st.dy = Math.sin(b);
-      warn({ x: A.bx, y: A.by, a: b, w: 8, len: V(30) * 0.5 + 20, life: 30 });
+      warn({ x: A.bx, y: A.by, a: b, w: 8, bw: 24, len: V(30) * 0.5 + 20, life: 30 });
     }
     if (f === 114) { kick('medium'); A.sfx('fireblast'); }
     if (f >= 114 && f < 144) {
@@ -1146,11 +1157,12 @@
      afterimage every 4 f and two wake darts every 6 f, and stops with a ring. */
   ATK.PredictiveCharge = function (st) {
     var f = st.f - (st.p.f0 || 0), k, dx, dy, L, s, pa, p, T = st.p.f0 ? 26 : 40;
-    if (f === 0) { st.p.tl = { x: A.bx, y: A.by, a: 0, at: G.fr, life: Math.min(30, T) }; G.tele.push(st.p.tl); }
+    if (f === 0) { st.p.tl = { x: A.bx, y: A.by, a: 0, at: G.fr, life: Math.min(30, T), bw: 24 }; G.tele.push(st.p.tl); }
     if (f < T) {
       A.anim('charge_telegraph'); A.willCharge(true);
       p = predict(A.bx, A.by, 900);
       st.p.tl.x = A.bx; st.p.tl.y = A.by; st.p.tl.a = Math.atan2(p.y - A.by, p.x - A.bx);
+      st.p.tl.len = Math.hypot(p.x - A.bx, p.y - A.by) + 40;
       st.p.tx = p.x; st.p.ty = p.y;
       return false;
     }
@@ -1631,12 +1643,12 @@
     if (p.n < 3 && f === p.t) {
       p.t = wave(p.k + p.n, p.side, 380 + 30 * p.n + 15 * Math.min(L, 3)) - G.fr + f + 10;
       p.side = -p.side; p.n++;
-      if (L >= 2) {
-        for (i = 0; i < 5; i++) (function (x) {
-          warn({ x: x, y: A.AY + 8, a: Math.PI / 2, w: 2, len: A.AH, life: 26 });
-          later(26, function () { A.shot(x, A.AY + 4, 0, 300, 0, { tag: 'brim', fuse: 3 }); });
-        })(A.AX + A.AW * (0.1 + 0.2 * i) + (RNG() - 0.5) * 30);
-      }
+      /* geysers from L0: three, four at L1, five at L2+ */
+      var nG = L >= 2 ? 5 : L === 1 ? 4 : 3;
+      for (i = 0; i < nG; i++) (function (x) {
+        warn({ x: x, y: A.AY + 8, a: Math.PI / 2, w: 4, bw: 10, len: A.AH, life: 26 });
+        later(26, function () { A.shot(x, A.AY + 4, 0, 300, 0, { tag: 'brim', fuse: 3 }); });
+      })(A.AX + A.AW * (0.1 + 0.2 * i) + (RNG() - 0.5) * 30);
     }
     /* geysers stop at the last wave: one every 34 f would keep the bones (and the end check) alive forever */
     if (f % 34 === 17 && p.n > 0 && f < p.t) landingGeyser();
@@ -1752,7 +1764,7 @@
      dash ends in a 10-ring with a two-dart gap toward the soul. */
   ATK.TwinCharge = function (st) {
     var f = st.f, p = st.p, n = G.lvl >= 2 ? 3 : 2;
-    if (f === 0) { p.c = 0; p.t = 30; p.w = warn({ x: A.bx, y: A.by, a: aim(), w: 6, len: 420 * 33 / 60 + 20, life: 30 }); A.willCharge(true); cue('chime'); }
+    if (f === 0) { p.c = 0; p.t = 30; p.w = warn({ x: A.bx, y: A.by, a: aim(), w: 6, bw: 24, len: 420 * 33 / 60 + 40, life: 30 }); A.willCharge(true); cue('chime'); }
     if (p.c >= n) return f >= p.t;
     if (f < p.t) {
       A.anim('charge_telegraph');
@@ -1770,7 +1782,7 @@
     }
     ringRamp(A.bx, A.by, 10, 190, aim(), 9, 2);
     p.c++;
-    if (p.c < n) { p.t = f + 24; p.w = warn({ x: A.bx, y: A.by, a: aim(), w: 6, len: 420 * 33 / 60 + 20, life: 24 }); }
+    if (p.c < n) { p.t = f + 24; p.w = warn({ x: A.bx, y: A.by, a: aim(), w: 6, bw: 24, len: 420 * 33 / 60 + 40, life: 24 }); }
     else p.t = f + 30;
     return false;
   };
@@ -1979,7 +1991,9 @@
     if (p.count < 20 && !p.next && s >= p.nt - 24) {
       var a = rnd(0, TAU), d = D(rnd(180, 455));
       p.next = { x: hx(A.px + Math.cos(a) * d), y: hy(A.py + Math.sin(a) * d) };
-      warn({ x: p.next.x, y: p.next.y, r: 24, w: 2, life: 24 });
+      /* the ten-dart ring's 0.4 s reach, and a line to where the boss lands */
+      warn({ x: p.next.x, y: p.next.y, r: V(8) * 0.4, rFill: true, w: 3, life: 24 });
+      warn({ x: A.bx, y: A.by, a: Math.atan2(p.next.y - A.by, p.next.x - A.bx), len: Math.hypot(p.next.x - A.bx, p.next.y - A.by), w: 2, bw: 0, life: 24 });
     }
     if (p.next && s >= p.nt && p.count < 20) {
       A.boom(A.bx, A.by);
@@ -2388,7 +2402,8 @@
       get history() { return G ? G.hist : []; },
       get lightning() { return G ? G.lightPh : 0; },
       /* the live warnings (line, ring), for fixes73: each has its life in frames */
-      get warns() { return G && G.fx ? G.fx.warn : []; }
+      get warns() { return G && G.fx ? G.fx.warn : []; },
+      get darkTo() { return G && G.fx ? G.fx.darkTo : 0; }
     },
     /* the new bodies, for draw and the tests */
     beam: function () { return G ? G.beam : null; },
@@ -2441,8 +2456,17 @@
         for (i = 0; i < G.tele.length; i++) {
           t = G.tele[i];
           var k = Math.sin(Math.PI * (G.fr - t.at) / t.life), c = Math.cos(t.a), sn = Math.sin(t.a);
+          var tw = Math.max(3, t.bw ? t.bw * 2 * 0.35 : 3), tg = Math.round(lerp(0x6A, 0xE0, k)), tb = Math.round(lerp(0x50, 0xC0, k));
+          /* the hit band (2 bw wide) is filled under the line, to the line's own length */
+          if (t.bw) {
+            ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.a);
+            ctx.fillStyle = 'rgba(255,60,40,' + (0.18 * k).toFixed(3) + ')';
+            ctx.fillRect(0, -t.bw, t.len || L, 2 * t.bw);
+            ctx.restore();
+          }
+          line(ctx, t.x - c * L, t.y - sn * L, t.x + c * L, t.y + sn * L, 'rgba(0,0,0,.6)', tw + 4);
           line(ctx, t.x - c * L, t.y - sn * L, t.x + c * L, t.y + sn * L,
-               'rgba(255,0,0,' + Math.min(1, k * 3).toFixed(2) + ')', Math.max(1, Math.round(lerp(0.3, 3, k))));
+               'rgb(255,' + tg + ',' + tb + ')', tw);
         }
         if (G.beam) beam(ctx, G.beam);
         drawNew(ctx);
