@@ -132,6 +132,13 @@
   function teleT(T) { return clamp(T, 24, 30); }
   /* a warning: a line (a = angle) or a ring (r = radius) that ramps up to its hit frame */
   function warn(o) { o.life = clamp(o.life || 24, 24, 30); o.at = G.fr; fx().warn.push(o); return o; }
+  /* a safe gap (cyan, dashed, no fill): len across the wall, full depth of the
+     arena. horiz: the gap runs along x (a top or bottom wall), else along y. */
+  function gapMark(x, y, horiz, len, life) {
+    return warn({ kind: 'rect', safe: true, life: life || 24,
+      x: horiz ? x - len / 2 : A.AX, y: horiz ? A.AY : y - len / 2,
+      w: horiz ? len : A.AW, h: horiz ? A.AH : len });
+  }
   /* a bullet that starts slow and reaches sp (floor .45, cap sp): read, then go */
   function shotRamp(x, y, a, sp, k, o) {
     o = o || {};
@@ -220,21 +227,28 @@
       if (w.kind === 'rect') {
         /* a telegraphed box: fill .2, 2 px edge */
         ctx.globalAlpha = fade;
-        ctx.fillStyle = 'rgba(' + c + ',.2)'; ctx.fillRect(w.x, w.y, w.w, w.h);
-        ctx.strokeStyle = 'rgba(' + c + ',.85)'; ctx.lineWidth = 2; ctx.strokeRect(w.x, w.y, w.w, w.h);
+        if (w.safe) {
+          /* safe gap: cyan dashed outline, never filled (cyan = safe, red = hurt) */
+          ctx.setLineDash([8, 6]); ctx.strokeStyle = '#5FF2FF'; ctx.lineWidth = 2;
+          ctx.strokeRect(w.x, w.y, w.w, w.h); ctx.setLineDash([]); ctx.globalAlpha = 1;
+          continue;
+        }
+        ctx.fillStyle = 'rgba(' + c + ',' + (w.fillA || 0.2) + ')'; ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.strokeStyle = 'rgba(' + c + ',.85)'; ctx.lineWidth = w.lw || 2; ctx.strokeRect(w.x, w.y, w.w, w.h);
         ctx.globalAlpha = 1;
         continue;
       }
       if (w.kind === 'fan') {
         /* a sector from a0 to a1 at radius r, filled .16, with its two edge lines */
         ctx.globalAlpha = fade;
-        ctx.fillStyle = 'rgba(' + c + ',.16)';
-        ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.arc(w.x, w.y, w.r, w.a0, w.a1); ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = 'rgba(' + c + ',.85)'; ctx.lineWidth = 2;
+        if (w.safe) { ctx.setLineDash([8, 6]); ctx.strokeStyle = '#5FF2FF'; }
+        else { ctx.fillStyle = 'rgba(' + c + ',.16)'; ctx.strokeStyle = 'rgba(' + c + ',.85)'; }
+        if (!w.safe) { ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.arc(w.x, w.y, w.r, w.a0, w.a1); ctx.closePath(); ctx.fill(); }
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(w.x, w.y); ctx.lineTo(w.x + Math.cos(w.a0) * w.r, w.y + Math.sin(w.a0) * w.r);
         ctx.moveTo(w.x, w.y); ctx.lineTo(w.x + Math.cos(w.a1) * w.r, w.y + Math.sin(w.a1) * w.r);
-        ctx.stroke();
+        ctx.stroke(); ctx.setLineDash([]);
         ctx.globalAlpha = 1;
         continue;
       }
@@ -276,6 +290,18 @@
       ctx.lineWidth = core;
       ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(ex, ey); ctx.stroke();
     }
+    /* the desperation stage card: 30 f, alpha 0 -> 1 -> 0, spaced caps, black stroke */
+    if (F.title && G.fr - F.title.at < 30) {
+      t = (G.fr - F.title.at) / 30;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = t < 0.5 ? t * 2 : (1 - t) * 2;
+      ctx.font = '32px monospace'; ctx.textAlign = 'center';
+      ctx.lineWidth = 3; ctx.strokeStyle = '#000';
+      ctx.strokeText(F.title.text.split('').join(' '), A.AX + A.AW / 2, A.AY + A.AH * 0.35);
+      ctx.fillStyle = '#FFE0C0';
+      ctx.fillText(F.title.text.split('').join(' '), A.AX + A.AW / 2, A.AY + A.AH * 0.35);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'lighter';
+    }
     for (wk = 0, wn = 0; wk < F.mine.length; wk++) {
       m = F.mine[wk];
       if (m.fuse > 0 && m.x > A.AX - 40 && m.x < A.AX + A.AW + 40 && m.y > A.AY - 40 && m.y < A.AY + A.AH + 40) F.mine[wn++] = m;
@@ -289,6 +315,8 @@
       sp = Math.hypot(m.vx, m.vy);
       rot = Math.atan2(m.vy, m.vx);
       s = m.k === 2 || m.k === 3 || m.k === 5 ? 22 : 12;
+      /* demon skulls (k 5) get a 2 px ember outline so they read on #2a0008 (3:1+) */
+      if (m.k === 5) { ctx.strokeStyle = '#FFB070'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(m.x, m.y, 14, 0, TAU); ctx.stroke(); }
       for (var j = n; j >= 1; j--) {
         twinFlare(ctx, m.x - m.vx * j * 0.56 / 60 * 2, m.y - m.vy * j * 0.56 / 60 * 2, s * (1 - j / (n + 2)), rot, 0.4 * (1 - j / (n + 1)));
       }
@@ -976,11 +1004,19 @@
       warn({ x: b.x, y: b.y + b.h, a: 0, life: Tw, w: 3, len: b.w });
       warn({ x: b.x, y: b.y, a: Math.PI / 2, life: Tw, w: 3, len: b.h });
       warn({ x: b.x + b.w, y: b.y, a: Math.PI / 2, life: Tw, w: 3, len: b.h });
+      /* the final box (s = .2), previewed as a 3 px outline */
+      warn({ kind: 'rect', x: A.AX + A.AW * 0.2, y: A.AY + A.AH * 0.2, w: A.AW * 0.6, h: A.AH * 0.6, safe: false, lw: 3, life: Tw });
       cue('chime');
     }
     cad = Math.round(36 - 24 * Math.min(1, f / D_));
     if (f % cad === 0) {
       gp = (f / cad) | 0;
+      /* the walking two-slot gap, marked on each edge */
+      var gc = ((gp + 1) % n + 0.0) / n;
+      gapMark(b.x + gc * b.w, b.y, true, 2 * b.w / n, cad);
+      gapMark(b.x + gc * b.w, b.y + b.h, true, 2 * b.w / n, cad);
+      gapMark(b.x, b.y + gc * b.h, false, 2 * b.h / n, cad);
+      gapMark(b.x + b.w, b.y + gc * b.h, false, 2 * b.h / n, cad);
       for (e = 0; e < 4; e++) for (i = 0; i < n; i++) {
         if ((((i - gp) % n) + n) % n < 2) continue;
         t = (i + 0.5) / n;
@@ -1007,11 +1043,16 @@
   /* the look's four stages (boss-scal despLevel): each restored substate
      rides the stage of the step before it */
   var DESP_STAGE = ['lightning', 'lightning', 'rend', 'rend', 'gravity', 'gravity', 'gravity', 'final'];
+  function titleCard(name) {
+    fx().title = { at: G.fr, text: name.replace(/([a-z])([A-Z])/g, '$1 $2').toUpperCase() };
+    cue('chime');
+  }
   ATK.DesperationPhase = function (st) {
     if (st.f === 0) {
       A.invuln(true); G.sub = 0; G.desp = G.desp || { stage: '' }; G.desp.stage = DESP_STAGE[0];
       st.p.s = newSt();
       G.hist.push({ name: DESP[0], lvl: G.lvl, f: G.fr });
+      titleCard(DESP[0]);
     }
     if (ATK[DESP[G.sub]](st.p.s)) {
       if (DESP[G.sub] === 'GravityOfRuin') blueOff();
@@ -1019,6 +1060,7 @@
       G.sub++; st.p.s = newSt();
       G.desp.stage = DESP_STAGE[G.sub];
       G.hist.push({ name: DESP[G.sub], lvl: G.lvl, f: G.fr });
+      titleCard(DESP[G.sub]);
     } else st.p.s.f++;
     return false;
   };
@@ -1199,10 +1241,15 @@
     if (f === 0) warn({ x: cx, y: cy, r: 180, w: 2, life: 30 });
     if (f >= 30 && f < 210 && (f - 30) % cad === 0) {
       r = Math.max(40, 330 - (f - 30) * 1.6);
+      /* the open gap: midway between arm 0 and arm 1, safe-marked as a fan */
+      var gap = (f - 30) * 0.22 + TAU / (2 * arms);
+      warn({ kind: 'fan', safe: true, x: cx, y: cy, r: r, a0: gap - 0.12, a1: gap + 0.12, life: 24 });
+      G.convGapX = clamp(cx + (A.AY - cy) * Math.cos(gap) / (Math.abs(Math.sin(gap)) < 0.2 ? 0.2 : Math.sin(gap)), A.AX, A.AX + A.AW);
       for (k = 0; k < arms; k++) {
         q = (f - 30) * 0.22 + k * TAU / arms;
-        x = cx + Math.cos(q) * r; y = cy + Math.sin(q) * r;
+        x = clamp(cx + Math.cos(q) * r, A.AX, A.AX + A.AW); y = clamp(cy + Math.sin(q) * r, A.AY, A.AY + A.AH);
         ia = Math.atan2(cy - y, cx - x);
+        if (k === 0) warn({ x: x, y: y, r: 12, w: 2, life: 24 });
         A.shot(x, y, Math.cos(ia) * dr, Math.sin(ia) * dr, 0, { tag: 'demon', fuse: 8 });
       }
     }
@@ -1212,6 +1259,7 @@
       ringRamp(cx, cy, 9, V(7), aim(), 8, 3);
       kick('medium'); cue('fireblast'); sparks(cx, cy, 20, 0, TAU, 200);
     }
+    if (f >= 240) G.convGapX = undefined;
     return f >= 240;
   };
 
@@ -1230,9 +1278,12 @@
       G.lanes = { s: st.p.safe, n: w, at: G.fr, life: 80 };
       cue('chime');
     }
+    /* a combo's converging gap (ComboSkullRain): no falling lane may sit within 40 px of it */
+    var nearGap = function (x) { return G.convGapX !== undefined && Math.abs(x - G.convGapX) < 40; };
     if (c >= 8 && (c - 8) % cad === 0) {
       for (i = 0; i < L; i++) {
         if (i >= st.p.safe && i < st.p.safe + w) continue;
+        if (nearGap(A.AX + (i + 0.5) * lw)) continue;
         warn({ x: A.AX + (i + 0.5) * lw, y: A.AY, a: Math.PI / 2, len: A.AH, w: 2, life: 24 });
       }
     }
@@ -1240,6 +1291,7 @@
       for (i = 0; i < L; i++) {
         if (i >= st.p.safe && i < st.p.safe + w) continue;
         x = A.AX + (i + 0.5) * lw + ((c >> 3) % 2 ? -lw * 0.25 : lw * 0.25);
+        if (nearGap(x)) continue;
         A.shot(x, A.AY - 10, 0, 240, 0, { tag: 'brim', fuse: 3 });
       }
     }
@@ -1749,7 +1801,7 @@
     if (f >= 20 && f < 320 && (f - 20) % iv === 0) {
       var y = hy(A.py + (RNG() - 0.5) * 24), side = st.side, x = side > 0 ? A.AX + 2 : A.AX + A.AW - 2, n = st.n++;
       var ys = n % 4 === 3 ? [y - 36, y + 36] : [y];
-      for (var j = 0; j < ys.length; j++) warn({ x: x, y: ys[j], a: side > 0 ? 0 : Math.PI, w: 3, len: A.AW, life: 24 });
+      for (var j = 0; j < ys.length; j++) warn({ kind: 'rect', x: A.AX, y: ys[j] - 8, w: A.AW, h: 16, life: 24 });
       later(24, function () {
         for (var q = 0; q < ys.length; q++) A.shot(x, ys[q], side * sp, 0, 3, { tag: 'hell', fuse: 5 });
       });
@@ -1817,14 +1869,18 @@
   }
   function wallWarn(d, hole) {
     var vert = d === 'd' || d === 'u', T = 24, e;
+    /* the whole sweep lane, faint, then the two edge lines and the safe gap */
+    warn({ kind: 'rect', x: A.AX, y: A.AY, w: A.AW, h: A.AH, fillA: 0.12, life: T });
     if (vert) {
       e = d === 'd' ? A.AY + 3 : A.AY + A.AH - 3;
       warn({ x: A.AX, y: e, a: 0, w: 3, len: Math.max(0, hole - 54 - A.AX), life: T });
       warn({ x: A.AX + A.AW, y: e, a: Math.PI, w: 3, len: Math.max(0, A.AX + A.AW - hole - 54), life: T });
+      gapMark(hole, A.AY + A.AH / 2, true, 108, T);
     } else {
       e = d === 'r' ? A.AX + 3 : A.AX + A.AW - 3;
       warn({ x: e, y: A.AY, a: Math.PI / 2, w: 3, len: Math.max(0, hole - 48 - A.AY), life: T });
       warn({ x: e, y: A.AY + A.AH, a: -Math.PI / 2, w: 3, len: Math.max(0, A.AY + A.AH - hole - 48), life: T });
+      gapMark(A.AX + A.AW / 2, hole, false, 96, T);
     }
   }
   ATK.BrimstoneWalls = function (st) {
@@ -1855,7 +1911,7 @@
       y = A.AY + 50 + i * (A.AH - 100) / (n - 1);
       b = A.shot(fromLeft ? A.AX - 10 : A.AX + A.AW + 10, y, (fromLeft ? 1 : -1) * (150 + 15 * Math.min(G.lvl, 3)), 0, 5,
                  { tag: 'demon', fuse: 6 });
-      if (b) l.push({ b: b, ph: i * 0.6, t: 0 });
+      if (b) { l.push({ b: b, ph: i * 0.6, t: 0 }); fx().mine.push(b); }
     }
     A.sfx('hellblast');
   }
@@ -1870,7 +1926,7 @@
     for (k = 0; k < n; k++) {
       if (f === (k === 0 ? 0 : 20 + k * 70 - 24)) {
         var fl = k % 2 === 0;
-        for (var i = 0; i < 5; i++) warn({ x: fl ? A.AX + 6 : A.AX + A.AW - 6, y: A.AY + 50 + i * (A.AH - 100) / 4, r: 10, w: 2, life: 24 });
+        for (var i = 0; i < 5; i++) warn({ x: fl ? A.AX + 24 : A.AX + A.AW - 24, y: A.AY + 50 + i * (A.AH - 100) / 4, r: 16, rFill: true, w: 2, life: 24 });
         cue('chime');
       }
       if (f === (k === 0 ? 24 : 20 + k * 70)) skullRow(st, k % 2 === 0, 5);
@@ -1958,7 +2014,11 @@
     if (s < len - 60 && s % 60 === 0) {
       p.wallBase = A.AX + ((p.wn % 2) ? D(420) : 0) - D(840);
       for (var x0 = p.wallBase; x0 < A.AX + A.AW; x0 += D(840)) {
-        warn({ x: Math.max(A.AX, x0), y: A.AY + 3, a: 0, w: 3, len: Math.max(0, Math.min(D(420), x0 + D(420) - A.AX)), life: 24 });
+        var sx = Math.max(A.AX, x0), sx2 = Math.min(A.AX + A.AW, x0 + D(420));
+        if (sx2 > sx) {
+          warn({ kind: 'rect', x: sx, y: A.AY, w: sx2 - sx, h: A.AH, life: 24 });
+          gapMark(x0 + D(210), A.AY + A.AH / 2, true, 2 * D(21), 24);
+        }
       }
     }
     if (s < len - 60 && s >= 24 && (s - 24) % 60 === 0) {
@@ -2403,7 +2463,9 @@
       get lightning() { return G ? G.lightPh : 0; },
       /* the live warnings (line, ring), for fixes73: each has its life in frames */
       get warns() { return G && G.fx ? G.fx.warn : []; },
-      get darkTo() { return G && G.fx ? G.fx.darkTo : 0; }
+      get darkTo() { return G && G.fx ? G.fx.darkTo : 0; },
+      /* the combo's converging gap column (ComboSkullRain), for fixes106 */
+      get convGap() { return G ? G.convGapX : undefined; }
     },
     /* the new bodies, for draw and the tests */
     beam: function () { return G ? G.beam : null; },
