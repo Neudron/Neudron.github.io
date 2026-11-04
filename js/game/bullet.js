@@ -1,6 +1,6 @@
 /* bullet.js — the room behind the door.
    ───────────────────────────────────────────────────────────────────
-   A twenty-second encounter, Undertale's box with Calamity's feel: the
+   A thirty-second encounter, Undertale's box with Calamity's feel: the
    thing at the far end is the clock, and its boss bar is the twenty
    seconds draining. Three short phases, each announced in the box
    before it fires:
@@ -37,7 +37,8 @@
   function announce(s) { if (live) live.textContent = s; }
 
   var dm = NEU.danmaku;
-  var SURVIVE   = 20;          // seconds
+  var SURVIVE   = 30;          // seconds
+  var VLEN      = 20;          // Act III's seeded plan keeps its twenty seconds
   var PLAYER_R  = dm.soul.R;   // the TRUE hitbox
   var MAX_B     = 700;
   var BL_HALF = 24; // was 17, matches visual beam width at game scale
@@ -66,12 +67,15 @@
      emitters [kind, every]. Emitters drift out of sync on purpose —
      synchronised ones make corridors you can stand in forever. */
   var PHASES = [
-    { at: 0,  mode: 'red',  line: '* twenty seconds. that\'s the whole ask.',
+    { at: 0,  mode: 'red',  line: '* thirty seconds. that\'s the whole ask.',
       em: [['ring', 1.30], ['aimed', 0.95]] },
-    { at: 7,  mode: 'blue', line: '* your SOUL is blue now. stay on the ground.',
+    { at: 9,  mode: 'blue', line: '* your SOUL is blue now. stay on the ground.',
       em: [['bone', 1.25], ['blaster', 2.2], ['elec', 2.6]] },
-    { at: 13, mode: 'red',  line: '* the last six. it is still aiming.',
-      em: [['spiral', 0.075], ['wall', 2.6], ['blaster', 3.1], ['aimed', 1.4]] }
+    { at: 19, mode: 'red',  line: '* it is still aiming.',
+      em: [['spiral', 0.075], ['wall', 2.6], ['blaster', 3.1], ['aimed', 1.4]] },
+    /* the 4th: the 3rd's spiral, a touch faster (third element = spin step) */
+    { at: 25, mode: 'red',  line: '* the last few seconds. stay in the open.',
+      em: [['spiral', 0.06, 0.44], ['wall', 1.8], ['aimed', 0.9]] }
   ];
 
   /* Undertale's blaster: 6 frames of 43x57, mouth down. 0 = charging,
@@ -167,12 +171,30 @@
   }
   addEventListener('resize', function () { if (running) layout(); });
 
-  function add(x, y, vx, vy, r, c) { dm.shot(bullets, x, y, vx, vy, r, c, 0, MAX_B); }
+  function add(x, y, vx, vy, r, c) { spot(x, y); dm.shot(bullets, x, y, vx, vy, r, c, 0, MAX_B); }
+
+  /* Spawn markers: the first shot of each emitter leaves a 2px ring on the
+     box's rim for 0.35 s, at its spawn point projected onto the rim. */
+  var curE = null, marks = [], flashAt = -9, grazeFx = -9;
+  function spot(x, y) {
+    if (!curE || curE.shown) return;
+    curE.shown = true;
+    var cx = Math.min(Math.max(x, AX), AX + AW), cy = Math.min(Math.max(y, AY), AY + AH);
+    var dl = cx - AX, dr = AX + AW - cx, dt = cy - AY, db = AY + AH - cy;
+    var m = Math.min(dl, dr, dt, db), rx = cx, ry = cy;
+    if (m === dl) rx = AX - BORDER / 2;
+    else if (m === dr) rx = AX + AW + BORDER / 2;
+    else if (m === dt) ry = AY - BORDER / 2;
+    else ry = AY + AH + BORDER / 2;
+    marks.push({ x: rx, y: ry, t0: t });
+  }
 
   /* Difficulty: 0 at the start, 1 at the end. Endless keeps climbing —
      the curve is the content once there is no finish line. */
+  /* The run's length: Act III's plan is twenty seconds, the room is thirty. */
+  function span() { return variant ? VLEN : SURVIVE; }
   function ramp() {
-    return endless ? Math.min(2.4, t / SURVIVE) : Math.min(1, t / SURVIVE);
+    return endless ? Math.min(2.4, t / SURVIVE) : Math.min(1, t / span());
   }
 
   /* Endless loops the three phases every twenty seconds. */
@@ -189,7 +211,10 @@
     dm.soulMode(F, P.mode);
     emitters = [];
     for (var i = 0; i < (P.em || []).length; i++)
-      emitters.push({ kind: P.em[i][0], every: P.em[i][1], next: t + TELE + i * 0.3, ang: 0 });
+      emitters.push({ kind: P.em[i][0], every: P.em[i][1], next: t + TELE + i * 0.3, ang: 0,
+                      spin: P.em[i][2], shown: false });
+    /* a phase change: the box flashes white and the soul is hit "small" */
+    if (n > 1) { flashAt = t; if (NEU.juice) NEU.juice.hit('small'); }
   }
 
   /* ── Act III variant: the plan ────────────────────────────────────
@@ -243,9 +268,9 @@
     blocks(shuffle(['triple', 'pair'], r));
     phases.push({ at: at, mode: 'red', line: LINES[3], em: [] });
     var fin = { kind: 'spiral', ang: 0 }, wall = { kind: 'wall', ang: 0 };
-    events.push({ t: at + 0.6, e: wall, blk: 'final', start: at, end: SURVIVE });
-    for (var s = at + 0.2; s < SURVIVE - 0.2; s += 0.4)
-      events.push({ t: s, e: fin, blk: 'final', start: at, end: SURVIVE });
+    events.push({ t: at + 0.6, e: wall, blk: 'final', start: at, end: VLEN });
+    for (var s = at + 0.2; s < VLEN - 0.2; s += 0.4)
+      events.push({ t: s, e: fin, blk: 'final', start: at, end: VLEN });
     return { phases: phases, events: events };
   }
 
@@ -261,6 +286,7 @@
       bl.lane = Math.min(Math.max(F.x + off, AX + 34), AX + AW - 34);
       bl.from = (F.mode === 'blue' || Math.random() < 0.5) ? 't' : 'b';
     }
+    spot(horiz ? (bl.from === 'l' ? AX : AX + AW) : bl.lane, horiz ? bl.lane : (bl.from === 't' ? AY : AY + AH));
     blasters.push(bl);
   }
 
@@ -292,7 +318,7 @@
         add(sx, sy, Math.cos(base + o) * spd, Math.sin(base + o) * spd, 4, PAL.ui);
       }
     } else if (e.kind === 'spiral') {
-      e.ang += 0.42;
+      e.ang += e.spin || 0.42;
       var arms = 2 + Math.round(k * 2), s2 = 96 + k * 44;
       for (var m = 0; m < arms; m++) {
         var a2 = e.ang + m * (Math.PI * 2 / arms);
@@ -307,6 +333,7 @@
     } else if (e.kind === 'bone') {
       /* Undertale's blue-soul bone: slides along the floor, jump it. */
       var left = (e.ang = 1 - e.ang) === 1;
+      spot(left ? AX - 8 : AX + AW + 8, AY + AH);
       bones.push({ x: left ? AX - 8 : AX + AW + 8, vx: (left ? 1 : -1) * (150 + k * 60),
                    h: 18 + ((Math.random() * 12) | 0) });
     } else if (e.kind === 'wall') {
@@ -363,7 +390,7 @@
     }
     for (var i = 0; i < emitters.length; i++) {
       var e = emitters[i];
-      if (t >= e.next) { e.next = t + e.every; fire(e); }
+      if (t >= e.next) { e.next = t + e.every; curE = e; fire(e); curE = null; }
     }
 
     if (inv > 0) inv -= dt;
@@ -429,7 +456,7 @@
       beatAt = t;
       if (NEU.sfx && NEU.sfx.heart) NEU.sfx.heart();
     }
-    if (!endless && t >= SURVIVE) { finish(true); return; }
+    if (!endless && t >= span()) { finish(true); return; }
     draw();
   }
 
@@ -482,6 +509,8 @@
   }
   function grazed() {
     meter = Math.min(100, meter + GRAZE_GAIN);
+    grazeFx = t;
+    if (NEU.juice) NEU.juice.burst(F.x, F.y, 4, '#FFFFFF', 90);
     if (t - lastGz >= GRAZE_GAP) {
       lastGz = t;
       if (!reducedFx()) F.grazeFlashT = 0.12;
@@ -495,6 +524,7 @@
     ctx.fillStyle = PAL.slot; ctx.fillRect(x, y + 7, 100, 12);
     ctx.fillStyle = meter >= 100 ? PAL.full : PAL.meter;
     ctx.fillRect(x, y + 7, meter, 12);
+    if (t - grazeFx < 0.3) { ctx.fillStyle = '#FFFFFF'; ctx.fillText('+1', x + 104, y + 4); }
   }
 
   function drawBlaster(bl) {
@@ -579,6 +609,22 @@
       ctx.fillRect((b.x - b.r) | 0, (b.y - b.r) | 0, s, s);
     }
     ctx.restore();
+    /* spawn markers, on the rim only; the phase flash is the box's outline */
+    marks = marks.filter(function (m) { return t - m.t0 < 0.35; });
+    if (marks.length) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(AX - BORDER, AY - BORDER, AW + BORDER * 2, AH + BORDER * 2);
+      ctx.rect(AX, AY, AW, AH); ctx.clip('evenodd');
+      ctx.strokeStyle = PAL.box; ctx.lineWidth = 2;
+      for (var k = 0; k < marks.length; k++) {
+        ctx.beginPath(); ctx.arc(marks[k].x, marks[k].y, 3, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (t - flashAt < 0.12) {
+      ctx.lineWidth = 4; ctx.strokeStyle = PAL.box;
+      ctx.strokeRect(AX - BORDER - 2, AY - BORDER - 2, AW + BORDER * 2 + 4, AH + BORDER * 2 + 4);
+    }
 
     dm.drawFX(ctx, F, inv);
 
@@ -597,11 +643,10 @@
        finish, so the bar drains with the difficulty and the name is
        the clock counting up. */
     dm.hud(ctx, F, { w: w, h: h, AY: AY, AH: AH,
-                     name: endless ? t.toFixed(1) + 's, endless' : 'twenty seconds',
-                     hp: endless ? 1 - ramp() / 2.4 : SURVIVE - t,
-                     max: endless ? 1 : SURVIVE,
-                     ticks: endless ? null : variant ? plan.phases.slice(1).map(function (p) { return 1 - p.at / SURVIVE; })
-                                                     : [1 - 7 / SURVIVE, 1 - 13 / SURVIVE],
+                     name: endless ? t.toFixed(1) + 's, endless' : 'thirty seconds',
+                     hp: endless ? 1 - ramp() / 2.4 : span() - t,
+                     max: endless ? 1 : span(),
+                     ticks: endless ? null : table().slice(1).map(function (p) { return 1 - p.at / span(); }),
                      php: hp, pmax: 3, phase: phase, rage: 0, rageOn: false });
     drawCarried();
     drawGraze();
@@ -637,7 +682,7 @@
     layout();
     F.x = AX + AW / 2; F.y = AY + AH - 60;
     bullets = []; blasters = []; bones = [];
-    meter = 0; lastGz = -9;
+    meter = 0; lastGz = -9; grazeFx = -9; flashAt = -9; marks = [];
     plan = variant ? buildPlan(attempt++) : null; qi = 0;
     PAL = variant ? PAL_III : PAL_II;
     enterPhase(1);
@@ -694,11 +739,11 @@
     if (msg) {
       msg.hidden = false;
       msg.innerHTML = good
-        ? '<b>you made it.</b><br>twenty seconds. take the dog food?<br><small>esc to leave</small>'
+        ? '<b>you made it.</b><br>thirty seconds. take the dog food?<br><small>esc to leave</small>'
         : '<b>ouch.</b><br>enter to try again &middot; esc to leave';
     }
     if (good) {
-      announce('you made it. twenty seconds. take the dog food?');
+      announce('you made it. thirty seconds. take the dog food?');
       if (NEU.quest) NEU.quest.mark('survive');
       if (NEU.grantDogFood) NEU.grantDogFood();
     }
@@ -730,7 +775,7 @@
        being typed while you are also dodging with the other hand. */
     if (running && /^[0-9]$/.test(e.key)) {
       cheat = (cheat + e.key).slice(-5);
-      if (cheat === '69420') { t = SURVIVE; }
+      if (cheat === '69420') { t = span(); }
     }
   });
   addEventListener('keyup', function (e) {
@@ -787,6 +832,7 @@
   NEU.bullet = { open: open, close: close, get endless() { return endless; }, get running() { return running; },
                  get won() { return won; }, get phase() { return phase; }, get soul() { return F; },
                  get variant() { return variant; }, get plan() { return plan; }, get meter() { return meter; },
+                 get phases() { return PHASES; }, get bullets() { return bullets; },
                  buildPlan: buildPlan, teleAlpha: teleAlpha, chargeTime: BL_CHARGE, get pal() { return PAL; },
                  set t(v) { t = +v || 0; } };   /* dev/screenshots: jump the clock */
 })();
