@@ -970,8 +970,10 @@
                      NEU.juice.end(ctx, shook);
                      NEU.juice.overlay(ctx, w, h); }
 
+    if (L && L.drawStage) L.drawStage(ctx, w, h, -ox, -oy, room.w * TILE * S, room.h * TILE * S, now, room.tileset, S, padH > 0);
+
     if (fade > 0) {
-      if (L && !reduced) L.drawIris(ctx, w, h, sx(px), sy(py - 8), fade);
+      if (L && !reduced) L.drawIris(ctx, w, h, sx(px), sy(py - 8), fade, room.tileset, S);
       else { ctx.fillStyle = 'rgba(5,5,7,' + fade.toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); }
     }
   }

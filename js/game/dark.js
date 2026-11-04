@@ -432,6 +432,10 @@
       }
       ctx.globalCompositeOperation = 'destination-in';
       ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
+      /* stage light: bone tint on what the mask kept, so the rings stay stepped */
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.globalAlpha = 0.1; ctx.fillStyle = '#EDE7DE'; ctx.fillRect(0, 0, w, h);
+      ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
 
       /* keep the finished, masked frame for the frames that repeat it */
@@ -442,6 +446,8 @@
       if (lc) { lc.drawImage(cv, 0, 0); } else { litCv = null; litKey = null; }
     }
     ctx.globalCompositeOperation = 'source-over';
+    /* K4 stage lamp hanging over the player: the torch's source (after the blit, so litKey is unaffected) */
+    if (NEU.stage) NEU.stage.lamp(ctx, (w / 2 - 10) | 0, (h / 2 - 112) | 0, 2, 1);
 
     /* Drawn after the torch mask, so they read from across the room. */
     var calm = !!(NEU.motion && NEU.motion.reduced && NEU.motion.reduced());
@@ -452,7 +458,7 @@
       var gd = Math.hypot(px - L.x, py - L.y);
       if (gd < LIGHT * 0.6) continue;
       var fade = Math.min(1, 900 / gd);
-      ctx.fillStyle = L.col;
+      ctx.fillStyle = m === 2 ? '#FFD34E' : L.col;   /* door highlight: show-gold */
       if (m === 2) {
         ctx.globalAlpha = Math.max(0, (0.16 + breathe) * fade);
         ctx.fillRect(dx - 8, dy - 8, DOOR.w + 16, DOOR.h + 16);
@@ -481,8 +487,9 @@
     if (ctx.setLineDash) ctx.setLineDash([]);
 
     for (var pl = 0; pl < LANDMARKS.length; pl++) {
-      if (!lit[pl]) continue;
       var PL = LANDMARKS[pl], pr = [160, 100, 50], pa = [0.10, 0.18, 0.28];
+      /* a reached landmark marks the room, not the torch: no tint over the player */
+      if (!lit[pl] || Math.hypot(px - PL.x, py - PL.y) < pr[0]) continue;
       ctx.fillStyle = PL.col;
       for (var q = 0; q < 3; q++) {
         ctx.globalAlpha = pa[q]; ctx.beginPath();
@@ -556,7 +563,7 @@
       for (var mo = 0; mo < motes.length; mo++) {
         var M = motes[mo], md = Math.hypot(M.x - px, M.y - py);
         if (md >= rad) continue;
-        ctx.globalAlpha = 0.5 * (1 - md / rad); ctx.fillStyle = '#D8C8FF';
+        ctx.globalAlpha = 0.5 * (1 - md / rad); ctx.fillStyle = '#EDE7DE';
         ctx.fillRect((M.x - camX) | 0, (M.y - camY) | 0, 2, 2);
       }
     }

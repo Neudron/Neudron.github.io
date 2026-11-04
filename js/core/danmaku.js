@@ -467,43 +467,57 @@
     ctx.fillStyle = track; ctx.fillRect(x, y, w, h);
     ctx.fillStyle = fill; ctx.fillRect(x, y, Math.round(w * Math.max(0, Math.min(1, r))), h);
   }
+  /* K1 thin frame (2px rim, black inside) from the stage kit; a test
+     page without stage.js just skips it */
+  function fr(ctx, x, y, w, h, rim) {
+    if (NEU.stage) NEU.stage.frame(ctx, x | 0, y | 0, w | 0, h | 0, true, rim);
+  }
+  /* an open-bottom plate (K2, no top bar) sitting on a frame's top edge */
+  function tab(ctx, x, yBot, w) {
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, yBot - 30, w, 30);
+    ctx.fillStyle = '#000000'; ctx.fillRect(x + 2, yBot - 28, w - 4, 28);
+  }
 
-  /* The HUD, drawn outside the shake. Top: a Calamity boss bar (dark
-     frame, red fill, a white chip that trails behind, phase ticks).
-     Bottom: a Deltarune party panel for YOU, the adrenaline gauge on
-     its left, rage (and tp, when the boss has one) inside it.
-     o = { w, h, AY, AH, name, hp, max, ticks, invuln, php, pmax, phase,
-           tp?, rage?, rageOn? } */
-  /* TP, Deltarune's meter: a vertical bar down the arena's left side.
-     tp is 0..1 (the wiki's 0..250 shown as 0..100 %). MAX under 100. */
+  /* The HUD, drawn outside the shake. Top: a framed boss bar (red
+     3-step fill, a white chip that trails behind, phase notches) with
+     its name and % on plates. Bottom: one party strip band under the
+     arena: the YOU cell (soul, HP) and RAGE / DASH / ADRN sub-bars.
+     o = { w, h, AX?, AW?, AY, AH, name, hp, max, ticks, invuln, php,
+           pmax, phase, tp?, rage?, rageOn?, frame? } */
+  /* TP, Deltarune's meter: a vertical framed gauge left of the arena,
+     ten cells filling bottom-up, gold at MAX. tp is 0..1. */
   function tpMeter(ctx, tp, AX, AY, AH) {
-    /* Deltarune's look: a tall dark well with a white rim, orange fill
-       (yellow at MAX) with a bright line riding the top of it, the
-       letters T and P stacked down its left, the % above it. */
-    var f = Math.max(0, Math.min(1, tp)), w = 20, h = AH, max = f >= 1;
-    var x = Math.max(40, (AX - 52) | 0), y = AY | 0, slim = AX < 92;
-    /* a phone has no room left of the arena: a slim bar in the margin */
-    if (slim) { w = 6; x = Math.max(6, (AX - 12) | 0); }
-    ctx.fillStyle = '#000000'; ctx.fillRect(x - 3, y - 3, w + 6, h + 6);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(x - 2, y - 2, w + 4, 1); ctx.fillRect(x - 2, y + h + 1, w + 4, 1);
-    ctx.fillRect(x - 2, y - 2, 1, h + 4); ctx.fillRect(x + w + 1, y - 2, 1, h + 4);
-    ctx.fillStyle = '#3A1A06'; ctx.fillRect(x, y, w, h);
-    var fh = Math.round(h * f);
-    ctx.fillStyle = max ? '#FFD84A' : '#FF8A1E';
-    ctx.fillRect(x, y + h - fh, w, fh);
-    if (fh > 2) { ctx.fillStyle = max ? '#FFFFFF' : '#FFC88A'; ctx.fillRect(x, y + h - fh, w, 2); }
-    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillStyle = '#FF8A1E';
-    if (!slim) {
-      ctx.fillText('T', x - 16, y + (h >> 1) - 20);
-      ctx.fillText('P', x - 16, y + (h >> 1));
+    var f = Math.max(0, Math.min(1, tp)), max = f >= 1, slim = AX < 92;
+    var w = slim ? 12 : 24, h = Math.min(320, AH) | 0;
+    var x = slim ? Math.max(6, (AX - 18) | 0) : Math.max(40, (AX - 52) | 0);
+    var y = (AY + ((AH - h) >> 1)) | 0;
+    fr(ctx, x, y, w, h, '#FFFFFF');
+    fr(ctx, x + 2, y + 2, w - 4, h - 4, '#8C2F4A');
+    /* 10 cells, 2px black gaps, inside the 4px rims */
+    var ix = x + 4, iw = w - 8, ch = ((h - 8 - 2) / 10 | 0) - 2, n = f * 10, i, cy, part;
+    for (i = 0; i < 10; i++) {
+      cy = y + h - 4 - 2 - (i + 1) * (ch + 2) + 2;
+      ctx.fillStyle = '#3A1A06'; ctx.fillRect(ix, cy, iw, ch);
+      part = max ? ch : Math.round(ch * Math.max(0, Math.min(1, n - i)));
+      if (part > 0) {
+        ctx.fillStyle = max ? '#FFD34E' : '#FF8A1E';
+        ctx.fillRect(ix, cy + ch - part, iw, part);
+      }
     }
-    ctx.fillStyle = max ? '#FFD84A' : '#EDE7DE';
-    if (slim) ctx.textAlign = 'left';
-    ctx.fillText((slim ? 'TP ' : '') + (max ? 'MAX' : Math.floor(f * 100) + '%'), slim ? x - 2 : x + w / 2, y - 24);
-    ctx.textAlign = 'center';
-    if (max) { ctx.fillStyle = '#EDE7DE'; ctx.fillText('100%', x + w / 2, y + h + 6); }
+    ctx.textBaseline = 'top';
+    var s = max ? 'MAX' : Math.floor(f * 100) + '%';
+    if (slim) {
+      ctx.textAlign = 'left'; ctx.fillStyle = max ? '#FFD34E' : '#EDE7DE';
+      ctx.fillText('TP ' + s, x - 2, y - 24);
+      return;
+    }
+    ctx.textAlign = 'center'; ctx.fillStyle = '#FF8A1E';
+    ctx.fillText('T', x - 16, y + (h >> 1) - 16);
+    ctx.fillText('P', x - 16, y + (h >> 1));
+    var pw = Math.ceil((ctx.measureText(s).width + 32) / 8) * 8, px = (x + (w >> 1) - (pw >> 1)) | 0;
+    tab(ctx, px, y, pw);
+    ctx.fillStyle = max ? '#FFD34E' : '#EDE7DE';
+    ctx.fillText(s, x + (w >> 1), y - 22);
     ctx.textAlign = 'left';
   }
 
@@ -520,52 +534,62 @@
     var d = Math.max(0, F.clock - F.hudAt); F.hudAt = F.clock;
     if (r > F.chip) F.chip = r;
     else if (F.clock - F.hitAt > 0.4) F.chip = Math.max(r, F.chip - d * 0.6);
-    var bw = barW(o.w), bx = ((o.w - bw) / 2) | 0, by = 36;
-    ctx.fillStyle = '#05050A'; ctx.fillRect(bx - 4, by - 4, bw + 8, 20);
-    ctx.fillStyle = '#5A5468'; ctx.fillRect(bx - 2, by - 2, bw + 4, 16);
-    ctx.fillStyle = '#1A0A0E'; ctx.fillRect(bx, by, bw, 12);
-    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(bx, by, Math.round(bw * F.chip), 12);
-    ctx.fillStyle = o.invuln ? '#6A6480' : '#C8202E'; ctx.fillRect(bx, by, Math.round(bw * r), 12);
-    ctx.fillStyle = o.invuln ? '#8A8598' : '#FF5A4A'; ctx.fillRect(bx, by, Math.round(bw * r), 3);
-    ctx.fillStyle = '#EDE7DE';
-    for (var i = 0; o.ticks && i < o.ticks.length; i++)
-      ctx.fillRect(bx + Math.round(bw * o.ticks[i]), by - 2, 2, 16);
+    var bw = barW(o.w), bx = ((o.w - bw) / 2) | 0, by = 36, i;
+    /* boss bar: 2px white rim, 2px inner rim (o.frame), 16px well */
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(bx - 4, by - 4, bw + 8, 24);
+    ctx.fillStyle = o.frame || '#B892FF'; ctx.fillRect(bx - 2, by - 2, bw + 4, 20);
+    ctx.fillStyle = '#1A0A0E'; ctx.fillRect(bx, by, bw, 16);
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(bx, by, Math.round(bw * F.chip), 16);
+    var fw = Math.round(bw * r);
+    ctx.fillStyle = o.invuln ? '#6A6480' : '#C8202E'; ctx.fillRect(bx, by, fw, 16);
+    ctx.fillStyle = o.invuln ? '#4A4458' : '#8C1A22'; ctx.fillRect(bx, by + 11, fw, 5);
+    ctx.fillStyle = o.invuln ? '#8A8598' : '#FF5A4A'; ctx.fillRect(bx, by, fw, 2);
+    /* phase ticks: 2px notches cut down through the top rim */
+    ctx.fillStyle = '#000000';
+    for (i = 0; o.ticks && i < o.ticks.length; i++)
+      ctx.fillRect(bx + Math.round(bw * o.ticks[i]), by - 4, 2, 6);
     /* Glitch: the last phase look shivers her name at 2 Hz (two pinned
        positions per second, none under reduced motion). */
     var still = !!(NEU.settings && NEU.settings.reduced);
     var glx = (o.glitch && !still) ? ((Math.floor(F.clock * 2) & 1) ? 2 : -2) : 0;
-    ctx.textAlign = 'left'; ctx.fillText(o.name, bx + glx, by - 24);
-    ctx.textAlign = 'right'; ctx.fillText(Math.ceil(r * 100) + '%', bx + bw, by - 24);
+    var pct = Math.ceil(r * 100) + '%';
+    var nw = Math.min(bw - 80, Math.ceil((ctx.measureText(o.name).width + 32) / 8) * 8) | 0;
+    var cw = Math.ceil((ctx.measureText(pct).width + 32) / 8) * 8;
+    tab(ctx, bx - 4, by - 4, nw); tab(ctx, bx + bw + 4 - cw, by - 4, cw);
+    ctx.fillStyle = '#EDE7DE';
+    ctx.textAlign = 'left'; ctx.fillText(o.name, bx + 12 + glx, by - 26);
+    ctx.textAlign = 'right'; ctx.fillText(pct, bx + bw - 12, by - 26);
 
-    var pw = Math.min(300, o.w - 64), ph = 48;
-    var px = ((o.w - pw) / 2 + 12) | 0;
-    var py = Math.min(o.AY + o.AH + 24, o.h - ph - 4) | 0;
-    var tab = COL_SOUL;
-    ctx.fillStyle = '#000000'; ctx.fillRect(px, py, pw, ph);
-    ctx.fillStyle = tab;
-    ctx.fillRect(px, py, pw, 2); ctx.fillRect(px, py + ph - 2, pw, 2);
-    ctx.fillRect(px, py, 2, ph); ctx.fillRect(px + pw - 2, py, 2, ph);
-    ctx.fillRect(px + 8, py - 18, 56, 18);
-    ctx.textAlign = 'left'; ctx.fillStyle = '#000000'; ctx.fillText('YOU', px + 18, py - 17);
-    ctx.fillStyle = '#EDE7DE'; ctx.fillText('HP', px + 10, py + 6);
-    ctx.textAlign = 'right'; ctx.fillText(Math.max(0, o.php) + '/' + o.pmax, px + pw - 10, py + 6);
-    bar(ctx, px + 40, py + 8, pw - 110, 12, o.php / o.pmax, '#800000', '#FFFF00');
+    /* the party strip: one band, the arena's width, under the arena */
+    var AW = o.AW || (o.AX !== undefined ? o.w - 2 * o.AX : Math.min(760, o.w - 48));
+    AW = Math.max(240, Math.min(o.w - 16, AW)) | 0;
+    var sx = ((o.w - AW) / 2) | 0, sy = Math.min(o.AY + o.AH + 8, o.h - 56 - 8) | 0;
+    var yw = Math.min(256, AW - 120) | 0;
+    fr(ctx, sx, sy, AW, 56, '#FFFFFF');
+    ctx.fillStyle = COL_SOUL; ctx.fillRect(sx, sy, AW, 4);
+    if (NEU.stage) {
+      NEU.stage.strip(ctx, sx, sy, yw, [{ name: 'YOU', hp: Math.max(0, o.php), max: o.pmax, col: COL_SOUL,
+        face: function (c, fx, fy) { stamp(c, HEART, fx + 20, fy + 20, 3, COL_SOUL); } }]);
+      /* the cell's right rim would split the band: paint it out */
+      ctx.fillStyle = '#000000'; ctx.fillRect(sx + yw - 2, sy + 4, 4, 50);
+    }
     var rg = o.rage !== undefined ? o.rage : F.rage;
     var rgOn = o.rageOn !== undefined ? o.rageOn : F.rageT > 0;
-    var half = pw - 20;
-    ctx.textAlign = 'left'; ctx.fillStyle = COL_RAGE; ctx.fillText('RAGE', px + 10, py + 26);
-    bar(ctx, px + 58, py + 30, half - 152, 8, rgOn ? 1 : rg, '#3A0E0E', rgOn ? '#FFC46A' : COL_RAGE);
-    /* DASH: the cooldown, moved off the soul */
     var dk = F.dashCd > 0 ? 1 - F.dashCd / (F.dashCdMax || DASH_CD) : 1;
-    ctx.fillStyle = dk >= 1 ? '#B8E6FF' : '#6A6480'; ctx.fillText('DASH', px + pw - 102, py + 26);
-    bar(ctx, px + pw - 54, py + 30, 44, 8, dk, '#1A2230', dk >= 1 ? '#B8E6FF' : '#5A7A90');
+    var ar = F.adrenT > 0 ? F.adrenT / ADREN_ON : F.adren;
+    var lx = sx + yw + 8, bx2 = lx + 56, bw2 = sx + AW - 10 - bx2;
+    var SUB = [
+      ['RAGE', COL_RAGE, rgOn ? 1 : rg, '#3A0E0E', rgOn ? '#FFC46A' : COL_RAGE],
+      ['DASH', dk >= 1 ? '#B8E6FF' : '#6A6480', dk, '#1A2230', dk >= 1 ? '#B8E6FF' : '#5A7A90'],
+      ['ADRN', COL_ADREN, ar, '#0F2A18', F.adrenT > 0 || F.adren >= 1 ? '#B8FFD0' : COL_ADREN]
+    ];
+    ctx.textAlign = 'left';
+    for (i = 0; i < 3; i++) {
+      var ry = sy + 6 + i * 16;
+      ctx.fillStyle = SUB[i][1]; ctx.fillText(SUB[i][0], lx, ry);
+      bar(ctx, bx2, ry + 6, bw2, 4, SUB[i][2] || 0, SUB[i][3], SUB[i][4]);
+    }
     if (o.tp !== undefined) tpMeter(ctx, o.tp, o.AX, o.AY, o.AH);
-    var gx = px - 22, ar = F.adrenT > 0 ? F.adrenT / ADREN_ON : F.adren;
-    var fh = Math.round(ph * Math.max(0, Math.min(1, ar)));
-    ctx.fillStyle = '#000000'; ctx.fillRect(gx - 2, py - 2, 18, ph + 4);
-    ctx.fillStyle = '#0F2A18'; ctx.fillRect(gx, py, 14, ph);
-    ctx.fillStyle = F.adrenT > 0 ? '#B8FFD0' : COL_ADREN; ctx.fillRect(gx, py + ph - fh, 14, fh);
-    if (F.adren >= 1 || F.adrenT > 0) glow(ctx, gx + 7, py + ph / 2, 32, COL_ADREN, 0.5);
     /* the screen-reader line: HP and phase, written only on a change */
     var s = 'HP ' + Math.max(0, o.php) + '/' + o.pmax + ', ' + o.name + ' phase ' + o.phase;
     if (s !== F.live) {

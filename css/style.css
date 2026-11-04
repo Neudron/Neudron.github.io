@@ -732,9 +732,8 @@ html.is-lite .glass { display: none; }
    the boot screen. */
 .tbox {
   position: fixed; left: 50%;
-  bottom: clamp(88px, 15vh, 142px);
+  bottom: 16px;
   transform: translateX(-50%);
-  width: min(520px, calc(100vw - 40px));
   /* TOP OF THE STACK, and it has to stay there. This sat at 44 and got
      buried by anything that outranked it: the petting hand (46) drew
      across the dog's own dialogue, the inside panel (55) slid over the
@@ -750,11 +749,12 @@ html.is-lite .glass { display: none; }
 .tbox[data-who="narr"] .tbox__face { display: none; }
 
 /* the Deltarune look (frame, *, portrait) lives in css/game.css */
+/* static 8x8 gold square, no blink; sans.js toggles [hidden] */
 .tbox__more {
-  align-self: end; color: #fff; font-size: 16px;
-  animation: tblink 1s steps(2, jump-none) infinite;
+  position: absolute; right: 16px; bottom: 16px;
+  width: 8px; height: 8px; overflow: hidden;
+  background: var(--show-gold); color: transparent; font-size: 16px;
 }
-@keyframes tblink { 0% { opacity: 1; } 50% { opacity: 0; } }
 
 
 /* ── swing trail ──────────────────────────────────────────────────
@@ -948,16 +948,15 @@ html.rm .sword.is-carried::after, html.rm .keyobj.is-carried::after { animation:
 body.is-playing { overflow: hidden; }
 
 .bh__msg {
-  position: absolute; left: 50%; top: 50%;
-  transform: translate(-50%,-50%);
-  padding: 24px 32px;
-  background: var(--void);
-  border: 3px solid var(--bone);
-  color: var(--bone);
-  font: 400 16px/1.7 var(--font);
-  text-align: center;
-  white-space: nowrap;
+  position: absolute; left: 16px; right: 16px; bottom: 56px;
+  max-width: 960px; margin: 0 auto; box-sizing: border-box;
+  padding: 16px 32px 16px 64px;
+  color: #fff; text-align: left;
+  font: 400 32px/1.25 var(--font);
 }
+.bh__msg::before { content: '*'; position: absolute; left: 32px; top: 16px; }
+@media (max-width: 600px) { .bh__msg { font-size: 16px; padding-left: 40px; } .bh__msg::before { left: 20px; } }
+@media (pointer: coarse) { .bh__msg { bottom: 216px; } }
 .bh__msg small { color: var(--dim); }
 .bh__quit {
   position: absolute; right: 20px; top: 20px;
@@ -1235,9 +1234,9 @@ body.is-blackout::before {
   background: url(../img/act4/deltarune/tvtime/podium.png) 0 0 / 100% 100% no-repeat;
   image-rendering: pixelated;
 }
-/* crowd band behind the dialog box: 3 frames, 4.5 fps */
+/* the crowd: a foreground band over the stage lip, 3 frames, 4.5 fps */
 .quiz__set::after {
-  content: ''; position: absolute; left: 0; width: 100%; top: 100%; height: 12.5%;
+  content: ''; position: absolute; left: 0; width: 100%; bottom: -8px; height: 25%; z-index: 2;
   background: url(../img/act4/deltarune/tvtime/crowd.png) 0 0 / 300% auto repeat-x;
   image-rendering: pixelated; pointer-events: none;
   animation: quizCrowd .667s steps(1) infinite;
@@ -1258,28 +1257,23 @@ i[data-s=tvTenBow] { background-image: url(../img/act4/deltarune/tvtime/tenna-bo
 i[data-s=tvFaces] { background-image: url(../img/act4/deltarune/tvtime/faces.png); }
 i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-static.png); }
 .quiz.is-mini .quiz__tenna { visibility: hidden; }
-.quiz__top {
-  position: relative; z-index: 2;
-  display: flex; justify-content: space-between; gap: 16px;
-  padding: 8px 16px;
-  font: 400 16px/1 var(--font); color: #FFF;
-}
-.quiz__cat { color: #FFFF00; }
-.quiz__num { color: #FFF; }
-/* rank thresholds on the backdrop screen, left of Tenna */
+/* the valance across the stage; category and score hang off it as plates */
+.quiz__top { position: relative; z-index: 2; display: flex; justify-content: space-between; padding: 0 16px; }
+.quiz__cat { color: var(--show-gold); }
+/* rank thresholds: a marquee on the stage lip, in front of the crowd */
 .quiz__board {
-  position: absolute; left: 22%; top: 12%; width: 37%; padding: 4px 0;
-  display: grid; grid-template-columns: repeat(5, auto); justify-content: center; gap: 0 4px;
-  background: #000; border: 2px solid #FFF;
+  position: absolute; z-index: 3; left: 50%; bottom: 16px; transform: translateX(-50%); padding: 4px 8px;
+  display: grid; grid-template-columns: repeat(9, auto); justify-content: center; gap: 0 4px;
+  background: var(--show-gold);
 }
-.quiz__board span { font: 400 16px/1.2 var(--font); color: #FFF; padding: 0 4px; white-space: nowrap; transition: background-color .2s, color .2s; }
-.quiz__board b { color: #FFFF00; margin-right: 4px; }
-.quiz__board span.is-lit { background: #FFFF00; color: #000; text-shadow: none; }
-.quiz__board span.is-lit b { color: #000; }
+.quiz__board span { font: 400 16px/1.2 var(--font); color: var(--void); padding: 0 4px; white-space: nowrap; }
+.quiz__board b { color: var(--curtain-lo); margin-right: 4px; }
+.quiz__board span.is-lit { background: #000; color: var(--show-gold); }
+.quiz__board span.is-lit b { color: var(--show-gold); }
 .quiz__round {
-  position: absolute; z-index: 1; left: 50%; top: 0; transform: translateX(-50%);
+  position: absolute; z-index: 1; left: 50%; top: 8px; transform: translateX(-50%);
   padding: 2px 8px; background: #000; white-space: nowrap;
-  font: 400 16px/1.2 var(--font-display); color: #FFFF00; text-transform: uppercase;
+  font: 400 16px/1.2 var(--font-display); color: var(--show-gold); text-transform: uppercase;
 }
 /* the minigames: 320x160 at 2x over the stage */
 .quiz__canvas {
@@ -1290,28 +1284,25 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 /* phone: the board sits under the stage */
 @media (max-width: 759px) {
   .quiz__set { margin-bottom: 56px; }
-  .quiz__board { top: 100%; left: 0; width: 100%; padding: 4px 0; background: #000; z-index: 2; }
+  .quiz__set::after { height: 15%; }
+  .quiz__board { top: 100%; bottom: auto; left: 0; width: 100%; transform: none; grid-template-columns: repeat(5, auto); }
 }
 .quiz__canvas.is-hit { animation: quizWrong .25s linear; }
 
-/* the dialog box: a 16px 9-slice, 2x on a wide stage */
+/* the dialog box: the one stage frame (.frame, game.css) */
 .quiz__box {
   position: relative; z-index: 2;
   display: grid; gap: 8px; align-content: start;
-  margin: 5% 0 12px;
-  border: 16px solid #8888C8; background: #000;
-  border-image: url(../img/act4/deltarune/tvtime/box9.png) 16 fill / 16px stretch;
-  padding: 0 0 0 80px; min-height: 56px; box-sizing: content-box;
-  image-rendering: pixelated;
+  margin: 0 0 12px; padding: 16px 16px 16px 96px; min-height: 88px;
 }
 /* Tenna's head, left of the host line */
 .quiz__face {
-  position: absolute; left: 0; top: 0; width: 72px; height: 56px;
+  position: absolute; left: 16px; top: 16px; width: 72px; height: 56px;
   image-rendering: pixelated;
 }
 @media (min-width: 700px) {
-  .quiz__box { border-width: 32px; border-image-width: 32px; padding-left: 152px; min-height: 112px; }
-  .quiz__face { width: 144px; height: 112px; }
+  .quiz__box { padding: 24px 24px 24px 184px; min-height: 160px; }
+  .quiz__face { left: 24px; top: 24px; width: 144px; height: 112px; }
 }
 .quiz__host {
   display: grid; grid-template-columns: 24px 1fr;
@@ -1331,19 +1322,18 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
   font: 400 16px/1.3 var(--font); cursor: pointer;
 }
 @media (pointer: coarse) { .quiz__o { min-height: 44px; } }
-.quiz__o b { color: #808080; }
-.quiz__o:hover, .quiz__o:focus { color: #FFFF00; outline: none; }
+.quiz__o b { color: var(--ghost); }
+.quiz__o:hover, .quiz__o:focus { color: var(--show-gold); outline: none; }
 .quiz__o.is-sel::before, .quiz__o:hover::before, .quiz__o.is-right::before {
   content: ''; position: absolute; left: 4px; top: 50%;
   width: 16px; height: 16px; margin-top: -8px;
   background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
   image-rendering: pixelated;
 }
-.quiz__o.is-right { color: #00FF00; animation: quizRight .5s ease-out; }
-.quiz__o.is-wrong { color: #FF0000; animation: quizWrong .35s ease-out; }
-.quiz__timer { height: 6px; background: #404040; }
-.quiz__timer i { display: block; height: 100%; width: 100%; background: #FFFF00; }
-.quiz__timer i.is-low { background: #FF0000; }
+.quiz__o.is-right { color: var(--show-gold); animation: quizRight .5s ease-out; }
+.quiz__o.is-wrong { color: #E23B55; animation: quizWrong .35s ease-out; }
+.quiz__timer i { display: block; height: 100%; width: 100%; background: var(--show-gold); }
+.quiz__timer i.is-low { background: var(--blood); }
 /* a big screen gets Deltarune's own scale: 2x text, 2x soul */
 @media (min-width: 1100px) and (min-height: 760px) {
   .quiz__stage { width: min(100vw, calc((100vh - 400px) * 1.8)); }
@@ -1362,7 +1352,7 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 /* ── the finale ──────────────────────────────────────────────────
    The questions go; the score counts up, the rank stamps down and the
    doors it opened light up on the board, under two sweeping lights. */
-.quiz.is-finale .quiz__top, .quiz.is-finale .quiz__q,
+.quiz.is-finale .quiz__top > *, .quiz.is-finale .quiz__q,
 .quiz.is-finale .quiz__opts, .quiz.is-finale .quiz__timer { display: none; }
 /* the answer keys mean nothing now; the go button says what does */
 .quiz.is-finale .bh__keys { visibility: hidden; }
@@ -1371,29 +1361,24 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 .quiz__end {
   position: absolute; z-index: 3; inset: 0; overflow: auto;
   display: grid; justify-items: center; align-content: center; gap: 8px;
-  padding: 8px 0 24px; text-align: center; background: rgba(0, 0, 0, .6);
+  padding: 8px 0 24px; text-align: center;
 }
 .quiz__fin {
-  margin: 0; font: 400 32px/1.1 var(--font-display); color: #FFD34E;
-  letter-spacing: 2px; text-shadow: 3px 3px 0 #8A1028;
+  margin: 0; font: 400 32px/1.1 var(--font-display); color: var(--show-gold);
+  letter-spacing: 2px; text-shadow: 3px 3px 0 var(--curtain-lo);
   animation: quizPop .5s var(--bounce) both;
 }
 .quiz__score { margin: 0; font: 400 32px/1 var(--font-display); color: var(--ghost); }
 .quiz__score b { font: 400 64px/1 var(--font-display); color: var(--bone); }
 .quiz__rank {
   margin: 0; min-height: 128px;
-  font: 400 128px/1 var(--font-display); color: #FFD34E;
-  text-shadow: 6px 6px 0 #C8203A, 0 0 32px rgba(255, 211, 78, .5);
+  font: 400 128px/1 var(--font-display); color: var(--show-gold);
+  text-shadow: 6px 6px 0 var(--curtain-hi);
 }
 .quiz__rank.is-stamped { animation: quizStamp .5s cubic-bezier(.2, 1.5, .4, 1) both; }
 .quiz__doors { margin: 0; min-height: 1.5em; font: 400 16px/1.5 var(--font); color: var(--bone); }
-.quiz__go {
-  min-height: 44px; padding: 10px 20px; margin-top: 8px;
-  font: 400 16px/1 var(--font); color: #1B0E2E; background: #FFD34E;
-  border: 0; cursor: pointer; white-space: nowrap;
-}
-.quiz__go:hover, .quiz__go:focus-visible { background: #FFE58A; outline: 3px solid #FF8ACF; outline-offset: 3px; }
-.quiz__small { margin: 0; font: 400 16px/1.5 var(--font); color: #A39BBA; }
+.quiz__go { margin-top: 8px; white-space: nowrap; }
+.quiz__small { margin: 0; font: 400 16px/1.5 var(--font); color: var(--bone); }
 @keyframes quizPop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
 @keyframes quizStamp {
   0%   { opacity: 0; transform: scale(3) rotate(-14deg); }
@@ -1402,21 +1387,20 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 }
 /* two spotlights, only while the finale is on. Real elements that
    quiz.js un-hides, so the hidden attribute (which every engine
-   honours) is what keeps them off the rest of the show. */
-.quiz__beam {
-  position: absolute; top: -20%; z-index: 0;
-  width: 44vmax; height: 140%;
-  background: linear-gradient(to bottom, rgba(255, 240, 190, .30), rgba(255, 240, 190, 0) 75%);
+   honours) is what keeps them off the rest of the show. Two flat
+   steps (K4), hung from the backdrop's inner lamps at 15% / 85%. */
+.quiz__beam, .quiz__beam::before {
+  position: absolute; top: 12%; z-index: 0; width: 40%; height: 80%;
+  background: rgba(237, 231, 222, .08);
   clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%);
-  transform-origin: 50% 0;
-  pointer-events: none;
-  animation: quizBeamIn .6s ease-out both, quizSweepL 3s ease-in-out infinite alternate;
+  transform-origin: 50% 0; pointer-events: none;
 }
-.quiz__beam--l { left: -4%; }
-.quiz__beam--r { right: -4%; animation-name: quizBeamIn, quizSweepR; }
-@keyframes quizBeamIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes quizSweepL { from { transform: rotate(-30deg); } to { transform: rotate(16deg); } }
-@keyframes quizSweepR { from { transform: rotate(30deg); } to { transform: rotate(-16deg); } }
+.quiz__beam { animation: quizSweepL 3s steps(6) infinite alternate; }
+.quiz__beam::before { content: ''; top: 0; left: 0; width: 100%; height: 100%; clip-path: polygon(48% 0, 52% 0, 75% 100%, 25% 100%); }
+.quiz__beam--l { left: -5%; }
+.quiz__beam--r { left: 65%; animation-name: quizSweepR; }
+@keyframes quizSweepL { from { transform: rotate(-24deg); } to { transform: rotate(12deg); } }
+@keyframes quizSweepR { from { transform: rotate(24deg); } to { transform: rotate(-12deg); } }
 /* confetti, over the picture */
 .quiz__fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; transition: opacity .25s; }
 
@@ -1676,12 +1660,7 @@ html.rm body.is-trip .eng canvas, html.rm body.is-trip .craft { filter: saturate
 .eng { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100svh; z-index: 70; background: #08080B; display: grid; place-items: center; transform-origin: center center; }
 .eng canvas { display: block; max-width: 100%; max-height: 100%; image-rendering: pixelated; }
 
-/* ── what's on the television ─────────────────────────────────────
-   A handheld's home screen. It is the only screen on this site that
-   is allowed to look like a PRODUCT rather than like the page: real
-   status bar, real library shelf, real focus ring. The gag only lands
-   if the interface is convincing, so this is the one place the goth
-   restraint gets dropped for consumer-electronics blue. */
+/* ── what's on the television: a handheld console, on the stage kit ── */
 .deck {
   position: fixed; inset: 0; z-index: 78;
   background: #0B0E14;
@@ -1694,15 +1673,20 @@ html.rm body.is-trip .eng canvas, html.rm body.is-trip .craft { filter: saturate
 .deck__bar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px clamp(18px, 4vw, 46px);
-  border-bottom: 2px solid #1B2130;
-  background: #10151E;
+  position: relative; background: #000;
   font: 400 16px/1 var(--font);
 }
+/* The valance strip: a .bulbs marquee (game.css K5) hung under the bar. */
+.deck__bar::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 8px;
+  background: #000 var(--bulb-tile) 0 0 / 16px 8px repeat-x;
+  image-rendering: pixelated; animation: bulbchase .5s steps(1) infinite;
+}
+html.rm .deck__bar::after { animation: none; }
 .deck__brand { color: var(--bone); letter-spacing: 2px; }
 .deck__stat { display: flex; align-items: center; gap: 14px; color: var(--ghost); }
 .deck__wifi { color: #4FC3F7; letter-spacing: -2px; font-size: 16px; }
-/* A battery outline with a real terminal nub on the end — the nub is
-   most of what makes the shape read as a battery at this size. */
+/* Battery outline + terminal nub. */
 .deck__batt {
   position: relative;
   width: 34px; height: 15px;
@@ -1726,9 +1710,7 @@ html.rm body.is-trip .eng canvas, html.rm body.is-trip .craft { filter: saturate
   color: var(--ghost); letter-spacing: 4px; text-transform: uppercase;
 }
 
-/* One row that scrolls sideways. A console shelf is horizontal
-   because a stick is horizontal, and the horizontal-ness is most of
-   what stops this reading as a web page with cards on it. */
+/* One sideways row: a console shelf follows the stick. */
 .deck__shelf {
   display: flex; gap: 18px;
   margin: 0; padding: 10px 4px 18px; list-style: none;
@@ -1741,12 +1723,11 @@ html.rm body.is-trip .eng canvas, html.rm body.is-trip .craft { filter: saturate
 .deck__tile {
   flex: none; width: 132px;
   cursor: pointer;
-  transition: transform .18s var(--bounce);
 }
 .deck__art {
   display: grid; place-content: center;
   width: 132px; height: 132px;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   image-rendering: pixelated;
 }
 .deck__art.is-sigil { display: grid; place-items: center; }
@@ -1761,9 +1742,13 @@ html.rm body.is-trip .eng canvas, html.rm body.is-trip .craft { filter: saturate
   font: 400 16px/1.2 var(--font);
   color: var(--ghost);
 }
-.deck__tile.is-on { transform: translateY(-8px) scale(1.06); }
-.deck__tile.is-on .deck__art { border-color: #ff0; }
-.deck__tile.is-on .deck__cap { color: var(--bone); }
+.deck__tile.is-on .deck__art { border-color: var(--show-gold); }
+/* K2 caption plate (no top bar); the soul caret sits inside its left pad. */
+.deck .deck__tile.is-on .deck__cap {
+  padding: 6px 8px 6px 32px; background: #000; color: var(--show-gold);
+  border: 2px solid #fff; line-height: 16px; text-transform: uppercase;
+}
+.deck .deck__soul { left: 10px; top: 150px; }
 /* The ones that don't run are visibly greyed, so the failure is a
    promise the shelf already made rather than a surprise. */
 .deck__tile.is-dead .deck__art { filter: grayscale(.72) brightness(.72); }
@@ -1772,14 +1757,12 @@ html.rm body.is-trip .eng canvas, html.rm body.is-trip .craft { filter: saturate
 .deck__t { margin: 0; font: 400 32px/1 var(--font-display); color: var(--bone); }
 .deck__m { margin: 0; font: 400 16px/1 var(--font); color: var(--ghost); }
 .deck__play {
-  margin-top: 6px;
-  padding: 12px 26px;
-  border: 0; background: #4FC3F7; color: #06121B;
-  font: 400 16px/1 var(--font); letter-spacing: 2px;
-  cursor: pointer;
-  transition: transform .14s var(--bounce), background-color .2s;
+  margin-top: 8px; height: 48px; padding: 0 16px; border-radius: 0;
+  border: 2px solid var(--show-gold-lo); box-shadow: inset 0 0 0 2px #000;
+  background: #000; color: #fff; text-transform: uppercase;
+  font: 400 16px/16px var(--font); letter-spacing: 2px; cursor: pointer;
 }
-.deck__play:hover { background: #7BD8FF; transform: translateY(-2px); }
+.deck__play:hover, .deck__play:focus-visible { background: var(--show-gold); color: #000; outline: none; }
 .deck__err {
   margin: 4px 0 0; font: 400 16px/1.4 var(--font);
   color: #FF6B8A;
@@ -2158,7 +2141,7 @@ html.rm .sword.is-burst::after { animation: none; display: none; }
 .sett__key { min-width: 44px; min-height: 44px; padding: 0 12px; font: 400 16px/1 var(--font); color: var(--text); background: transparent; border: 2px solid var(--edge); border-radius: 12px; cursor: pointer; }
 .sett__key:hover { border-color: var(--accent); }
 .sett__key:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-kbd { font: 400 16px/1 var(--font); padding: 2px 6px; border: 2px solid var(--edge); border-radius: 8px; }
+kbd { font: 400 16px/1 var(--font); padding: 2px 6px; border: 2px solid #fff; border-radius: 0; }
 
 /* ── the one-time notes (motion on the device, flashing ahead) ──────
    z-index 93: above every scene and the thumb pad, below settings (94)

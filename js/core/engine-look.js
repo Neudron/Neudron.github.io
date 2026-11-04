@@ -905,10 +905,11 @@
     var u = Math.max(2, Math.round(s * 0.75));
     var bob = reduced ? 0 : Math.round(Math.sin(t * 5) * u * 0.6);
     var w = 9 * u, h = 9 * u, x = Math.round(cx - w / 2), y = Math.round(cy - h) + bob;
-    ctx.fillStyle = OUT; ctx.fillRect(x - u, y, w + 2 * u, h); ctx.fillRect(x, y - u, w, h + 2 * u);
-    ctx.fillStyle = '#EDE7DE'; ctx.fillRect(x, y, w, h - u);
-    ctx.fillStyle = '#B8B0C8'; ctx.fillRect(x, y + h - 2 * u, w, u);
-    ctx.fillStyle = OUT;
+    /* a K10 cap: white rim, black face, gold glyph */
+    ctx.fillStyle = '#fff'; ctx.fillRect(x - u, y, w + 2 * u, h); ctx.fillRect(x, y - u, w, h + 2 * u);
+    ctx.fillStyle = '#000'; ctx.fillRect(x, y, w, h - u);
+    ctx.fillStyle = '#3A3252'; ctx.fillRect(x, y + h - 2 * u, w, u);
+    ctx.fillStyle = '#FFD34E';
     if (touch) {
       ctx.fillRect(x + 2 * u, y + 4 * u, u, u); ctx.fillRect(x + 4 * u, y + 4 * u, u, u); ctx.fillRect(x + 6 * u, y + 4 * u, u, u);
     } else if (NEU.keys && NEU.keys.get('z') !== 'z') {
@@ -922,15 +923,23 @@
         if (GLYPH_Z[r][c] === '1') ctx.fillRect(x + (3 + c) * u, y + (1 + r) * u, u, u);
     }
     /* the tail, pointing at the thing */
-    ctx.fillStyle = OUT; ctx.fillRect(x + 3 * u, y + h, 3 * u, u);
-    ctx.fillStyle = '#EDE7DE'; ctx.fillRect(x + 4 * u, y + h - u, u, u);
+    ctx.fillStyle = '#fff'; ctx.fillRect(x + 3 * u, y + h, 3 * u, u);
+    ctx.fillStyle = '#000'; ctx.fillRect(x + 4 * u, y + h - u, u, u);
   }
 
   /* ── transitions ─────────────────────────────────────────────────────
      An iris: a stepped circle closing on the player, opening on the
      spawn. k = 0 open, 1 closed. */
-  function drawIris(ctx, w, h, cx, cy, k) {
+  function drawIris(ctx, w, h, cx, cy, k, zn, s) {
     if (k <= 0) return;
+    var St = NEU.stage;
+    if (St && zone(zn) === ZONES.prize) {
+      /* the prize zones close two curtain panels instead, in 6 steps */
+      var pw = Math.ceil(Math.min(1, Math.ceil(k * 6) / 6) * w / 2);
+      St.curtain(ctx, 0, 0, pw, h, 'l', s || 2);
+      St.curtain(ctx, w - pw, 0, pw, h, 'r', s || 2);
+      return;
+    }
     if (k >= 1) { ctx.fillStyle = '#050507'; ctx.fillRect(0, 0, w, h); return; }
     var R = Math.sqrt(w * w + h * h);
     var steps = 10, r = Math.round((1 - k) * steps) / steps * R;
@@ -942,6 +951,31 @@
     ctx.fill('evenodd');
   }
 
+  /* ── the set ─────────────────────────────────────────────────────────
+     Prize zones only: the letterbox around a small room becomes a
+     proscenium (curtains, valance with bulbs, a crowd at the foot). It is
+     clipped to the letterbox, so it never paints inside the room rect.
+     The curtain layer is baked per size; bulbs and crowd are an overlay. */
+  function drawStage(ctx, w, h, rx, ry, rw, rh, now, zn, s, pad) {
+    var St = NEU.stage;
+    if (!St || zone(zn) !== ZONES.prize) return;
+    var L = Math.max(0, rx), T = Math.max(0, ry), Rr = Math.min(w, rx + rw), B = Math.min(h, ry + rh);
+    if (L <= 0 && T <= 0 && Rr >= w && B >= h) return;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(L, T, Rr - L, B - T); ctx.clip('evenodd');
+    ctx.drawImage(St.bake('ow' + w + 'x' + h + 's' + s, w, h, function (g) {
+      var m = w >> 1;
+      St.curtain(g, 0, 0, m, h, 'l', s);
+      St.curtain(g, m, 0, w - m, h, 'r', s);
+      St.valance(g, 0, 0, w, s);
+    }), 0, 0);
+    St.bulbs(ctx, 0, 5 * s, w, now, s);
+    /* the crowd stays off phones: the pad owns the foot of the screen */
+    var cs = Math.min(s, Math.floor((h - B) / 44));   /* the whole crowd fits the band, or none */
+    if (!pad && cs >= 1) St.crowd(ctx, 0, h - 40 * cs, w, now, 7, cs);
+    ctx.restore();
+  }
+
   NEU.engineLook = {
     zone: zone, palette: palette, material: material, bakeRoom: bakeRoom,
     drawAnimated: drawAnimated, stamp: stamp, shadow: shadow,
@@ -950,7 +984,7 @@
     drawLight: drawLight, glow: glow,
     weatherReset: weatherReset, weatherStep: weatherStep, weatherDraw: weatherDraw,
     get weather() { return { kind: wKind, count: parts.length, flash: flash }; },
-    drawPrompt: drawPrompt, drawIris: drawIris,
+    drawPrompt: drawPrompt, drawIris: drawIris, drawStage: drawStage,
     relight: relight, mix: mix, shade: shade, rgba: rgba, hash: hash,
     get reduced() { return reduced; },
     /* tests flip this to exercise the reduced-motion path */

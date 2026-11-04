@@ -215,15 +215,15 @@
 <!-- ═══ tenna ══════════════════════════════════════════════════════
      A game show, which is an interface, so it is elements. -->
 <div class="quiz" id="quiz" hidden role="dialog" aria-modal="true" aria-label="the show">
-  <div class="quiz__tv" id="quizTv">
-    <i class="quiz__beam quiz__beam--l" hidden></i><i class="quiz__beam quiz__beam--r" hidden></i>
+  <div class="quiz__tv stage-curtain" id="quizTv">
     <div class="quiz__stage">
       <div class="quiz__main">
-        <div class="quiz__top">
-          <span class="quiz__cat" id="quizCat"></span>
-          <span class="quiz__num" id="quizNum"></span>
+        <div class="quiz__top stage-valance">
+          <span class="quiz__cat plate" id="quizCat"></span>
+          <span class="quiz__num plate" id="quizNum"></span>
         </div>
         <div class="quiz__set">
+          <i class="quiz__beam quiz__beam--l" hidden></i><i class="quiz__beam quiz__beam--r" hidden></i>
           <i class="quiz__pod" aria-hidden="true"></i>
           <div class="quiz__tenna" id="quizTenna" aria-hidden="true"></div>
           <div class="quiz__board" id="quizBoard" aria-label="rank thresholds"></div>
@@ -231,7 +231,7 @@
           <canvas class="quiz__canvas" id="quizCanvas" width="320" height="160" hidden></canvas>
           <div class="quiz__end" id="quizEnd" hidden></div>
         </div>
-        <div class="quiz__box">
+        <div class="quiz__box frame">
           <div class="quiz__face" id="quizFace" aria-hidden="true"></div>
           <p class="quiz__host" id="quizSay" aria-live="polite"></p>
           <h2 class="quiz__q" id="quizQ"></h2>
@@ -243,7 +243,7 @@
   </div>
   <canvas class="quiz__fx" id="quizFx" aria-hidden="true"></canvas>
   <button class="bh__quit" id="quizQuit">esc</button>
-  <p class="bh__keys">a b c d &nbsp;&middot;&nbsp; or 1 2 3 4 &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> to answer &nbsp;&middot;&nbsp; esc to leave</p>
+  <p class="bh__keys"><kbd>a</kbd><kbd>b</kbd><kbd>c</kbd><kbd>d</kbd> or <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> <kbd data-k="z">z</kbd> answer <kbd>esc</kbd> leave</p>
 </div>
 
 <!-- ═══ through the crack ══════════════════════════════════════════ -->
@@ -514,6 +514,7 @@
 <script src="js/core/save.js"></script>
 <script src="js/core/keys.js"></script>
 <script src="js/core/juice.js"></script>
+<script src="js/core/stage.js"></script>
 <script src="js/core/danmaku.js"></script>
 <script src="js/data/sheets.js"></script>
 <script src="js/core/engine-look.js"></script>

@@ -204,8 +204,7 @@
 
       var art = document.createElement('span');
       art.className = 'deck__art';
-      art.style.background =
-        'linear-gradient(150deg,' + g.a + ' 0%,' + g.b + ' 78%)';
+      art.style.background = g.a;
 
       /* Presence in SIGILS is the switch — there is no separate flag to
          forget to set. Inline svg, so it inherits the tile's scaling

@@ -599,6 +599,9 @@
     }
     if (n === right) {
       score++;
+      /* the bulb row over the set chases for one beat (css: .quiz.is-right) */
+      wrap.classList.add('is-right');
+      setTimeout(function () { wrap.classList.remove('is-right'); }, 500);
       host(TENNA.right[(Math.random() * TENNA.right.length) | 0]);
       pose('cheer', 'happy');
       var b = btns[right] && btns[right].getBoundingClientRect ? btns[right].getBoundingClientRect() : null;
@@ -648,8 +651,8 @@
         '<p class="quiz__score"><b id="quizTally">0</b> / ' + deal.length + '</p>' +
         '<p class="quiz__rank" id="quizRank"></p>' +
         '<p class="quiz__doors" id="quizDoors"></p>' +
-        '<button type="button" class="quiz__go" id="quizGoBtn">to the doors →</button>' +
-        (runRank === 'Z' ? '<button type="button" class="quiz__go" id="quizCheatBtn" style="margin-top:8px;opacity:.55">cheat (you didn\'t see this)</button>' : '') +
+        '<button type="button" class="quiz__go cmd" id="quizGoBtn">to the doors →</button>' +
+        (runRank === 'Z' ? '<button type="button" class="quiz__go cmd" id="quizCheatBtn" style="margin-top:8px;opacity:.55">cheat (you didn\'t see this)</button>' : '') +
         '<p class="quiz__small">the show takes you there on its own. enter or a tap goes now.</p>';
       var go_ = $('quizGoBtn');
       if (go_) {

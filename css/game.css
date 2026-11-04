@@ -1,5 +1,66 @@
 /* game.css — Act IV UI that came after style.css hit its size cap. */
 
+/* ── stage kit (.opencode/plans/stage-style.md §1) ───────────────────
+   Stage surfaces are a device like the deck: always dark, same in light
+   mode. Tokens mirror NEU.stage.C in js/core/stage.js. */
+:root {
+  --show-gold: #FFD34E;
+  --show-gold-lo: #C8901E;
+  --bulb-off: #3A3252;
+  --curtain-lo: #5A1E2E;
+  --curtain-hi: #C2405F;
+  --plank-hi: #E8DCC8;
+  --plank: #C9B9A2;
+  --plank-lo: #BFA98C;
+  --frame: inset 0 0 0 4px #000, inset 0 0 0 6px #fff;
+  --bulb-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='8'%3E%3Crect x='2' y='2' width='4' height='4' fill='%23FFD34E'/%3E%3Crect x='10' y='2' width='4' height='4' fill='%233A3252'/%3E%3C/svg%3E");
+}
+/* K1: the one frame. Outer 4px white, 4px black, inner 2px white. */
+.tbox, .inv, .fnf__msg, .bh__msg, .frame {
+  border: 4px solid #fff; box-shadow: var(--frame); background: #000;
+}
+/* K2: name plate / tab. Open bottom edge sits on a frame. */
+.plate {
+  display: inline-block; box-sizing: border-box;
+  padding: 8px 16px; background: #000; color: #fff;
+  font: 400 16px/16px var(--font); text-transform: uppercase;
+  border: 2px solid #fff; border-bottom: 0;
+  box-shadow: inset 0 4px 0 var(--show-gold);
+}
+/* K3: pleats on a 32px tile + gold-lo hem; valance with scallops + trim */
+.stage-curtain {
+  background: #8C2F4A url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='8'%3E%3Crect width='8' height='8' fill='%235A1E2E'/%3E%3Crect x='8' width='8' height='8' fill='%238C2F4A'/%3E%3Crect x='16' width='8' height='8' fill='%23C2405F'/%3E%3Crect x='24' width='8' height='8' fill='%238C2F4A'/%3E%3C/svg%3E") repeat;
+  box-shadow: inset 0 -8px 0 var(--show-gold-lo);
+  image-rendering: pixelated;
+}
+.stage-valance {
+  height: 36px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='36'%3E%3Crect width='32' height='32' fill='%238C2F4A'/%3E%3Crect x='8' y='24' width='16' height='4' fill='%235A1E2E'/%3E%3Crect x='12' y='28' width='8' height='4' fill='%235A1E2E'/%3E%3Crect y='32' width='32' height='4' fill='%23C8901E'/%3E%3C/svg%3E") repeat-x;
+  image-rendering: pixelated;
+}
+/* K5: bulb marquee. 16x8 tile, one lit one off; 2 steps per 0.5s means
+   a bulb changes state every 250ms (2 Hz cycle, under the 3 Hz cap). */
+.bulbs {
+  height: 8px;
+  background: #000 var(--bulb-tile) 0 0 / 16px 8px repeat-x;
+  image-rendering: pixelated;
+  animation: bulbchase .5s steps(1) infinite;
+}
+@keyframes bulbchase { 0% { background-position: 0 0; } 50% { background-position: 8px 0; } }
+html.rm .bulbs { animation: none; }
+/* K10: square command button, 48px (touch floor 44). */
+.cmd {
+  width: 48px; height: 48px; padding: 0; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #000; color: #fff; border-radius: 0;
+  border: 2px solid var(--show-gold-lo); box-shadow: inset 0 0 0 2px #000;
+  font: 400 16px/16px var(--font); text-transform: uppercase;
+  cursor: pointer; transition: none;
+}
+.cmd img { image-rendering: pixelated; }
+.cmd.is-on, .cmd:focus-visible { background: var(--show-gold); color: #000; outline: none; }
+.cmd[disabled] { border-color: #5C5C70; background: var(--bulb-off); color: var(--ghost); cursor: default; }
+
 /* ITEM box (js/act4/inventory.js): Deltarune's black menu with the
    white two-step pixel frame. z 76 like .quiz, below .tbox (96). */
 .inv {
@@ -7,10 +68,7 @@
   left: 50%; top: 16px; transform: translateX(-50%);
   width: min(512px, calc(100vw - 48px)); box-sizing: border-box;
   padding: 16px 32px 24px;
-  background: #000; color: #fff;
-  border: 4px solid #fff;
-  /* the second step: a black gap, then a thin white line inside */
-  box-shadow: inset 0 0 0 4px #000, inset 0 0 0 6px #fff;
+  color: #fff;
   font: 400 32px/1.25 var(--font);
   outline: none;
 }
@@ -38,9 +96,7 @@
   position: absolute; left: 16px; right: 16px; bottom: 16px;
   max-width: 960px; margin: 0 auto; box-sizing: border-box;
   padding: 16px 32px 16px 64px;
-  background: #000; color: #fff; text-align: left;
-  border: 4px solid #fff;
-  box-shadow: inset 0 0 0 4px #000, inset 0 0 0 6px #fff;
+  color: #fff; text-align: left;
   font: 400 32px/1.25 var(--font);
 }
 .fnf__msg::before { content: '*'; position: absolute; left: 32px; top: 16px; }
@@ -62,30 +118,50 @@
    in comic sans, everyone else in the pixel face. Position and z-index
    stay in style.css. */
 .tbox {
-  width: min(768px, calc(100vw - 32px)); box-sizing: border-box;
+  width: min(1024px, calc(100vw - 32px)); box-sizing: border-box;
   display: flex; align-items: flex-start; gap: 24px;
-  padding: 24px 32px;
-  background: #000; color: #fff; text-align: left;
-  border: 4px solid #fff;
-  box-shadow: inset 0 0 0 4px #000, inset 0 0 0 6px #fff;
-  font: 400 32px/1.5 var(--font);
+  padding: 16px 32px;
+  color: #fff; text-align: left;
+  font: 400 32px/1.25 var(--font);
 }
 .tbox[data-who="sans"] { font-family: var(--font-talk); }
-.tbox__face { flex: none; line-height: 0; }
+/* portrait well; narration keeps the text column where it is */
+.tbox__face {
+  flex: none; line-height: 0; width: 128px; height: 128px; overflow: hidden;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: var(--ink); box-shadow: inset 0 0 0 2px var(--crypt);
+}
+.tbox[data-who="narr"] { padding-left: 184px; }
 /* 36x33 crop at 3x; 2x on a phone */
 .tbox__face img { width: 108px; height: auto; image-rendering: pixelated; }
 .tbox__txt {
   position: relative; flex: 1; margin: 0;
-  padding-left: 32px; min-height: 4.5em;
+  padding-left: 32px; min-height: 128px; /* = the well, so narr does not jump */
   overflow-wrap: anywhere;
 }
-.tbox__txt::before { content: '*'; position: absolute; left: 0; top: 0; }
+.tbox__txt::before { content: '*'; position: absolute; left: 0; top: 0; font-family: var(--font); }
+/* K2 name plate from data-who; open bottom sits on the frame. Narr: none. */
+.tbox::after {
+  position: absolute; top: -38px; left: 24px;
+  padding: 8px 16px; background: #000; color: #fff;
+  font: 400 16px/16px var(--font); text-transform: uppercase;
+  border: 2px solid #fff; border-bottom: 0;
+  box-shadow: inset 0 4px 0 var(--show-gold);
+}
+.tbox[data-who="sans"]::after { content: "SANS"; }
+.tbox[data-who="dog"]::after { content: "DOG"; }
+.tbox[data-who="tv"]::after { content: "TV"; }
+.tbox[data-who="witch"]::after { content: "WITCH"; }
+.tbox[data-who="scal"]::after, .tbox[data-who="scalHood"]::after { content: "CALAMITAS"; }
+@media (pointer: coarse) { .tbox { bottom: 216px; } }
 /* Sans: a real 23x30 crop at integer scale. */
 .sans__btn img { width: 69px; height: auto; image-rendering: pixelated; }
 @media (max-width: 600px) {
   .tbox { gap: 16px; padding: 16px; font-size: 16px; }
+  .tbox[data-who="narr"] { padding-left: 128px; }
+  .tbox__face { width: 96px; height: 96px; }
   .tbox__face img { width: 72px; }
-  .tbox__txt { padding-left: 24px; }
+  .tbox__txt { padding-left: 24px; min-height: 96px; }
   .sans__btn img { width: 46px; }
 }
 
@@ -136,3 +212,43 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   max-width: none; max-height: none;
   pointer-events: none; image-rendering: pixelated;
 }
+
+/* The show on the stage kit (W2): curtains in the gutters (.quiz__tv is
+   .stage-curtain), the valance across the stage, bulbs, hard cells. */
+/* K5 on the set's top edge: still, every other bulb lit; a right answer
+   (quiz.js answer(), 500 ms) makes it chase. */
+.quiz__set::before, .quiz__board::before, .quiz__board::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 8px; z-index: 3;
+  background: #000 var(--bulb-tile) 0 0 / 16px 8px repeat-x; image-rendering: pixelated;
+}
+.quiz__set::before { top: 0; }
+.quiz__board::before { top: -8px; }
+.quiz__board::after { bottom: -8px; }
+.quiz.is-right .quiz__set::before { animation: bulbchase .5s steps(1) infinite; }
+html.rm .quiz.is-right .quiz__set::before { animation: none; }
+.quiz.is-finale .quiz__board { display: none; }
+/* timer: 12 hard cells, gold on an unlit track */
+.quiz__timer { position: relative; height: 8px; background: var(--bulb-off); }
+.quiz__timer::after {
+  content: ''; position: absolute; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 1' preserveAspectRatio='none'%3E%3Crect x='30' width='2' height='1'/%3E%3C/svg%3E") 0 0 / calc(100% / 12) 100% repeat-x;
+}
+/* key hints: square chips, one line */
+.quiz .bh__keys kbd {
+  display: inline-block; min-width: 16px; padding: 2px 4px; margin: 0 2px;
+  border: 2px solid var(--show-gold-lo); border-radius: 0; background: #000; color: #fff;
+}
+/* finale: no scrim. The tally keeps to the screen's columns, and each
+   line is a hard black block, not a wash. */
+.quiz__end { left: 19%; right: 19%; }
+.quiz__score, .quiz__doors, .quiz__small { background: #000; padding: 0 8px; }
+.quiz__go.cmd { width: auto; padding: 0 16px 0 40px; position: relative; }
+.quiz__go.cmd::before {
+  content: ''; position: absolute; left: 12px; top: 50%; width: 16px; height: 16px; margin-top: -8px;
+  background: url(../img/act4/undertale/soul.png) 0 0 / 100% 100%; image-rendering: pixelated;
+}
+.quiz .bh__keys { width: fit-content; margin: 0 auto; padding: 4px 8px; background: #000; color: var(--bone); }
+.quiz__doors:empty { background: none; }
+.quiz__top .plate:empty { visibility: hidden; }
+/* a minigame owns the whole picture: no crowd or board over its canvas */
+.quiz.is-mini .quiz__set::before, .quiz.is-mini .quiz__set::after, .quiz.is-mini .quiz__board { display: none; }
