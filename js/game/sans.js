@@ -126,6 +126,22 @@
     "i'd throw it, personally. hard."
   ];
   var swings = 0;
+  var HITS = 10;
+
+  /* The sword's ten-hit meter: one pip per landed swing, built here so
+     index.html stays as it is. Empty pips show only while the sword is armed. */
+  var pips = null;
+  if (sans) {
+    pips = document.createElement('div');
+    pips.className = 'sans__pips';
+    pips.setAttribute('aria-hidden', 'true');
+    for (var pi = 0; pi < HITS; pi++) pips.appendChild(document.createElement('i'));
+    sans.appendChild(pips);
+  }
+  function paintPips() {
+    if (!pips) return;
+    for (var i = 0; i < HITS; i++) pips.children[i].className = i < swings ? 'on t' + (i < 3 ? 1 : i < 6 ? 2 : i < 9 ? 3 : 4) : '';
+  }
 
   /* ── the blip ───────────────────────────────────────────────────
      Its own tiny context rather than reaching into main.js's audio
@@ -558,10 +574,10 @@
   var parts = [], praf = 0, plast = 0;
   var PAL = ['#3FBF6F', '#7CE07C', '#C9A227', '#EFEBE4'];
 
-  function burst() {
+  function burst(more) {
     if (!pctx || calm()) return;
     var cx = pcv.width / 2, cy = pcv.height / 2;
-    parts = [];
+    if (!more) parts = [];
     for (var i = 0; i < 26; i++) {
       var a = Math.random() * Math.PI * 2, sp = 26 + Math.random() * 62;
       parts.push({
@@ -845,6 +861,7 @@
        by the time it exists the sword is gone, and it has to keep
        falling whether or not sans is on screen. */
     if (kstate !== 'off' && kel) keyStep(now);
+    keyFx(now);
 
     if ((state === 'away' || state === 'broken') && !hilt && NEU.tvBreakable()) raiseHilt();
 
@@ -1092,6 +1109,8 @@
     grabId = e.pointerId; grabTap = tapCarry(e);
     if (!grabTap) sword.setPointerCapture && sword.setPointerCapture(e.pointerId);
     tellCarry('sword');
+    if (sans && !hilt) sans.classList.add('is-armed');
+    paintPips();
     beatsStart();
   });
 
@@ -1137,8 +1156,11 @@
   var hasKey = false;
   var chip = document.getElementById('keyChip');
   var kel  = document.getElementById('keyObj');
+  var fxEl = document.createElement('canvas'); fxEl.className = 'keyfx'; fxEl.setAttribute('aria-hidden', 'true'); document.body.appendChild(fxEl);
+  var fxc = fxEl.getContext('2d'); var fxDirty = false, fxFlash = null, fxSpark = [];
 
   var kstate = 'off';                    // off | fall | rest | held | carry | thrown
+  var kIdle = false;                     // mirrors the is-idle class, so it is toggled only on change
   /* kx is a screen x (there is no horizontal scroll) but ky is a
      DOCUMENT y — the key falls to the bottom of the PAGE, not the
      bottom of the viewport, so it keeps falling past the fold and
@@ -1153,7 +1175,139 @@
   }
   var GRAV = 2400, FLOOR = 46, WALL = 26;
   var THROW_MIN = 950;                   // px/s before it counts as "with force"
+  var sansHits = 0;
   var trk = [];
+
+  /* Throw velocity from the recent pointer samples. Shared by the throw
+     itself (pointerup) and the speed ring drawn while the key is held. */
+  function heldVel(now, x, y) {
+    var a = null;
+    for (var i = trk.length - 1; i >= 0; i--) {
+      if (now - trk[i].t > 90) break;
+      a = trk[i];
+    }
+    if (!a || now - a.t <= 8) return { vx: 0, vy: 0 };
+    var dt = (now - a.t) / 1000;
+    return { vx: (x - a.x) / dt, vy: (y - a.y) / dt };
+  }
+
+  function fxRing(x, y, r) {
+    fxc.beginPath(); fxc.arc(x, y, r, 0, Math.PI * 2); fxc.stroke();
+  }
+
+  /* One overlay canvas for everything the key does on screen. Early-outs
+     with no draw calls while there is nothing to show. */
+  function keyFx(now) {
+    if (fxEl.width !== innerWidth || fxEl.height !== innerHeight) {
+      fxEl.width = innerWidth; fxEl.height = innerHeight; fxDirty = false;
+    }
+    var live = hasKey && (kstate === 'held' || kstate === 'carry' || kstate === 'thrown' || kstate === 'fall') || fxFlash || fxSpark.length;
+    if (!live) {
+      if (fxDirty) { fxc.clearRect(0, 0, fxEl.width, fxEl.height); fxDirty = false; }
+      return;
+    }
+    fxc.clearRect(0, 0, fxEl.width, fxEl.height); fxDirty = true;
+
+    var d = !doorOpened && NEU.doorScreenPos ? NEU.doorScreenPos() : null;
+    var t = (now % 1100) / 1100; var sy = ky - scrollY;
+    var pn = performance.now();
+
+    /* (a) beacon: the door is the target while the key is in play */
+    if (d && kstate !== 'off') {
+      fxc.lineWidth = 2; fxc.strokeStyle = 'rgba(255,216,107,.35)';
+      fxRing(d.x, d.y, d.r + 4);
+      if (!calm()) {
+        fxc.lineWidth = 3; fxc.strokeStyle = 'rgba(255,216,107,' + (0.85 * (1 - t)).toFixed(3) + ')';
+        fxRing(d.x, d.y, d.r + 4 + 18 * t);
+      }
+    }
+
+    /* (b) turn hint: door faces away, so draw a dashed arrow over the cube */
+    if (!d && !doorOpened && (kstate === 'held' || kstate === 'carry') && NEU.heroT >= 0.25) {
+      var gl = document.getElementById('glassCanvas');
+      var r = gl ? gl.getBoundingClientRect() : null;
+      if (r && r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight) {
+        var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        var R = 0.32 * Math.min(r.width, r.height);
+        var a1 = -0.85 * Math.PI;
+        var px = cx + R * Math.cos(a1), py = cy + R * Math.sin(a1);
+        var tx = Math.sin(a1), ty = -Math.cos(a1);
+        var nx = Math.cos(a1), ny = Math.sin(a1);
+        fxc.strokeStyle = 'rgba(255,216,107,.6)'; fxc.fillStyle = 'rgba(255,216,107,.6)'; fxc.lineWidth = 3;
+        fxc.setLineDash([6, 6]); fxc.lineDashOffset = -now / 40;
+        fxc.beginPath(); fxc.arc(cx, cy, R, -0.15 * Math.PI, a1, true); fxc.stroke();
+        fxc.setLineDash([]);
+        fxc.beginPath();
+        fxc.moveTo(px + tx * 12, py + ty * 12);
+        fxc.lineTo(px + nx * 6, py + ny * 6);
+        fxc.lineTo(px - nx * 6, py - ny * 6);
+        fxc.closePath(); fxc.fill();
+      }
+    }
+
+    /* (c) speed ring, and the trajectory preview once the throw has force */
+    if (kstate === 'held') {
+      var v = heldVel(pn, kx, ky);
+      var sp = Math.hypot(v.vx, v.vy);
+      var k = Math.min(1, sp / THROW_MIN);
+      var col = k >= 1 ? '#7CE07C' : k > 0.44 ? '#C9A227' : '#8A8578';
+      fxc.lineWidth = 4; fxc.strokeStyle = col;
+      if (k >= 1) { fxc.shadowBlur = 10; fxc.shadowColor = col; }
+      fxc.beginPath(); fxc.arc(kx, sy, 30, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * k); fxc.stroke();
+      fxc.shadowBlur = 0;
+
+      if (sp > 420) {
+        var x = kx, y = sy, vx = v.vx, vy = v.vy;
+        var xs = [], ys = [], hit = false;
+        for (var i = 0; i < 16; i++) {
+          vy += GRAV / 30;
+          var nxp = x + vx / 30, nyp = y + vy / 30;
+          if (d && segDist(x, y, nxp, nyp, d.x, d.y) <= d.r + 20) hit = true;
+          x = nxp; y = nyp;
+          if (x < 0 || x > innerWidth || y < 0 || y > innerHeight) break;
+          xs.push(x); ys.push(y);
+        }
+        var dc = hit ? '#FFD86B' : col;
+        fxc.fillStyle = dc;
+        for (var j = 0; j < xs.length; j++) {
+          fxc.globalAlpha = 0.9 - 0.7 * j / 15;
+          fxc.fillRect(xs[j] - 1.5, ys[j] - 1.5, 3, 3);
+        }
+        fxc.globalAlpha = 1;
+        if (hit && d && !calm()) {
+          fxc.lineWidth = 3; fxc.strokeStyle = 'rgba(255,216,107,' + Math.min(1, 1.7 * (1 - t)).toFixed(3) + ')';
+          fxRing(d.x, d.y, d.r + 4 + 18 * t);
+        }
+      }
+    }
+
+    /* (d) sparkles while the key is near the door */
+    if (d && kstate !== 'off' && Math.hypot(kx - d.x, sy - d.y) < 260 &&
+        !calm() && !(NEU.juice && NEU.juice.noParticles) && fxSpark.length < 40) {
+      var ang = Math.random() * Math.PI * 2;
+      fxSpark.push({ x: d.x + Math.cos(ang) * d.r, y: d.y + Math.sin(ang) * d.r, vy: -30, life: 0.5 });
+    }
+    fxc.fillStyle = '#FFE9A8';
+    for (var s = fxSpark.length - 1; s >= 0; s--) {
+      var p = fxSpark[s];
+      fxc.globalAlpha = Math.max(0, p.life / 0.5);
+      fxc.fillRect(p.x, p.y, 2, 2);
+      p.life -= 1 / 60; p.y += p.vy / 60;
+      if (p.life <= 0) fxSpark.splice(s, 1);
+    }
+    fxc.globalAlpha = 1;
+
+    /* (e) impact flash: red for a slow touch, gold for a landed blow */
+    if (fxFlash) {
+      var e = (pn - fxFlash.t) / 380;
+      if (e >= 1) fxFlash = null;
+      else {
+        fxc.lineWidth = 5; fxc.strokeStyle = fxFlash.c; fxc.globalAlpha = 1 - e;
+        fxRing(fxFlash.x, fxFlash.y, fxFlash.r + 30 * e);
+        fxc.globalAlpha = 1;
+      }
+    }
+  }
 
   function keyStep(now) {
     var dt = Math.min(0.033, (now - klast) / 1000); klast = now;
@@ -1218,6 +1372,9 @@
       if (kstate === 'thrown') keyHit(fromX, fromY);
     }
 
+    var wantIdle = kstate === 'rest' && !doorOpened;
+    if (wantIdle !== kIdle) { kIdle = wantIdle; kel.classList.toggle('is-idle', kIdle); }
+
     kel.style.transform = 'translate3d(' + Math.round(kx) + 'px,' +
                           Math.round(ky - scrollY) + 'px,0) translate(-50%,-50%) rotate(' +
                           krot.toFixed(1) + 'deg)';
@@ -1266,8 +1423,9 @@
 
   /* Everything a landed blow shares across targets: the speed gate,
      the once-only nag, the cooldown and the bounce. */
-  function landBlow() {
+  function landBlow(tgt) {
     if (Math.hypot(kvx, kvy) < THROW_MIN) {
+      fxFlash = { x: tgt.x, y: tgt.y, r: tgt.r, c: '#C2405F', t: performance.now() };
       if (!keyHit.nagged) { keyHit.nagged = true; say(["put some shoulder into it."]); }
       return false;
     }
@@ -1286,6 +1444,19 @@
     var nowMs = performance.now();
     if (keyHit.at && nowMs - keyHit.at < 900) return false;
     keyHit.at = nowMs;
+    fxFlash = { x: tgt.x, y: tgt.y, r: tgt.r, c: '#FFD86B', t: nowMs };
+    /* The key counts its landed blows and escalates with the streak:
+       five-plus hits in a row flash orange, the tenth pays off in a red
+       'huge'. Textless — the escalation IS the explanation. */
+    sansHits++;
+    if (sansHits >= 10) {
+      if (NEU.juice) NEU.juice.hit('huge', { dx: kvx, dy: kvy, colour: '#FF0000' });
+      sansHits = 0;
+    } else if (NEU.juice) {
+      NEU.juice.hit('large', sansHits >= 5
+        ? { dx: kvx, dy: kvy, colour: '#FFAA00' }
+        : { dx: kvx, dy: kvy });
+    }
 
     /* The key BOUNCES OFF. It used to be consumed here, and that was
        a dead end: the key vanished, the door had no memory of being
@@ -1308,7 +1479,7 @@
        meant for the TV. */
     var tv = tvScreenPos();
     if (tv && sweptInto(fromX, fromY, tv)) {
-      if (landBlow()) NEU.breakTV();
+      if (landBlow(tv)) NEU.breakTV();
       return;
     }
     var d = NEU.doorScreenPos && NEU.doorScreenPos();
@@ -1318,7 +1489,7 @@
        the door is facing into the page. So you have to carry it up AND
        turn the cube. */
     if (!sweptInto(fromX, fromY, d)) return;
-    if (landBlow()) {
+    if (landBlow(d)) {
       unlockDoor();
       openPanel();
     }
@@ -1349,16 +1520,8 @@
       if (kGrabId !== null && e.pointerId !== kGrabId) return;
       kel.classList.remove('is-held');
       kGrabId = null;
-      var now = performance.now(), a = null;
-      for (var i = trk.length - 1; i >= 0; i--) {
-        if (now - trk[i].t > 90) break;
-        a = trk[i];
-      }
-      if (a && now - a.t > 8) {
-        var dt = (now - a.t) / 1000;
-        kvx = (e.clientX - a.x) / dt;
-        kvy = (e.clientY + scrollY - a.y) / dt;
-      } else { kvx = 0; kvy = 0; }
+      var now = performance.now();
+      var v = heldVel(now, e.clientX, e.clientY + scrollY); kvx = v.vx; kvy = v.vy;
       kx = e.clientX; ky = e.clientY + scrollY;
 
       /* On a finger, a stationary tap is not a throw — it is picking the
@@ -1469,7 +1632,7 @@
      own the answer: calm motion drops the shake and the burst, keeps a
      third of the stop, and says so in juice.js rather than here. */
   function hitStop() {
-    if (NEU.juice) NEU.juice.hit('medium', { shake: 0.12 });
+    if (NEU.juice) NEU.juice.hit(swings >= HITS - 1 ? 'huge' : 'medium', { shake: swings >= HITS - 1 ? null : 0.12 + 0.05 * swings });
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
   }
 
@@ -1480,6 +1643,7 @@
     setTimeout(function () { sans.style.filter = ''; }, 220);
   }
   function missBeat() {
+    if (pips) { pips.classList.remove('is-miss'); void pips.offsetWidth; pips.classList.add('is-miss'); setTimeout(function () { pips.classList.remove('is-miss'); }, 420); }
     if (NEU.juice) NEU.juice.hit('tick');
     if (!sans || !sans.animate || calm() || (NEU.juice && NEU.juice.noShake)) return;
     sans.animate([{ transform: 'none' }, { transform: 'translateX(-12px)' }, { transform: 'none' }],
@@ -1499,21 +1663,27 @@
     if (!overSans(x, y)) { setLedge(); say(["swing and a miss. classic."]); missBeat(); flyHome(); return; }
 
     state = 'swing';
-    var willBreak = swings >= LINES.length;    // nothing left to say
+    var willBreak = swings >= HITS - 1;        // the tenth landed swing breaks it
 
     NEU.sword.swing(
       function () {                            // on impact
         hitStop();
         shake();
         hurtTint();
+        if (sans) sans.style.setProperty('--dmg', (Math.min(swings + 1, HITS) / HITS).toFixed(2));
         if (willBreak) {
+          swings = HITS; paintPips();
           snap();
+          burst(); burst(true);                // the final hit gets a double burst
+          if (sans) setTimeout(function () { sans.classList.remove('is-armed'); }, 700);
           NEU.sword.breakApart(gainKey);       // cancels the follow-through
           return;
         }
         popTotem();
-        say([LINES[swings]]);
+        say([LINES[Math.min(swings, LINES.length - 1)]]);
         swings++;
+        paintPips();
+        if (pips) pips.children[swings - 1].classList.add('pop');
       },
       function () {                            // after the follow-through
         if (!willBreak) flyHome();
@@ -2273,7 +2443,7 @@
 
     /* the sword is gone for good, the key lies where it fell */
     if (has('break')) {
-      state = 'broken'; swings = LINES.length;
+      state = 'broken'; swings = HITS;
       hasKey = true; NEU.hasKey = true;
       if (NEU.doorGlow) NEU.doorGlow(true);
       if (kel) {

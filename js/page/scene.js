@@ -321,6 +321,7 @@ function init() {
   let dragging = false, dragged = false, lastX = 0, lastY = 0;
   let leanX = 0, leanY = 0, leanTX = 0, leanTY = 0;
   let squash = 0;
+  let idleT = 0;
 
   const K = 60, C = 9;   // damping ratio ≈ 0.58 → one soft overshoot
 
@@ -328,11 +329,13 @@ function init() {
     if (NEU.heroT < 0.25) return;
     dragging = true; dragged = false;
     lastX = e.clientX; lastY = e.clientY;
+    idleT = 0;
     canvas.classList.add('dragging');
     canvas.setPointerCapture?.(e.pointerId);
   });
 
   canvas.addEventListener('pointermove', e => {
+    idleT = 0;
     const r = canvas.getBoundingClientRect();
     leanTX = ((e.clientY - r.top) / r.height * 2 - 1) * 0.05;
     leanTY = ((e.clientX - r.left) / r.width * 2 - 1) * 0.05;
@@ -438,6 +441,8 @@ function init() {
     } else {
       if (dragging) { velY *= 0.86; velX *= 0.86; }
       else {
+        idleT += dt;
+        if (idleT > 8 && t > 0.6 && !dragging && document.body.classList.contains('is-ready')) { idleT = 0; velY -= 2.6; velX += 0.5; }
         velY += (-K * spinY - C * velY) * dt;
         velX += (-K * spinX - C * velX) * dt;
       }

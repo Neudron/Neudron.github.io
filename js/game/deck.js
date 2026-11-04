@@ -284,6 +284,8 @@
       void elErr.offsetWidth;
       if (!reduced) elErr.classList.add('is-shake');
     }
+    /* the cover itself refuses: art shakes (not the li, whose transform is the lift) */
+    if (NEU.juice && tiles[sel]) NEU.juice.shakeEl(tiles[sel].firstChild, 'small');
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
   }
 

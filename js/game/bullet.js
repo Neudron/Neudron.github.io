@@ -42,6 +42,10 @@
   var PLAYER_R  = dm.soul.R;   // the TRUE hitbox
   var MAX_B     = 700;
   var BL_HALF = 24; // was 17, matches visual beam width at game scale
+  /* Charge cell, per stage (0 while charge < 50, 1 after): a hit in the
+     core adds gain (+perfect in the centre third), a miss in the beam
+     fizzes, and the cell drains every second. Stage 1 is tighter. */
+  var CELL = { gain: [0.55, 0.4], core: [13, 8], drain: [0.04, 0.08], perfect: 0.12, fizz: 0.2 };
   var BORDER = 4;              // Undertale's white box edge
   var TELE = 1.0;              // a phase's line shows this long before it fires
 
@@ -109,6 +113,7 @@
 
   var blasters = [], bones = [];
   var BL_CHARGE = 0.85, BL_FIRE = 0.42;
+  var AIM_TELE = 0.45, aims = [];
   /* The beam's ghost: the last TELE_LEAD s of the charge show the real
      beam's width as a soft fill, faded in, held, faded out right before
      it fires. Low alpha and one per blaster, so it never reads as a flash. */
@@ -126,6 +131,8 @@
   /* Read back from the save, so a full console is still full after a
      reload. A missing flag is undefined, and `| 0` makes that 0. */
   var charge = (NEU.save && NEU.save.flag('console_charge')) | 0, chargeFx = 0, emptyFx = 0;
+  var cell = 0, cellLostAt = 0;
+  function stage() { return charge >= 50 ? 1 : 0; }
   /* sans.js owns the console; this room only asks whether it is in
      your hands right now. */
   function carrying() { return !!(NEU.hasConsole && NEU.hasConsole()); }
@@ -136,6 +143,19 @@
   function keepCharge() {
     if (charge >= 100 && NEU.save) NEU.save.flag('console_charge', 100);
   }
+  /* Pure: what one beam hit at `off` from its centre adds to the cell. */
+  function coreGain(off, st) {
+    var c = CELL.core[st];
+    if (off >= c) return -CELL.fizz;
+    return CELL.gain[st] + (off < c / 3 ? CELL.perfect : 0);
+  }
+  /* Pure: x of each interference spark for a lane. Stage 0 flanks the core
+     at 22 px, stage 1 adds an outer pair at 29 px. None is inside the core. */
+  function sparkCols(lane, st) {
+    var c = CELL.core[st], d = st ? [9, 21] : [9], out = [];
+    for (var i = 0; i < d.length; i++) out.push(lane - c - d[i], lane + c + d[i]);
+    return out;
+  }
   NEU.charge = function () { return charge; };
   NEU.devCharge = function (n) {
     charge = Math.max(0, Math.min(100, n | 0));
@@ -145,6 +165,7 @@
     return charge;
   };
   var dying = 0;
+  var outroF = 0;                          // frames left in the win's shatter
 
   var running = false, won = false;
   /* Act III variant: a seeded plan of blocks, and the graze meter. */
@@ -154,6 +175,7 @@
   var F = dm.fight(0, 0), keys = {};
   var bullets = [], emitters = [], phase = 0, phaseAt = 0;
   var AW = 0, AH = 0, AX = 0, AY = 0;     // box rect, canvas space
+  var BAX = 0, BAW = 0;                    // the box's own rect, before the squeeze
   var cheat = '';                          // the 69420 buffer
 
   /* ── layout ─────────────────────────────────────────────────────── */
@@ -166,10 +188,19 @@
     ctx.imageSmoothingEnabled = false;
     var ar = dm.arena(w, h, 640, 360, 22);
     AW = ar.AW; AH = ar.AH; AX = ar.AX; AY = ar.AY;
-    F.x = Math.min(Math.max(F.x, AX + 12), AX + AW - 12);
+    BAX = AX; BAW = AW; squeezeBox();
+    F.x =Math.min(Math.max(F.x, AX + 12), AX + AW - 12);
     F.y = Math.min(Math.max(F.y, AY + 12), AY + AH - 12);
   }
   addEventListener('resize', function () { if (running) layout(); });
+
+  /* Phase 4: the walls close in over 1.5 s, 13% a side, then hold. */
+  function squeezeBox() {
+    if (!running) return;                  // open() lays out before its plan exists
+    var s =(phase && phase === table().length) ? Math.min(1, (t - phaseAt) / 1.5) : 0;
+    s = s * s * (3 - 2 * s);
+    var ins = (BAW * 0.13 * s) | 0; AX = BAX + ins; AW = BAW - ins * 2;
+  }
 
   function add(x, y, vx, vy, r, c) { spot(x, y); dm.shot(bullets, x, y, vx, vy, r, c, 0, MAX_B); }
 
@@ -226,6 +257,7 @@
      blaster), a faster blue last-but-one (triple, pair), and a short
      red final pattern to the twenty-second mark. */
   var VGAP = 0.3, GRAZE_R = 7, GRAZE_GAIN = 4, GRAZE_GAP = 0.4;
+  var PULSE_R = 72, pulseAt = -9;
   var VBLOCK = {
     ring:    { dur: 2.4, at: [0.5, 1.8], kind: 'ring' },
     aimed:   { dur: 2.4, at: [0.5, 1.1, 1.7, 2.3], kind: 'aimed' },
@@ -287,6 +319,13 @@
       bl.from = (F.mode === 'blue' || Math.random() < 0.5) ? 't' : 'b';
     }
     spot(horiz ? (bl.from === 'l' ? AX : AX + AW) : bl.lane, horiz ? bl.lane : (bl.from === 't' ? AY : AY + AH));
+    /* Interference sparks flank the core while you charge: only the core
+       is safe. Stage 1 sparks land late, so you must already be settled. */
+    if (elec && carrying() && charge < 100) {
+      var st = stage(), cols = sparkCols(bl.lane, st), vy = AH / (BL_CHARGE * (st ? 0.75 : 1));
+      for (var i = 0; i < cols.length; i++)
+        if (cols[i] > AX + 4 && cols[i] < AX + AW - 4) add(cols[i], AY + 4, 0, vy, 3, '#FFF06A');
+    }
     blasters.push(bl);
   }
 
@@ -312,11 +351,10 @@
       else if (side === 2) { sx = AX + Math.random() * AW; sy = AY + AH + 16; }
       else { sx = AX - 16; sy = AY + Math.random() * AH; }
       var base = Math.atan2(F.y - sy, F.x - sx);
-      var cnt = 3 + Math.round(k * 3), spd = 128 + k * 92;
-      for (var j = 0; j < cnt; j++) {
-        var o = (j - (cnt - 1) / 2) * 0.17;
-        add(sx, sy, Math.cos(base + o) * spd, Math.sin(base + o) * spd, 4, PAL.ui);
-      }
+      var kk = Math.min(k, 1.6);
+      var cnt = 3 + Math.round(kk * 4), spd = 150 + kk * 130;
+      spot(sx, sy);
+      aims.push({ sx: sx, sy: sy, base: base, cnt: cnt, spd: spd, t0: t });
     } else if (e.kind === 'spiral') {
       e.ang += e.spin || 0.42;
       var arms = 2 + Math.round(k * 2), s2 = 96 + k * 44;
@@ -359,6 +397,7 @@
   function hitPlayer(dx, dy) {
     if (inv > 0 || F.dashI > 0) return false;
     hp--; inv = dm.IFRAMES || 1.15;
+    if (cell > 0) { cell = 0; cellLostAt = performance.now(); if (NEU.juice) NEU.juice.burst(F.x, F.y, 12, PAL.elec, 160); }
     dm.hurt(F, F.x, F.y - 12);
     /* MEDIUM: felt, but never enough to make the pattern unreadable on
        the frame you most need to read it. Leans the way the hit went. */
@@ -380,6 +419,7 @@
     if (NEU.juice && NEU.juice.frozen()) { draw(); return; }
     t += dt;
     if (phaseFor() !== phase) enterPhase(phaseFor());
+    squeezeBox();
 
     dm.move(F, keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH });
     dm.tick(F, dt, null);
@@ -392,6 +432,17 @@
       var e = emitters[i];
       if (t >= e.next) { e.next = t + e.every; curE = e; fire(e); curE = null; }
     }
+
+    var ka = [];
+    for (var ai = 0; ai < aims.length; ai++) {
+      var a = aims[ai];
+      if (t - a.t0 < AIM_TELE) { ka.push(a); continue; }
+      for (var j = 0; j < a.cnt; j++) {
+        var o = (j - (a.cnt - 1) / 2) * 0.17;
+        add(a.sx, a.sy, Math.cos(a.base + o) * a.spd, Math.sin(a.base + o) * a.spd, 4, PAL.ui);
+      }
+    }
+    aims = ka;
 
     if (inv > 0) inv -= dt;
     bullets = dm.step(bullets, bdt, { AX: AX, AY: AY, AW: AW, AH: AH });
@@ -432,13 +483,28 @@
       var held = F.ground;
       if (held && carrying()) {
         bl.took = true;
-        charge = Math.min(100, charge + 50);
-        keepCharge();
-        chargeFx = performance.now();
-        if (NEU.juice) { NEU.juice.hit('large', { colour: '#4FC3F7' });
-                         NEU.juice.burst(F.x, F.y, 26, PAL.elec, 190); }
-        if (NEU.quest) NEU.quest.bump('charge', charge / 50);
-        if (NEU.tvState) NEU.tvState();
+        var gn = coreGain(off, stage());
+        cell = Math.max(0, cell + gn);
+        if (NEU.juice && gn > 0) {
+          var perfect = gn > CELL.gain[stage()];
+          NEU.juice.hit('small', { colour: PAL.elec });
+          NEU.juice.burst(F.x, F.y, perfect ? 10 : 6, perfect ? '#FFF06A' : PAL.elecCore, 120);
+        }
+        if (cell >= 1) {
+          cell = 0;
+          charge = Math.min(100, charge + 50);
+          keepCharge();
+          chargeFx = performance.now();
+          if (NEU.juice) {
+            if (charge >= 100) {
+              NEU.juice.hit('huge', { colour: PAL.full }); NEU.juice.burst(F.x, F.y, 44, PAL.full, 240);
+              for (var fy = 0.25; fy < 1; fy += 0.25) NEU.juice.burst(bl.lane, AY + AH * fy, 8, PAL.elecCore, 120);
+            } else { NEU.juice.hit('large', { colour: '#4FC3F7' }); NEU.juice.burst(F.x, F.y, 26, PAL.elec, 190); }
+          }
+          if (NEU.quest) NEU.quest.bump('charge', charge / 50);
+          if (NEU.tvState) NEU.tvState();
+        }
+        if (gn < 0 && NEU.juice) NEU.juice.hit('tick');
       } else if (held) {
         /* Safe, but nothing happens. Said out loud, because "stood on
            the ground and got no charge" otherwise reads as a bug. */
@@ -450,6 +516,7 @@
       }
     }
     blasters = kb;
+    if (cell > 0) cell = Math.max(0, cell - CELL.drain[stage()] * bdt);
 
     /* One hit from death, the soul beats about once a second. */
     if (hp === 1 && t - beatAt >= 0.9) {
@@ -475,7 +542,7 @@
      Drawn even at 0% — an empty battery is information. */
   function drawCarried() {
     ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
-    var x = AX, y = AY - BORDER - 34;
+    var x = BAX, y = AY - BORDER - 34;
     if (!carrying()) {
       if (emptyFx && performance.now() - emptyFx < 2200) {
         ctx.fillStyle = PAL.dim;
@@ -493,8 +560,26 @@
     /* Red under 50: the dock wants 100 and half is a fail state. */
     var iw = w - 28, ih = h - 14, ix = x + 14, iy = y + 7;
     ctx.fillStyle = '#22222E'; ctx.fillRect(ix, iy, iw, ih);
-    ctx.fillStyle = charge >= 100 ? '#7BE38A' : (charge >= 50 ? PAL.elec : PAL.blood);
-    ctx.fillRect(ix, iy, (iw * charge / 100) | 0, ih);
+    /* Two cells, one per stage. The current one fills by `cell` and pulses
+       at 2 Hz; a lost cell jitters and outlines red for 400 ms. */
+    var half = (iw / 2) | 0, now = performance.now(), jit = 0;
+    if (cellLostAt && now - cellLostAt < 400 && !reducedFx())
+      jit = Math.round(Math.sin((now - cellLostAt) * 0.09) * 3);
+    for (var i = 0; i < 2; i++) {
+      var cur = i === stage() && charge < 100, sx = ix + i * half + (cur ? jit : 0);
+      if (charge >= 50 * (i + 1)) {
+        ctx.fillStyle = charge >= 100 ? PAL.full : PAL.elec;
+        ctx.fillRect(sx, iy, half - 1, ih);
+      } else if (cur) {
+        ctx.fillStyle = cell < 0.34 ? PAL.blood : cell < 0.67 ? PAL.lilac : PAL.elecCore;
+        ctx.fillRect(sx, iy, ((half - 1) * cell) | 0, ih);
+        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * Math.PI * 4);
+        ctx.fillRect(sx, iy, half - 1, 2);
+        ctx.globalAlpha = 1;
+      }
+      if (cur && jit) { ctx.strokeStyle = PAL.blood; ctx.strokeRect(sx + 0.5, iy + 0.5, half - 2, ih - 1); }
+      if (!i) { ctx.fillStyle = PAL.panel; ctx.fillRect(ix + half - 1, iy, 1, ih); }
+    }
     ctx.fillStyle = PAL.ui;
     ctx.fillText(charge + '%' + (charge < 100 ? '  stay on the ground in the blue one' : ''),
                  x + w + 8, y + 5, Math.max(40, AW - w - 8));
@@ -509,6 +594,7 @@
   }
   function grazed() {
     meter = Math.min(100, meter + GRAZE_GAIN);
+    if (meter >= 100) pulse();
     grazeFx = t;
     if (NEU.juice) NEU.juice.burst(F.x, F.y, 4, '#FFFFFF', 90);
     if (t - lastGz >= GRAZE_GAP) {
@@ -516,13 +602,27 @@
       if (!reducedFx()) F.grazeFlashT = 0.12;
     }
   }
+  /* A full meter clears the bullets around the soul, heals one HP. */
+  function pulse() {
+    meter = 0; pulseAt = t;
+    var kept = [], gone = 0;
+    for (var i = 0; i < bullets.length; i++) {
+      var b = bullets[i];
+      if (Math.sqrt((b.x - F.x) * (b.x - F.x) + (b.y - F.y) * (b.y - F.y)) >= PULSE_R) { kept.push(b); continue; }
+      if (gone < 12 && NEU.juice) NEU.juice.burst(b.x, b.y, 3, b.c, 70);
+      gone++;
+    }
+    bullets = kept;
+    if (hp < 3) hp++;
+    if (NEU.juice) NEU.juice.hit('small', { colour: PAL.meter });
+  }
   function drawGraze() {
-    var x = AX + AW - 120, y = AY - BORDER - 34;
+    var x = BAX + BAW - 120, y = AY - BORDER - 34;
     ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
     ctx.fillStyle = PAL.ui;
     ctx.fillText('graze', x - 64, y + 4);
     ctx.fillStyle = PAL.slot; ctx.fillRect(x, y + 7, 100, 12);
-    ctx.fillStyle = meter >= 100 ? PAL.full : PAL.meter;
+    ctx.fillStyle = meter >= 100 || (meter >= 80 && !reducedFx() && ((t / 0.25) | 0) % 2) ? PAL.full : PAL.meter;
     ctx.fillRect(x, y + 7, meter, 12);
     if (t - grazeFx < 0.3) { ctx.fillStyle = '#FFFFFF'; ctx.fillText('+1', x + 104, y + 4); }
   }
@@ -560,6 +660,17 @@
         else          { ctx.fillRect((bl.lane - BL_HALF) | 0, AY, 2, AH); ctx.fillRect((bl.lane + BL_HALF - 2) | 0, AY, 2, AH); }
       }
       ctx.globalAlpha = 1;
+      /* the jaws: they close from the beam's width onto the core */
+      if (bl.elec && carrying() && charge < 100 && !bl.horiz) {
+        var k = bl.t / BL_CHARGE, e = 1 - Math.pow(1 - k, 3), lane = bl.lane | 0, fl = AY + AH;
+        var hw = (BL_HALF + (CELL.core[stage()] - BL_HALF) * e) | 0;
+        ctx.fillStyle = PAL.elecCore;
+        ctx.globalAlpha = Math.min(1, 0.35 + teleAlpha(bl.t) * 2);
+        ctx.fillRect(lane - hw - 2, fl - 10, 2, 10);
+        ctx.fillRect(lane + hw, fl - 10, 2, 10);
+        ctx.fillRect(lane - hw, fl - 2, hw * 2, 2);
+        ctx.globalAlpha = 1;
+      }
     } else {
       var f = 1 - (bl.t - BL_CHARGE) / BL_FIRE;      // beam narrows as it dies
       var hh = (BL_HALF * f) | 0, core = Math.max(2, (hh / 1.5) | 0);
@@ -587,6 +698,13 @@
     var w = innerWidth, h = innerHeight;
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
     box();
+    if (phase && phase === table().length && t - phaseAt < 1.5) {
+      /* the walls' final stop, telegraphed */
+      ctx.fillStyle = PAL.box; ctx.globalAlpha = 0.35;
+      ctx.fillRect(BAX + BAW * 0.13 - 1, AY, 2, AH);
+      ctx.fillRect(BAX + BAW * 0.87 - 1, AY, 2, AH);
+      ctx.globalAlpha = 1;
+    }
 
     /* blasters first: their telegraph and beam must never hide a bullet */
     for (var q = 0; q < blasters.length; q++) drawBlaster(blasters[q]);
@@ -600,6 +718,20 @@
       ctx.fillRect(bx - 3, floor - bo.h, 6, bo.h);
       ctx.fillRect(bx - 5, floor - bo.h, 10, 4);
     }
+
+    /* aimed telegraph: rays from the edge point, growing, fading in and out */
+    for (var ax = 0; ax < aims.length; ax++) {
+      var ag = aims[ax], u = (t - ag.t0) / AIM_TELE;
+      var al = Math.max(0, Math.min(u / 0.08, 1, 1 - (u - 0.27) / 0.48));
+      var L = 60 + 140 * Math.min(1, u * 4);
+      ctx.strokeStyle = PAL.ui; ctx.lineWidth = 2; ctx.globalAlpha = al * 0.5;
+      for (var r = 0; r < ag.cnt; r++) {
+        var ro = (r - (ag.cnt - 1) / 2) * 0.17, ra = ag.base + ro;
+        ctx.beginPath(); ctx.moveTo(ag.sx, ag.sy);
+        ctx.lineTo(ag.sx + Math.cos(ra) * L, ag.sy + Math.sin(ra) * L); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
 
     /* bullets — squares on integer coords over a soft glow */
     for (var i = 0; i < bullets.length; i++) {
@@ -627,6 +759,20 @@
     }
 
     dm.drawFX(ctx, F, inv);
+    if (t - pulseAt < 0.3) {
+      var pk = (t - pulseAt) / 0.3;
+      ctx.globalAlpha = 1 - pk; ctx.lineWidth = 3; ctx.strokeStyle = PAL.meter;
+      ctx.beginPath();
+      ctx.arc(F.x, F.y, 12 + (PULSE_R - 12) * (1 - Math.pow(1 - pk, 3)), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    /* the charge arc: wraps the soul as the current cell fills */
+    if (carrying() && cell > 0 && charge < 100) {
+      ctx.save(); ctx.globalAlpha = 0.85; ctx.strokeStyle = PAL.elec; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(F.x, F.y, 9, -Math.PI / 2, -Math.PI / 2 + cell * Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
 
     /* the phase's line, Undertale-style, inside the box */
     if (phase && t - phaseAt < TELE + 0.6) {
@@ -635,6 +781,15 @@
       ctx.fillText(table()[phase - 1].line, AX + 16, AY + 16, AW - 32);
     }
 
+    /* the win's soul ring: it grows out from the soul and fades */
+    if (won && outroF > 0 && !reducedFx()) {
+      var wk = 1 - outroF / 54;
+      ctx.globalAlpha = 1 - wk; ctx.lineWidth = 4; ctx.strokeStyle = PAL.full;
+      ctx.beginPath();
+      ctx.arc(F.x, F.y, 10 + (AW / 2) * (1 - Math.pow(1 - wk, 3)), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     if (NEU.juice) { NEU.juice.drawParts(ctx, 1 / 60);
                      NEU.juice.end(ctx, shook);
                      NEU.juice.overlay(ctx, w, h); }
@@ -676,13 +831,15 @@
   /* ── start / finish ───────────────────────────────────────────────*/
   function begin() {
     dying = 0;                           /* a pending death animation is cancelled by restarting */
+    outroF = 0;
     t = 0; hp = 3; inv = 0; won = false; cheat = '';
     beatAt = -Infinity;
     F = dm.fight(0, 0);
     layout();
     F.x = AX + AW / 2; F.y = AY + AH - 60;
-    bullets = []; blasters = []; bones = [];
-    meter = 0; lastGz = -9; grazeFx = -9; flashAt = -9; marks = [];
+    bullets = []; blasters = []; bones = []; aims = [];
+    meter = 0; lastGz = -9; grazeFx = -9; flashAt = -9; pulseAt = -9; marks = [];
+    cell = 0; cellLostAt = 0;
     plan = variant ? buildPlan(attempt++) : null; qi = 0;
     PAL = variant ? PAL_III : PAL_II;
     enterPhase(1);
@@ -717,6 +874,18 @@
 
   function finish(good, quiet) {
     running = false; won = good;
+    if (good && !endless && NEU.juice) {
+      var every = Math.ceil(bullets.length / 40), i, b;
+      for (i = 0; i < bullets.length; i += every) {
+        b = bullets[i];
+        NEU.juice.burst(b.x, b.y, 2, b.c, 60);
+      }
+    }
+    if (good && !endless && NEU.juice) {
+      bullets = []; blasters = []; bones = []; aims = [];
+      NEU.juice.hit('large', { colour: PAL.full }); NEU.juice.burst(F.x, F.y, 22, PAL.soul, 150);
+      outroF = 54; requestAnimationFrame(outro);
+    }
     if (!quiet) draw();
 
     if (endless) {
@@ -787,6 +956,13 @@
      there would leave the soul slow. Losing focus drops every held key. */
   addEventListener('blur', function () { keys = {}; });
 
+  /* The win's shatter: the particles and shake decay, then it stops. */
+  function outro() {
+    if (running || !won || wrap.hidden || outroF <= 0) return;
+    outroF--; draw();
+    requestAnimationFrame(outro);
+  }
+
   /* ── endless ──────────────────────────────────────────────────────
      Launched from the console's library it has no cap: the phases loop,
      the ramp keeps climbing past 1.0, there is no win state, and the
@@ -831,8 +1007,10 @@
 
   NEU.bullet = { open: open, close: close, get endless() { return endless; }, get running() { return running; },
                  get won() { return won; }, get phase() { return phase; }, get soul() { return F; },
-                 get variant() { return variant; }, get plan() { return plan; }, get meter() { return meter; },
+                 get variant() { return variant; }, get plan() { return plan; }, get meter() { return meter; }, get hp() { return hp; },
                  get phases() { return PHASES; }, get bullets() { return bullets; },
-                 buildPlan: buildPlan, teleAlpha: teleAlpha, chargeTime: BL_CHARGE, get pal() { return PAL; },
+                 get aims() { return aims; },
+                 get box() { return { AX: AX, AW: AW, BAW: BAW }; },
+                 buildPlan: buildPlan, teleAlpha: teleAlpha, chargeTime: BL_CHARGE, cellCfg: CELL, coreGain: coreGain, sparkCols: sparkCols, get cell() { return cell; }, get pal() { return PAL; },
                  set t(v) { t = +v || 0; } };   /* dev/screenshots: jump the clock */
 })();

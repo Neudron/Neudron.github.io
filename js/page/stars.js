@@ -83,6 +83,9 @@
 
   var stars = [];
   var lit = false;
+  var px = -999, py = -999, GLOW_R2 = 110 * 110;
+  addEventListener('pointermove', function (e) { px = e.clientX; py = e.clientY; }, { passive: true });
+  document.documentElement.addEventListener('mouseleave', function () { px = py = -999; });
   var w = 0, h = 0;
 
   NEU.stars = {
@@ -145,9 +148,15 @@
 
     for (var i = 0; i < stars.length; i++) {
       var s = stars[i];
-      ctx.globalAlpha = s.alpha;
+      var near = !reduce && (s.x - px) * (s.x - px) + (s.y - py) * (s.y - py) < GLOW_R2;
+      ctx.globalAlpha = near ? Math.min(1, s.base + 0.35) : s.alpha;
       ctx.fillStyle = s.color;
       ctx.fillRect(s.x, s.y, PIXEL, PIXEL);
+      if (near) {
+        ctx.globalAlpha = 0.45 * Math.min(1, s.base + 0.35);
+        ctx.fillRect(s.x - PIXEL, s.y, PIXEL * 3, PIXEL);
+        ctx.fillRect(s.x, s.y - PIXEL, PIXEL, PIXEL * 3);
+      }
     }
 
     ctx.globalAlpha = 1;
