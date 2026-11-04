@@ -71,6 +71,9 @@
                      cd: VOLLEY_EVERY * (i + 1) / SEEKERS });
     spawned = true;
     place();
+    /* a ring warning on every slot, so the wave reads before it fires */
+    for (var j = 0; j < seekers.length; j++)
+      if (NEU.scalAtk && NEU.scalAtk.warn) NEU.scalAtk.warn({ x: seekers[j].x, y: seekers[j].y, r: 16, life: 24 });
   }
   function clear() {
     seekers.length = 0;
@@ -167,6 +170,8 @@
       if (!sprite('dart', d.x, d.y, 0.5, Math.atan2(d.vy, d.vx) + Math.PI / 2, now)) {
         ctx.fillStyle = '#FF4A2A';
         ctx.fillRect((d.x - d.r) | 0, (d.y - d.r) | 0, d.r * 2, d.r * 2);
+        ctx.strokeStyle = '#FFE0C0'; ctx.lineWidth = 1;
+        ctx.strokeRect((d.x - d.r) | 0, (d.y - d.r) | 0, d.r * 2, d.r * 2);
       }
     }
     /* Glow mask stacked additively — the same way the brothers' glows
@@ -174,8 +179,14 @@
     for (i = 0; i < seekers.length; i++) {
       s = seekers[i];
       var rot = Math.atan2(s.y - (AY + AH / 2), s.x - (AX + AW / 2));
+      /* contrast rim: black under-disc and a pink ring, drawn under the sprite */
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(0,0,0,.55)';
+      ctx.beginPath(); ctx.arc(s.x, s.y, 15, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#FF8AA0'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 15, 0, Math.PI * 2); ctx.stroke();
       if (!sprite('soulSeeker', s.x, s.y, 0.7, rot, now, ['soulSeekerGlow'])) {
-        ctx.fillStyle = '#8C2F4A';
+        ctx.fillStyle = '#E0405A';
         ctx.fillRect((s.x - 12) | 0, (s.y - 12) | 0, 24, 24);
       }
     }

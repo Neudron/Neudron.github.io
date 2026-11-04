@@ -809,7 +809,7 @@
       var rate = Math.max(24, (L >= 1 ? 27 : 32) - st.vol), T = Math.max(24, Math.min(rate - 4, teleT(rate)));
       var n = Math.min(9, (L >= 1 ? 7 : 5) + (st.vol >> 1)) - (busy() ? 2 : 0), base = aim(), ox = A.bx, oy = A.by;
       st.next += rate;
-      warn({ x: ox, y: oy, a: base, w: 2, life: T });
+      warn({ x: ox, y: oy, kind: 'fan', a0: base - 0.45, a1: base + 0.45, r: D(1500), w: 4, life: T });
       later(T, function () {
         for (var j = 0; j < n; j++) shotRamp(ox, oy, base + lerp(-0.45, 0.45, j / (n - 1)), V(7.5), 0, { tag: 'brim', fuse: 6 });
       });
@@ -2392,6 +2392,7 @@
   NEU.scalAtk = {
     /* boss-scal.js hands over its adapter once, at load */
     attach: function (adapter) { A = adapter; },
+    warn: function (o) { return G ? warn(o) : o; },
     /* the fight begins: the lead-in, which is the Sepulcher's 270 f delay */
     start: function () {
       G = fresh(); acc = 0; K = A.AW / 2000;
