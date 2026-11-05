@@ -66,8 +66,11 @@
      millisecond of slack keeps a 120 Hz panel on every vsync and a
      240 Hz one on every other one; 60, 144 and 165 Hz land where they
      did. */
-  var PACE = 1000 / 120;
-  var SLACK = 1;
+  /* No artificial 120 Hz cap: render follows the display's rAF cadence.
+     Simulation stays on its fixed 60 Hz step (engine STEP, boss dt cap);
+     paced() only dedupes multiple callers sharing one vsync timestamp. */
+  var PACE = 0;
+  var SLACK = 0;
   var pacedLast = 0, pacedNow = -1, pacedOk = true;
   /* ONE VERDICT PER VSYNC. Every rAF callback of a frame is handed the
      same `now`, and more than one loop asks (the engine's room draw and

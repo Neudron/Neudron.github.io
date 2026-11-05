@@ -1,0 +1,317 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>renderer benchmark</title>
+<style>
+  html,body{margin:0;background:#050505;color:#ddd;font:12px monospace}
+  #wrap{display:flex;gap:8px;padding:8px}
+  canvas{width:480px;height:360px;image-rendering:pixelated;background:#100}
+  #log{padding:0 8px}
+</style>
+<div id="wrap"><canvas id="c2d" width="800" height="600"></canvas></div>
+<div id="log"></div>
+<script type="module">
+import * as PIXI from '/node_modules/pixi.js/dist/pixi.min.mjs';
+
+const W = 800, H = 600;
+const IMG = '/img/act4/calamity/';
+const sheets = {
+  scal:      { file: 'SupremeCalamitas.png',       fw: 60, fh: 60, frames: 21 },
+  dart:      { file: 'BrimstoneBarrage.png',       fw: 18, fh: 44, frames: 4 },
+  fireblast: { file: 'SCalBrimstoneFireblast.png', fw: 36, fh: 50, frames: 5 },
+  heart:     { file: 'BrimstoneHeart.png',         fw: 7,  fh: 7,  frames: 6 }
+};
+
+const cv = document.getElementById('c2d');
+const ctx = cv.getContext('2d', { alpha: false });
+ctx.imageSmoothingEnabled = false;
+
+function loadImage(src) {
+  return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+}
+
+const images = {};
+for (const k of Object.keys(sheets)) images[k] = await loadImage(IMG + sheets[k].file);
+
+/* Pixi must use the same decoded art. */
+const app = new PIXI.Application();
+await app.init({ width: W, height: H, background: 0x110000, antialias: false,
+  preference: 'webgl', powerPreference: 'high-performance', autoStart: false });
+app.canvas.style.width = '480px';
+app.canvas.style.height = '360px';
+app.canvas.style.imageRendering = 'pixelated';
+document.getElementById('wrap').appendChild(app.canvas);
+
+function subTexture(img, meta, frame) {
+  const tex = PIXI.Texture.from(img);
+  return new PIXI.Texture({ source: tex.source,
+    frame: new PIXI.Rectangle(0, (frame % meta.frames) * meta.fh, meta.fw, meta.fh) });
+}
+
+function glowTexture(size) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gr.addColorStop(0, 'rgba(255,220,180,1)');
+  gr.addColorStop(0.25, 'rgba(255,90,42,0.55)');
+  gr.addColorStop(1, 'rgba(255,40,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, size, size);
+  return c;
+}
+const glowCanvas = glowTexture(64);
+const glowTex = PIXI.Texture.from(glowCanvas);
+
+/* ring texture for seekers */
+const ringCanvas = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 48;
+  const g = c.getContext('2d');
+  g.fillStyle = '#180000'; g.beginPath(); g.arc(24, 24, 15, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#FF8AA0'; g.lineWidth = 2; g.beginPath(); g.arc(24, 24, 15, 0, Math.PI * 2); g.stroke();
+  return c;
+})();
+const ringTex = PIXI.Texture.from(ringCanvas);
+
+/* deterministic model. One entry per visible object. */
+const state = { level: 1, bullets: [], bolts: [], seekers: [], embers: [], phase: 0 };
+
+function mulberry32(a) {
+  return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+function build(level) {
+  state.level = level;
+  const rnd = mulberry32(0xC0FFEE);
+  const nBul = 420 * level, nBolt = 10 * level, nSeek = 24 * level;
+  state.bullets = []; state.bolts = []; state.seekers = []; state.embers = [];
+  for (let i = 0; i < nBul; i++) {
+    const a = rnd() * Math.PI * 2, sp = 40 + rnd() * 120;
+    state.bullets.push({ x: W / 2 + (rnd() - 0.5) * 400, y: H / 2 + (rnd() - 0.5) * 300,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 10 + rnd() * 18,
+      kind: i % 5 === 0 ? 'fireblast' : 'dart', frame: (rnd() * 4) | 0, rot: a });
+  }
+  for (let i = 0; i < nBolt; i++) {
+    const segs = [], n = 9 + ((rnd() * 8) | 0);
+    let x = 40 + rnd() * (W - 80), y = 40 + rnd() * (H - 80), a = rnd() * Math.PI * 2;
+    for (let j = 0; j < n; j++) {
+      const nx = x + Math.cos(a) * (18 + rnd() * 30), ny = y + Math.sin(a) * (18 + rnd() * 30);
+      segs.push({ x0: x, y0: y, x1: nx, y1: ny }); x = nx; y = ny; a += (rnd() - 0.5) * 0.9;
+    }
+    state.bolts.push({ segs, a: 0.3 + rnd() * 0.7 });
+  }
+  for (let i = 0; i < nSeek; i++) state.seekers.push({ x: 40 + rnd() * (W - 80), y: 40 + rnd() * (H - 80), ph: rnd() * 6.28 });
+  for (let i = 0; i < 40 + 20 * (level - 1); i++) state.embers.push({ x: rnd(), y: rnd(), s: 2 + ((rnd() * 2) | 0), ph: rnd() * 6.28 });
+  buildCanvas();
+  buildPixi();
+}
+
+/* ── Canvas2D: the real game's draw shape (batched bolt glow, cached glow stamps) */
+let cBoltLayer = [];
+function buildCanvas() {
+  cBoltLayer = state.bolts.map(() => null); /* built lazily as plain segment lists */
+}
+
+function canvasDraw(t) {
+  ctx.fillStyle = '#0d0305'; ctx.fillRect(0, 0, W, H);
+  /* storm */
+  ctx.strokeStyle = 'rgba(255,60,40,0.20)'; ctx.lineWidth = 2; ctx.beginPath();
+  for (let i = 0; i < 40; i++) {
+    const x = (i * 211 + t * 60) % W, y = (i * 97 + t * 30) % H;
+    ctx.moveTo(x, y); ctx.lineTo(x - 18, y + 70);
+  }
+  ctx.stroke();
+  /* field + embers */
+  ctx.fillStyle = 'rgba(80,8,18,0.35)'; ctx.fillRect(30, 30, W - 60, H - 60);
+  for (let i = 0; i < state.embers.length; i++) {
+    const m = state.embers[i], ex = (m.x * W + Math.sin(m.ph) * 6) | 0, ey = (m.y * H) | 0;
+    ctx.fillStyle = m.s === 3 ? '#FFB050' : '#FF5A2A';
+    ctx.globalAlpha = 0.35 + 0.4 * (1 - m.y);
+    ctx.fillRect(ex, ey, m.s, m.s);
+  }
+  ctx.globalAlpha = 1;
+  /* boss */
+  const bossFrame = (t * 4 | 0) % 21, bossCol = (bossFrame / 21) | 0;
+  ctx.drawImage(images.scal, bossCol * 60, (bossFrame % 21) * 60, 60, 60, 360, 220, 120, 120);
+  /* bolts: 4 glow layers, one path per disjoint-ish batch */
+  ctx.lineCap = 'round';
+  for (let i = 0; i < state.bolts.length; i++) {
+    const b = state.bolts[i], k = b.a * (0.7 + 0.3 * Math.sin(t * 30 + i));
+    const cols = ['rgba(150,16,24,' + (0.35 * k).toFixed(2) + ')', 'rgba(255,70,36,' + (0.5 * k).toFixed(2) + ')',
+      'rgba(255,190,140,' + (0.85 * k).toFixed(2) + ')', 'rgba(255,255,255,' + (0.9 * k).toFixed(2) + ')'];
+    const ws = [15, 7.8, 3.6, 1.35];
+    for (let l = 0; l < 4; l++) {
+      ctx.strokeStyle = cols[l]; ctx.lineWidth = ws[l]; ctx.beginPath();
+      for (let j = 0; j < b.segs.length; j++) { const s = b.segs[j]; ctx.moveTo(s.x0, s.y0); ctx.lineTo(s.x1, s.y1); }
+      ctx.stroke();
+    }
+  }
+  /* glow stamps + bullets */
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < state.bullets.length; i++) {
+    const b = state.bullets[i];
+    const x = b.x + b.vx * t, y = b.y + b.vy * t;
+    const s = Math.max(10, b.r * 3) | 0;
+    ctx.globalAlpha = 0.55;
+    ctx.drawImage(glowCanvas, x - s / 2, y - s / 2, s, s);
+  }
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < state.bullets.length; i++) {
+    const b = state.bullets[i], meta = sheets[b.kind];
+    const x = b.x + b.vx * t, y = b.y + b.vy * t, frame = (b.frame + (t * 14 | 0)) % meta.frames;
+    const sw = meta.fw * 0.55, sh = meta.fh * 0.55;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(b.rot + t); ctx.drawImage(images[b.kind], 0, frame * meta.fh, meta.fw, meta.fh, -sw / 2, -sh / 2, sw, sh); ctx.restore();
+  }
+  /* seekers */
+  for (let i = 0; i < state.seekers.length; i++) {
+    const s = state.seekers[i], x = s.x + Math.sin(t * 2 + s.ph) * 30, y = s.y + Math.cos(t * 1.7 + s.ph) * 24;
+    ctx.drawImage(ringCanvas, x - 24, y - 24);
+  }
+  /* hearts */
+  for (let i = 0; i < 6; i++) {
+    const frame = (t * 8 | 0) % 6;
+    ctx.drawImage(images.heart, 0, frame * 7, 7, 7, 330 + i * 24, 500, 21, 21);
+  }
+}
+
+/* ── PixiJS WebGL2: same objects, sprites + prebuilt Graphics */
+const pRoot = new PIXI.Container();
+const pBoss = new PIXI.Container();
+const pBolts = new PIXI.Container();
+const pBullets = new PIXI.Container();
+const pGlow = new PIXI.Container();
+const pSeek = new PIXI.Container();
+const pEmber = new PIXI.Container();
+const pHearts = new PIXI.Container();
+pRoot.addChild(pEmber, pBoss, pBolts, pGlow, pBullets, pSeek, pHearts);
+app.stage.addChild(pRoot);
+
+const pSprites = { bullets: [], glows: [], bolts: [], seekers: [], embers: [], hearts: [] };
+let pBossSprite, pField;
+
+function buildPixi() {
+  for (const c of [pBoss, pBolts, pBullets, pGlow, pSeek, pEmber, pHearts]) c.removeChildren();
+  pSprites.bullets = []; pSprites.glows = []; pSprites.bolts = []; pSprites.seekers = []; pSprites.embers = []; pSprites.hearts = [];
+
+  pField = new PIXI.Graphics();
+  pField.rect(30, 30, W - 60, H - 60).fill({ color: 0x500812, alpha: 0.35 });
+  pBoss.addChild(pField);
+  pBossSprite = new PIXI.Sprite(subTexture(images.scal, sheets.scal, 0));
+  pBossSprite.anchor.set(0.5); pBossSprite.position.set(420, 280); pBossSprite.scale.set(2);
+  pBoss.addChild(pBossSprite);
+
+  for (const m of state.embers) {
+    const s = new PIXI.Sprite(PIXI.Texture.WHITE);
+    s.tint = m.s === 3 ? 0xFFB050 : 0xFF5A2A; s.anchor.set(0); s.alpha = 0.6;
+    pEmber.addChild(s); pSprites.embers.push(s);
+  }
+  for (const b of state.bolts) {
+    const box = new PIXI.Container();
+    const cols = [0x960c12, 0xff4624, 0xffbe8c, 0xffffff], alphas = [0.35, 0.5, 0.85, 0.9], ws = [15, 7.8, 3.6, 1.35];
+    for (let l = 0; l < 4; l++) {
+      const g = new PIXI.Graphics();
+      g.setStrokeStyle({ width: ws[l], color: cols[l], alpha: alphas[l], cap: 'round' });
+      for (const s of b.segs) { g.moveTo(s.x0, s.y0); g.lineTo(s.x1, s.y1); }
+      g.stroke();
+      box.addChild(g);
+    }
+    pBolts.addChild(box); pSprites.bolts.push(box);
+  }
+  for (const b of state.bullets) {
+    const meta = sheets[b.kind];
+    const sp = new PIXI.Sprite(subTexture(images[b.kind], meta, b.frame));
+    sp.anchor.set(0.5); sp.scale.set(0.55);
+    pBullets.addChild(sp); pSprites.bullets.push(sp);
+    const gl = new PIXI.Sprite(glowTex);
+    gl.anchor.set(0.5); gl.blendMode = 'add'; gl.alpha = 0.55;
+    pGlow.addChild(gl); pSprites.glows.push(gl);
+  }
+  for (const s of state.seekers) {
+    const sp = new PIXI.Sprite(ringTex); sp.anchor.set(0.5);
+    pSeek.addChild(sp); pSprites.seekers.push(sp);
+  }
+  for (let i = 0; i < 6; i++) {
+    const sp = new PIXI.Sprite(subTexture(images.heart, sheets.heart, i));
+    sp.anchor.set(0.5); sp.position.set(340 + i * 24, 510); sp.scale.set(3);
+    pHearts.addChild(sp); pSprites.hearts.push(sp);
+  }
+}
+
+const bossTex = [];
+for (let i = 0; i < 21; i++) bossTex.push(subTexture(images.scal, sheets.scal, i));
+const heartTex = [];
+for (let i = 0; i < 6; i++) heartTex.push(subTexture(images.heart, sheets.heart, i));
+
+function pixiDraw(t) {
+  const bossFrame = (t * 4 | 0) % 21;
+  pBossSprite.texture = bossTex[bossFrame];
+  const list = pSprites.bullets;
+  for (let i = 0; i < state.bullets.length; i++) {
+    const b = state.bullets[i], sp = list[i], gl = pSprites.glows[i];
+    const x = b.x + b.vx * t, y = b.y + b.vy * t;
+    sp.position.set(x, y); sp.rotation = b.rot + t;
+    gl.position.set(x, y);
+    const s = Math.max(10, b.r * 3) | 0; gl.width = s; gl.height = s;
+  }
+  for (let i = 0; i < state.bolts.length; i++) pSprites.bolts[i].alpha = state.bolts[i].a * (0.7 + 0.3 * Math.sin(t * 30 + i));
+  for (let i = 0; i < state.seekers.length; i++) {
+    const s = state.seekers[i];
+    pSprites.seekers[i].position.set(s.x + Math.sin(t * 2 + s.ph) * 30, s.y + Math.cos(t * 1.7 + s.ph) * 24);
+  }
+  for (let i = 0; i < state.embers.length; i++) {
+    const m = state.embers[i];
+    const sp = pSprites.embers[i];
+    sp.position.set((m.x * W + Math.sin(m.ph) * 6) | 0, (m.y * H) | 0);
+    sp.width = m.s; sp.height = m.s; sp.alpha = 0.35 + 0.4 * (1 - m.y);
+  }
+  for (let i = 0; i < 6; i++) pSprites.hearts[i].texture = heartTex[(t * 8 | 0) % 6];
+  app.render();
+}
+
+/* ── harness */
+const out = { readyMs: performance.now(), gpu: null };
+{
+  const gl = app.renderer.gl;
+  const ext = gl.getExtension('WEBGL_debug_renderer_info');
+  out.gpu = gl.getParameter(ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
+  out.webgl2 = app.renderer.type === PIXI.RendererType.WEBGL;
+}
+window.BENCH = {
+  build,
+  async run(kind, level, seconds) {
+    build(level);
+    cv.style.display = kind === 'canvas' ? '' : 'none';
+    app.canvas.style.display = kind === 'pixi' ? '' : 'none';
+    let t = 0, running = true, last = performance.now(), n = 0;
+    const sub = [], iv = [];
+    let prev = 0;
+    await new Promise(res => {
+      function tick(ts) {
+        if (!running) return res();
+        if (!prev) prev = ts;
+        else iv.push(ts - prev), prev = ts;
+        const dt = Math.min(0.05, (ts - last) / 1000); last = ts; t += dt;
+        const t0 = performance.now();
+        if (kind === 'canvas') canvasDraw(t); else pixiDraw(t);
+        sub.push(performance.now() - t0);
+        n++;
+        if (n >= seconds * 60) { running = false; res(); return; }
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+    app.renderer.gl.finish();
+    const q = (a, p) => { a = a.slice().sort((x, y) => x - y); return a.length ? +a[Math.min(a.length - 1, Math.floor(a.length * p))].toFixed(3) : 0; };
+    const sum = a => a.reduce((x, y) => x + y, 0);
+    return {
+      frames: n, fps: +(n / (sum(iv) / 1000)).toFixed(1),
+      submit: { p50: q(sub, .5), p90: q(sub, .9), p95: q(sub, .95), p99: q(sub, .99), max: q(sub, 1), mean: +(sum(sub) / n).toFixed(3) },
+      interval: { p50: q(iv, .5), p95: q(iv, .95), p99: q(iv, .99), max: q(iv, 1) },
+      dropped25: iv.filter(x => x > 25).length, missed50: iv.filter(x => x > 50).length
+    };
+  }
+};
+await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+out.readyMs = +performance.now().toFixed(1);
+out.resources = performance.getEntriesByType('resource').map(e => ({ name: e.name.split('/').pop(), bytes: e.transferSize || e.encodedBodySize || 0 }));
+window.BENCH.out = out;
+document.getElementById('log').textContent = 'ready ' + out.readyMs + 'ms · ' + out.gpu;
+</script>

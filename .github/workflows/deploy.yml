@@ -1,17 +1,10 @@
 # Deploy the site to GitHub Pages.
 #
-# This repo's Pages source is set to "GitHub Actions" rather than
-# "Deploy from a branch". That distinction is the whole reason this
-# file has to exist: with the Actions source selected, a push to main
-# does NOT publish anything on its own — GitHub waits for a workflow
-# to upload an artifact. With no workflow present, every push looked
-# like it succeeded and silently deployed nothing.
-#
-# The site is plain static files with no build step. After the merge
-# that flattened site/ to root, the repo root also contains memory/
-# (the complete walkthrough — the first puzzle is finding the way in),
-# tests/, _scripts/, and .github/. These must never ship, so the
-# workflow stages only the web-facing files before uploading.
+# Pages source is "GitHub Actions": a push to main publishes only after
+# this workflow uploads an artifact. The site is built from source into
+# dist/ — the portfolio shell loads immediately, the game chunk and its
+# art stay off the wire until a visitor enters the game. Only dist/ is
+# uploaded; memory/, tests/, _scripts/, notes and tooling never ship.
 
 name: Deploy site to Pages
 
@@ -41,19 +34,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Build publishable site
+        run: npm run build
+
+      - name: Verify artifact allowlist and public surface
+        run: npm run verify
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Stage only site files
-        run: |
-          mkdir _stage
-          cp -r index.html 404.html css js fonts img audio CNAME .nojekyll og.png robots.txt sitemap.xml llms.txt humans.txt manifest.json apple-touch-icon.png icon-512.png _stage/ 2>/dev/null || true
-          cp -r .well-known _stage/ 2>/dev/null || true
-
-      - name: Upload staged site
+      - name: Upload dist
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './_stage'
+          path: './dist'
 
       - name: Deploy
         id: deployment

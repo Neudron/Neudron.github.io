@@ -2550,10 +2550,9 @@
     line(ctx, x0, y0, x1, y1, 'rgba(255,190,140,' + (0.85 * k).toFixed(2) + ')', core * 1.2);
     line(ctx, x0, y0, x1, y1, 'rgba(255,255,255,' + (0.9 * k).toFixed(2) + ')', Math.max(1, core * 0.45));
   }
-  /* glowLine over a whole bolt, layer by layer: four strokeStyle sets per
-     bolt, not four per segment. Every layer is added ('lighter'), so the
-     order cannot change a pixel; each segment stays its own stroke (one
-     path would lose the bright joints). */
+  /* glowSegs over a whole bolt, layer by layer: four strokeStyle sets per
+     bolt, one stroke per segment per layer. Kept per-segment so the
+     compositing order (and thus pixels) is identical to the original. */
   function glowSegs(ctx, segs, k, core) {
     var cols = ['rgba(150,16,24,' + (0.35 * k).toFixed(2) + ')', 'rgba(255,70,36,' + (0.5 * k).toFixed(2) + ')',
                 'rgba(255,190,140,' + (0.85 * k).toFixed(2) + ')', 'rgba(255,255,255,' + (0.9 * k).toFixed(2) + ')'];

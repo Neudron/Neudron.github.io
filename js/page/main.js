@@ -269,8 +269,8 @@
        instead of a failed decode. */
     var sample = null, sampleOk = false;
     try {
-      sample = new Audio('audio/vine-boom.mp3');
-      sample.preload = 'auto';
+      sample = new Audio();
+      sample.preload = 'none';
       sample.volume = 0.55;
       sample.addEventListener('canplaythrough', function () { sampleOk = true; });
       sample.addEventListener('error', function () { sampleOk = false; });
@@ -278,6 +278,7 @@
 
     function boom() {
       if (hushed()) return;
+      if (sample && !sample.src) { sample.src = 'audio/vine-boom.mp3'; try { sample.load(); } catch (e) {} }
       if (sampleOk && sample) {
         try { sample.currentTime = 0; sample.play(); return; } catch (e) {}
       }

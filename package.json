@@ -1,0 +1,15 @@
+{
+  "name": "neu-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "verify": "node scripts/verify-dist.mjs",
+    "bench": "node bench/renderers.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "pixi.js": "^8.22.0",
+    "three": "0.185.1"
+  }
+}

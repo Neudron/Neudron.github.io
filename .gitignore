@@ -95,3 +95,7 @@ tests/
 audio/README.txt
 fonts/README.txt
 .omc/
+
+# build + benchmark deps (migration)
+node_modules/
+dist/

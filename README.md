@@ -1,7 +1,7 @@
 # neu
 
 <!-- badges:start -->
-**tests:** 28 suites · 1591+ checks · all green · ES5 gate clean
+**tests:** 92 suites · 1591+ checks · all green · ES5 gate clean
 <!-- badges:end -->
 
 A personal site at **[www.neu.ac](https://www.neu.ac)**. Black pixel art, one
@@ -11,25 +11,36 @@ It is also, quietly, a game — a few hours of one, hidden behind the contact
 section. That is as much as this file will say about it. Finding the way in
 is the first puzzle and spoiling it here would be the one unrecoverable bug.
 
-**No build step.** No npm, no bundler, no framework, no transpile. Plain
-`<script>` tags; three.js arrives from jsDelivr through an importmap. Edit a
-file, refresh the browser. That is the whole loop, and it is a constraint the
-project is built around rather than a stage it has not reached yet.
+**Build step (migration).** The source is still plain `<script>` tags and
+jsdom tests run against it untouched, but production is built: `npm run build`
+writes `dist/` — a small portfolio shell, a lazy game chunk that is not
+downloaded until a visitor enters the game, and a self-hosted three.js
+bundle. `npm run verify` checks the artifact allowlist and public surface.
+three.js is no longer pulled from jsDelivr at runtime.
 
 ---
 
 ## Run it
+
+Source (what the tests exercise):
 
 ```bash
 python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
+Production artifact:
+
+```bash
+npm ci
+npm run build      # writes dist/
+npm run verify     # allowlist + public surface
+python3 -m http.server 8000 --directory dist
+```
+
 Opening `index.html` straight off disk mostly works, but `js/page/scene.js`
 is an ES module and some browsers refuse those on `file://`. The one-line
 server above avoids the question.
-
-Nothing to install. There is no `package.json` outside `tests/`.
 
 ## Test it
 
@@ -38,8 +49,9 @@ no headless Chrome.
 
 ```bash
 node tests/run-all.mjs   # every suite, ~90s, hard 60s timeout each
-# or one at a time:
-node tests/fixes5.mjs    # ... through fixes18.mjs
+npm run build && npm run verify   # production artifact
+# or one suite at a time:
+node tests/fixes5.mjs    # ... through fixes111.mjs
 node tests/playthrough.mjs   # a full scripted run of the whole game
 ```
 
@@ -64,8 +76,9 @@ shape, refuses to ship anything that must not ship, shows you the diff,
 **asks**, then pushes and verifies against the live URL. Add `-DryRun` to do
 everything except the last three steps.
 
-GitHub Pages deploys from an Action, so a push to `main` is live in about a
-minute and there is no staging step. Hence the prompt.
+GitHub Pages deploys from an Action on push to `main`: it runs
+`npm ci`, `npm run build`, `npm run verify`, then uploads only `dist/`.
+`memory/`, `tests/`, `_scripts/` and notes never reach Pages.
 
 ---
 
@@ -85,6 +98,8 @@ memory/               ALL the documentation. Start at PLAN.md
 tests/                the jsdom suites
 _deploy/                a clone of the Pages repo. Push from here, via the script
 _scripts/               one-off tools; not part of the site
+scripts/                build.mjs, prelude.js, verify-dist.mjs (tracked)
+dist/                   build output, gitignored
 ```
 
 (The repo was flattened 2026-08-21 — everything that used to live under
@@ -117,7 +132,9 @@ meter (`fps`).
 
 These are not aspirations; there are tests that fail when they are broken.
 
-- **No build step.** If a fix needs tooling, it is the wrong fix.
+- **Source stays ES5.** `js/` is still `var`/function, no arrow functions,
+  no `const`/`let`; the build targets ES2018/2022 and bundles. The test
+  harness may use modern syntax; the shipped source may not.
 - **ES5 syntax in `js/`.** `var`, function declarations, no arrow functions,
   no `const`/`let`. The test harness may use modern syntax; the shipped site
   may not.
@@ -141,8 +158,8 @@ This file is the front door. Everything else is in `memory/` — which is
 of the game in plain prose, and `chain.md`, `plan-act4.md` and
 `build-notes.md` between them give away every room, boss and mechanic. They
 were shipping by accident back when the deploy mirrored the whole tree; the
-deploy workflow now stages only web-facing files into `_stage/` before
-uploading, so `memory/`, `tests/` and `_scripts/` never reach Pages.
+deploy workflow builds `dist/` and uploads only that, so `memory/`,
+`tests/` and `_scripts/` never reach Pages.
 
 So if you are reading this on the web, the table below is a map of a folder
 you cannot see. Clone it and you get the lot.

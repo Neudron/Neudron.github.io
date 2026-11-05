@@ -165,7 +165,7 @@
   try {
     for (var bi = 0; bi < 4; bi++) {
       var ba = new Audio('audio/txtsans.wav');
-      ba.preload = 'auto'; ba.volume = 0.32;
+      ba.preload = 'none'; ba.volume = 0.32;
       ba.addEventListener('error', function () { blipOk = false; });
       blipPool.push(ba);
     }
@@ -266,7 +266,7 @@
     var canOgg = !!tSample.canPlayType &&
                  tSample.canPlayType('audio/ogg; codecs="vorbis"') !== '';
     tSample.src = canOgg ? 'audio/totem.ogg' : 'audio/totem.mp3';
-    tSample.preload = 'auto';
+    tSample.preload = 'none';
     /* a "you nearly died" cue, deliberately 3 dB above the -19 LUFS target
        (-16 LUFS; the file measures -10.7 LUFS, ebur128, 2026-11-03) */
     tSample.volume = 0.5 * Math.pow(10, (-16 - -10.7) / 20);
@@ -689,6 +689,7 @@
     tbox.setAttribute('data-who', curV);
     setFace(curV);
     ttxt.textContent = '';
+    blipPool.forEach(function (a) { if (a.preload !== 'auto') { a.preload = 'auto'; try { a.load(); } catch (e) {} } });
     if (tmore) tmore.hidden = true;
     if (reduced) {                       // no typing, just the line
       ttxt.textContent = line;
@@ -777,6 +778,7 @@
     pop.style.setProperty('--ty', (Math.sin(a) * 14 - 30).toFixed(1) + 'px');
     pop.classList.add('is-pop');
     burst();
+    if (tSample && tSample.preload !== 'auto') { tSample.preload = 'auto'; try { tSample.load(); } catch (e) {} }
     totemSound();
     popT = setTimeout(function () { pop.classList.remove('is-pop'); }, 1830);
   }
