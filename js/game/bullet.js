@@ -971,9 +971,11 @@
   function open(opts) {
     if (NEU.settings && NEU.settings.warnFlash) NEU.settings.warnFlash();
     if (running) return;                 /* already mid-run — never stack a second loop */
-    endless = !!(opts && opts.endless);
-    /* Act III passes { variant: true }. With no option the room asks the
-       quest: once the console's step is done, this is the Act III room. */
+    /* The library launches endless. With no option the room asks the
+       quest: once the console's step is done this is the in-console run,
+       and it runs until you exit manually — no twenty-second cap. */
+    endless = !!(opts && opts.endless) || (opts === undefined && !!(NEU.quest && NEU.quest.has && NEU.quest.has('console')));
+    /* Act III passes { variant: true } for the bounded room. */
     variant = !endless && (opts && 'variant' in opts ? !!opts.variant
                                                     : !!(NEU.quest && NEU.quest.has && NEU.quest.has('console')));
     NEU.activeMinigame = 'bullet';

@@ -2348,7 +2348,7 @@
     for (i = 0; i < G.lasers.length; i++) {
       if (G.fr < G.lasers[i].at) continue;
       s = laserSeg(G.lasers[i]);
-      if (segDist(A.px, A.py, s.x0, s.y0, s.x1, s.y1) < 7) A.hit();
+      if (segDist(A.px, A.py, s.x0, s.y0, s.x1, s.y1) < 7 && !(A.dashI && A.dashI() > 0)) A.hit();
     }
     for (i = 0; i < G.rend.length; i++) {
       r = G.rend[i];
@@ -2638,7 +2638,7 @@
       l = G.lasers[i];
       sg = laserSeg(l);
       if (G.fr < l.at) {
-        line(ctx, sg.x0, sg.y0, sg.x1, sg.y1, 'rgba(255,0,0,' + (0.35 + 0.35 * Math.sin(G.fr * 0.3)).toFixed(2) + ')', 1);
+        line(ctx, sg.x0, sg.y0, sg.x1, sg.y1, 'rgba(255,60,40,' + (0.55 + 0.35 * Math.sin(G.fr * 0.3)).toFixed(2) + ')', 2);
       } else {
         ctx.globalCompositeOperation = 'lighter';
         glowLine(ctx, sg.x0, sg.y0, sg.x1, sg.y1, 1, 4);

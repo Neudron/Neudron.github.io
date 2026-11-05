@@ -2121,6 +2121,7 @@
     },
     sfx: function (n) { sfxPlay(n); },
     hit: function () { if (inv <= 0 && mode !== 'won') hitPlayer(); },
+    dashI: function () { return F.dashI; },
     over: function () { return !running; },
     win: function () { win(); },
     special: function (kind) {
