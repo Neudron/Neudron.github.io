@@ -1186,7 +1186,9 @@
      ninth of the fill cost (the vignette alone covers the screen
      several times over). */
   var vig = null, vigKey = '';
-  /* the black stepped vignette, cached: it only changes with `near` */
+  var rimCv = null, rimKey = '';
+  /* the black stepped vignette, cached. near is quantized to 1/20 so
+     walking does not rebuild a full-screen bitmap every frame. */
   function vignette(w, h, bw, aStr) {
     var key = w + 'x' + h + ':' + bw + ':' + aStr;
     if (key === vigKey && vig) return vig;
@@ -1201,6 +1203,35 @@
     }
     vigKey = key;
     return vig;
+  }
+  /* red rim: same nested bands, baked once per (size, bw, quantized ra) */
+  function redRim(w, h, bw, ra) {
+    var raStr = ra.toFixed(2);
+    var key = w + 'x' + h + ':' + bw + ':' + raStr;
+    if (key === rimKey && rimCv) return rimCv;
+    if (!rimCv) rimCv = mkc(w, h);
+    if (rimCv.width !== w || rimCv.height !== h) { rimCv.width = w; rimCv.height = h; }
+    var r = rimCv.getContext('2d'), i, j, x0, iw, ih;
+    r.clearRect(0, 0, w, h);
+    for (i = 0; i < 6; i++) {
+      j = i; x0 = j * bw; iw = w - 2 * x0; ih = h - 2 * x0;
+      if (iw <= 0 || ih <= 0) break;
+      r.fillStyle = 'rgba(170,8,14,' + (1 - Math.pow(1 - ra, 6 - j)).toFixed(4) + ')';
+      r.fillRect(x0, x0, iw, bw); r.fillRect(x0, h - x0 - bw, iw, bw);
+      r.fillRect(x0, x0 + bw, bw, ih - 2 * bw); r.fillRect(w - x0 - bw, x0 + bw, bw, ih - 2 * bw);
+    }
+    rimKey = key;
+    return rimCv;
+  }
+  /* ember/ash sprites: one fillRect each, then every particle is drawImage */
+  var partSpr = {};
+  function partSprite(col, s) {
+    var k = col + ':' + s, c = partSpr[k];
+    if (c) return c;
+    c = mkc(s, s);
+    var x = c.getContext('2d');
+    x.fillStyle = col; x.fillRect(0, 0, s, s);
+    return (partSpr[k] = c);
   }
 
   /* the after: a hole in the vault and one pale shaft down onto the
@@ -1235,9 +1266,11 @@
     var S = origin.S, ox = origin.x, oy = origin.y, cold = dead();
     var dk = run ? dbg.dark : 0;
     var i;
-    /* the vignette: stepped bands, black, then a red rim that beats */
+    /* the vignette: stepped bands, black, then a red rim that beats.
+       near / pulse are quantized so the full-screen caches stick. */
     var bw = Math.max(4, Math.round(Math.min(w, h) / 64));
-    var aStr = ((cold ? 0.035 : 0.06) * (1 + near)).toFixed(3);
+    var nearQ = Math.round(near * 20) / 20;
+    var aStr = ((cold ? 0.035 : 0.06) * (1 + nearQ)).toFixed(3);
     if (slow) {
       for (i = 0; i < 10; i++) {
         g.fillStyle = 'rgba(0,0,0,' + aStr + ')';
@@ -1250,21 +1283,15 @@
          Band i is the frame i+1 steps deep, so the ring j steps in has
          been painted (6 - j) times; paint each ring ONCE at the alpha
          those repeats add up to (one pass over the frame, not ~3.5). */
-      var rim = (0.03 + 0.1 * near + (run ? 0.1 : 0)) * (0.55 + 0.45 * pulse(now, 0.5 + near * 0.7));
-      var ra = parseFloat(rim.toFixed(3));
-      for (i = 0; i < 6; i++) {
-        var t = (i + 1) * bw;
-        if (slow) {
+      var rim = (0.03 + 0.1 * nearQ + (run ? 0.1 : 0)) * (0.55 + 0.45 * pulse(now, 0.5 + nearQ * 0.7));
+      var ra = Math.round(rim * 100) / 100;
+      if (slow) {
+        for (i = 0; i < 6; i++) {
+          var t = (i + 1) * bw;
           g.fillStyle = 'rgba(170,8,14,' + ra.toFixed(3) + ')';
           g.fillRect(0, 0, w, t); g.fillRect(0, h - t, w, t); g.fillRect(0, t, t, h - 2 * t); g.fillRect(w - t, t, t, h - 2 * t);
-          continue;
         }
-        var j = i, x0 = j * bw, iw = w - 2 * x0, ih = h - 2 * x0;
-        if (iw <= 0 || ih <= 0) break;
-        g.fillStyle = 'rgba(170,8,14,' + (1 - Math.pow(1 - ra, 6 - j)).toFixed(4) + ')';
-        g.fillRect(x0, x0, iw, bw); g.fillRect(x0, h - x0 - bw, iw, bw);
-        g.fillRect(x0, x0 + bw, bw, ih - 2 * bw); g.fillRect(w - x0 - bw, x0 + bw, bw, ih - 2 * bw);
-      }
+      } else g.drawImage(redRim(w, h, bw, ra), 0, 0);
     }
     /* the dark falls */
     if (dk > 0) { g.fillStyle = 'rgba(2,0,2,' + (0.9 * dk).toFixed(3) + ')'; g.fillRect(0, 0, w, h); }
@@ -1279,14 +1306,14 @@
       if (cold && i < SHAFT_MOTES) {
         if (moving) { f.y += f.v * 0.35 * dt; if (f.y > SHAFT_H) f.y = 0; }
         var sl = SHAFT_L + f.y * SHAFT_DL, sr = SHAFT_R + f.y * SHAFT_DR;
-        g.fillStyle = '#E8E0FF';
-        g.fillRect(ox + Math.round(sl + (sr - sl) * (f.ph / 6.3) + (still() ? 0 : Math.sin(now / 1300 + f.ph) * 3)) * S,
-                   oy + Math.round(f.y) * S, S, S);
+        g.drawImage(partSprite('#E8E0FF', 1),
+                    ox + Math.round(sl + (sr - sl) * (f.ph / 6.3) + (still() ? 0 : Math.sin(now / 1300 + f.ph) * 3)) * S,
+                    oy + Math.round(f.y) * S, S, S);
         continue;
       }
       if (moving) { f.y += f.v * dt; f.x += Math.sin(now / 900 + f.ph) * 4 * dt; if (f.y > 13 * TILE) { f.y = 0; f.x = Math.random() * 21 * TILE; } }
-      g.fillStyle = cold ? '#8A8290' : '#5A5260';
-      g.fillRect(ox + Math.round(f.x) * S, oy + Math.round(f.y) * S, f.s * S, f.s * S);
+      g.drawImage(partSprite(cold ? '#8A8290' : '#5A5260', f.s),
+                  ox + Math.round(f.x) * S, oy + Math.round(f.y) * S, f.s * S, f.s * S);
     }
     if (!cold) for (i = 0; i < embers.length; i++) {
       var m = embers[i];
@@ -1295,8 +1322,8 @@
         if (m.life <= 0 || m.y < 0) newEmber(false, m);
       }
       g.globalAlpha = Math.min(1, m.life);
-      g.fillStyle = EMBER_COL[m.life > 3 ? 3 : m.life > 1.6 ? 2 : m.life > 0.6 ? 1 : 0];
-      g.fillRect(ox + Math.round(m.x) * S, oy + Math.round(m.y) * S, m.s * S, m.s * S);
+      g.drawImage(partSprite(EMBER_COL[m.life > 3 ? 3 : m.life > 1.6 ? 2 : m.life > 0.6 ? 1 : 0], m.s),
+                  ox + Math.round(m.x) * S, oy + Math.round(m.y) * S, m.s * S, m.s * S);
     }
     g.globalAlpha = 1;
     if (run) paintSummon(now, S, ox + CX * S, oy + CY * S, w, h);
