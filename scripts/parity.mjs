@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 /*
- * parity.mjs — content manifest for the strangler plan (Phase 0.1, Phase 5 gates).
+ * parity.mjs — content manifest for the strangler plan (Phase 0.1/1b, Phase 5 gates).
  *
  * Records what the site's content ACTUALLY is: rooms + tilesets (via a node:vm
  * sandbox with a recording stand-in NEU.engine, the tests/reach.mjs trick),
- * sheet keys, scal attack names, quest ids, shop stock, save-flag call sites,
- * and a sha256 inventory of every file under js/, img/, audio/, fonts/.
+ * sheet + attack tables, quest ids, shop stock, save-flag call sites, a sha256
+ * inventory of every file under js/, img/, audio/, fonts/, and of the shipped
+ * html/css + root files.
  *
  *   node scripts/parity.mjs                        # write .parity/baseline.json
  *   node scripts/parity.mjs --against FILE         # diff capture vs FILE
+ *   node scripts/parity.mjs --ref R --against FILE # diff capture AT GIT REF vs FILE
+ *
+ * Arrays are diffed as multisets (add/remove only — no positional index noise).
+ * Room entities + spawns and sheet values are hashed, so a dialogue edit or a
+ * hitRadius change shows up without the full JSON in the manifest.
  *
  * Determinism: the manifest is captured twice and byte-compared internally;
  * exit 2 if a capture differs. No timestamps in the JSON on purpose.
@@ -16,22 +22,70 @@
  * # ponytail: quest/shop/flags lanes are regex over source (STEPS/STOCK are
  * closure vars), so counts of exact literals only; dynamic keys (`rank:*`,
  * `solved:*`, `gone:*`, `p:`, `t:` templates) appear as prefixes or not at
- * all. Upgrade a lane to a vm capture when its scene migrates (Phase 2+).
+ * all. VM_FILES is a fixed list: a room file added without registering here is
+ * silently uncaptured — keep the list in sync (fix when scenes migrate, P2).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import vm from 'node:vm';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, '.parity', 'baseline.json');
 
 /* ── hashing ─────────────────────────────────────────────────────────── */
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
+/* ── file access: worktree fs, or a git ref ──────────────────────────── */
+function gitOut(args) {
+  return execFileSync('git', args, { cwd: ROOT, maxBuffer: 1 << 26 });
+}
+function sourcing(ref) {
+  if (!ref) return {
+    readText: (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8'),
+    readBin: (rel) => fs.readFileSync(path.join(ROOT, rel)),
+    list: (prefixes) => fsList(prefixes),
+  };
+  return {
+    readText: (rel) => gitShow(ref, rel).toString('utf8'),
+    readBin: (rel) => gitShow(ref, rel),
+    list: (prefixes) => String(gitOut(['ls-tree', '-r', '--name-only', ref, ...prefixes]))
+      .split('\n').filter(Boolean),
+  };
+}
+function gitShow(ref, rel) {
+  try {
+    return gitOut(['show', `${ref}:${rel}`]);
+  } catch (e) {
+    e.rel = rel;
+    throw e;
+  }
+}
+function fsList(prefixes) {
+  const out = [];
+  for (const dir of prefixes) {
+    const root = path.join(ROOT, dir);
+    if (!fs.existsSync(root)) continue;
+    const walk = (d) => {
+      const rel = path.relative(ROOT, d);
+      if (fs.statSync(d).isFile()) { out.push(rel.split(path.sep).join('/')); return; }
+      for (const name of fs.readdirSync(d).sort()) {
+        const p = path.join(d, name);
+        if (fs.statSync(p).isDirectory()) walk(p);
+        else out.push(path.relative(ROOT, p).split(path.sep).join('/'));
+      }
+    };
+    walk(root);
+  }
+  return out;
+}
+
 /* ── static source-parsed lanes (closure tables never reach a sandbox) ─ */
-function scanRegex(rel, re, keep) {
-  const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+function scanRegex(S, rel, re, keep, errors) {
+  let src;
+  try { src = S.readText(rel); } catch (e) { errors.push(`${rel}: ${e.message}`); return []; }
   const out = [];
   for (let m; (m = re.exec(src)); ) out.push(keep(m));
   return out;
@@ -67,17 +121,20 @@ const VM_FILES = [
   'js/act4/scal-attacks.js',
 ];
 
-function capture() {
+function capture(S) {
   const rooms = {}, tilesets = {}, errors = [];
   const engine = {
     register: (id, def) => {
       def.id = id;
+      const u = id.indexOf('_');
       rooms[id] = {
         id,
-        zone: id.slice(0, id.indexOf('_')) || id,
+        zone: u < 0 ? id : id.slice(0, u),
         ts: def.tileset || '',
         th: sha(String(def.tiles || '')),
         sp: Object.keys(def.spawns || {}).sort(),
+        /* value hash of spawns + entities: a dialogue/trigger/props edit shows as `sh` */
+        sh: sha(String(hashOne(def.spawns || {})) + String(hashOne(def.entities || []))),
         ex: (def.entities || [])
           .filter((e) => e.t === 'exit')
           .map((e) => ({ x: e.x, y: e.y, to: e.to, sp: e.spawn, st: e.style })),
@@ -106,129 +163,153 @@ function capture() {
     Audio: function () {},
   });
   for (const f of VM_FILES) {
-    const file = path.join(ROOT, f);
     try {
-      const src = fs.readFileSync(file, 'utf8');
+      const src = S.readText(f);
       new vm.Script(src, { filename: f }).runInContext(ctx, { timeout: 5000 });
     } catch (e) {
       errors.push(`${f}: ${e.message}`);
     }
   }
 
-  /* sheets + scal attack names, straight off the host object */
-  const sheets = Object.keys(host.NEU.sheets || {}).sort();
+  /* sheets as key → value hash (recolor/collision edits are visible), attacks as names */
+  const sheets = hashValues(host.NEU.sheets);
   const atk = host.NEU.scalAtk && host.NEU.scalAtk.names()
     ? host.NEU.scalAtk.names().slice().sort()
     : [];
 
   const man = {
-    v: 1,
+    v: 2,
     rooms,
     tilesets,
     sheets,
     atk,
-    steps: scanRegex('js/core/quest.js', /\{\s*id:\s*'([^']+)',/g, (m) => m[1]),
-    marks: scanJs(/\b(?:mark|bump)\(\s*'([^']+)'/g, (m) => m[1]),
-    shop: scanRegex('js/act4/shop.js', /\{\s*name:\s*'([^']+)',\s*price:\s*'([^']+)'/g, (m) => m[1] + ' ' + m[2]),
-    flags: scanJs(/\bflag(?:ged)?\(\s*'([^']+)'/g, (m) => m[1]),
-    js: scanJsDir('js', (src) => ({
+    steps: scanRegex(S, 'js/core/quest.js', /\{\s*id:\s*'([^']+)',/g, (m) => m[1], errors),
+    marks: scanRegJs(S, /\b(?:mark|bump)\(\s*'([^']+)'/g, (m) => m[1], errors),
+    shop: scanRegex(S, 'js/act4/shop.js', /\{\s*name:\s*'([^']+)',\s*price:\s*'([^']+)'/g, (m) => m[1] + ' ' + m[2], errors),
+    flags: scanRegJs(S, /\bflag(?:ged)?\(\s*'([^']+)'/g, (m) => m[1], errors),
+    js: laneFiles(S, ['js'], /\.js$/, (src) => ({
       h: sha(src),
       d: (src.match(/lines\s*:\s*\[/g) || []).length,
-    })),
-    assets: scanAssets(),
+    }), errors, null),
+    text: laneFiles(S, FS_PREFIXES, /.*/, (src) => ({ h: sha(src) }), errors, (p) => TEXT_ROOTS.includes(p) || /^css\//.test(p)),
+    assets: laneAssets(S, errors),
     errors,
   };
+  for (const lane of [man.js, man.text, man.assets]) bypSort(lane);
   return man;
 }
 
-/* generic per-file scan over a whole dir tree (sorted paths) */
-function scanJsDir(dir, transform) {
+/* files under prefixes, shaped by transform, filtered by optional filter */
+function laneFiles(S, prefixes, extRe, transform, errors, keepFilter) {
   const out = [];
-  const walk = (d) => {
-    for (const name of fs.readdirSync(d).sort()) {
-      const p = path.join(d, name);
-      const st = fs.statSync(p);
-      if (st.isDirectory()) walk(p);
-      else if (name.endsWith('.js')) {
-        const rel = path.relative(ROOT, p);
-        const src = fs.readFileSync(p, 'utf8');
-        const base = transform(src);
-        out.push({ p: rel.split(path.sep).join('/'), h: base.h, d: base.d });
-      }
-    }
-  };
-  walk(path.join(ROOT, dir));
-  return out;
-}
-
-/* flags + marks regexes across all js files */
-function scanJs(re, keep) {
-  const out = [];
-  walkJs(path.join(ROOT, 'js'), (rel, src) => {
-    for (let m; (m = re.exec(src)); ) out.push(keep(m));
-  });
-  return out.sort();
-  function walkJs(d, fn) {
-    for (const name of fs.readdirSync(d).sort()) {
-      const p = path.join(d, name);
-      if (fs.statSync(p).isDirectory()) walkJs(p, fn);
-      else if (name.endsWith('.js')) fn(path.relative(ROOT, p).split(path.sep).join('/'), fs.readFileSync(p, 'utf8'));
+  for (const rel of S.list(prefixes)) {
+    if (!extRe.test(rel)) continue;
+    if (keepFilter && !keepFilter(rel)) continue;
+    try {
+      const src = S.readText(rel);
+      out.push({ p: rel, ...transform(src, rel) });
+    } catch (e) {
+      errors.push(`${rel}: ${e.message}`);
     }
   }
-}
-
-/* ── assets lane: every file under img/ audio/ fonts/ ───────────────── */
-function scanAssets() {
-  const out = [];
-  const walk = (d) => {
-    if (!fs.existsSync(d)) return;
-    for (const name of fs.readdirSync(d).sort()) {
-      const p = path.join(d, name);
-      const st = fs.statSync(p);
-      if (st.isDirectory()) walk(p);
-      else if (name !== 'README.txt') {
-        const rel = path.relative(ROOT, p).split(path.sep).join('/');
-        out.push({ p: rel, h: sha(fs.readFileSync(p)), b: st.size });
-      }
-    }
-  };
-  for (const g of ['img', 'audio', 'fonts']) walk(path.join(ROOT, g));
   return out;
+}
+const TEXT_ROOTS = ['index.html', 'CNAME', 'robots.txt', 'sitemap.xml', 'manifest.json', 'README.md', 'package.json'];
+const FS_PREFIXES = ['js', 'img', 'audio', 'fonts', 'css', ...TEXT_ROOTS];
+
+/* assets lane: sha256 of RAW bytes (utf8 decode is lossy, no sha on strings) */
+function laneAssets(S, errors) {
+  const out = [];
+  for (const rel of S.list(['img', 'audio', 'fonts'])) {
+    if (/README\.txt$/.test(rel)) continue;
+    try {
+      const buf = S.readBin(rel);
+      out.push({ p: rel, h: sha(buf), b: buf.length });
+    } catch (e) {
+      errors.push(`${rel}: ${e.message}`);
+    }
+  }
+  return bypSort(out);
+}
+const bypSort = (arr) => {
+  if (arr.length && typeof arr[0] === 'object') arr.sort((r, s) => String(r.p).localeCompare(String(s.p)));
+  return arr;
+};
+
+/* flags + marks regexes across all js files */
+function scanRegJs(S, re, keep, errors) {
+  const out = [];
+  for (const rel of S.list(['js'])) {
+    if (!rel.endsWith('.js')) continue;
+    try {
+      const src = S.readText(rel);
+      for (let m; (m = re.exec(src)); ) out.push(keep(m));
+    } catch (e) {
+      errors.push(`${rel}: ${e.message}`);
+    }
+  }
+  return out.sort();
 }
 
 /* ── diff ────────────────────────────────────────────────────────────── */
 function diff(a, b, at, out) {
+  if (a == null || b == null) {
+    if (short(a) !== short(b)) out.push(`${at}: ${short(a)} => ${short(b)}`);
+    return;
+  }
   if (typeof a !== typeof b || Array.isArray(a) !== Array.isArray(b)) {
     out.push(`${at}: ${short(a)} => ${short(b)}`);
     return;
   }
   if (Array.isArray(a)) {
-    if (a.length !== b.length) out.push(`${at}: [${a.length}] => [${b.length}]`);
-    for (let i = 0; i < Math.min(a.length, b.length); i++) diff(a[i], b[i], `${at}[${i}]`, out);
+    const lines = [], cntA = multiset(a), cntB = multiset(b);
+    for (const [k, n] of cntA) if (n > (cntB.get(k) || 0)) lines.push(`${at}: removed ${k.slice(0, 76)}`);
+    for (const [k, n] of cntB) if (n > (cntA.get(k) || 0)) lines.push(`${at}: added ${k.slice(0, 76)}`);
+    out.push(...lines.sort());
     return;
+    function multiset(arr) {
+      const m = new Map();
+      for (const v of arr) { const k = JSON.stringify(v); m.set(k, (m.get(k) || 0) + 1); }
+      return m;
+    }
   }
-  if (a && typeof a === 'object') {
-    for (const k of Object.keys(a).concat(Object.keys(b)).sort().filter(dupFilter)) {
-      diff(a[k], b[k], `${at}.${k}`, out);
+  if (typeof a === 'object') {
+    for (const k of Object.keys(a).concat(Object.keys(b)).sort().filter(dup)) {
+      diff(a[k], b[k], at ? `${at}.${k}` : k, out);
     }
     return;
   }
   if (a !== b) out.push(`${at}: ${short(a)} => ${short(b)}`);
-  function dupFilter(k, i, arr) { return arr.indexOf(k) === i; }
+  function dup(k, i, arr) { return arr.indexOf(k) === i; }
 }
-const short = (v) => (v === undefined ? '(absent)' : JSON.stringify(v).slice(0, 60));
+const short = (v) => (v === undefined || v == null ? '(absent)' : JSON.stringify(v).slice(0, 76));
 
 /* ── main ────────────────────────────────────────────────────────────── */
-const againstIdx = process.argv.indexOf('--against');
-const man = capture();
-if (JSON.stringify(man) !== JSON.stringify(capture())) {
+const argv = process.argv.slice(2);
+const take = (flag) => {
+  const i = argv.indexOf(flag);
+  return i < 0 ? null : argv[i + 1] || null;
+};
+const ref = take('--ref');
+const againstFile = take('--against');
+
+if (ref && !againstFile) {
+  console.error('usage: node scripts/parity.mjs [--ref <git-ref>] [--against FILE]\n  --ref requires --against');
+  process.exit(3);
+}
+
+const man = capture(sourcing(ref));
+if (JSON.stringify(man) !== JSON.stringify(capture(sourcing(ref)))) {
   console.error('parity: capture is nondeterministic — fix before baselining');
   process.exit(2);
 }
-const json = JSON.stringify(man, null, 2) + '\n';
 
-if (againstIdx > 0 && process.argv.length > againstIdx + 1) {
-  const other = JSON.parse(fs.readFileSync(path.resolve(process.argv[againstIdx + 1]), 'utf8'));
+let other = null;
+if (againstFile) {
+  other = JSON.parse(fs.readFileSync(path.resolve(againstFile), 'utf8'));
+}
+
+if (other) {
   const out = [];
   diff(other, man, '', out);
   if (!out.length) {
@@ -242,13 +323,13 @@ if (againstIdx > 0 && process.argv.length > againstIdx + 1) {
 }
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
-fs.writeFileSync(OUT, json);
-const rooms = Object.keys(man.rooms).length;
+fs.writeFileSync(OUT, JSON.stringify(man, null, 2) + '\n');
 console.log(
-  `parity: baseline written (${rooms} rooms, ${Object.keys(man.tilesets).length} tilesets, ` +
-  `${man.sheets.length} sheets, ${man.atk.length} attacks, ${man.steps.length} steps, ` +
-  `${man.marks.length} marks, ${man.shop.length} stock, ${man.flags.length} flags, ` +
-  `${man.js.length} js files, ${man.assets.length} assets)`
+  `parity: baseline written (${Object.keys(man.rooms).length} rooms, ` +
+  `${Object.keys(man.tilesets).length} tilesets, ${Object.keys(man.sheets).length} sheets, ` +
+  `${man.atk.length} attacks, ${man.steps.length} steps, ${man.marks.length} marks, ` +
+  `${man.shop.length} stock, ${man.flags.length} flags, ${man.js.length} js files, ` +
+  `${man.text.length} html/css/root files, ${man.assets.length} assets)`
 );
 if (man.errors.length) {
   console.error('parity: load errors (recorded in JSON):');
