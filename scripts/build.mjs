@@ -16,7 +16,7 @@ const exists = async (p) => { try { await fs.access(p); return true; } catch { r
 
 const SHELL = [
   'js/core/motion.js', 'js/data/data.js', 'js/page/main.js', 'js/page/stars.js',
-  'js/core/quest.js', 'js/core/save.js', 'js/core/keys.js', 'js/core/juice.js',
+  'js/core/quest.js', 'js/core/save.js', 'js/core/keys.js', 'js/core/juice.js', 'js/core/rand.js',
   'js/game/sword.js', 'js/game/sans.js', 'js/core/music.js', 'js/core/perf.js',
   'js/core/settings.js', 'js/core/touch.js', 'js/core/dev.js'
 ];
