@@ -557,3 +557,51 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
     animation: none;
   }
 }
+
+/* C menu: ITEMS / EQUIP (W2.2). Keep the frame under .tbox at z 76. */
+.inv {
+  top: 50%; width: min(1152px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+  transform: translate(-50%, -50%); overflow: auto; padding: 16px;
+  border: 2px solid #fff; box-shadow: inset 0 0 0 2px #000, inset 0 0 0 4px #fff;
+  font: 400 16px/1.25 var(--font);
+}
+.inv__top { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; border-bottom: 2px solid #fff; }
+.inv__tabs { display: flex; align-items: stretch; gap: 16px; }
+.inv__tab { display: inline-flex; align-items: center; gap: 8px; border: 0; padding: 8px 16px; color: #fff; background: transparent; font: inherit; cursor: pointer; }
+.inv__tab canvas { width: 16px; height: 16px; image-rendering: pixelated; }
+.inv__tab.is-sel { color: #ff0; outline: 2px solid #ff0; outline-offset: -2px; }
+.inv__coins { white-space: nowrap; color: #fff; }
+.inv__body { display: grid; grid-template-columns: 160px 256px 224px minmax(256px, 1fr); gap: 16px; min-height: 288px; padding: 16px 0; }
+.inv__body section { min-width: 0; border: 2px solid #fff; padding: 8px; }
+.inv__body h2 { margin: 0 0 8px; color: #fff; font: inherit; }
+.inv__char { text-align: center; }
+.inv__portrait { display: block; width: 80px; height: 120px; margin: 16px auto; image-rendering: pixelated; }
+.inv__slots { display: grid; gap: 8px; }
+.inv__slot { display: grid; grid-template-columns: 32px 1fr; align-items: center; min-height: 48px; }
+.inv__slot > span:first-child { grid-row: span 2; font-size: 16px; }
+.inv__slot b { font-weight: normal; color: #bbb; }
+.inv__slot.is-focus { color: #ff0; outline: 2px solid #ff0; }
+.inv__slot.is-focus b { color: #ff0; }
+.inv__statlines { display: grid; gap: 16px; }
+.inv__statlines b { font-weight: normal; }
+.inv__statlines .is-up { color: #5f6; }
+.inv__statlines .is-down { color: #f55; }
+.inv__statlines .is-fx { color: #fa4; }
+.inv__inventory { grid-column: 1 / -1; }
+.inv__inventory.is-equip { grid-column: auto; }
+.inv__list { max-height: 240px; overflow: auto; }
+.inv__list li { min-height: 40px; padding: 4px 4px 4px 40px; gap: 8px; }
+.inv__list li::before { width: 16px; height: 16px; margin-top: -8px; background: none; content: '♥'; color: #f55; font-size: 16px; }
+.inv__list li.is-sel { outline: 2px solid #ff0; }
+.inv__list li.is-unusable { color: #666; }
+.inv__list li.is-equipped span::after { content: '  EQUIPPED'; color: #aaa; }
+.inv__icon { width: 16px; height: 16px; image-rendering: pixelated; }
+.inv__desc { min-height: 48px; border: 2px solid #fff; padding: 8px; }
+.inv__body[hidden], .inv__body section[hidden] { display: none; }
+@media (max-width: 800px) {
+  .inv__body { grid-template-columns: 1fr 1fr; }
+  .inv__inventory { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
+}
