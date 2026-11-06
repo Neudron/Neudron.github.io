@@ -23,10 +23,15 @@
     { id: 'recall', name: 'Recall Potion', kind: 'key', price: 30, sell: 0, fx: 'recall', stats: {}, desc: 'a safe place, briefly.' },
     { id: 'boss_key', name: 'Bone Key', kind: 'key', price: 0, sell: 0, fx: 'key', stats: {}, desc: 'it opens something unpleasant.' },
     { id: 'dad_card', name: "Dad's Card", kind: 'quest', price: 0, sell: 0, fx: 'quest', stats: {}, desc: 'he kept the receipt.' },
-    { id: 'package', name: 'Misleading-looking Package', kind: 'quest', price: 0, sell: 0, fx: 'quest', stats: {}, desc: 'it looks exactly as advertised.' },
+    { id: 'pkg_misleading', name: 'Misleading-looking Package', kind: 'quest', price: 0, sell: 0, fx: 'quest', stats: {}, desc: 'it looks exactly as advertised.' },
     { id: 'photo', name: 'Old Photograph', kind: 'quest', price: 0, sell: 0, fx: 'quest', stats: {}, desc: 'everyone was younger then.' },
     { id: 'axe', name: 'Axe', kind: 'quest', price: 0, sell: 0, fx: 'quest', stats: {}, desc: 'it remembers being a sword.' },
-    { id: 'ashes', name: 'Ashes', kind: 'quest', price: 0, sell: 0, fx: 'quest', stats: {}, desc: 'what is left. you keep it anyway.' }
+    { id: 'ashes', name: 'Ashes', kind: 'quest', price: 0, sell: 0, fx: 'quest', stats: {}, desc: 'what is left. you keep it anyway.' },
+    { id: 'phaseslayer', name: 'Phaseslayer', kind: 'melee', price: 0, sell: 0, fx: 'dashstrike', stats: { dmg: 14, cd: 0.45, r: 96 }, desc: 'Draedon kept the receipt.' },
+    { id: 'pulse_rifle', name: 'Pulse Rifle', kind: 'ranged', price: 0, sell: 0, fx: 'shot', stats: { dmg: 7, cd: 0.35 }, desc: 'it counts in pulses.' },
+    { id: 'exoblade', name: 'Exoblade', kind: 'melee', price: 0, sell: 0, fx: 'arc', stats: { dmg: 16, cd: 0.5, r: 100 }, desc: 'the mechs, folded once.' },
+    { id: 'magnomaly', name: 'Magnomaly Cannon', kind: 'ranged', price: 0, sell: 0, fx: 'beam', stats: { dmg: 9, cd: 0.8 }, desc: 'a polite singularity.' },
+    { id: 'flying_chair', name: 'Flying Chair', kind: 'quest', price: 0, sell: 0, fx: 'quest', stats: {}, desc: 'the snails are retired.' }
   ];
 
   function get(id) {

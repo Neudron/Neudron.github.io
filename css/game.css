@@ -605,3 +605,284 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
 }
+
+.plat { position: fixed; inset: 0; z-index: 76; background: #0b0a12; }
+.plat canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+.cards { position: fixed; inset: 0; z-index: 80; background: #000; }
+.cards canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+/* Mage shop (js/act4/mage.js). Undertale split: art, menu, dialogue. z 76, under .tbox. */
+.mage {
+  position: fixed; inset: 0; z-index: 76;
+  display: flex; flex-direction: column;
+  background: #000; color: #fff;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+.mage[hidden] { display: none !important; }
+.mage__art { flex: 3 1 60%; min-height: 0; margin: 16px 16px 0; border: 4px solid #fff; background: #1C1814; }
+.mage__art canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.mage__dock { flex: 2 1 40%; display: flex; gap: 16px; padding: 16px; min-height: 0; }
+.mage__menu, .mage__box {
+  border: 4px solid #fff; padding: 16px; min-width: 0; overflow: auto; background: #000;
+}
+.mage__menu { flex: 2 1 40%; }
+.mage__box { flex: 3 1 60%; }
+.mage__say { margin: 0; font: 400 16px/1.35 var(--font, monospace); color: #fff; }
+.mage__row {
+  position: relative; display: block; width: 100%;
+  margin: 0; padding: 0 0 0 32px; min-height: 32px;
+  text-align: left; color: #fff; background: transparent;
+  border: 0; font: 400 16px/2 var(--font, monospace); cursor: pointer;
+}
+.mage__row.is-sel { color: #ff0; }
+.mage__row.is-sel::before {
+  content: '\2665'; position: absolute; left: 0; top: 0;
+  color: #f00; font-size: 16px;
+}
+.mage__p { float: right; color: #fff; }
+@media (prefers-reduced-motion: reduce) {
+  .mage, .mage * { animation: none !important; transition: none !important; }
+}
+
+/* Card duel (js/act4/cards.js). The picture is the canvas; this only
+   parks the overlay. Motion lives in the draw, and stops with the media query. */
+.cards[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .cards, .cards * { animation: none !important; transition: none !important; }
+}
+
+/* Exo Mechs (js/act4/boss-exo.js). z 76, under .tbox. */
+.exo {
+  position: fixed; inset: 0; z-index: 76;
+  background: #101820; color: #fff;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+.exo[hidden] { display: none !important; }
+.exo canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.exo__pick {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  min-width: 320px;
+}
+.exo__pick button {
+  display: block; width: 100%; min-height: 48px; margin: 0 0 16px;
+  padding: 0 16px; text-align: left; color: #fff; background: #000;
+  border: 4px solid #fff; font: 400 16px/2 var(--font, monospace); cursor: pointer;
+}
+.exo__pick button.is-sel { color: #ff0; border-color: #ff0; }
+.exo__vuln {
+  position: absolute; top: 16px; left: 0; right: 0; margin: 0;
+  text-align: center; font: 400 32px/1 var(--font, monospace); pointer-events: none;
+}
+.exo__hud {
+  position: absolute; left: 16px; bottom: 16px; margin: 0;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+.exo__quit {
+  position: absolute; top: 16px; right: 16px;
+  font: 400 16px/1 var(--font, monospace); color: #fff; background: transparent; border: 0;
+}
+.exo__keys {
+  position: absolute; right: 16px; bottom: 16px; margin: 0;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+@media (prefers-reduced-motion: reduce) {
+  .exo, .exo * { animation: none !important; transition: none !important; }
+}
+
+/* Merchant stall after the rap (rhythm.js). Sits inside #fnf, under .tbox. */
+.fnf__stall {
+  position: absolute; left: 16px; right: 16px; bottom: 128px; z-index: 4;
+  max-width: 640px; margin: 0 auto; box-sizing: border-box;
+  padding: 16px; background: #000; color: #fff;
+  border: 4px solid #fff;
+  font: 400 16px/1.5 "Determination Mono", "Pixelify Sans", monospace;
+}
+.fnf__stall[hidden] { display: none !important; }
+.fnf__stall button {
+  display: block; width: 100%; min-height: 32px; margin: 0 0 8px; padding: 0 16px;
+  text-align: left; color: #fff; background: #000; border: 0; cursor: pointer;
+  font: 400 16px/2 "Determination Mono", "Pixelify Sans", monospace;
+}
+.fnf__stall button.is-sel { color: #ff0; }
+@media (prefers-reduced-motion: reduce) {
+  .fnf, .fnf * { animation: none !important; transition: none !important; }
+}
+
+/* Painter lightning (rooms-p.js). Under .tbox (96). */
+.bolt {
+  position: fixed; inset: 0; z-index: 80;
+  background: #0a0a0c;
+}
+.bolt[hidden] { display: none !important; }
+.bolt canvas {
+  display: block; width: 100%; height: 100%;
+  image-rendering: pixelated;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bolt, .bolt * { animation: none !important; transition: none !important; }
+}
+
+/* Minecart (js/act4/cart.js). Under .tbox (96). */
+.cart { position: fixed; inset: 0; z-index: 76; background: #140e0a; }
+.cart[hidden] { display: none !important; }
+.cart canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+.cart__hint {
+  position: absolute; left: 16px; bottom: 16px; margin: 0; color: #f0d8a8;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cart, .cart * { animation: none !important; transition: none !important; }
+}
+
+/* Elevator (js/act4/elevator.js). Under .tbox (96), over the cart. */
+.elv { position: fixed; inset: 0; z-index: 77; background: #14110e; }
+.elv[hidden] { display: none !important; }
+.elv canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+.elv__screen {
+  position: absolute; left: 50%; top: 32px; transform: translateX(-50%);
+  margin: 0; min-width: 288px; padding: 8px 16px; text-align: center;
+  color: #b7ff9a; background: #10160f; border: 4px solid #3a4634;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+.elv__pad { position: absolute; left: 0; right: 0; bottom: 32px; text-align: center; }
+.elv__pad button {
+  min-width: 64px; min-height: 48px; margin: 0 16px; color: #f4efe4;
+  background: #2a241c; border: 4px solid #8a7a62; cursor: pointer;
+  font: 400 32px/1 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .elv, .elv * { animation: none !important; transition: none !important; }
+}
+
+/* Draedon (js/act4/boss-draedon.js). z 76, under .tbox. */
+.draedon {
+  position: fixed; inset: 0; z-index: 76;
+  background: #101820; color: #fff;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+.draedon[hidden] { display: none !important; }
+.draedon canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.draedon__vuln {
+  position: absolute; top: 16px; left: 0; right: 0; margin: 0;
+  text-align: center; font: 400 32px/1 var(--font, monospace); pointer-events: none;
+}
+.draedon__bang {
+  position: absolute; left: 16px; top: 64px; margin: 0;
+  color: #ff0; font: 700 64px/1 var(--font, monospace); pointer-events: none;
+}
+.draedon__prompt {
+  position: absolute; left: 96px; top: 80px; margin: 0;
+  color: #ff0; font: 700 32px/1 var(--font, monospace); pointer-events: none;
+}
+.draedon__count {
+  position: absolute; left: 0; right: 0; top: 160px; margin: 0;
+  text-align: center; color: #fff; font: 400 64px/1 var(--font, monospace);
+  pointer-events: none;
+}
+.draedon__hud {
+  position: absolute; left: 16px; bottom: 16px; margin: 0;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+.draedon__quit {
+  position: absolute; top: 16px; right: 16px;
+  font: 400 16px/1 var(--font, monospace); color: #fff; background: transparent; border: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .draedon, .draedon * { animation: none !important; transition: none !important; }
+}
+
+/* Snail station (js/act4/snail.js). Under .tbox (96). */
+.snail { position: fixed; inset: 0; z-index: 76; background: #1a120c; }
+.snail[hidden] { display: none !important; }
+.snail canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.snail__list {
+  position: absolute; left: 16px; top: 16px; margin: 0; padding: 16px;
+  list-style: none; background: #000; color: #fff; border: 4px solid #fff;
+  font: 400 16px/2 "Determination Mono", "Pixelify Sans", monospace;
+}
+.snail__list li { min-height: 32px; padding: 0 16px; }
+.snail__list li.is-sel { color: #ff0; }
+.snail__hint {
+  position: absolute; left: 16px; bottom: 16px; margin: 0; color: #f0d8a8;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .snail, .snail * { animation: none !important; transition: none !important; }
+}
+
+/* Desk note (js/act4/note.js). Centred, under .tbox (96). */
+.note {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 78; background: #120e0c; border: 4px solid #5a4634;
+}
+.note[hidden] { display: none !important; }
+.note canvas { display: block; width: 320px; height: 180px; image-rendering: pixelated; }
+.note__hint {
+  margin: 0; padding: 0 16px 16px; color: #e4d8c0;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .note, .note * { animation: none !important; transition: none !important; }
+}
+
+/* Village lockdown (js/act4/chase.js). Under .tbox (96). */
+#sAlarm.s-alarm {
+  position: fixed; left: 0; right: 0; top: 0; height: 16px;
+  z-index: 76; pointer-events: none; background: #E23B55;
+  animation: s-alarm 800ms steps(2, end) infinite;
+}
+@keyframes s-alarm {
+  from { opacity: 1; }
+  to { opacity: 0.15; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #sAlarm.s-alarm { animation: none; opacity: 0.85; }
+}
+
+/* Supreme finale (js/act4/finale.js). Under .tbox (96). */
+.finale { position: fixed; inset: 0; z-index: 76; background: #07060c; }
+.finale[hidden] { display: none !important; }
+.finale canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.finale__word {
+  position: absolute; left: 0; right: 0; top: 32px; margin: 0;
+  text-align: center; color: #e8d4ff; pointer-events: none;
+  font: 400 64px/1 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .finale, .finale * { animation: none !important; transition: none !important; }
+}
+
+/* Flying chair (js/act4/chair.js). Replaces the snail menu. Under .tbox (96). */
+.chair { position: fixed; inset: 0; z-index: 76; background: #120818; }
+.chair[hidden] { display: none !important; }
+.chair__list {
+  position: absolute; left: 16px; top: 16px; margin: 0; padding: 16px;
+  list-style: none; background: #000; color: #fff; border: 4px solid #e8d4ff;
+  font: 400 16px/2 "Determination Mono", "Pixelify Sans", monospace;
+}
+.chair__list li { min-height: 32px; padding: 0 16px; }
+.chair__list li.is-sel { color: #ff0; }
+.chair__hint {
+  position: absolute; left: 16px; bottom: 16px; margin: 0; color: #e8d4ff;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chair, .chair * { animation: none !important; transition: none !important; }
+}
+
+/* Photograph (js/act4/photo.js). Centred, under .tbox (96). */
+.photo {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 78; background: #12161e; border: 4px solid #5a4634;
+}
+.photo[hidden] { display: none !important; }
+.photo canvas { display: block; width: 320px; height: 180px; image-rendering: pixelated; }
+.photo__mark, .photo__hint {
+  margin: 0; padding: 0 16px 16px; color: #e4d8c0;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+.photo__mark { color: #b01018; }
+@media (prefers-reduced-motion: reduce) {
+  .photo, .photo * { animation: none !important; transition: none !important; }
+}

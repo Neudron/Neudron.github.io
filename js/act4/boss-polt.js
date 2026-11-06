@@ -18,9 +18,9 @@
 
    PHASES (from the wiki):
      P1 — alternates slow+6 shots / fast+6 blasts; glows red, lines up
-          diagonally, charges once.            → 50%
+          diagonally, charges once.            → 65%
      P2 — hooks DETACH and fire independently through walls; faster;
-          spreads of 7 potent shots; charges twice.   → 20%
+          spreads of 7 potent shots; charges twice.   → 35%
      P3 — summons a clone; hooks re-chain and slow; spread of 8 every
           7s (10 if the clone is dead); clone mirrors and charges in
           tandem up to 3x, or 4x and faster if it is dead.           */
@@ -47,6 +47,7 @@
     { field: '#061418', rim: COL.ecto },
     { field: '#14070E', rim: COL.red }];
   var VULN_COL = '#FFC46A';            /* same gold as her VULNERABLE banner */
+  var REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   var PLAYER_R = (dm.soul && dm.soul.R) || 3.2, IFRAMES = dm.IFRAMES || 1.1, MAXHP = 6;
   /* the shared fight feel: dash, adrenaline, rage, numbers, the HUD */
@@ -55,12 +56,13 @@
   var running = false, last = 0, t = 0, dying = 0;
   var AX = 0, AY = 0, AW = 0, AH = 0;
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
-  var bullets = [], hooks = [], phase = 1, bossHP = 30, bossMax = 30;
+  var bullets = [], hooks = [], legs = [], attackWarns = [], attackFrameAcc = 0, kit = null, bossTarget = { kind: 'boss' }, cloneTarget = { kind: 'clone' }, phase = 1, bossHP = 900, bossMax = 900;
   var bx = 0, by = 0, bz = 0, charging = 0, glow = 0, nextFire = 0, nextCharge = 0;
   var TELE = 24 / 60;                    /* hook telegraph: 24 frames before a hook can hit */
   /* game-clock state: every timer here is advanced by the update loop, so a
      pause or a death holds it and open()/close() wipe it */
   var warnAt = 0, chargePath = null, vuln = 0, sig = 0, sigDone = false, sigRing = 0, sigSpin = 0;
+  var phaseFlash = 0, phaseFlashes = 0, flashedPhase = 0;
   var clone = null, mode = 'fight';
   var line = '', lineT = 0;
 
@@ -124,20 +126,112 @@
     }
   }
 
+  function attachAttacks() {
+    if (!NEU.poltAtk) return;
+    NEU.poltAtk.attach({
+      warn: function (shape) { attackWarns.push({ shape: shape, age: 0, life: 24 / 60 }); },
+      hit: function (shape, name, speed) {
+        var i, n = shape.count, a, gapAt = Math.floor(n / 2), col = name === 'DesperationAttack' || phase === 3 ? COL.red : COL.ectoHi;
+        for (i = 0; i < n; i++) {
+          if (shape.gap && ((i - gapAt + n) % n) < shape.gap) continue;
+          if (shape.kind === 'ring') {
+            a = shape.a + i * Math.PI * 2 / n;
+            shot(shape.x + Math.cos(a) * shape.r, shape.y + Math.sin(a) * shape.r,
+              Math.cos(a) * speed, Math.sin(a) * speed, 4, col, 1);
+          } else {
+            a = shape.a + (shape.kind !== 'fan' || n === 1 ? 0 : (i / (n - 1) - 0.5) * shape.spread);
+            shot(shape.x, shape.y, Math.cos(a) * speed, Math.sin(a) * speed, 4, col, 1);
+          }
+        }
+        if (name === 'CloneSplit' && !clone) clone = { x: bx, y: by, t: 2.4 };
+      }
+    });
+  }
+  function tickAttacks(dt) {
+    if (!NEU.poltAtk) return;
+    attackFrameAcc += dt;
+    while (attackFrameAcc >= 1 / 60) {
+      attackFrameAcc -= 1 / 60;
+      if (NEU.poltAtk.step({ x: bx, y: by, tx: px, ty: py, ax: AX, ay: AY, aw: AW, ah: AH })) {
+        sig = 0; sigDone = true; say('* it holds on. one more.');
+      }
+    }
+    for (var i = attackWarns.length - 1; i >= 0; i--) {
+      attackWarns[i].age += dt;
+      if (attackWarns[i].age >= attackWarns[i].life) attackWarns.splice(i, 1);
+    }
+  }
+
   function resetHooks() {
     hooks = [];
     for (var i = 0; i < 4; i++) {
-      hooks.push({ a: i * Math.PI / 2, r: 120, x: bx, y: by, t: Math.random() * 2,
+      hooks.push({ a: i * Math.PI / 2, r: 120, x: bx, y: by, t: 0,
                    free: false, warn: false });
+    }
+  }
+
+  function resetLegs() {
+    legs = [];
+    for (var i = 0; i < 4; i++) {
+      var a = Math.PI * 2 * i / 4 + Math.PI / 4;
+      var p = legEdgePoint(a);
+      legs.push({ a: a, foot: p, planted: true, step: 0 });
+    }
+  }
+
+  function legEdgePoint(a) {
+    var dx = Math.cos(a), dy = Math.sin(a), cx = AX + AW / 2, cy = AY + AH / 2;
+    var tx = Math.abs(dx) < 0.001 ? Infinity : (dx > 0 ? AX + AW - 12 - cx : AX + 12 - cx) / dx;
+    var ty = Math.abs(dy) < 0.001 ? Infinity : (dy > 0 ? AY + AH - 12 - cy : AY + 12 - cy) / dy;
+    var d = Math.min(Math.abs(tx), Math.abs(ty));
+    return { x: cx + dx * d, y: cy + dy * d };
+  }
+
+  function solveLeg(leg) {
+    var hx = bx + Math.cos(leg.a) * 23, hy = by + Math.sin(leg.a) * 20;
+    var dx = leg.foot.x - hx, dy = leg.foot.y - hy, d = Math.sqrt(dx * dx + dy * dy);
+    var l1 = Math.max(70, d * 0.52), l2 = Math.max(70, d * 0.52);
+    var reach = Math.max(1, Math.min(l1 + l2 - 1, d));
+    var along = (l1 * l1 - l2 * l2 + reach * reach) / (2 * reach);
+    var side = Math.sqrt(Math.max(0, l1 * l1 - along * along));
+    var ux = dx / (d || 1), uy = dy / (d || 1);
+    return { hx: hx, hy: hy, kx: hx + ux * along - uy * side,
+      ky: hy + uy * along + ux * side, fx: leg.foot.x, fy: leg.foot.y };
+  }
+
+  function stepLegs() {
+    if (REDUCE_MOTION) return;
+    for (var i = 0; i < legs.length; i++) {
+      var leg = legs[i], reach = Math.hypot(leg.foot.x - bx, leg.foot.y - by);
+      leg.step = Math.max(0, leg.step - 1 / 60);
+      if (reach > Math.min(AW, AH) * 0.46 && leg.step <= 0) {
+        leg.foot = legEdgePoint(leg.a + Math.atan2(by - (AY + AH / 2), bx - (AX + AW / 2)) * 0.12);
+        leg.planted = false; leg.step = 0.22;
+      }
+      if (leg.step <= 0) leg.planted = true;
+    }
+  }
+
+  function drawLegs() {
+    ctx.lineCap = 'square'; ctx.lineWidth = 7; ctx.strokeStyle = '#2B3440';
+    for (var i = 0; i < legs.length; i++) {
+      var p = solveLeg(legs[i]);
+      ctx.beginPath(); ctx.moveTo(p.hx | 0, p.hy | 0); ctx.lineTo(p.kx | 0, p.ky | 0);
+      ctx.lineTo(p.fx | 0, p.fy | 0); ctx.stroke();
+      ctx.fillStyle = 'rgba(127,227,255,0.24)'; ctx.fillRect((p.kx - 7) | 0, (p.ky - 7) | 0, 14, 14);
+      ctx.fillStyle = '#7FE3FF'; ctx.fillRect((p.kx - 3) | 0, (p.ky - 3) | 0, 6, 6);
+      ctx.fillStyle = legs[i].planted ? '#7FE3FF' : '#C4FFF0';
+      ctx.fillRect((p.fx - 4) | 0, (p.fy - 4) | 0, 8, 8);
     }
   }
 
   function stepFn(nowMs) {
     if (!running) { if (dying) deathStep(nowMs); return; }
-    requestAnimationFrame(stepFn);
+    /* legacy loop when the kernel is absent; the kernel tick owns the frame otherwise */
+    if (!NEU.kernel) requestAnimationFrame(stepFn);
+    if (NEU.perf && !NEU.perf.paced(nowMs)) return;
     /* the pace cap (perf.js): `last` advances on drawn frames only,
        so dt covers the skipped vsyncs */
-    if (NEU.perf && !NEU.perf.paced(nowMs)) return;
     var dt = Math.min(0.033, (nowMs - last) / 1000); last = nowMs;
     if (NEU.juice && NEU.juice.frozen()) { draw(nowMs); return; }
     t += dt;
@@ -148,6 +242,8 @@
     dm.move(F, keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH });
     px = F.x; py = F.y;
     dm.tick(F, dt, 1 - Math.min(1, Math.max(0, Math.hypot(px - bx, py - by) - 40) / 260));
+    if (kit) kit.tick(dt);
+    tickAttacks(dt);
 
     /* him — Plantera-like chase, faster each phase */
     var chase = [0, 1.0, 1.7, 2.6][phase];
@@ -164,6 +260,7 @@
     }
     bx = Math.min(Math.max(bx, AX + 20), AX + AW - 20);
     by = Math.min(Math.max(by, AY + 20), AY + AH - 20);
+    stepLegs();
 
     /* hooks. attached in P1 and P3, free and shooting in P2 */
     for (var i = 0; i < hooks.length; i++) {
@@ -224,7 +321,10 @@
     if (warnAt && t >= warnAt) { warnAt = 0; doCharge(); }
     if (glow > 0) glow -= dt;
     if (vuln > 0) vuln -= dt;
-    if (sig > 0) {
+    if (phaseFlash > 0) phaseFlash = Math.max(0, phaseFlash - dt);
+    /* the attack record owns the signature's hitboxes, so this timer
+       does not throw a second, untelegraphed ring */
+    if (sig > 0 && !NEU.poltAtk) {
       sig -= dt; sigRing -= dt;
       if (sigRing <= 0) {
         sigRing = 1.2; sigSpin += 0.26;
@@ -233,6 +333,9 @@
           shot(bx, by, Math.cos(sa2) * 170, Math.sin(sa2) * 170, 5, COL.red, 1);
         }
       }
+      if (sig <= 0) { sig = 0; sigDone = true; say('* it holds on. one more.'); }
+    } else if (sig > 0) {
+      sig -= dt;
       if (sig <= 0) { sig = 0; sigDone = true; say('* it holds on. one more.'); }
     }
 
@@ -264,7 +367,8 @@
 
   /* the signature at 1 HP: the kill is held until this has been survived */
   function startSig() {
-    sig = 4; sigRing = 0; sigSpin = 0;
+    sig = 6; sigRing = 0; sigSpin = 0;
+    if (NEU.poltAtk) NEU.poltAtk.signature();
     say('* it makes one last thing of itself.');
   }
 
@@ -293,7 +397,7 @@
   }
 
   /* One damage path; a dash or the i-frames pass through. True = dead. */
-  function hurt(dx, dy) {
+  function hurtRaw(dx, dy) {
     if (inv > 0 || F.dashI > 0 || (NEU.cheat && NEU.cheat.god)) return false;   /* dev `god` (dev.js) */
     hp--; inv = IFRAMES;
     dm.hurt(F, px, py - 12);
@@ -302,9 +406,13 @@
     if (hp <= 0) { startDeath(); return true; }
     return false;
   }
+  function hurt(dx, dy) {
+    if (kit && kit.hit(1)) return false;
+    return hurtRaw(dx, dy);
+  }
 
   var STRIKE_CD = 0.18, lastHit = -1;   /* game seconds between strikes */
-  function tryHit() {
+  function tryHit(target, amount) {
     if (!running || t - lastHit < STRIKE_CD) return;
     lastHit = t;
     /* The clone check has to come before the boss-range guard: the
@@ -316,9 +424,17 @@
       say("* the copy comes apart. the original notices.");
       return;
     }
+    if (target && target.kind === 'clone' && clone) {
+      clone = null;
+      say("* the copy comes apart. the original notices.");
+      return;
+    }
     if (sig > 0) { say('* not yet.'); return; }
-    if (Math.hypot(px - bx, py - by) > 40) return;
-    var dmg = dm.mul(F) * (vuln > 0 ? 2 : 1);
+    if (target ? target.kind !== 'boss' : Math.hypot(px - bx, py - by) > 40) return;
+    /* Six blade damage is normalized to one boss point: 900 HP at the
+       kit's 0.3 s cadence is 270 s of clean hits; movement and dodging put
+       real runs near the requested 4–6 minute window. */
+    var dmg = dm.mul(F) * (amount || 1) * (vuln > 0 ? 2 : 1);
     bossHP -= dmg;
     dm.bossHit(F, bx, by, dmg);
     if (NEU.sfx && NEU.sfx.hit) NEU.sfx.hit();
@@ -328,15 +444,19 @@
     var killing = bossHP <= 0;
     if (killing) bossHP = 1;
     var pct = bossHP / bossMax;
-    if (pct <= 0.20 && phase < 3) {
+      if (pct <= 0.35 && phase < 3) {
       phase = 3;
+      pulsePhase();
+      if (NEU.poltAtk) NEU.poltAtk.phase(phase);
       hooks.forEach(function (h) { h.free = false; });
       clone = { x: bx, y: by, t: 2 };
       say("* it makes another one of itself.");
       if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(3);
       if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', phase);
-    } else if (pct <= 0.50 && phase < 2) {
+    } else if (pct <= 0.65 && phase < 2) {
       phase = 2;
+      pulsePhase();
+      if (NEU.poltAtk) NEU.poltAtk.phase(phase);
       hooks.forEach(function (h) { h.free = true; h.t = 1.5; });
       say("* the hooks let go.");
       if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(2);
@@ -345,12 +465,82 @@
     if (killing) startSig();
   }
 
+  function ensureTvCss() {
+    if (document.getElementById('tvRestoredCss')) return;
+    var s = document.createElement('style');
+    s.id = 'tvRestoredCss';
+    s.textContent = [
+      '#tvRestored{position:fixed;top:0;left:0;right:0;bottom:0;z-index:95;display:flex;',
+      'align-items:center;justify-content:center;background:#000;overflow:hidden;}',
+      '#tvRestored .tvRestored__title{position:relative;z-index:2;color:#fff;letter-spacing:2px;',
+      'font-family:"Determination Sans",monospace;font-size:96px;}',
+      '#tvRestored .tvRestored__sheen{position:absolute;top:0;bottom:0;width:96px;left:-96px;',
+      'background:linear-gradient(90deg,rgba(0,0,0,0),#F4F6FA,rgba(0,0,0,0));',
+      'animation:tvSheen 2.4s steps(6) 1;}',
+      '#tvRestored .tvRestored__sheen.is-still{animation:none;left:30%;opacity:.45;}',
+      '#tvRestored .tvRestored__flash{position:absolute;top:0;left:0;right:0;bottom:0;background:#fff;',
+      'opacity:0;animation:tvFlash .4s steps(2) 1;}',
+      '@keyframes tvSheen{from{left:-96px}to{left:100%}}',
+      '@keyframes tvFlash{0%{opacity:.7}100%{opacity:0}}',
+      '@media (prefers-reduced-motion: reduce){',
+      '#tvRestored .tvRestored__sheen{animation:none;left:30%;opacity:.45}',
+      '#tvRestored .tvRestored__flash{animation:none;display:none}}'
+    ].join('');
+    document.head.appendChild(s);
+  }
+  /* Full-screen title. One flash (0.4 s, a single iteration — under 3 Hz)
+     and one chrome sweep. Z or 2.5 s removes it. Reduced motion keeps a
+     still highlight and skips the flash. Sits under the text box (96). */
+  function showTvCard() {
+    ensureTvCss();
+    var old = document.getElementById('tvRestored');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var card = document.createElement('div');
+    card.id = 'tvRestored';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-label', 'THE TV IS RESTORED');
+    var sheen = document.createElement('div');
+    sheen.className = 'tvRestored__sheen' + (REDUCE_MOTION ? ' is-still' : '');
+    sheen.setAttribute('aria-hidden', 'true');
+    card.appendChild(sheen);
+    if (!REDUCE_MOTION) {
+      var flash = document.createElement('div');
+      flash.className = 'tvRestored__flash';
+      flash.setAttribute('aria-hidden', 'true');
+      card.appendChild(flash);
+    }
+    var title = document.createElement('div');
+    title.className = 'tvRestored__title';
+    title.style.fontFamily = '"Determination Sans", monospace';
+    title.style.fontSize = '96px';
+    title.textContent = 'THE TV IS RESTORED';
+    card.appendChild(title);
+    document.body.appendChild(card);
+    var removed = false;
+    function removeCard() {
+      if (removed) return;
+      removed = true;
+      removeEventListener('keydown', onZ);
+      if (card.parentNode) card.parentNode.removeChild(card);
+    }
+    function onZ(e) {
+      if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z') { e.preventDefault(); removeCard(); }
+    }
+    addEventListener('keydown', onZ);
+    /* a boot that loaded the kernel after DOMContentLoaded never started the loop */
+    if (NEU.kernel && !NEU.kernel.rafId && NEU.kernel.start) NEU.kernel.start();
+    if (NEU.kernel && NEU.kernel.after) NEU.kernel.after(2500, removeCard);
+  }
+
   function win() {
     running = false; mode = 'won'; bullets = [];
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', -1);
     if (NEU.juice) { NEU.juice.hit('huge', { colour: '#7FE3C4' });
                      NEU.juice.burst(bx, by, 60, COL.ecto, 260); }
     if (NEU.save) NEU.save.flag('polt_dead', 1);
+    if (NEU.save) NEU.save.flag('tv_restored', 1);
+    if (NEU.restoreTV) NEU.restoreTV();
+    showTvCard();
     if (NEU.quest) NEU.quest.mark('a4_polt');
     draw(performance.now());
     /* the shatter plays AFTER the save, so a tab closed mid-beat keeps
@@ -377,11 +567,9 @@
     running = false; dying = performance.now();
     if (dm.resetDeath) dm.resetDeath();
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
-    requestAnimationFrame(deathStep);
   }
 
   function deathStep(nowMs) {
-    /* the pace cap (perf.js) — skip must re-queue or the death loop dies */
     if (NEU.perf && !NEU.perf.paced(nowMs)) { requestAnimationFrame(deathStep); return; }
     var ms = nowMs - dying;
     ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, innerWidth, innerHeight);
@@ -393,7 +581,7 @@
         msg.innerHTML = '<b>it waits.</b><br>enter to try again &middot; esc to leave'; }
       return;
     }
-    requestAnimationFrame(deathStep);
+    if (!NEU.kernel) requestAnimationFrame(deathStep);
   }
 
   /* ── the real art ───────────────────────────────────────────────
@@ -409,6 +597,16 @@
     return NEU.sheetDraw(ctx, key, x, y, {
       scale: scale, glowKeys: glowKeys, rot: rot, now: performance.now()
     });
+  }
+
+  /* one white frame per phase (0.4 s, under 3 Hz). Reduced motion
+     keeps the palette change and skips the flash. */
+  function pulsePhase() {
+    if (flashedPhase === phase) return;
+    flashedPhase = phase;
+    if (REDUCE_MOTION) return;
+    phaseFlash = 0.4;
+    phaseFlashes += 1;
   }
 
   function frame() {
@@ -439,6 +637,7 @@
     frame();
 
     /* chains first, behind everything */
+    drawLegs();
     if (phase !== 2) {
       /* Real chain links, not a translucent line. The header of this
          file has always said the chains are drawn; PolterghastChain.png
@@ -476,6 +675,24 @@
       for (var j = 0; j <= 20; j++) {
         var u = j / 20;
         ctx.fillRect((cp.x0 + (cp.x1 - cp.x0) * u - 2) | 0, (cp.y0 + (cp.y1 - cp.y0) * u - 2) | 0, 4, 4);
+      }
+      ctx.globalAlpha = 1;
+    }
+    for (var awi = 0; awi < attackWarns.length; awi++) {
+      var ash = attackWarns[awi].shape, ap = REDUCE_MOTION ? 1 : (NEU.poltAtk && NEU.poltAtk.bump
+        ? NEU.poltAtk.bump(attackWarns[awi].age / attackWarns[awi].life, 0, 0.08, 0.27, 0.75)
+        : 1 - attackWarns[awi].age / attackWarns[awi].life);
+      ctx.globalAlpha = Math.max(0, ap);
+      ctx.fillStyle = phase === 3 ? COL.red : COL.ectoHi;
+      var lines = ash.lines && ash.lines.length ? ash.lines : [{ x: ash.x, y: ash.y, a: ash.a, len: ash.len || 200 }];
+      for (var li = 0; li < lines.length; li++) {
+        var ln = lines[li], x1 = ln.x + Math.cos(ln.a) * ln.len, y1 = ln.y + Math.sin(ln.a) * ln.len;
+        var dots = Math.max(2, Math.min(24, (ln.len / 32) | 0));
+        for (var s = 0; s <= dots; s++) {
+          var u = s / dots;
+          ctx.fillRect((ln.x + (x1 - ln.x) * u - 1) | 0, (ln.y + (y1 - ln.y) * u - 1) | 0, 2, 2);
+        }
+        ctx.fillRect((ln.x - 2) | 0, (ln.y - 2) | 0, 4, 4);
       }
       ctx.globalAlpha = 1;
     }
@@ -557,6 +774,7 @@
     if (NEU.juice) NEU.juice.end(ctx, shook);
     if (NEU.juice) NEU.juice.overlay(ctx, innerWidth, innerHeight);
 
+    if (kit) kit.draw(ctx);
     dm.hud(ctx, F, { w: innerWidth, h: innerHeight, AY: AY, AH: AH, name: 'polterghast',
                      hp: bossHP, max: bossMax, ticks: [0.5, 0.2],
                      php: hp, pmax: MAXHP, phase: phase });
@@ -569,13 +787,24 @@
       ctx.globalAlpha = 0.85; ctx.fillStyle = '#000000';
       ctx.fillRect(lx - 8, ly - 32, (lw + 16) | 0, 44);
       ctx.globalAlpha = 1; ctx.fillStyle = VULN_COL;
-      ctx.fillText('VULNERABLE', lx, ly);
+      ctx.fillText('VULNERABLE', lx, ly, innerWidth);
+    } else if (mode !== 'won' && running) {
+      ctx.font = '32px "Determination Mono","Pixelify Sans",monospace';
+      ctx.fillStyle = COL.dim;
+      ctx.fillText('INVULNERABLE', AX + AW / 2 - 120, AY + 48, innerWidth);
+    }
+
+    if (phaseFlash > 0 && !REDUCE_MOTION) {
+      ctx.globalAlpha = Math.min(0.7, phaseFlash / 0.4);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, innerWidth, innerHeight);
+      ctx.globalAlpha = 1;
     }
 
     if (line && nowMs - lineT < 5000) {
       ctx.fillStyle = COL.bone;
       ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
-      ctx.fillText(line, AX, AY + AH + 80, AW);
+      ctx.fillText(line, AX, AY + AH + 80, Math.min(AW, innerWidth));
     }
   }
 
@@ -593,11 +822,18 @@
     if (!running && !dying && mode !== 'won' && (e.key === 'Enter' || e.key === 'z' || e.key === 'Z')) { e.preventDefault(); open(); return; }
     /* z (or Enter) strikes before the soul looks at the key; x dashes.
        A held key's auto-repeat is not a strike. */
-    if (e.key === 'z' || e.key === 'Z' || (e.key === 'Enter' && running)) { e.preventDefault(); if (!e.repeat) tryHit(); return; }
+    if (running && kit && (e.key === 'z' || e.key === 'Z' || e.key === 'c' || e.key === 'C')) {
+      e.preventDefault(); if (!e.repeat) kit.keydown(e.key); return;
+    }
+    if (running && kit && kit.stripOpen && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Up' || e.key === 'Down')) {
+      e.preventDefault(); kit.keydown(e.key); return;
+    }
+    if ((e.key === 'Enter' || e.key === 'z' || e.key === 'Z') && running) { e.preventDefault(); if (!e.repeat) tryHit(); return; }
     if (running && dm.key(F, e)) { e.preventDefault(); return; }
     var n = dm.keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
   });
   addEventListener('keyup', function (e) {
+    if (kit && running) kit.keyup(e.key);
     var n = dm.keyName(e); if (n) keys[n] = false;
   });
   /* A key let go outside the tab never sends keyup, so a Shift released
@@ -611,18 +847,33 @@
     if (NEU.quest) NEU.quest.lock(true);
     if (msg) msg.hidden = true;
     layout();
-    t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; keys = {}; dying = 0;
-    bossMax = 30; bossHP = bossMax; phase = 1; clone = null; mode = 'fight';
+    t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; attackWarns = []; attackFrameAcc = 0; keys = {}; dying = 0;
+    bossMax = 900; bossHP = bossMax; phase = 1; clone = null; mode = 'fight';
+    phaseFlash = 0; phaseFlashes = 0; flashedPhase = 0;
     px = AX + AW / 2; py = AY + AH - 70;
     F = dm.fight(px, py);
+    kit = NEU.kit ? NEU.kit.create({ F: F, box: { AX: AX, AY: AY, AW: AW, AH: AH }, adapter: {
+      targets: function () {
+        bossTarget.x = bx; bossTarget.y = by; bossTarget.r = 22;
+        var out = [bossTarget];
+        if (clone) { cloneTarget.x = clone.x; cloneTarget.y = clone.y; cloneTarget.r = 22; out.push(cloneTarget); }
+        return out;
+      },
+      damage: function (target, n) { tryHit(target, Math.max(1, Math.round(n / 6))); },
+      hurtPlayer: function (n) { hurtRaw(0, 0); }
+    } }) : null;
     bx = AX + AW / 2; by = AY + 80; bz = 0;
     charging = 0; glow = 0; nextFire = 1.4; nextCharge = 5;
     warnAt = 0; chargePath = null; vuln = 0; sig = 0; sigDone = false;
     resetHooks();
+    resetLegs();
+    attachAttacks();
+    if (NEU.poltAtk) NEU.poltAtk.start(phase, false);
+    pulsePhase();
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', 1);
     say('* something in the wall has been listening the whole time.');
     running = true; last = performance.now();
-    requestAnimationFrame(stepFn);
+    if (!NEU.kernel) requestAnimationFrame(stepFn);
     if (NEU.kernel) NEU.kernel.push('polt');
   }
   function close() {
@@ -630,6 +881,7 @@
     if (NEU.kernel && NEU.kernel.current() === 'polt') NEU.kernel.pop();
     warnAt = 0; charging = 0; vuln = 0; sig = 0; chargePath = null;
     stopRise();
+    if (NEU.poltAtk) NEU.poltAtk.reset();
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', -1);
     if (NEU.activeMinigame === 'polt') NEU.activeMinigame = null;
     wrap.hidden = true;
@@ -653,12 +905,12 @@
   });
 
   if (NEU.kernel) NEU.kernel.register('polt', {
-    tick: function (dt) {},
+    tick: function (dt) { stepFn(performance.now()); },
     open: open, close: close,
-    running: function () { return running; }
+    running: function () { return running || !!dying; }
   });
 
-  NEU.polt = { open: open, close: close,
+  NEU.polt = { open: open, close: close, win: win,
                get running() { return running; },
                get phase() { return phase; },
                get hp() { return bossHP; },
@@ -668,6 +920,8 @@
                   the signature, and each hook's telegraph */
                get state() {
                  return { vulnerable: vuln > 0, chargePath: chargePath, sig: sig > 0,
+                          attack: NEU.poltAtk ? NEU.poltAtk.current() : null,
+                          flashes: phaseFlashes, warns: attackWarns.length, shots: bullets.length,
                           hooks: hooks.map(function (h) { return { x: h.x, y: h.y, warn: !!h.warn }; }) };
                },
                /* the shared feel state (core/danmaku.js), for tests */

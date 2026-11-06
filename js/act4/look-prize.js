@@ -1519,50 +1519,58 @@
   NPCART.vending = {
     w: 32, h: 50, ax: 16, ay: 48, shadow: 22,
     key: function () { var s = save(); return String(Math.min(6, (s && s.flag('punches')) || 0)); },
-    light: function () { return machineOff() ? { r: 16, col: '#3A4A7A', glow: 0.05 } : { r: 66, col: '#9FE0FF', glow: 0.22 }; },
+    light: function () { return machineOff() ? { r: 16, col: '#3A4A3A', glow: 0.05 } : { r: 66, col: '#E0A04A', glow: 0.22 }; },
     paint: function (P) {
       var n = Math.min(6, ((save() && save().flag('punches')) || 0)), off = n >= 6;
-      /* the cabinet */
-      P.r(1, 2, 30, 46, K);
-      P.r(2, 3, 28, 44, '#2E3E6E'); P.r(2, 3, 28, 2, '#4A5E9E'); P.r(2, 3, 2, 44, '#3A4E86'); P.r(28, 3, 2, 44, '#1E2A4E');
-      P.r(4, 0, 24, 4, K); P.r(5, 1, 22, 2, off ? '#1A2238' : '#9FE0FF');                 /* the header light */
-      /* the glass, the spirals, and slot D4 */
-      P.r(4, 6, 18, 28, K); P.r(5, 7, 16, 26, off ? '#0A1020' : '#123A4E');
+      /* olive cabinet, teal stile, damp for years */
+      P.r(1, 2, 30, 46, '#141A10');
+      P.r(2, 3, 28, 44, '#3A4636'); P.r(2, 3, 28, 2, '#5C6A4E');
+      P.r(2, 3, 2, 44, '#2A403C'); P.r(28, 3, 2, 44, '#243028');
+      P.r(4, 0, 24, 4, '#141A10');
+      P.r(5, 1, 22, 2, off ? '#1A140C' : '#E0A04A');
+      /* cracked glass, dusty bottles, slot D4 still empty */
+      P.r(4, 6, 18, 28, '#141A10'); P.r(5, 7, 16, 26, off ? '#0C100E' : '#1A2824');
       for (var r = 0; r < 4; r++) {
-        P.r(5, 12 + r * 6, 16, 1, '#4A5E9E');
+        P.r(5, 12 + r * 6, 16, 1, '#2A3830');
         for (var c = 0; c < 4; c++) {
           var x = 6 + c * 4, y = 9 + r * 6;
-          var d4 = r === 3 && c === 3;
-          if (d4) continue;
-          if (r === 3 && c === 0) continue;   /* the one empty slot that was always empty */
-          P.r(x, y, 3, 3, ['#C2405F', '#E4C46A', '#6A9A5A', '#B892FF'][(r + c) & 3]);
+          if (r === 3 && c === 3) continue;
+          if (r === 3 && c === 0) continue;
+          P.r(x, y, 2, 3, ['#6B7A6E', '#8A7A58', '#4A5A48', '#A09070'][(r + c) & 3]);
+          P.r(x, y, 2, 1, '#C8C0A8');
         }
       }
       /* Deez Nutz: hanging on, then not */
       if (n < 6) {
         var lean = n >= 3 ? 1 : 0, drop = n >= 5 ? 1 : 0;
-        P.r(18 + lean, 27 + drop, 3, 4, '#B07A3A'); P.r(18 + lean, 27 + drop, 3, 1, '#E4C46A');
-      } else { P.r(7, 42, 14, 3, '#B07A3A'); P.r(7, 42, 14, 1, '#E4C46A'); }
-      if (!off) { P.a(0.25); P.r(5, 7, 16, 26, '#9FE0FF'); P.a(1); P.line(6, 8, 12, 14, '#D8F6FF'); }
+        P.r(18 + lean, 27 + drop, 3, 4, '#6A4A28'); P.r(18 + lean, 27 + drop, 3, 1, '#C4A06A');
+      } else { P.r(7, 42, 14, 3, '#6A4A28'); P.r(7, 42, 14, 1, '#C4A06A'); }
+      P.line(9, 13, 9, 17, '#D8E8C0'); P.line(9, 17, 13, 22, '#9AA890');
+      /* mould bloom on the left stile, rust down the right */
+      P.r(2, 28, 2, 12, '#141A10'); P.dith(2, 28, 2, 12, '#4A6B35', 0); P.dith4(2, 30, 2, 8, '#7BA05B', 0);
+      P.r(29, 8, 1, 16, '#7A3A22'); P.r(28, 16, 1, 8, '#A05A32');
       /* keypad, coin slot (useless), tray */
-      P.r(23, 8, 5, 16, K); P.r(24, 9, 3, 3, off ? '#1A2238' : '#4ADE80');
-      for (var k = 0; k < 6; k++) P.r(24 + (k & 1) * 2, 13 + (k >> 1) * 3, 1, 2, '#C8C0B0');
-      P.r(24, 22, 3, 1, '#0A0C14');
-      P.r(4, 37, 24, 8, K); P.r(5, 38, 22, 6, '#0A0E1A'); P.r(5, 38, 22, 1, '#3A4E86');
+      P.r(23, 8, 5, 16, '#141A10'); P.r(24, 9, 3, 3, off ? '#1A140C' : '#E0A04A');
+      for (var k = 0; k < 6; k++) P.r(24 + (k & 1) * 2, 13 + (k >> 1) * 3, 1, 2, '#6B7A6E');
+      P.r(24, 22, 3, 1, '#0A0C0A');
+      P.r(4, 37, 24, 8, '#141A10'); P.r(5, 38, 22, 6, '#101410'); P.r(5, 38, 22, 1, '#2A403C');
       /* dents: one per punch */
       var dents = [[8, 46], [24, 30], [14, 46], [3, 20], [27, 40], [10, 4]];
-      for (k = 0; k < n; k++) { P.r(dents[k][0], dents[k][1] - 1, 3, 1, '#1A2448'); P.px(dents[k][0] + 1, dents[k][1], '#5A6EAA'); }
-      P.r(3, 47, 26, 1, '#0A0C14');
+      for (k = 0; k < n; k++) { P.r(dents[k][0], dents[k][1] - 1, 3, 1, '#1A2018'); P.px(dents[k][0] + 1, dents[k][1], '#5C6A4E'); }
+      P.r(3, 47, 26, 1, '#0A0C0A');
+      P.dith4(4, 44, 22, 3, '#2A2418', 0);
     },
     anim: function (g, x, y, S, now) {
-      /* the hum: a scan line creeping down the glass */
+      /* sodium tube, 400ms cycle (2.5 Hz). reduced motion holds the paint. */
       if (still() || machineOff()) return;
-      var k = ((now / 90) | 0) % 26;
-      g.globalAlpha = 0.25; g.fillStyle = '#D8F6FF';
-      g.fillRect(x - 11 * S, y + (k - 41) * S, 16 * S, S);
+      var dim = ((now / 200) | 0) & 1;
+      g.globalAlpha = dim ? 0.45 : 0.15;
+      g.fillStyle = dim ? '#1A140C' : '#E0A04A';
+      g.fillRect(x - 11 * S, y - 47 * S, 22 * S, 2 * S);
       g.globalAlpha = 1;
     }
   };
+  NPCART.vend_a = NPCART.vend_b = NPCART.vend_c = NPCART.vending;
   PROP.aframe = {
     w: 18, h: 22, ax: 9, ay: 21, shadow: 10,
     paint: function (P) {
