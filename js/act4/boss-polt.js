@@ -623,9 +623,11 @@
     say('* something in the wall has been listening the whole time.');
     running = true; last = performance.now();
     requestAnimationFrame(stepFn);
+    if (NEU.kernel) NEU.kernel.push('polt');
   }
   function close() {
     running = false; dying = 0;
+    if (NEU.kernel && NEU.kernel.current() === 'polt') NEU.kernel.pop();
     warnAt = 0; charging = 0; vuln = 0; sig = 0; chargePath = null;
     stopRise();
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', -1);
@@ -648,6 +650,12 @@
     /* same path as ESC: a confirmed exit, since the fight is on the line */
     if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Polterghast', close);
     else close();
+  });
+
+  if (NEU.kernel) NEU.kernel.register('polt', {
+    tick: function (dt) {},
+    open: open, close: close,
+    running: function () { return running; }
   });
 
   NEU.polt = { open: open, close: close,

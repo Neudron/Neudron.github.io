@@ -1072,8 +1072,9 @@
   /* ── open / close ─────────────────────────────────────────────── */
   /* opts.iris: seconds for the iris to open on arrival (default 0.22). */
   function enter(id, spawn, opts) {
-    if (NEU.settings && NEU.settings.warnFlash) NEU.settings.warnFlash();
     if (!rooms[id]) return false;
+    if (NEU.kernel) NEU.kernel.push('engine');
+    if (NEU.settings && NEU.settings.warnFlash) NEU.settings.warnFlash();
     wrap.hidden = false;
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
@@ -1179,6 +1180,7 @@
 
   function leave() {
     running = false;
+    if (NEU.kernel && NEU.kernel.current() === 'engine') NEU.kernel.pop();
     clearLater();
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
@@ -1214,6 +1216,11 @@
     var y = anchorFeet ? sy : sy + (13 * s) / 2;
     L.drawPlayer(targetCtx || ctx, sx, y, fce || 'down', wlk || 0, !!mov, s, Date.now());
   }
+
+  if (NEU.kernel) NEU.kernel.register('engine', {
+    tick: function (dt) {},
+    running: function () { return running; }
+  });
 
   NEU.engine = {
     register: register, tileset: tileset, decor: decor, enter: enter, leave: leave, go: go,

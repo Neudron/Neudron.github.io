@@ -2222,9 +2222,11 @@
     say('* the small one was not small.');
     running = true; last = performance.now();
     requestAnimationFrame(stepFn);
+    if (NEU.kernel) NEU.kernel.push('scal');
   }
   function close() {
     active = false; running = false; dying = 0; stripOpen = false;
+    if (NEU.kernel && NEU.kernel.current() === 'scal') NEU.kernel.pop();
     F.pops = []; endPh();
     var kh = document.querySelector('#bh .bh__keys');
     if (kh) { kh.__v = false; kh.style.visibility = ''; }
@@ -2271,6 +2273,12 @@
       if (NEU.engine) NEU.engine.enter('b8_arena', 'west');
       open();
     }
+  });
+
+  if (NEU.kernel) NEU.kernel.register('scal', {
+    tick: function (dt) {},
+    open: open, close: close,
+    running: function () { return running; }
   });
 
   NEU.scal = { open: open, close: close,
