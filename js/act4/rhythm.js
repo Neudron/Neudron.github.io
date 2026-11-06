@@ -197,7 +197,7 @@
 
   function step(ts) {
     if (!running) return;
-    requestAnimationFrame(step);
+    if (!NEU.kernel) requestAnimationFrame(step);
     /* the pace cap (perf.js): note judgment runs on the audio clock,
        so a skipped draw costs no timing */
     if (NEU.perf && !NEU.perf.paced(ts)) return;
@@ -532,7 +532,8 @@
     S.health = 1; S.combo = 0; keys = {};
     running = true;
     startRound();
-    requestAnimationFrame(step);
+    if (!NEU.kernel) requestAnimationFrame(step);
+    if (NEU.kernel) NEU.kernel.push('rhythm');
   }
   function open() {
     wrap.hidden = false;
@@ -545,7 +546,8 @@
     S.misses = S.judged = S.weight = 0; S.acc = 1; pops.length = splashes.length = 0;
     running = true;
     startRound();
-    requestAnimationFrame(step);
+    if (!NEU.kernel) requestAnimationFrame(step);
+    if (NEU.kernel) NEU.kernel.push('rhythm');
   }
   /* The counter axe leaves the room for good, and the line about it
      waits until the overlay is gone (see close). */
@@ -557,6 +559,7 @@
 
   function close() {
     running = false;
+    if (NEU.kernel && NEU.kernel.current() === 'rhythm') NEU.kernel.pop();
     /* release the input claim before handing control back to the room */
     if (NEU.activeMinigame === 'rhythm') NEU.activeMinigame = null;
     wrap.hidden = true;
@@ -571,6 +574,12 @@
     /* same path as ESC: a confirmed exit, since the round is on the line */
     if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Rhythm Game', close);
     else close();
+  });
+
+  if (NEU.kernel) NEU.kernel.register('rhythm', {
+    tick: function (dt) { if (running) step(performance.now()); },
+    open: open, close: close,
+    running: function () { return running; }
   });
 
   NEU.rhythm = { open: open, close: close, win: win,

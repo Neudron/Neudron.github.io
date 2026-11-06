@@ -149,6 +149,7 @@
        quiz and the settings panel give. Only captured once. */
     if (!lastFocus) lastFocus = document.activeElement;
     wrap.hidden = false;
+    if (NEU.kernel) NEU.kernel.push('craft');
     NEU.activeMinigame = 'craft';       /* the room underneath must not move or take Escape */
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
@@ -160,6 +161,7 @@
     setTimeout(focusCell, 50);
   }
   function close() {
+    if (NEU.kernel && NEU.kernel.current() === 'craft') NEU.kernel.pop();
     if (NEU.activeMinigame === 'craft') NEU.activeMinigame = null;
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
@@ -222,6 +224,12 @@
       return;
     }
     if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z') { e.preventDefault(); take(); }
+  });
+
+  if (NEU.kernel) NEU.kernel.register('craft', {
+    tick: function (dt) {},
+    open: open, close: close,
+    running: function () { return !wrap.hidden; }
   });
 
   NEU.craft = { open: open, close: close,

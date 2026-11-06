@@ -413,7 +413,7 @@
   var looping = false, clock = 0, lastNow = 0;
   function frame(now) {
     if (!open_) { looping = false; return; }
-    requestAnimationFrame(frame);
+    if (!NEU.kernel) requestAnimationFrame(frame);
     var dt = (now - lastNow) / 1000;
     lastNow = now;
     if (!(dt > 0) || dt > 0.05) dt = 0.016;
@@ -424,7 +424,7 @@
   function startLoop() {
     if (looping || typeof requestAnimationFrame !== 'function') return;
     looping = true; lastNow = 0;
-    requestAnimationFrame(frame);
+    if (!NEU.kernel) requestAnimationFrame(frame);
   }
   addEventListener('resize', function () { if (open_) sizeFx(); });
 
@@ -458,6 +458,7 @@
     if (NEU.quest) { NEU.quest.lock(true); NEU.quest.mark('a4_tenna'); }
     sizeFx();
     paint(); startLoop();
+    if (NEU.kernel) NEU.kernel.push('quiz');
     begin();
   }
 
@@ -499,6 +500,7 @@
        objectives panel over a running room. */
     if (!open_) return;
     open_ = false;
+    if (NEU.kernel && NEU.kernel.current() === 'quiz') NEU.kernel.pop();
     run++;
     ended = false; leaving = false; state = 'idle';
     stopTimers();
@@ -1114,6 +1116,12 @@
     if (ended) { skip(); return; }
     /* same path as ESC: confirmExit('Quiz', close) */
     leave();
+  });
+
+  if (NEU.kernel) NEU.kernel.register('quiz', {
+    tick: function (dt) { if (looping) frame(performance.now()); },
+    open: open, close: close,
+    running: function () { return open_; }
   });
 
   NEU.quiz = { open: open, close: close, skip: skip,
