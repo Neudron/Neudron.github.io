@@ -6,7 +6,8 @@
     "build": "node scripts/build.mjs",
     "check": "node scripts/check.mjs",
     "verify": "node scripts/verify-dist.mjs",
-    "bench": "node bench/renderers.mjs"
+    "bench": "node bench/renderers.mjs",
+    "dev": "node scripts/dev.mjs"
   },
   "devDependencies": {
     "acorn": "8.19.0",
