@@ -4,10 +4,12 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs",
     "verify": "node scripts/verify-dist.mjs",
     "bench": "node bench/renderers.mjs"
   },
   "devDependencies": {
+    "acorn": "8.19.0",
     "esbuild": "^0.28.2",
     "pixi.js": "^8.22.0",
     "three": "0.185.1"
