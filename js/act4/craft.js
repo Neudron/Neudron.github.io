@@ -49,8 +49,16 @@
       for (var i = 0; i < 9; i++) {
         (function (n) {
           var b = document.createElement('button');
-          b.className = 'craft__cell' + (grid[n] ? ' is-full' : '');
+          b.className = 'craft__cell' + (grid[n] ? ' is-full' : '') + (RECIPE[n] && !grid[n] ? ' craft__cell--ghost' : '');
           b.setAttribute('aria-label', 'slot ' + (n + 1));
+          /* A slot the recipe needs shows a faint mushroom outline until
+             the player fills it. The shape stays the puzzle: only the
+             needed cells ghost, never which ones are right. */
+          if (RECIPE[n] && !grid[n]) {
+            var gh = document.createElement('img');
+            gh.src = 'img/act4/terraria/mushroom.png'; gh.alt = ''; gh.className = 'craft__ghost';
+            b.appendChild(gh);
+          }
           if (grid[n]) {
             var im = document.createElement('img');
             im.src = 'img/act4/terraria/mushroom.png'; im.alt = 'mushroom';
@@ -79,6 +87,29 @@
       outEl.innerHTML = revealed
         ? '<b>mushroom soup</b><span>taken</span>'
         : '<span>?</span>';
+    }
+    renderRecipe();
+  }
+
+  /* The torn card's mini 3x3, drawn straight from RECIPE: faded ink
+     glyphs where the mushrooms go, blank cells elsewhere, one smudge. */
+  function renderRecipe() {
+    var el = document.getElementById('craftRecipe');
+    if (!el) return;
+    el.innerHTML = '';
+    for (var i = 0; i < 9; i++) {
+      (function (n) {
+        var c = document.createElement('div');
+        c.className = 'craft__rc-cell';
+        if (RECIPE[n]) {
+          c.className += ' craft__rc-m';
+          var im = document.createElement('img');
+          im.src = 'img/act4/terraria/mushroom.png'; im.alt = 'mushroom';
+          c.appendChild(im);
+        }
+        if (n === 4) c.className += ' craft__rc-smudge';
+        el.appendChild(c);
+      })(i);
     }
   }
 

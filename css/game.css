@@ -136,3 +136,57 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   max-width: none; max-height: none;
   pointer-events: none; image-rendering: pixelated;
 }
+
+/* bug tracker #7: the bottom-left "inside" chip is gone; the cube door (NEU.tryDoor) is the way in */
+#insideChip { display: none !important; }
+
+/* ── the pot: witch's cauldron, torn recipe, stepping brew (WO W1.1) ──
+   All of this lives inside #craft (z 76, under .tbox at 96); no new
+   z-indexes are needed. Font sizes stay in 16px steps. Bubbles and
+   steam are pure CSS (box-shadow pixels plus keyframes), and
+   prefers-reduced-motion switches them off. */
+
+/* torn parchment card at the left of the cauldron: ragged edge, a missing
+   corner, rotated slightly, "an old recipe" at 16px */
+.craft__recipe { position: relative; width: 176px; padding: 14px 10px 16px; margin-right: 10px; background: #CFC6B4; border: 2px solid #A89F8C; clip-path: polygon(2% 0, 88% 0, 100% 10%, 92% 16%, 100% 26%, 94% 32%, 100% 42%, 88% 48%, 100% 58%, 86% 66%, 100% 76%, 92% 84%, 100% 92%, 88% 100%, 0 100%, 0 8%, 6% 2%); transform: rotate(-3deg); }
+.craft__rc-title { margin: 0 0 10px; font: 400 16px/1 var(--font-display); color: #7A6E58; }
+.craft__rc-grid { display: grid; grid-template-columns: repeat(3, 32px); gap: 6px; margin-top: 8px; }
+.craft__rc-cell { position: relative; width: 32px; height: 32px; background: #EDE7DE; border-radius: 4px; }
+.craft__rc-cell img { width: 16px; height: 16px; opacity: 0.35; image-rendering: pixelated; }
+.craft__rc-smudge { position: relative; }
+.craft__rc-smudge::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 48%; height: 48%; background: #8E7F68; border-radius: 60% 40% 55% 45%; opacity: 0.6; }
+
+/* cauldron: dark iron bowl (#22222E, 4px #5C5C70 rim), stepped-gradient
+   brew (#3B1F5C -> #6A3FA0 -> #B892FF) under the grid in the mouth */
+.craft__cauldron { position: relative; width: min(400px, 94vw); height: 520px; }
+.craft__bowl { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: 100%; height: 52%; background: #22222E; border-radius: 48% 48% 38% 38% / 75% 75% 25% 25%; }
+.craft__rim { position: absolute; left: 50%; bottom: 66%; transform: translate(-50%, 50%); width: 122%; height: 26px; background: #5C5C70; border-radius: 50%; }
+.craft__brew { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); width: 78%; height: 26%; background: linear-gradient(to top, #3B1F5C 33%, #6A3FA0 33%, #6A3FA0 66%, #B892FF 66%); border-radius: 42% 42% 28% 28% / 70% 70% 20% 20%; overflow: hidden; }
+.craft__brew::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 160%; height: 160%;
+  box-shadow: 10px 14px #EDE7DE, -16px 42px #EDE7DE, 24px 70px #EDE7DE, -8px 96px #EDE7DE, 32px 124px #EDE7DE, -20px 150px #EDE7DE, 14px 180px #EDE7DE;
+  opacity: 0.75; image-rendering: pixelated; animation: craftBubbles 6s steps(8) infinite; }
+@keyframes craftBubbles { to { transform: translate(-50%, -150%); opacity: 0; } }
+
+/* faint steam pixels above the pot */
+.craft__steam { position: absolute; left: 50%; top: 4px; transform: translateX(-50%); width: 150px; height: 64px; opacity: 0.55; }
+.craft__steam::after { content: ''; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 100%; height: 100%;
+  box-shadow: 10px -12px #EDE7DE, -8px -26px #EDE7DE, 4px -42px #EDE7DE, -12px -56px #EDE7DE, 2px -74px #EDE7DE;
+  image-rendering: pixelated; animation: craftSteam 7s steps(8) infinite; }
+@keyframes craftSteam { to { transform: translateX(-50%) translateY(-62px); opacity: 0; } }
+
+/* slots: dark stone cells; hover and focus get a lilac 2px outline and a
+   small bounce; recipe-needed empty cells ghost a 20% mushroom outline */
+.craft__cell { --bounce: craftBounce .2s both; }
+.craft__cell:hover { outline: 2px solid #C3B1E1; outline-offset: 2px; transform: translateY(-2px); transition: transform .18s var(--bounce); }
+.craft__cell:focus-visible { outline: 2px solid #C3B1E1; outline-offset: 2px; transform: translateY(-2px); transition: transform .18s var(--bounce); }
+@keyframes craftBounce { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+.craft__cell--ghost img { opacity: 0.2; }
+.craft__cell--ghost { box-shadow: inset 0 0 0 2px rgba(237,231,222,0.25); }
+
+/* calm motion: no bubbles, no steam, no bounce */
+@media (prefers-reduced-motion: reduce) {
+  .craft__brew::after { animation: none; }
+  .craft__steam::after { animation: none; }
+  .craft__cell:hover { transform: none; transition: none; }
+  .craft__cell:focus-visible { transform: none; transition: none; }
+}
