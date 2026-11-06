@@ -16,7 +16,7 @@
 
   var NEU = window.NEU = window.NEU || {};
 
-  var DEFS = ['w', 'a', 's', 'd', 'z', 'x', 'Shift', 'c', 'r', 'i', 'Tab', 'm'];
+  var DEFS = ['w', 'a', 's', 'd', 'z', 'x', 'Shift', 'c', 'r', 'i', 'Tab', 'm', 'e'];
   var RESERVED = ['Escape', 'Enter', ' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
                   'Control', 'Alt', 'AltGraph', 'Meta', 'OS', 'CapsLock', 'Dead',
                   'Unidentified', 'Process', 'ContextMenu'];

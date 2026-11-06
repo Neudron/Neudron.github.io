@@ -147,11 +147,9 @@
     }
     if (NEU.quest) NEU.quest.mark('a4_soup');
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
-    if (sayEl) sayEl.textContent = 'you drink it standing up. it tastes like a decision.';
-    setTimeout(function () {
-      close();
-      if (NEU.act4 && NEU.act4.wake) NEU.act4.wake();
-    }, 3200);
+    var label = NEU.keys && NEU.keys.label ? NEU.keys.label('c') : 'C';
+    close();
+    if (NEU.talk) NEU.talk(['* you ladle the soup into a bowl.', '* press [' + label + '] to open your things.'], 'narr');
   }
 
   var focusIdx = 0;

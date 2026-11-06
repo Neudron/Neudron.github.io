@@ -1,5 +1,5 @@
 /* inventory.js — Deltarune's ITEM box for Act IV.
-   I opens it while the engine is running and nothing else owns the
+   C opens it while the engine is running and nothing else owns the
    page. Arrows move the soul, Enter/Z reads the item through NEU.talk
    (the one textbox), Esc/C/X close. It listens on window in the capture
    phase and stops every key it sees, so the engine (and its ESC) never
@@ -9,11 +9,35 @@
   'use strict';
   var NEU = window.NEU = window.NEU || {};
 
+  /* The soup icon is drawn only when its row is opened, so boot does not
+     depend on canvas serialization support. Integer fillRect only. */
+  var soupIcon = 'soup-icon';
+  function drawSoupIcon(c) {
+    var x;
+    try { x = c.getContext('2d'); } catch (e) { return; }
+    if (!x) return;
+    /* bowl body — dark iron */
+    x.fillStyle = '#22222E';
+    x.fillRect(2, 6, 12, 8);
+    x.fillRect(3, 14, 10, 1);
+    x.fillRect(4, 15, 8, 1);
+    /* bone rim */
+    x.fillStyle = '#D4C9A8';
+    x.fillRect(1, 5, 14, 2);
+    /* broth — lilac-green */
+    x.fillStyle = '#8BAA7F';
+    x.fillRect(3, 7, 10, 4);
+    /* mushroom bits */
+    x.fillStyle = '#6A3FA0';
+    x.fillRect(5, 8, 2, 2);
+    x.fillRect(9, 9, 2, 2);
+  }
+
   /* id (or prefix for the counted ones) -> name, sheet, description */
   var INFO = {
     axe:    ['Axe', 'axe', ['* an axe. it remembers being a sword.']],
     mush:   ['Mushroom', 'mushroom', ['* a mushroom. it is still a little warm.', '* five make a soup.']],
-    soup:   ['Mushroom Soup', null, ['* mushroom soup. it smells like a forest that forgave you.']],
+    soup:   ['Mushroom Soup', soupIcon, ['* mushroom soup. it smells like a forest that forgave you.']],
     recall: ['Recall Potion', 'recall', ['* a recall potion. it pulls you back to the last place you were safe.']],
     ashes:  ['Ashes', null, ['* what is left. you keep it anyway.']]
   };
@@ -59,6 +83,22 @@
     live(label(rows[sel]));
   }
 
+  var drinking = false;
+
+  /* drink beat: bowl icon tips, three steam puffs (~0.8 s), then consume */
+  function drinkSoup() {
+    if (drinking) return;
+    drinking = true;
+    var li = list.children[sel];
+    if (li) li.classList.add('inv__soup-drink');
+    setTimeout(function () {
+      if (NEU.save) NEU.save.take('soup');
+      close();
+      drinking = false;
+      if (NEU.act4 && NEU.act4.wake) NEU.act4.wake();
+    }, 800);
+  }
+
   function open() {
     if (!box) build();
     rows = owned();
@@ -67,7 +107,15 @@
       var li = document.createElement('li'), sh = rows[i].sheet && NEU.sheets && NEU.sheets[rows[i].sheet];
       li.setAttribute('role', 'option');
       li.innerHTML = '<img alt=""><span></span>';
-      if (sh) li.firstChild.src = sh.src; else li.firstChild.style.visibility = 'hidden';
+      if (rows[i].sheet === soupIcon) {
+        var icon = document.createElement('canvas');
+        icon.width = 16; icon.height = 16;
+        icon.setAttribute('aria-hidden', 'true');
+        icon.style.imageRendering = 'pixelated';
+        li.replaceChild(icon, li.firstChild);
+        drawSoupIcon(icon);
+      } else if (sh) { li.firstChild.src = sh.src; }
+      else { li.firstChild.style.visibility = 'hidden'; }
       li.lastChild.textContent = label(rows[i]);
       list.appendChild(li);
     }
@@ -103,9 +151,8 @@
     }
     if (k === 'ArrowUp' || k === 'w' || k === 'W') pick(sel - 1);
     else if (k === 'ArrowDown' || k === 's' || k === 'S') pick(sel + 1);
-    else if ((k === 'Enter' || k === 'z' || k === 'Z') && rows[sel] && rows[sel].id === 'soup' && NEU.act4 && NEU.act4.wake) {
-      if (NEU.save) NEU.save.take('soup');
-      close(); NEU.act4.wake();
+    else if ((k === 'Enter' || k === 'z' || k === 'Z') && rows[sel] && rows[sel].id === 'soup') {
+      drinkSoup();
     }
     else if ((k === 'Enter' || k === 'z' || k === 'Z') && rows[sel] && NEU.talk) NEU.talk(rows[sel].say, 'narr');
     else if (/^(Escape|c|C|x|X)$/.test(k)) close();

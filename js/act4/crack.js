@@ -25,6 +25,7 @@
   if (!el) { NEU.crack = { arm: function () {} }; return; }
 
   var armed = false, clicks = 0, opened = false, timer = null, actx = null;
+  var hintEl = null;
 
   var NOISE = [
     'something behind the panel makes a noise. it is not a good noise.',
@@ -32,12 +33,28 @@
     ''
   ];
 
+  function showHint() {
+    if (hintEl) return;
+    if (NEU.quest && NEU.quest.has('a4_crack')) return;
+    hintEl = document.createElement('div');
+    hintEl.className = 'crack-hint';
+    hintEl.textContent = 'something cracked inside the cube';
+    document.body.appendChild(hintEl);
+  }
+
+  function hideHint() {
+    if (!hintEl) return;
+    if (hintEl.parentNode) hintEl.parentNode.removeChild(hintEl);
+    hintEl = null;
+  }
+
   function arm() {
     if (armed) return;
     armed = true;
     el.hidden = false;
     requestAnimationFrame(function () { el.classList.add('is-in'); });
     if (NEU.save) NEU.save.flag('crack_armed', 1);
+    showHint();
   }
 
   function hit() {
@@ -73,6 +90,7 @@
     el.setAttribute('data-n', String(clicks));
 
     if (clicks === 1 && NEU.quest) NEU.quest.mark('a4_crack');
+    hideHint();
     if (NOISE[clicks - 1] && NEU.talk) NEU.talk([NOISE[clicks - 1]], 'narr');
 
     if (clicks >= 3) {

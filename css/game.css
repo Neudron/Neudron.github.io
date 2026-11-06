@@ -190,3 +190,370 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   .craft__cell:hover { transform: none; transition: none; }
   .craft__cell:focus-visible { transform: none; transition: none; }
 }
+
+
+/* ── soup drink beat (inventory.js W1.2) ─────────────────────────
+   Bowl icon tips right, three integer-pixel steam puffs rise from it,
+   ~0.8 s total. prefers-reduced-motion: no animation at all. */
+@keyframes inv-soup-tip { 0% { transform: rotate(0); } 50% { transform: rotate(32deg); } 100% { transform: rotate(32deg); } }
+@keyframes inv-soup-steam { 0% { opacity: 0.7; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-16px); } }
+.inv__soup-drink img {
+  animation: inv-soup-tip 0.8s steps(4) both;
+  transform-origin: bottom right;
+}
+.inv__soup-drink::after {
+  content: '';
+  position: absolute; left: 56px; top: 2px;
+  width: 4px; height: 4px;
+  box-shadow: 0 0 0 0 #fff, 6px -3px 0 0 #fff, -4px -6px 0 0 #fff;
+  animation: inv-soup-steam 0.8s steps(4) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv__soup-drink img { animation: none; }
+  .inv__soup-drink::after { animation: none; display: none; }
+}
+
+
+/* ── crack: liquid chrome, arrow hint, red portal (WO W1.3) ──────
+   Override style.css rules from game.css with #panel specificity.
+   The stepped metallic ramp + specular sweep is the "liquid chrome"
+   look; prefers-reduced-motion kills all animation. */
+
+/* specular band sweeping across the chrome ramp */
+@keyframes crackSweep {
+  0%   { background-position: -80px 0; }
+  100% { background-position: 80px 0; }
+}
+
+/* bobbing arrow hint */
+@keyframes crackBob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(-6px); }
+}
+
+/* portal pulse */
+@keyframes crackPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+
+/* liquid chrome crack: bigger, jagged, stepped metallic fill */
+#panel #crack {
+  width: 48px; min-height: 48px; height: 48px;
+  right: 8px; bottom: 8px;
+}
+#panel #crack::before {
+  width: 48px; height: 48px;
+}
+#panel #crack::after {
+  clip-path: polygon(10% 0, 35% 15%, 55% 0, 70% 20%, 100% 35%, 85% 55%, 100% 75%, 75% 80%, 60% 100%, 40% 85%, 20% 100%, 5% 70%, 0 45%, 15% 30%);
+  background: linear-gradient(135deg, #F4F6FA 0%, #F4F6FA 20%, #C9CED8 20%, #C9CED8 40%, #8C93A3 40%, #8C93A3 60%, #4A5060 60%, #4A5060 80%, #1B1E26 80%, #1B1E26 100%);
+  background-size: 160px 160px;
+  animation: crackSweep 2.4s steps(6) infinite;
+  outline: 2px solid #1B1E26;
+  filter: drop-shadow(0 0 6px rgba(200,206,216,.6));
+}
+#panel #crack[data-n="1"] { transform: scale(1.5); }
+#panel #crack[data-n="2"] { transform: scale(2.4); }
+#panel #crack[data-n="2"]::after {
+  filter: drop-shadow(0 0 14px rgba(200,206,216,.9));
+}
+
+/* up-arrow hint: bobbing pixel arrow + text */
+.crack-hint {
+  position: fixed; z-index: 74;
+  top: 48px; left: 50%; transform: translateX(-50%);
+  color: #C9CED8; font-size: 16px; text-align: center;
+  pointer-events: none;
+  animation: crackBob 1.6s steps(4) infinite;
+}
+.crack-hint::before {
+  content: '▲'; display: block; font-size: 32px; line-height: 1;
+}
+
+/* red chrome portal: big, pulsing, unmissable */
+#panel #crack.is-portal {
+  width: 96px; height: 96px; min-height: 96px;
+  right: 4px; bottom: 4px;
+}
+#panel #crack.is-portal::after {
+  clip-path: circle(50%);
+  background: linear-gradient(135deg, #FFE3E3 0%, #FFE3E3 20%, #FF6B6B 20%, #FF6B6B 40%, #C2405F 40%, #C2405F 60%, #8C2F4A 60%, #8C2F4A 80%, #2A0A12 80%, #2A0A12 100%);
+  background-size: 200px 200px;
+  animation: crackSweep 2.4s steps(6) infinite;
+  outline: 2px solid #2A0A12;
+  filter: drop-shadow(0 0 20px rgba(255,107,107,.85));
+}
+#panel #crack.is-portal {
+  animation: crackPulse 1.2s steps(4) infinite;
+}
+
+/* calm motion: static chrome, no sweep/bob/pulse */
+@media (prefers-reduced-motion: reduce) {
+  #panel #crack::after { animation: none; }
+  #panel #crack.is-portal { animation: none; }
+  #panel #crack.is-portal::after { animation: none; }
+  .crack-hint { animation: none; }
+}
+
+
+/* ── Settings: Final Fantasy III Pixel Remaster CONFIG (WO W1.7) ─
+   Stepped vertical ramp #2B3FB0 → #1A2A8A → #0E1A5C (3 bands),
+   2px #F4F4F4 rounded (4px) border with 1px dark outer line,
+   two-pane layout with category list left and option rows right,
+   white pointing-hand cursor beside focused row.
+   All font sizes are multiples of 16px. */
+
+@keyframes settHandBob {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(4px); }
+}
+
+.sett__box {
+  width: min(720px, 94vw);
+  max-height: calc(100vh - 48px);
+  background: linear-gradient(180deg, #2B3FB0 0%, #2B3FB0 33%, #1A2A8A 33%, #1A2A8A 66%, #0E1A5C 66%, #0E1A5C 100%);
+  border: 2px solid #F4F4F4;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px #050814, 0 16px 48px rgba(0, 0, 0, 0.85);
+  color: #F4F4F4;
+  padding: 24px;
+  font-size: 16px;
+}
+
+.sett__h {
+  font: 400 32px/1 var(--font-quest, monospace);
+  color: #F4F4F4;
+  margin: 0 0 16px;
+  text-shadow: 2px 2px 0 #050814;
+}
+
+.sett__x {
+  border-color: #F4F4F4;
+  color: #F4F4F4;
+  border-radius: 4px;
+}
+.sett__x:hover, .sett__x:focus-visible {
+  background: #2B3FB0;
+  border-color: #FFFFFF;
+}
+
+.sett__two-pane {
+  display: flex;
+  gap: 20px;
+  min-height: 340px;
+}
+
+.sett__cats {
+  flex: 0 0 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-right: 2px solid rgba(244, 244, 244, 0.3);
+  padding-right: 12px;
+}
+
+.sett__cat {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px 8px 24px;
+  font: 400 16px/1 var(--font, monospace);
+  color: #F4F4F4;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sett__cat:hover {
+  background: rgba(43, 63, 176, 0.5);
+}
+
+.sett__cat[aria-selected="true"],
+.sett__cat.is-active {
+  background: #1A2A8A;
+  border-color: #F4F4F4;
+  color: #FFFFFF;
+}
+
+.sett__panes {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 160px);
+  padding-right: 8px;
+}
+
+.sett__pane[hidden] {
+  display: none !important;
+}
+
+.sett__pane {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sett__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 8px 10px 24px;
+  border-top: 1px dotted rgba(244, 244, 244, 0.3);
+  font-size: 16px;
+  color: #F4F4F4;
+}
+
+.sett__row:first-child {
+  border-top: 0;
+}
+
+.sett__row:hover,
+.sett__row:focus-within,
+.sett__row.is-focused {
+  background: rgba(43, 63, 176, 0.35);
+}
+
+.sett__lbl {
+  font: 400 16px/1.4 var(--font, monospace);
+  color: #F4F4F4;
+}
+
+.sett__lbl small {
+  display: block;
+  margin-top: 4px;
+  color: #C9CED8;
+  font-size: 16px;
+}
+
+.sett__dots {
+  flex: 1 1 auto;
+  border-bottom: 2px dotted rgba(244, 244, 244, 0.4);
+  margin: 0 8px;
+  height: 1px;
+}
+
+.sett__val-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: #F4F4F4;
+}
+
+.sett__arrow {
+  font-size: 16px;
+  color: #F4F4F4;
+  user-select: none;
+}
+
+.sett__sw {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 80px;
+  min-height: 44px;
+  padding: 0 12px;
+  font: 400 16px/1 var(--font, monospace);
+  color: #F4F4F4;
+  background: rgba(14, 26, 92, 0.7);
+  border: 2px solid #F4F4F4;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sett__sw::after { display: none; }
+.sett__sw[aria-checked="true"] {
+  background: #2B3FB0;
+  border-color: #FFFFFF;
+}
+.sett__sw:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 2px;
+}
+
+.sett__key,
+.sett__key-ext {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 44px;
+  padding: 0 12px;
+  font: 400 16px/1 var(--font, monospace);
+  color: #F4F4F4;
+  background: rgba(14, 26, 92, 0.7);
+  border: 2px solid #F4F4F4;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sett__key:hover, .sett__key-ext:hover {
+  border-color: #FFFFFF;
+  background: #2B3FB0;
+}
+.sett__key:focus-visible, .sett__key-ext:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 2px;
+}
+
+.sett__act {
+  min-height: 44px;
+  padding: 0 16px;
+  font: 400 16px/1 var(--font, monospace);
+  color: #F4F4F4;
+  background: rgba(14, 26, 92, 0.7);
+  border: 2px solid #F4F4F4;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sett__act:hover, .sett__act:focus-visible {
+  border-color: #FFFFFF;
+  background: #2B3FB0;
+}
+
+.sett__seg {
+  border: 2px solid #F4F4F4;
+  border-radius: 4px;
+  background: rgba(14, 26, 92, 0.7);
+}
+.sett__opt {
+  font-size: 16px;
+  color: #F4F4F4;
+  border-left: 2px solid #F4F4F4;
+}
+.sett__opt[aria-checked="true"] {
+  background: #2B3FB0;
+  color: #FFFFFF;
+}
+
+.sett__hand,
+.sett__cat:focus-visible::before,
+.sett__cat[aria-selected="true"]::before,
+.sett__row:focus-within::before,
+.sett__row.is-focused::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 16px 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23F4F4F4' d='M0 6h6V4h2V2h4v2h2v4h2v2h-2v2h-4v2H6v-2H4v-2H0V6z'/%3E%3Cpath fill='%230E1A5C' d='M1 7h5V5h2V3h4v2h2v4h2v1h-2v2h-4v1H6v-1H4v-2H1V7z'/%3E%3Cpath fill='%23FFFFFF' d='M2 8h4V6h2V4h3v1h1v3h2v1h-2v1h-3v1H6v-1H4v-1H2V8z'/%3E%3C/svg%3E");
+  animation: settHandBob 0.8s steps(2) infinite;
+}
+
+/* Reduced motion: no cursor bob */
+@media (prefers-reduced-motion: reduce) {
+  .sett__hand,
+  .sett__cat:focus-visible::before,
+  .sett__cat[aria-selected="true"]::before,
+  .sett__row:focus-within::before,
+  .sett__row.is-focused::before {
+    animation: none;
+  }
+}

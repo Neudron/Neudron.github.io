@@ -1003,8 +1003,11 @@ body.is-playing { overflow: hidden; }
   transition: opacity .5s ease, transform .5s var(--bounce);
 }
 .dog.is-in { opacity: 1; transform: none; }
-.dog img { display: block; image-rendering: pixelated;
+.dog img { display: block; image-rendering: pixelated; width: 88px; height: 76px;
            filter: drop-shadow(0 5px 16px rgba(0,0,0,.55)); }
+.dog.is-leave {
+  opacity: 0; transform: translateX(140px) translateY(-8px);
+  transition: opacity .5s ease-in, transform .5s ease-in; }
 
 /* Chips stack upward from the bottom-left rather than overlapping.
    roomChip is permanent once earned, so it takes the base slot. */
@@ -1026,7 +1029,7 @@ body.is-playing { overflow: hidden; }
    The idle only runs until he gives up the hammer. An animation that
    never stops stops reading as alive and starts reading as a loop. */
 .dog__btn img { animation: dogIdle 1.9s steps(2, end) infinite; }
-.dog.is-settled .dog__btn img { animation: none; }
+.dog.is-settled .dog__btn img { animation-play-state: paused; }
 @keyframes dogIdle {
   0%, 100% { transform: translateY(0) scaleY(1); }
   50%      { transform: translateY(-2px) scaleY(1.04); }
@@ -1069,7 +1072,7 @@ body.is-playing { overflow: hidden; }
    blanket as a 250x5 sliver and stretched the sleepers. */
 .sleep > img { position: absolute; height: auto; image-rendering: pixelated; }
 .sleep__blanket { left: 0; bottom: 0; width: 250px; }
-.sleep__sans    { left: 26px;  bottom: 16px; width: 46px;  transform: rotate(-90deg); }
+.sleep__sans    { left: 26px;  bottom: 16px; width: 46px;  z-index: 2; transform: rotate(-90deg); }
 .sleep__dog     { left: 108px; bottom: 20px; width: 92px; }
 .sleep__beat {
   position: absolute; left: -12px; bottom: 146px; z-index: 2;
@@ -1089,6 +1092,7 @@ body.is-playing { overflow: hidden; }
 .sleep__beat button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .sleep__progress span { transition: none !important; }
+  .dog.is-leave { transform: none; transition: opacity .5s ease; }
 }
 
 /* ── the console ──────────────────────────────────────────────────
@@ -1517,8 +1521,8 @@ html.rm .quiz__beam { animation: none; }
 
 /* he sits down */
 .sleep__chair {
-  left: 18px; bottom: 12px; width: 46px;
-  opacity: 0; transition: opacity .7s ease;
+  left: 12px; bottom: 10px; width: 45px; height: 83px; z-index: 1;
+  image-rendering: pixelated; opacity: 0; transition: opacity .7s ease;
 }
 .sleep__chair.is-in { opacity: 1; }
 

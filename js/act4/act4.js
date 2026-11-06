@@ -113,7 +113,13 @@
      which is the small joke the whole chain has been walking toward. */
   function settle() {
     var dog = document.getElementById('dog');
-    if (dog) { dog.classList.remove('is-in'); setTimeout(function () { dog.hidden = true; }, 520); }
+    if (dog) {
+      dog.classList.remove('is-in');
+      dog.classList.add('is-leave');
+      setTimeout(function () { dog.hidden = true; dog.classList.remove('is-leave'); }, 520);
+    }
+    var sleepDog = document.querySelector('.sleep__dog');
+    if (sleepDog) sleepDog.hidden = true;
     var chair = document.getElementById('armchair');
     if (chair) { chair.hidden = false; requestAnimationFrame(function () { chair.classList.add('is-in'); }); }
     if (NEU.crack) NEU.crack.arm();
@@ -147,6 +153,19 @@
      visuals re-arm with the state the file already remembers. */
   if (NEU.save && NEU.save.flagged('tripping')) {
     document.body.classList.add('is-trip');
+  }
+
+  /* A refresh after the wake restores the settled scene without
+     replaying the narration: the flags are the source of truth. */
+  if (NEU.save && NEU.save.flagged('dog_gone')) {
+    var _dog = document.getElementById('dog');
+    if (_dog) _dog.hidden = true;
+    var _sleepDog = document.querySelector('.sleep__dog');
+    if (_sleepDog) _sleepDog.hidden = true;
+  }
+  if (NEU.save && NEU.save.flagged('sans_sits')) {
+    var _chair = document.getElementById('armchair');
+    if (_chair) { _chair.hidden = false; _chair.classList.add('is-in'); }
   }
 
   NEU.act4 = {
