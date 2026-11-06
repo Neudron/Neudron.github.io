@@ -413,7 +413,7 @@
   var beatAt = -Infinity;
   function step(now) {
     if (!running) return;
-    requestAnimationFrame(step);
+    if (!NEU.kernel) requestAnimationFrame(step);
 
     var dt = Math.max(0, Math.min(0.033, (now - last) / 1000)); last = now;
     if (NEU.juice && NEU.juice.frozen()) { draw(); return; }
@@ -848,7 +848,8 @@
     running = true; last = performance.now();
     if (msg) msg.hidden = true;
     draw();
-    requestAnimationFrame(step);
+    if (!NEU.kernel) requestAnimationFrame(step);
+    if (NEU.kernel) NEU.kernel.push('bullet');
   }
 
   /* ── death ────────────────────────────────────────────────────────
@@ -987,6 +988,7 @@
   }
   function close() {
     running = false;
+    if (NEU.kernel && NEU.kernel.current() === 'bullet') NEU.kernel.pop();
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
@@ -1005,6 +1007,12 @@
     if (NEU.activeMinigame !== 'bullet') return;
     if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Bullet Hell', close);
     else close();
+  });
+
+  if (NEU.kernel) NEU.kernel.register('bullet', {
+    tick: function (dt) { if (running) step(performance.now()); },
+    open: open, close: close,
+    running: function () { return running; }
   });
 
   NEU.bullet = { open: open, close: close, get endless() { return endless; }, get running() { return running; },
