@@ -246,6 +246,31 @@
   <p class="bh__keys">a b c d &nbsp;&middot;&nbsp; or 1 2 3 4 &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> to answer &nbsp;&middot;&nbsp; esc to leave</p>
 </div>
 
+<!-- ═══ exo mechs ══════════════════════════════════════════════════ -->
+<div class="exo" id="exo" hidden aria-label="exo mechs">
+  <canvas id="exoCanvas"></canvas>
+  <div class="exo__pick" id="exoPick">
+    <button type="button" data-mech="thanatos">Thanatos</button>
+    <button type="button" data-mech="ares">Ares</button>
+    <button type="button" data-mech="twins">Artemis and Apollo</button>
+  </div>
+  <p class="exo__vuln" id="exoVuln" aria-live="polite"></p>
+  <p class="exo__hud" id="exoHud"></p>
+  <button type="button" class="exo__quit" id="exoQuit">esc</button>
+  <p class="exo__keys"><kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> strike &nbsp;&middot;&nbsp; <kbd data-k="x">x</kbd> dash &nbsp;&middot;&nbsp; 1 2 3 to choose</p>
+</div>
+
+<!-- ═══ draedon ════════════════════════════════════════════════════ -->
+<div class="draedon" id="draedon" hidden aria-label="draedon">
+  <canvas id="draedonCanvas"></canvas>
+  <p class="draedon__vuln" id="draedonVuln" aria-live="polite"></p>
+  <p class="draedon__bang" id="draedonBang" hidden>!</p>
+  <p class="draedon__prompt" id="draedonPrompt" hidden></p>
+  <p class="draedon__count" id="draedonCount" hidden></p>
+  <p class="draedon__hud" id="draedonHud"></p>
+  <button type="button" class="draedon__quit" id="draedonQuit">esc</button>
+</div>
+
 <!-- ═══ through the crack ══════════════════════════════════════════ -->
 <div class="polt" id="polt" hidden aria-label="polterghast">
   <canvas id="poltCanvas"></canvas>
@@ -253,6 +278,8 @@
   <button class="bh__quit" id="poltQuit">esc</button>
   <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> or enter to strike &nbsp;&middot;&nbsp; <kbd data-k="x">x</kbd> to dash &nbsp;&middot;&nbsp; <kbd data-k="Shift">shift</kbd> to focus</p>
 </div>
+<div class="plat" id="plat" hidden><canvas id="platCanvas"></canvas></div>
+<div class="bolt" id="bolt" hidden><canvas id="boltCanvas" width="640" height="360"></canvas></div>
 
 <!-- ═══ the argument ═══════════════════════════════════════════════ -->
 <div class="fnf" id="fnf" hidden aria-label="rap battle">
@@ -261,6 +288,21 @@
   <button class="bh__quit" id="fnfQuit">esc</button>
   <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; hit them when they land</p>
 </div>
+
+<!-- ═══ the mage ═════════════════════════════════════════════════════ -->
+<div class="mage" id="mage" hidden aria-label="mage">
+  <div class="mage__art">
+    <canvas id="mageCanvas" width="320" height="192"></canvas>
+  </div>
+  <div class="mage__dock">
+    <div class="mage__menu" id="mageMenu" role="listbox" aria-label="shop menu"></div>
+    <div class="mage__box">
+      <p class="mage__say" id="mageSay"></p>
+    </div>
+  </div>
+</div>
+
+<div class="cards" id="cards" hidden aria-label="cards"><canvas id="cardsCanvas" width="640" height="480"></canvas></div>
 
 <!-- ═══ the stall ═════════════════════════════════════════════════════ -->
 <div class="shop" id="shop" hidden aria-label="shop">
@@ -283,7 +325,17 @@
   <h2 class="craft__h">the pot</h2>
   <p class="craft__say" id="craftSay"></p>
   <div class="craft__row">
-    <div class="craft__grid" id="craftGrid"></div>
+    <div class="craft__recipe" aria-label="an old recipe">
+      <h3 class="craft__rc-title">an old recipe</h3>
+      <div class="craft__rc-grid" id="craftRecipe"></div>
+    </div>
+    <div class="craft__cauldron">
+      <div class="craft__brew" aria-hidden="true"></div>
+      <div class="craft__steam" aria-hidden="true"></div>
+      <div class="craft__bowl" aria-hidden="true"></div>
+      <div class="craft__rim" aria-hidden="true"></div>
+      <div class="craft__grid" id="craftGrid"></div>
+    </div>
     <button class="craft__out" id="craftOut"><span>nothing yet</span></button>
   </div>
   <div class="craft__tray" id="craftTray"></div>
@@ -502,6 +554,7 @@
 </script>
 <script src="js/core/motion.js"></script>
 <script src="js/data/data.js"></script>
+<script src="js/data/items.js"></script>
 <script src="js/page/main.js"></script>
 <!-- after main.js: stars.js hangs itself off the window.NEU bus -->
 <script src="js/page/stars.js"></script>
@@ -514,12 +567,21 @@
 <script src="js/core/save.js"></script>
 <script src="js/core/keys.js"></script>
 <script src="js/core/juice.js"></script>
+<script src="js/core/rand.js"></script>
+<script src="js/core/kernel.js"></script>
 <script src="js/core/danmaku.js"></script>
+<script src="js/core/kit.js"></script>
 <script src="js/data/sheets.js"></script>
 <script src="js/core/engine-look.js"></script>
 <script src="js/core/engine-doors.js"></script>
 <script src="js/core/engine-kinds.js"></script>
 <script src="js/core/engine.js"></script>
+<script src="js/core/plat.js"></script>
+<script src="js/act4/look-dungeon.js"></script>
+<script src="js/act4/dungeon.js"></script>
+<script src="js/act4/look-mountain.js"></script>
+<script src="js/act4/mountain.js"></script>
+<script src="js/act4/rooms-p.js"></script>
 <script src="js/game/sword.js"></script>
 <script src="js/game/sans.js"></script>
 <!-- bullet.js publishes NEU.bullet and calls NEU.grantDogFood, so it
@@ -533,7 +595,19 @@
 <script src="js/act4/summon.js"></script>
 <script src="js/act4/look-city.js"></script>
 <script src="js/act4/rooms-d.js"></script>
+<script src="js/act4/rooms-e.js"></script>
+<script src="js/act4/note.js"></script>
+<script src="js/act4/photo.js"></script>
+<script src="js/act4/look-savanna.js"></script>
+<script src="js/act4/snail.js"></script>
+<script src="js/act4/finale.js"></script>
+<script src="js/act4/chair.js"></script>
+<script src="js/act4/look-exo.js"></script>
+<script src="js/act4/chase.js"></script>
+<script src="js/act4/rooms-s.js"></script>
 <script src="js/act4/shop.js"></script>
+<script src="js/act4/mage.js"></script>
+<script src="js/act4/cards.js"></script>
 <script src="js/act4/scal-attacks.js"></script>
 <script src="js/act4/boss-scal.js"></script>
 <script src="js/act4/scal-worm.js"></script>
@@ -543,8 +617,17 @@
 <script src="js/act4/quiz.js"></script>
 <script src="js/act4/rhythm.js"></script>
 <script src="js/act4/craft.js"></script>
+<script src="js/act4/polt-attacks.js"></script>
 <script src="js/act4/boss-polt.js"></script>
+<script src="js/act4/exo-thanatos.js"></script>
+<script src="js/act4/exo-combos.js"></script>
+<script src="js/act4/boss-exo.js"></script>
+<script src="js/act4/boss-draedon.js"></script>
+<script src="js/act4/exo-ares.js"></script>
+<script src="js/act4/exo-twins.js"></script>
 <script src="js/act4/crack.js"></script>
+<script src="js/act4/cart.js"></script>
+<script src="js/act4/elevator.js"></script>
 <script src="js/act4/inventory.js"></script>
 <script src="js/game/deck.js"></script>
 <!-- after every scene, before settings: like touch.js it polls the

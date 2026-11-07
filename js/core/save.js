@@ -34,7 +34,8 @@
 
   var KEY = 'neu.save.v1';
   var BAD = 'neu.save.bad';
-  var VERSION = 2;
+  var VERSION = 3;
+  var DEFAULT_EQUIP = { melee: 'blade', ranged: 'soulfire', spell1: 'brimstone', spell2: 'soulshield' };
 
   /* The in-memory copy is the truth while playing. localStorage is a
      mirror of it, not the other way round — so a storage failure
@@ -46,8 +47,15 @@
 
   function blank() {
     return { v: VERSION, act: 3, room: null, spawn: null,
-             flags: {}, items: [], quest: { done: {}, counts: {} },
+             flags: {}, items: [], coins: 0, counts: {}, equip: Object.assign({}, DEFAULT_EQUIP),
+             quest: { done: {}, counts: {} },
              quiz: null, best: {}, stamp: 0 };
+  }
+
+  function isDefault(item) {
+    var slot;
+    for (slot in DEFAULT_EQUIP) if (DEFAULT_EQUIP[slot] === item) return true;
+    return false;
   }
 
   /* Merge defaults so partial/old saves never crash downstream code. */
@@ -59,6 +67,11 @@
     if (s.spawn === undefined) s.spawn = null;
     if (!s.flags || typeof s.flags !== 'object') s.flags = {};
     if (!Array.isArray(s.items)) s.items = [];
+    if (typeof s.coins !== 'number' || !isFinite(s.coins)) s.coins = 0;
+    if (!s.counts || typeof s.counts !== 'object') s.counts = {};
+    if (!s.equip || typeof s.equip !== 'object') s.equip = {};
+    var slot;
+    for (slot in DEFAULT_EQUIP) if (typeof s.equip[slot] !== 'string') s.equip[slot] = DEFAULT_EQUIP[slot];
     if (!s.quest || typeof s.quest !== 'object') s.quest = { done: {}, counts: {} };
     if (!s.quest.done || typeof s.quest.done !== 'object') s.quest.done = {};
     if (!s.quest.counts || typeof s.quest.counts !== 'object') s.quest.counts = {};
@@ -69,6 +82,9 @@
       v: s.v, act: s.act, room: s.room, spawn: s.spawn,
       flags: Object.assign({}, s.flags),
       items: s.items.slice(),
+      coins: Math.max(0, s.coins),
+      counts: Object.assign({}, s.counts),
+      equip: Object.assign({}, DEFAULT_EQUIP, s.equip),
       quest: { done: Object.assign({}, s.quest.done), counts: Object.assign({}, s.quest.counts) },
       quiz: s.quiz ? Object.assign({}, s.quiz) : null,
       best: Object.assign({}, s.best),
@@ -90,7 +106,7 @@
   }
 
   /* ── migration ──────────────────────────────────────────────────
-     Runs oldest-first so a v1 file can climb to v4 through every step
+     Runs oldest-first so a v1 file can climb to v3 through every step
      rather than needing an N×N table of direct conversions. */
   var STEPS = {
     /* 1: remap old rank names (S+..D-) to Deltarune ranks (T..Z). */
@@ -118,10 +134,23 @@
         s.flags.quiz_rank = MAP[s.flags.quiz_rank];
       s.v = 2;
       return s;
+    },
+    2: function (s) {
+      /* Add the item fields to a snapshot; the parsed save remains intact. */
+      var next = Object.assign({}, s);
+      next.coins = typeof s.coins === 'number' && isFinite(s.coins) ? Math.max(0, s.coins) : 0;
+      next.counts = s.counts && typeof s.counts === 'object' ? Object.assign({}, s.counts) : {};
+      next.equip = Object.assign({}, DEFAULT_EQUIP, s.equip && typeof s.equip === 'object' ? s.equip : {});
+      next.v = 3;
+      return next;
     }
   };
 
   function migrate(s) {
+    /* Migration steps receive a private snapshot, never the parsed object. */
+    s = Object.assign({}, s);
+    s.flags = Object.assign({}, s.flags || {});
+    s.quiz = s.quiz && typeof s.quiz === 'object' ? Object.assign({}, s.quiz) : s.quiz;
     var guard = 0;
     while (s.v < VERSION && guard++ < 50) {
       var step = STEPS[s.v];
@@ -221,15 +250,68 @@
     },
     flagged: function (k) { return !!mem.flags[k]; },
 
+    coins: function () { return mem.coins; },
+    addCoins: function (n) {
+      n = Number(n);
+      if (!isFinite(n)) n = 0;
+      mem.coins = Math.max(0, mem.coins + n);
+      write(true);
+      return mem.coins;
+    },
+    spend: function (n) {
+      n = Number(n);
+      if (!isFinite(n) || n < 0 || mem.coins < n) return false;
+      mem.coins -= n;
+      write(true);
+      return true;
+    },
+    count: function (item) {
+      var n = Number(mem.counts[item]) || 0;
+      if (NEU.items && NEU.items.get) {
+        var def = NEU.items.get(item);
+        if (def && def.kind === 'heal' && n === 0 && mem.items.indexOf(item) >= 0) return 1;
+      }
+      return n || (mem.items.indexOf(item) >= 0 ? 1 : 0);
+    },
+
     give: function (item) {
-      if (mem.items.indexOf(item) < 0) { mem.items.push(item); write(true); }
+      var def = NEU.items && NEU.items.get ? NEU.items.get(item) : null;
+      if (def && def.kind === 'heal') {
+        mem.counts[item] = NEU.save.count(item) + 1;
+        if (mem.items.indexOf(item) < 0) mem.items.push(item);
+        write(true);
+      } else if (mem.items.indexOf(item) < 0) { mem.items.push(item); write(true); }
     },
     take: function (item) {
+      var def = NEU.items && NEU.items.get ? NEU.items.get(item) : null;
+      if (def && def.kind === 'heal') {
+        var left = NEU.save.count(item);
+        if (left > 0) {
+          mem.counts[item] = left - 1;
+          if (!mem.counts[item]) {
+            delete mem.counts[item];
+            var hi = mem.items.indexOf(item);
+            if (hi >= 0) mem.items.splice(hi, 1);
+          }
+          write(true);
+        }
+        return;
+      }
       var i = mem.items.indexOf(item);
       if (i >= 0) { mem.items.splice(i, 1); write(true); }
     },
-    has: function (item) { return mem.items.indexOf(item) >= 0; },
+    has: function (item) { return NEU.save.count(item) > 0 || isDefault(item); },
     items: function () { return mem.items.slice(); },
+    equip: function (slot, item) {
+      var kind = slot === 'melee' ? 'melee' : slot === 'ranged' ? 'ranged' :
+        slot === 'spell1' || slot === 'spell2' ? 'spell' : null;
+      var def = NEU.items && NEU.items.get ? NEU.items.get(item) : null;
+      if (!kind || !def || def.kind !== kind || (!isDefault(item) && !NEU.save.has(item))) return false;
+      mem.equip[slot] = item;
+      write(true);
+      return true;
+    },
+    equipped: function (slot) { return mem.equip[slot] || DEFAULT_EQUIP[slot] || null; },
 
     /* Endless-mode personal bests. Only ever moves up. */
     best: function (game, score) {

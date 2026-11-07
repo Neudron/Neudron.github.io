@@ -369,7 +369,7 @@
 
   function step(now) {
     if (!running) return;
-    raf = requestAnimationFrame(step);
+    if (!NEU.kernel) raf = requestAnimationFrame(step);
     var dt = Math.min(0.033, (now - last) / 1000); last = now;
     if (NEU.juice && NEU.juice.frozen()) { draw(now); return; }
 
@@ -1006,10 +1006,12 @@
        library would tick a step you never earned. */
     if (NEU.quest) { if (!endless) NEU.quest.mark('smash'); NEU.quest.lock(true); }
     if (endless) say('the light is going. see how far you get.');
-    raf = requestAnimationFrame(step);
+    if (!NEU.kernel) raf = requestAnimationFrame(step);
+    if (NEU.kernel) NEU.kernel.push('dark');
   }
   function close() {
-    cancelAnimationFrame(raf);   /* close+reopen inside one frame must not run two loops */
+    if (!NEU.kernel) cancelAnimationFrame(raf);   /* close+reopen inside one frame must not run two loops */
+    if (NEU.kernel && NEU.kernel.current() === 'dark') NEU.kernel.pop();
     if (endless && NEU.save) NEU.save.best('dark', walked / 8);
     running = false;
     endless = false;
@@ -1068,4 +1070,10 @@
     get through() { return through; },
     get fixed() { return fixed; }
   };
+  if (NEU.kernel) NEU.kernel.register('dark', {
+    tick: function (dt) { if (running) step(performance.now()); },
+    open: open, close: close,
+    running: function () { return running; }
+  });
+
 })();

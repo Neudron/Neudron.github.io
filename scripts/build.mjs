@@ -16,21 +16,31 @@ const exists = async (p) => { try { await fs.access(p); return true; } catch { r
 
 const SHELL = [
   'js/core/motion.js', 'js/data/data.js', 'js/page/main.js', 'js/page/stars.js',
-  'js/core/quest.js', 'js/core/save.js', 'js/core/keys.js', 'js/core/juice.js',
+  'js/core/quest.js', 'js/core/save.js', 'js/core/keys.js', 'js/core/juice.js', 'js/core/rand.js', 'js/core/kernel.js',
   'js/game/sword.js', 'js/game/sans.js', 'js/core/music.js', 'js/core/perf.js',
   'js/core/settings.js', 'js/core/touch.js', 'js/core/dev.js'
 ];
 const GAME = [
-  'js/core/danmaku.js', 'js/data/sheets.js', 'js/core/engine-look.js',
-  'js/core/engine-doors.js', 'js/core/engine-kinds.js', 'js/core/engine.js',
-  'js/game/bullet.js', 'js/game/dark.js', 'js/act4/act4.js',
-  'js/act4/look-woods.js', 'js/act4/look-castle.js', 'js/act4/rooms-a.js',
-  'js/act4/summon.js', 'js/act4/look-city.js', 'js/act4/rooms-d.js',
-  'js/act4/shop.js', 'js/act4/scal-attacks.js', 'js/act4/boss-scal.js',
-  'js/act4/scal-worm.js', 'js/act4/scal-seekers.js', 'js/act4/look-prize.js',
-  'js/act4/rooms-g.js', 'js/act4/quiz.js', 'js/act4/rhythm.js',
-  'js/act4/craft.js', 'js/act4/boss-polt.js', 'js/act4/crack.js',
-  'js/act4/inventory.js', 'js/game/deck.js'
+  'js/data/items.js', 'js/core/danmaku.js', 'js/core/kit.js',
+  'js/data/sheets.js', 'js/core/engine-look.js', 'js/core/engine-doors.js',
+  'js/core/engine-kinds.js', 'js/core/engine.js', 'js/core/plat.js',
+  'js/act4/look-dungeon.js', 'js/act4/dungeon.js', 'js/act4/look-mountain.js',
+  'js/act4/mountain.js', 'js/act4/rooms-p.js', 'js/game/bullet.js',
+  'js/game/dark.js', 'js/act4/act4.js', 'js/act4/look-woods.js',
+  'js/act4/look-castle.js', 'js/act4/rooms-a.js', 'js/act4/summon.js',
+  'js/act4/look-city.js', 'js/act4/rooms-d.js', 'js/act4/rooms-e.js',
+  'js/act4/note.js', 'js/act4/photo.js', 'js/act4/look-savanna.js',
+  'js/act4/snail.js', 'js/act4/finale.js', 'js/act4/chair.js',
+  'js/act4/look-exo.js', 'js/act4/chase.js', 'js/act4/rooms-s.js',
+  'js/act4/shop.js', 'js/act4/mage.js', 'js/act4/cards.js',
+  'js/act4/scal-attacks.js', 'js/act4/boss-scal.js', 'js/act4/scal-worm.js',
+  'js/act4/scal-seekers.js', 'js/act4/look-prize.js', 'js/act4/rooms-g.js',
+  'js/act4/quiz.js', 'js/act4/rhythm.js', 'js/act4/craft.js',
+  'js/act4/polt-attacks.js', 'js/act4/boss-polt.js', 'js/act4/exo-thanatos.js',
+  'js/act4/exo-combos.js', 'js/act4/boss-exo.js', 'js/act4/boss-draedon.js',
+  'js/act4/exo-ares.js', 'js/act4/exo-twins.js', 'js/act4/crack.js',
+  'js/act4/cart.js', 'js/act4/elevator.js', 'js/act4/inventory.js',
+  'js/game/deck.js'
 ];
 const FILES = [
   '404.html', 'CNAME', '.nojekyll', 'og.png', 'robots.txt', 'sitemap.xml',

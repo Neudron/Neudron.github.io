@@ -309,6 +309,7 @@
   function open() {
     if (open_) return;
     open_ = true;
+    if (NEU.kernel) NEU.kernel.push('deck');
     wrap.hidden = false;
     NEU.activeMinigame = 'deck';        /* the room underneath must not move or take Escape */
     document.body.classList.add('is-playing');
@@ -324,6 +325,7 @@
   function close() {
     if (!open_) return;
     open_ = false;
+    if (NEU.kernel && NEU.kernel.current() === 'deck') NEU.kernel.pop();
     clearInterval(tick);
     wrap.classList.remove('is-in');
     wrap.hidden = true;
@@ -363,6 +365,12 @@
   if (elPlay) elPlay.addEventListener('click', launch);
   var q = document.getElementById('deckQuit');
   if (q) q.addEventListener('click', close);
+
+  if (NEU.kernel) NEU.kernel.register('deck', {
+    tick: function (dt) {},
+    open: open, close: close,
+    running: function () { return open_; }
+  });
 
   NEU.deck = { open: open, close: close,
                get running() { return open_; },

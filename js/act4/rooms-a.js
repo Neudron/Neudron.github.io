@@ -179,6 +179,69 @@
     return [{ t: 'woodsfloor', x: 0, y: 0 }, { t: 'woodsfx', x: 0, y: h - 1 }];
   }
 
+  /* The crack back to the dungeon. It is a picture (kind `crack`) plus
+     a trigger on the same cell: the engine only steps `t: 'trigger'`,
+     and only draws everything else. The lit path at 13,7 is open
+     ground; the campfire one cell north is solid, so the portal cannot
+     sit on the fire. Sheen steps every 400 ms (under 3 Hz) and holds
+     still when motion is reduced. */
+  /* One open per visit to the cell. Esc while still standing on it
+     must not open the dungeon again; walking off re-arms it. */
+  var crackLatched = false;
+  function onCrack(api) {
+    var p = api && api.player, T = (NEU.engine && NEU.engine.TILE) || 16;
+    var x0, y0;
+    if (!p) return false;
+    x0 = 13 * T; y0 = 7 * T;
+    return p.x >= x0 && p.x <= x0 + T && p.y >= y0 && p.y <= y0 + T;
+  }
+  function woodsCrackArm(api) {
+    if (!onCrack(api)) crackLatched = false;
+  }
+  function woodsCrackOpen() {
+    if (crackLatched) return;
+    crackLatched = true;
+    if (NEU.plat && NEU.plat.open) NEU.plat.open('d0');
+  }
+  function crackReduced() {
+    try {
+      if (NEU.motion && NEU.motion.reduced) return NEU.motion.reduced();
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) { return false; }
+  }
+  if (NEU.engineKinds && NEU.engineKinds.kind) {
+    NEU.engineKinds.kind('crack', {
+      interactive: function () { return false; },
+      draw: function (g, e, d) {
+        var S = d.S || 1, x = (d.sx - 6 * S) | 0, y = (d.sy - 14 * S) | 0;
+        var cols = ['#2A0A12', '#8C2F4A', '#C2405F', '#FF6B6B', '#FFE3E3'];
+        var rows = [
+          '..3.........',
+          '.3442.......',
+          '344421......',
+          '.3444211....',
+          '..3442211...',
+          '...3422111..',
+          '....322111..',
+          '.....22111..',
+          '......111...'
+        ];
+        var band = crackReduced() ? 3 : (((d.now || 0) / 400) | 0) % 8;
+        var r, c, ch;
+        for (r = 0; r < rows.length; r++) {
+          for (c = 0; c < rows[r].length; c++) {
+            ch = rows[r].charAt(c);
+            if (ch === '.') continue;
+            g.fillStyle = (c === band) ? cols[4] : cols[(ch - 1) | 0];
+            g.fillRect(x + c * S, y + r * S, S, S);
+          }
+        }
+      },
+      width: function () { return 12; },
+      light: function () { return { r: 28, col: '#FF6B6B', glow: 0.28 }; }
+    });
+  }
+
   /* ══ A1 — where you arrive ═══════════════════════════════════════
      Deliberately small and almost empty. One route out, lit. The
      first thing a player does in an unfamiliar space is look for the
@@ -191,7 +254,65 @@
      in the room, so it is the only thing to do. Three lanterns hang
      along it ("somebody has lit a path"). The exit is the far end of
      that tunnel, IN the east wall: walk to the end of the light and you
-     are through. Arriving back from A2 puts you one step inside it. */
+     are through. Arriving back from A2 puts you one step inside it.
+     After the TV is restored, a red-chrome crack stands on the lit
+     path. Stepping on it opens the dungeon surface. The same flag
+     puts a hooded figure on the cold campfire; they have no face,
+     only two pale eyes, and one line about a painting. The list is a
+     getter so the flag is read on each visit, not at load. */
+  function a1Entities() {
+    var list = woodsLook(13).concat([
+      { t: 'save', x: 6, y: 5 },
+      { t: 'npc', x: 17, y: 6, colour: '#4A4560', skin: 'sign1', look: 'signpost',
+        lines: ['a signpost. the writing has run.',
+                'you can make out one word. "ahead".'] },
+      { t: 'exit', x: 23, y: 7, to: 'a2_path', spawn: 'west', style: 'tunnel' },
+      P('moon', 10, 7),
+      P('campfire', 13, 4, { solid: true }),
+      P('lantern', 12, 6, { solid: true }), P('lantern', 16, 8, { solid: true }), P('lantern', 20, 6),
+      P('oak', 4, 3), P('oak', 16, 2, { big: 1 }), P('pine', 7, 2, { h: 70 }), P('pine', 19, 4),
+      P('dead', 21, 9), P('oak', 3, 9), P('pine', 18, 10, { h: 56 }), P('oak', 6, 11),
+      P('stump', 4, 7, { solid: true }), P('rock', 15, 9, { solid: true }), P('ferns', 7, 9),
+      P('shrooms', 4, 6), P('shrooms', 14, 3, { seed: 1 }), P('ferns', 12, 2), P('bush', 3, 5),
+      P('bush', 22, 8), P('ferns', 9, 10)
+    ]);
+    if (NEU.save && NEU.save.flagged && NEU.save.flagged('tv_restored')) {
+      list.push({ t: 'trigger', x: 0, y: 0, w: 24, h: 13, run: woodsCrackArm });
+      list.push({ t: 'crack', x: 13, y: 7 });
+      list.push({ t: 'trigger', x: 13, y: 7, run: woodsCrackOpen });
+      list.push({ t: 'npc', x: 13, y: 5, colour: '#100E16', skin: 'hood', look: 'hood', who: 'narr',
+        run: function (c) {
+          if (c.has('pkg_misleading')) {
+            if (NEU.save) NEU.save.take('pkg_misleading');
+            c.give('dad_card');
+            c.flag('dad_door', 1);
+            if (NEU.juice && NEU.juice.hit) NEU.juice.hit('small');
+            c.say(['he takes the package. the card he gives you has your dad\'s name on it.'], 'narr');
+            return;
+          }
+          c.say(['* ...fogor something in the dungeon. behind a painting.'], 'narr');
+        } });
+    }
+    return list;
+  }
+  /* Cloak and cowl are one black. The face is empty except the eyes. */
+  function hoodDraw(g, e, d) {
+    var S = (d && d.S) || 1, x = d.sx, y = d.sy;
+    try { g.imageSmoothingEnabled = false; } catch (err) {}
+    function R(px, py, w, h, col) {
+      g.fillStyle = col;
+      g.fillRect((x + px * S) | 0, (y + py * S) | 0, (w * S) | 0, (h * S) | 0);
+    }
+    R(-6, -3, 12, 3, '#1A1420');
+    R(-5, -20, 10, 18, '#100E16');
+    R(-4, -26, 8, 8, '#100E16');
+    R(-1, -24, 2, 8, '#100E16');
+    R(-2, -18, 2, 2, '#E4E0D4');
+    R(1, -18, 2, 2, '#E4E0D4');
+  }
+  if (NEU.roomArt && NEU.roomArt.skins) {
+    NEU.roomArt.skins.hood = { width: 0, draw: hoodDraw };
+  }
   E.register('a1_clearing', {
     tileset: 'woods',
     tiles: [
@@ -213,22 +334,9 @@
     mist: [9, 3],
     spawns: { default: { x: 10, y: 7, face: 'right' }, east: { x: 22, y: 7, face: 'left' },
               north: { x: 10, y: 3, face: 'down' } },
-    entities: woodsLook(13).concat([
-      { t: 'save', x: 6, y: 5 },
-      { t: 'npc', x: 17, y: 6, colour: '#4A4560', skin: 'sign1', look: 'signpost',
-        lines: ['a signpost. the writing has run.',
-                'you can make out one word. "ahead".'] },
-      { t: 'exit', x: 23, y: 7, to: 'a2_path', spawn: 'west', style: 'tunnel' },
-      P('moon', 10, 7),
-      P('campfire', 13, 4, { solid: true }),
-      P('lantern', 12, 6, { solid: true }), P('lantern', 16, 8, { solid: true }), P('lantern', 20, 6),
-      P('oak', 4, 3), P('oak', 16, 2, { big: 1 }), P('pine', 7, 2, { h: 70 }), P('pine', 19, 4),
-      P('dead', 21, 9), P('oak', 3, 9), P('pine', 18, 10, { h: 56 }), P('oak', 6, 11),
-      P('stump', 4, 7, { solid: true }), P('rock', 15, 9, { solid: true }), P('ferns', 7, 9),
-      P('shrooms', 4, 6), P('shrooms', 14, 3, { seed: 1 }), P('ferns', 12, 2), P('bush', 3, 5),
-      P('bush', 22, 8), P('ferns', 9, 10)
-    ]),
+    get entities() { return a1Entities(); },
     onEnter: function (c) {
+      crackLatched = false;
       if (c.flagged('a1_seen')) return;
       c.flag('a1_seen', 1);
       say(c, ['it is very dark, and the ground is very cold.',

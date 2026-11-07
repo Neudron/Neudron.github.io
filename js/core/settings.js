@@ -138,6 +138,9 @@
       l.appendChild(s);
     }
 
+    var dots = document.createElement('span');
+    dots.className = 'sett__dots';
+
     var sw = document.createElement('button');
     sw.className = 'sett__sw';
     sw.id = id;
@@ -145,13 +148,23 @@
     sw.setAttribute('role', 'switch');
     sw.setAttribute('aria-labelledby', l.id);
     sw.setAttribute('aria-checked', 'false');
+
+    function syncText() {
+      var on = sw.getAttribute('aria-checked') === 'true';
+      sw.textContent = '◀ ' + (on ? 'ON' : 'OFF') + ' ▶';
+    }
+    sw._sync = syncText;
+
     sw.addEventListener('click', function () {
       var on = sw.getAttribute('aria-checked') === 'true';
       sw.setAttribute('aria-checked', String(!on));
+      syncText();
       cb(!on);
     });
+    syncText();
 
     r.appendChild(l);
+    r.appendChild(dots);
     r.appendChild(sw);
     return r;
   }
@@ -174,6 +187,18 @@
       l.appendChild(s);
     }
 
+    var dots = document.createElement('span');
+    dots.className = 'sett__dots';
+
+    var wrap = document.createElement('div');
+    wrap.className = 'sett__val-wrap';
+    var leftArr = document.createElement('span');
+    leftArr.className = 'sett__arrow';
+    leftArr.textContent = '◀';
+    var rightArr = document.createElement('span');
+    rightArr.className = 'sett__arrow';
+    rightArr.textContent = '▶';
+
     var rg = document.createElement('input');
     rg.className = 'sett__rng';
     rg.id = id;
@@ -191,8 +216,13 @@
        an old save's "no shake" into 100 % before anyone touched it. */
     vtext();
 
+    wrap.appendChild(leftArr);
+    wrap.appendChild(rg);
+    wrap.appendChild(rightArr);
+
     r.appendChild(l);
-    r.appendChild(rg);
+    r.appendChild(dots);
+    r.appendChild(wrap);
     return r;
   }
 
@@ -209,6 +239,10 @@
     var s = document.createElement('small');
     s.textContent = hint;
     l.appendChild(s);
+
+    var dots = document.createElement('span');
+    dots.className = 'sett__dots';
+
     var g = document.createElement('div');
     g.className = 'sett__seg';
     g.id = id;
@@ -244,6 +278,7 @@
     g._paint = paint;
     paint();
     r.appendChild(l);
+    r.appendChild(dots);
     r.appendChild(g);
     return r;
   }
@@ -277,45 +312,85 @@
     apply(); refresh();
   }
 
-  /* One line per row from keys.js. A click asks for the next key; the
-     answer is a swap or a refusal, and the note says which. */
+  var currentCat = 'config';
+  var catBtns = [];
+  var panes = {};
+
+  function selectCategory(catName) {
+    currentCat = catName;
+    for (var i = 0; i < catBtns.length; i++) {
+      var b = catBtns[i];
+      var isSel = b.getAttribute('data-cat') === catName;
+      b.setAttribute('aria-selected', String(isSel));
+      if (isSel) b.classList.add('is-active');
+      else b.classList.remove('is-active');
+      b.tabIndex = isSel ? 0 : -1;
+    }
+    for (var name in panes) {
+      if (panes.hasOwnProperty(name)) {
+        panes[name].hidden = (name !== catName);
+      }
+    }
+  }
+
+  var DEFS_INFO = [
+    { def: 'w', title: 'W — move up — rooms, fights, dark walk' },
+    { def: 'a', title: 'A — move left — rooms, fights, dark walk' },
+    { def: 's', title: 'S — move down — rooms, fights, dark walk' },
+    { def: 'd', title: 'D — move right — rooms, fights, dark walk' },
+    { def: 'z', title: 'Z — confirm / melee / hold: ranged — rooms, fights, pot, shop' },
+    { def: 'x', title: 'X — cancel / skip text / dash — rooms, fights' },
+    { def: 'Shift', title: 'Shift — focus / slow move — fights' },
+    { def: 'c', title: 'C — fight menu / equip — fights, inventory' },
+    { def: 'r', title: 'R — reset room — puzzle rooms' },
+    { def: 'i', title: 'I — items / inventory — Act IV' },
+    { def: 'Tab', title: 'Tab — quest log — overworld' },
+    { def: 'm', title: 'M — mute / unmute — global' },
+    { def: 'e', title: 'E — interact — dark walk' }
+  ];
+
+  /* Keybinds page: lists every DEFS action with human label and minigames.
+     Enter or click starts capture; Esc cancels; conflicts swap. */
   function drawKeys() {
     var host = document.getElementById('settKeys');
     if (!host || !NEU.keys) return;
     host.textContent = '';
-    NEU.keys.rows().forEach(function (r) {
+    DEFS_INFO.forEach(function (info) {
       var line = document.createElement('div');
       line.className = 'sett__row';
       var l = document.createElement('span');
       l.className = 'sett__lbl';
-      l.textContent = r.label;
+      l.textContent = info.title;
       line.appendChild(l);
-      if (r.fixed) {
-        var k = document.createElement('kbd');
-        k.textContent = r.key;
-        line.appendChild(k);
-      } else {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'sett__key';
-        b.textContent = r.key;
-        b.addEventListener('click', function () {
-          var note = document.getElementById('settKeyNote');
-          b.textContent = 'press a key…';
-          NEU.keys.capture(function (k) {
-            if (k !== null) {
-              var res = NEU.keys.set(r.def, k);
-              var other = res.swapped && NEU.keys.rows().filter(function (x) {
-                return x.def === res.swapped;
-              })[0];
+
+      var dots = document.createElement('span');
+      dots.className = 'sett__dots';
+      line.appendChild(dots);
+
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = info.def === 'e' ? 'sett__key-ext' : 'sett__key';
+      var curKey = NEU.keys.label(info.def);
+      b.textContent = '◀ ' + (curKey ? curKey.toUpperCase() : info.def) + ' ▶';
+
+      function startCapture() {
+        var note = document.getElementById('settKeyNote');
+        b.textContent = 'press a key…';
+        NEU.keys.capture(function (k) {
+          if (k !== null) {
+            var res = NEU.keys.set(info.def, k);
+            var other = res.swapped;
+            if (note) {
               note.textContent = !res.ok ? res.why :
-                other ? 'swapped with ' + other.label + '.' : '';
+                other ? 'swapped with ' + other + '.' : '';
             }
-            drawKeys();
-          });
+          }
+          drawKeys();
         });
-        line.appendChild(b);
       }
+
+      b.addEventListener('click', startCapture);
+      line.appendChild(b);
       host.appendChild(line);
     });
   }
@@ -345,55 +420,125 @@
     box.appendChild(h);
     box.appendChild(x);
 
-    var st = document.createElement('p');
-    st.className = 'sett__note sett__note--top';
-    st.id = 'settDevice';
-    st.textContent = deviceLine();
-    box.appendChild(st);
+    var twoPane = document.createElement('div');
+    twoPane.className = 'sett__two-pane';
 
-    section(box, 'motion & flashing');
-    box.appendChild(seg('settMotion', 'motion',
+    var catsNav = document.createElement('nav');
+    catsNav.className = 'sett__cats';
+    catsNav.setAttribute('role', 'tablist');
+    catsNav.setAttribute('aria-label', 'settings categories');
+
+    var panesContainer = document.createElement('div');
+    panesContainer.className = 'sett__panes';
+
+    var CATEGORIES = [
+      ['config', 'Config'],
+      ['keybinds', 'Keybinds'],
+      ['sound', 'Sound'],
+      ['display', 'Display'],
+      ['accessibility', 'Accessibility']
+    ];
+
+    catBtns = [];
+    panes = {};
+
+    CATEGORIES.forEach(function (cat) {
+      var catId = cat[0];
+      var catLabel = cat[1];
+
+      var catBtn = document.createElement('button');
+      catBtn.type = 'button';
+      catBtn.className = 'sett__cat' + (catId === currentCat ? ' is-active' : '');
+      catBtn.setAttribute('data-cat', catId);
+      catBtn.setAttribute('role', 'tab');
+      catBtn.setAttribute('aria-selected', catId === currentCat ? 'true' : 'false');
+      catBtn.tabIndex = catId === currentCat ? 0 : -1;
+      catBtn.textContent = catLabel;
+
+      catBtn.addEventListener('click', function () {
+        selectCategory(catId);
+        catBtn.focus();
+      });
+
+      catsNav.appendChild(catBtn);
+      catBtns.push(catBtn);
+
+      var p = document.createElement('div');
+      p.className = 'sett__pane';
+      p.id = 'pane-' + catId;
+      p.setAttribute('role', 'tabpanel');
+      p.setAttribute('aria-label', catLabel);
+      p.hidden = (catId !== currentCat);
+      panes[catId] = p;
+      panesContainer.appendChild(p);
+    });
+
+    /* 1. Config pane */
+    var pConfig = panes.config;
+    pConfig.appendChild(seg('settMotion', 'motion',
         'calm keeps things still unless you move them. the game works either way.',
         [['auto', 'device'], ['full', 'full'], ['reduced', 'calm']],
         function () { return M.pref; },
         function (v) { M.set(v, null); refresh(); }));
-    box.appendChild(seg('settFlashing', 'flashing',
+    pConfig.appendChild(seg('settFlashing', 'flashing',
         'calm dims impacts instead of flashing the screen white.',
         [['auto', 'match motion'], ['full', 'full'], ['reduced', 'calm']],
         function () { return M.flashPref; },
         function (v) { M.set(null, v); refresh(); }));
-    box.appendChild(slider('settShake', 'screen shake',
+    pConfig.appendChild(slider('settShake', 'screen shake',
         'how hard hits rock the scene. zero is off. calm motion turns it off too.',
         shakePct,
         function (v) { if (NEU.save) NEU.save.flag(K_SHAKEPCT, v); apply(); },
         function (v) {
-          /* a small preview of the new strength, on the panel itself */
           if (v > 0 && !reducedNow() && NEU.juice && NEU.juice.shakeEl) NEU.juice.shakeEl(box, 'small');
         }));
-    box.appendChild(row('settHitstop', 'reduce hit-stop',
+    pConfig.appendChild(row('settHitstop', 'reduce hit-stop',
         'impacts land without the held frame', function (on) {
       set(K_STOP, on);
     }));
-    box.appendChild(row('settParticles', 'reduce particles',
+    pConfig.appendChild(row('settParticles', 'reduce particles',
         'hits leave no debris behind', function (on) {
       set(K_PART, on);
     }));
 
-    section(box, 'display');
-    box.appendChild(row('settText', 'larger text',
-        'zooms the whole page 1.25x', function (on) {
-      set(K_TEXT, on);
-    }));
+    /* 2. Keybinds pane */
+    var pKeys = panes.keybinds;
+    var kh = document.createElement('div');
+    kh.id = 'settKeys';
+    pKeys.appendChild(kh);
+    var kn = document.createElement('p');
+    kn.className = 'sett__note';
+    kn.id = 'settKeyNote';
+    kn.setAttribute('aria-live', 'polite');
+    pKeys.appendChild(kn);
 
-    section(box, 'sound');
-    /* On = sound ON, the same way the lever in the corner reads. */
-    box.appendChild(row('settSound', 'sound',
+    var resetRow = document.createElement('div');
+    resetRow.className = 'sett__row';
+    var resetLbl = document.createElement('span');
+    resetLbl.className = 'sett__lbl';
+    resetLbl.textContent = 'reset all keybinds';
+    var resetDots = document.createElement('span');
+    resetDots.className = 'sett__dots';
+    var kr = document.createElement('button');
+    kr.type = 'button'; kr.className = 'sett__act'; kr.id = 'settKeysReset';
+    kr.textContent = 'reset all keybinds';
+    kr.addEventListener('click', function () {
+      if (NEU.keys) NEU.keys.reset();
+      kn.textContent = 'controls back to default.';
+      drawKeys();
+    });
+    resetRow.appendChild(resetLbl);
+    resetRow.appendChild(resetDots);
+    resetRow.appendChild(kr);
+    pKeys.appendChild(resetRow);
+
+    /* 3. Sound pane */
+    var pSound = panes.sound;
+    pSound.appendChild(row('settSound', 'sound',
         'all sound. m turns it on and off from anywhere.', function (on) {
       mute(!on);
     }));
-    /* The soundtrack is synthesised, so this is a real level. Reads the
-       saved level, never NEU.music.volume, which is zero while muted. */
-    box.appendChild(slider('settMusic', 'music',
+    pSound.appendChild(slider('settMusic', 'music',
         'the soundtrack. drag to zero for silence.',
         function () { return num(K_MUSIC, 55); },
         function (v) {
@@ -401,42 +546,29 @@
           else if (NEU.save) NEU.save.flag(K_MUSIC, v);
         }));
 
-    section(box, 'game');
-    /* quiz.js reads it as each question starts, so a switch thrown
-       mid-question changes the next question, not this one. */
-    box.appendChild(row('settRelaxed', 'relaxed quiz timer',
+    /* 4. Display pane */
+    var pDisplay = panes.display;
+    pDisplay.appendChild(row('settText', 'larger text',
+        'zooms the whole page 1.25x', function (on) {
+      set(K_TEXT, on);
+    }));
+
+    /* 5. Accessibility pane */
+    var pA11y = panes.accessibility;
+    var st = document.createElement('p');
+    st.className = 'sett__note sett__note--top';
+    st.id = 'settDevice';
+    st.textContent = deviceLine();
+    pA11y.appendChild(st);
+
+    pA11y.appendChild(row('settRelaxed', 'relaxed quiz timer',
         'twenty-four seconds a question, not twelve', function (on) {
       set(K_RELAX, on);
     }));
-    /* Thumb controls appear on their own on a touch screen. This is
-       the override for the cases auto-detection gets wrong. */
-    box.appendChild(row('settTouch', 'thumb controls',
+    pA11y.appendChild(row('settTouch', 'thumb controls',
         'on-screen stick and buttons for the game scenes', function (on) {
       if (NEU.touch) NEU.touch.set(on ? 'on' : 'off');
     }));
-
-    /* Rebind here. Rows come from keys.js, so a verb the player has not
-       met stays ??? until it is revealed. */
-    if (NEU.keys) {
-      section(box, 'controls');
-      var kh = document.createElement('div');
-      kh.id = 'settKeys';
-      box.appendChild(kh);
-      var kn = document.createElement('p');
-      kn.className = 'sett__note';
-      kn.id = 'settKeyNote';
-      kn.setAttribute('aria-live', 'polite');
-      box.appendChild(kn);
-      var kr = document.createElement('button');
-      kr.type = 'button'; kr.className = 'sett__act'; kr.id = 'settKeysReset';
-      kr.textContent = 'reset controls';
-      kr.addEventListener('click', function () {
-        NEU.keys.reset();
-        kn.textContent = 'controls back to default.';
-        drawKeys();
-      });
-      box.appendChild(kr);
-    }
 
     var foot = document.createElement('div');
     foot.className = 'sett__foot';
@@ -450,13 +582,17 @@
     dflt.addEventListener('click', defaults);
     foot.appendChild(calm);
     foot.appendChild(dflt);
-    box.appendChild(foot);
+    pA11y.appendChild(foot);
 
-    var keys = document.createElement('p');
-    keys.className = 'sett__note';
-    keys.textContent = 'open this any time: the gear, or ctrl + shift + comma. ' +
-                       'settings save on this device.';
-    box.appendChild(keys);
+    twoPane.appendChild(catsNav);
+    twoPane.appendChild(panesContainer);
+    box.appendChild(twoPane);
+
+    var keysNote = document.createElement('p');
+    keysNote.className = 'sett__note';
+    keysNote.textContent = 'open this any time: the gear, or ctrl + shift + comma. ' +
+                           'settings save on this device.';
+    box.appendChild(keysNote);
 
     panel.appendChild(box);
     document.body.appendChild(panel);
@@ -532,6 +668,7 @@
     returnTo = document.activeElement;
     refresh();
     drawKeys();
+    selectCategory('config');
     panel.hidden = false;
     /* Settings opens over live rooms too — remember whether the room
        owned is-playing so close() hands it back instead of stealing it. */
@@ -540,7 +677,7 @@
     /* A single selector on purpose: a selector LIST comes back grouped
        by selector in jsdom, and the first match must be the first
        switch in DOM order, not the first element of the last group. */
-    var first = panel.querySelector('[role="radio"][tabindex="0"]');
+    var first = panel.querySelector('.sett__cat') || panel.querySelector('[role="radio"][tabindex="0"]');
     (first || panel.querySelector('.sett__x')).focus();
     requestAnimationFrame(function () { panel.classList.add('is-in'); });
   }
@@ -580,7 +717,74 @@
     if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey &&
         !e.altKey && !e.repeat && !typing()) mute(!state(K_MUTE));
     if (!open_ || !panel) return;
-    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); return; }
+
+    var inPanes = false;
+    var node = document.activeElement;
+    while (node && node !== panel) {
+      if (node.classList && (node.classList.contains('sett__panes') || node.classList.contains('sett__pane'))) {
+        inPanes = true;
+        break;
+      }
+      node = node.parentNode;
+    }
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (inPanes) {
+        var activeBtn = panel.querySelector('.sett__cat[aria-selected="true"]') || panel.querySelector('.sett__cat');
+        if (activeBtn) activeBtn.focus();
+      } else {
+        close();
+      }
+      return;
+    }
+
+    var catButtons = panel.querySelectorAll('.sett__cat');
+    var catIndex = -1;
+    for (var ci = 0; ci < catButtons.length; ci++) {
+      if (catButtons[ci] === document.activeElement) { catIndex = ci; break; }
+    }
+
+    if (catIndex >= 0) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        var nextCi = e.key === 'ArrowDown' ? (catIndex + 1) % catButtons.length : (catIndex - 1 + catButtons.length) % catButtons.length;
+        catButtons[nextCi].click();
+      } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        e.preventDefault();
+        var curPane = panes[currentCat];
+        if (curPane) {
+          var firstInPane = curPane.querySelector('button:not(:disabled), input:not(:disabled)');
+          if (firstInPane) firstInPane.focus();
+        }
+      }
+      return;
+    }
+
+    if (inPanes) {
+      if (e.key === 'ArrowLeft' && e.target && e.target.tagName !== 'INPUT') {
+        var actCat = panel.querySelector('.sett__cat[aria-selected="true"]') || panel.querySelector('.sett__cat');
+        if (actCat) {
+          e.preventDefault();
+          actCat.focus();
+          return;
+        }
+      }
+      if (e.target && e.target.type === 'range') {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          e.target.value = String(Math.max(+e.target.min, +e.target.value - (+e.target.step || 5)));
+          e.target.dispatchEvent(new Event('input', { bubbles: true }));
+          e.target.dispatchEvent(new Event('change', { bubbles: true }));
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          e.target.value = String(Math.min(+e.target.max, +e.target.value + (+e.target.step || 5)));
+          e.target.dispatchEvent(new Event('input', { bubbles: true }));
+          e.target.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+    }
   }, true);
   /* Capture, not bubble: the minigames bind ESC on window too, and a bubble
      listener runs after them, so their ESC branch would already have fired. */

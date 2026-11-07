@@ -30,10 +30,6 @@
   function V(v) { return v * 60 * K; }
   /* the pattern stream: Math.random until start() gives each fight its own seeded one */
   var RNG = Math.random;
-  function seeded(s) {
-    var x = (s >>> 0) || 1;
-    return function () { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return (x >>> 0) / 4294967296; };
-  }
   function rnd(a, b) { return a + RNG() * (b - a); }
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -2396,7 +2392,7 @@
     /* the fight begins: the lead-in, which is the Sepulcher's 270 f delay */
     start: function () {
       G = fresh(); acc = 0; K = A.AW / 2000;
-      RNG = seeded((Math.random() * 4294967296) >>> 0);
+      RNG = NEU.rand.seeded((Math.random() * 4294967296) >>> 0);
       begin('SummonSepulcher');
     },
     /* the fight is closed */

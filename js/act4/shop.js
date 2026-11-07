@@ -106,7 +106,18 @@
     say(item.quip);
   }
 
+  /* The win does not take the potion off the board. */
+  function ensureRecall() {
+    var i, back;
+    for (i = 0; i < STOCK.length; i++) if (STOCK[i].give === 'recall') return;
+    back = { name: 'Recall Potion', price: 'free', give: 'recall',
+      quip: 'it pulls you back to the last place you were safe.' };
+    back.glow = true;
+    STOCK.splice(3, 0, back);
+  }
+
   function open(step) {
+    ensureRecall();
     /* Remember who opened the board, but only on the way in: a second
        open() while the board is up must not overwrite it with a row from
        inside the board. */

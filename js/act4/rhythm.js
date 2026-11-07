@@ -64,6 +64,23 @@
     [[0,0],[0.5,1],[1,2],[1.5,3],[2,3],[2.5,2],[3,1],[3.5,0],
      [4,0],[4.5,2],[5,1],[5.5,3],[6,2],[6.5,0,1.5],[7,3],[7.5,1]]
   ];
+  /* Four sections of one song, beat 0 through SONG. Breaks are the dodge
+     start; the arrows ease out for 0.6 s before that and back after. */
+  var SECTIONS = 4, SONG = 104, EASE = 0.6, DODGE = 8;
+  var SEC = [0, 26, 52, 78];
+  var BREAK_AT = [14, 40, 92];
+  var ITEMS = [
+    [0.55, 1, 'bomb'], [7, 0, 'coin'], [8.2, 2, 'potion'], [9.4, 3, 'axe'],
+    [10.6, 0, 'mushroom'], [11.8, 1, 'recall'],
+    [33, 0, 'coin'], [34.2, 1, 'bomb'], [35.4, 2, 'potion'], [36.6, 3, 'axe'],
+    [59, 1, 'mushroom'], [60.5, 2, 'recall'], [62, 0, 'coin'],
+    [85, 3, 'axe'], [86.5, 1, 'bomb'], [88, 0, 'potion'], [103.6, 0, 'coin']
+  ];
+  var STALL = [
+    { id: 'recall', name: 'wormhole recall potion', price: 12 },
+    { id: 'potion', name: 'red potion', price: 6 },
+    { id: 'mushroom', name: 'odd mushroom', price: 4 }
+  ];
 
   var TAUNT = [
     ["you want the axe.", "the axe wants a reason."],
@@ -76,8 +93,13 @@
   var judgedT = 0;
   var keys = {};
   var S = { score: 0, combo: 0, health: 1, judgement: '', countdown: '', round: 0,
-            misses: 0, acc: 1, judged: 0, weight: 0 };
+            misses: 0, acc: 1, judged: 0, weight: 0,
+            section: 0, mode: 'chart', arrowA: 1, sway: 0, swayUntil: 0,
+            flip: 1, flipUntil: 0, blockLane: -1, blockUntil: 0,
+            soulx: 0, souly: 0, hazards: [] };
   var pops = [], splashes = [];
+  var soulF = null, hazBreak = -1, lastBrk = 0, loopSrc = null;
+  var stallOn = false, stallSel = 0;
   var confirmAt = [[-9, -9, -9, -9], [-9, -9, -9, -9]];   /* [his, mine][lane], audio time */
   var singAt = [-9, -9], singLane = [0, 0];
 
@@ -89,7 +111,30 @@
   function now() { return audio().currentTime; }
   function songPos() { return now() - t0; }
   function beatLen() { return 60 / BPM[round]; }
+  function blOf(sp) { return 60 / BPM[Math.min(sectionOf(sp), BPM.length - 1)]; }
   function ms(d) { return Math.floor(d * 1000 + 1e-6); }
+  function sectionOf(sp) {
+    var s = 0, i;
+    for (i = 0; i < SEC.length; i++) if (sp >= SEC[i]) s = i;
+    return s;
+  }
+  function breakPhase(sp) {
+    var i, b, u;
+    for (i = 0; i < BREAK_AT.length; i++) {
+      b = BREAK_AT[i];
+      if (sp >= b - EASE && sp < b) { u = (sp - (b - EASE)) / EASE; return { i: i, name: 'in', u: u }; }
+      if (sp >= b && sp < b + DODGE) return { i: i, name: 'dodge', u: 1 };
+      if (sp >= b + DODGE && sp < b + DODGE + EASE) {
+        u = (sp - (b + DODGE)) / EASE; return { i: i, name: 'out', u: u };
+      }
+    }
+    return null;
+  }
+  function songHasTail() {
+    var i;
+    for (i = 0; i < notes.length; i++) if (notes[i].t > 20) return true;
+    return false;
+  }
 
   function build(forYou) {
     var bl = beatLen(), off = forYou ? 4 : 0;
@@ -99,11 +144,62 @@
     });
   }
 
+  function appendSong() {
+    var i, s, bl, chart, n, t;
+    for (i = 0; i < ITEMS.length; i++) {
+      notes.push({ t: ITEMS[i][0], end: ITEMS[i][0], lane: ITEMS[i][1], mine: true,
+        hit: false, done: false, kind: ITEMS[i][2] });
+    }
+    for (s = 1; s < SECTIONS; s++) {
+      bl = 60 / BPM[Math.min(s, 2)];
+      chart = CHARTS[Math.min(s, 2)];
+      for (i = 0; i < chart.length; i++) {
+        n = chart[i];
+        t = SEC[s] + n[0] * bl;
+        notes.push({ t: t, end: t + (n[2] || 0) * bl, lane: n[1], mine: false, hit: false, done: false });
+        t = SEC[s] + (4 + n[0]) * bl;
+        notes.push({ t: t, end: t + (n[2] || 0) * bl, lane: n[1], mine: true, hit: false, done: false });
+      }
+    }
+  }
+  function resetFeel() {
+    S.section = 0; S.mode = 'chart'; S.arrowA = 1;
+    S.sway = 0; S.swayUntil = 0; S.flip = 1; S.flipUntil = 0;
+    S.blockLane = -1; S.blockUntil = 0; S.soulx = 0; S.souly = 0; S.hazards = [];
+    soulF = null; hazBreak = -1; lastBrk = 0;
+  }
+  function backing() {
+    if (NEU.settings && NEU.settings.muted) return;
+    try {
+      var a = audio(), bl = beatLen(), sr = a.sampleRate || 44100;
+      var frames = (sr * bl) | 0;
+      if (frames < 8) frames = 8;
+      var buf = a.createBuffer(1, frames, sr);
+      var data = buf.getChannelData(0);
+      var i, t;
+      for (i = 0; i < data.length; i++) {
+        t = i / sr;
+        data[i] = (t < 0.03 ? 0.45 : 0) + Math.sin(2 * Math.PI * 110 * t) * 0.18;
+      }
+      if (loopSrc && loopSrc.stop) { try { loopSrc.stop(); } catch (e1) {} }
+      var g = a.createGain();
+      g.gain.setValueAtTime(0.08, a.currentTime);
+      loopSrc = a.createBufferSource();
+      loopSrc.buffer = buf;
+      loopSrc.loop = true;
+      loopSrc.connect(g); g.connect(a.destination);
+      loopSrc.start(t0);
+      loopSrc.stop(t0 + SONG);
+    } catch (e2) {}
+  }
   function startRound() {
     t0 = now() + 4 * beatLen();           // four beats of 3-2-1-GO before beat 0
     notes = build(false).concat(build(true));
+    if (round === 0) appendSong();
     lastSp = 0; phase = 0; S.round = round; S.judgement = '';
+    resetFeel();
     say(TAUNT[round][0]);
+    backing();
   }
 
   function countLabel(sp) {
@@ -163,9 +259,20 @@
     lastSp = sp;
   }
 
+  function applyKind(n, sp) {
+    if (n.kind === 'coin') S.score += 200;
+    else if (n.kind === 'potion') addHealth(0.3);
+    else if (n.kind === 'axe') { S.blockLane = n.lane; S.blockUntil = sp + 2 * blOf(sp); }
+    else if (n.kind === 'mushroom') { S.sway = still() ? 0 : 12; S.swayUntil = sp + 2; }
+    else if (n.kind === 'recall') { S.flip = -1; S.flipUntil = sp + 2; }
+    if (n.kind && NEU.juice) NEU.juice.hit('small');
+  }
   function press(lane) {
     if (!running) return;
-    var sp = songPos(), best = null, bm = WINDOW_MS + 1;
+    var sp = songPos();
+    if (breakPhase(sp)) return;
+    if (lane === S.blockLane && sp < S.blockUntil) return;
+    var best = null, bm = WINDOW_MS + 1;
     tick(sp);
     for (var i = 0; i < notes.length; i++) {
       var n = notes[i];
@@ -176,9 +283,16 @@
     if (!best) { judge(4, 0); return; } /* ghost tap: a miss, so mashing cannot farm health */
     best.hit = true;
     confirmAt[1][lane] = singAt[1] = now(); singLane[1] = lane;
+    if (best.kind === 'bomb') {
+      best.done = true;
+      judge(4, bm);
+      if (NEU.juice) NEU.juice.burst(S.soulx || 80, S.souly || 80, 8, '#E04A6B', 1);
+      return;
+    }
     if (bm <= EDGE[0] && !still()) splashes.push({ l: lane, t: now() });
     if (best.end === best.t) best.done = true;
     judge(bm <= EDGE[0] ? 0 : bm <= EDGE[1] ? 1 : bm <= EDGE[2] ? 2 : 3, bm);
+    if (best.kind) applyKind(best, sp);
     blip(lane, true);
   }
 
@@ -197,14 +311,24 @@
 
   function step(ts) {
     if (!running) return;
-    requestAnimationFrame(step);
+    if (!NEU.kernel) requestAnimationFrame(step);
     /* the pace cap (perf.js): note judgment runs on the audio clock,
        so a skipped draw costs no timing */
     if (NEU.perf && !NEU.perf.paced(ts)) return;
     var sp = songPos();
     S.countdown = countLabel(sp);
+    S.section = sectionOf(sp);
     /* Leave prompt up: hold the frame. Notes that pass meanwhile are judged on resume. */
     if (NEU.juice && NEU.juice.frozen()) { lastSp = sp; draw(sp); return; }
+    var bp = breakPhase(sp);
+    if (bp) {
+      runBreak(sp, bp);
+      if (S.health <= 0) { lose(); return; }
+      draw(sp);
+      return;
+    }
+    S.mode = 'chart';
+    S.arrowA = 1;
 
     var ph = ms(sp - 4 * beatLen()) >= 0 ? 1 : 0;
     if (ph !== phase) { phase = ph; say(TAUNT[round][ph] || 'go.'); }
@@ -219,15 +343,84 @@
           confirmAt[0][n.lane] = singAt[0] = now(); singLane[0] = n.lane;
         }
       } else if (!n.hit && ms(sp - n.t) > WINDOW_MS) {
-        n.done = true; judge(4, 0);
+        n.done = true;
+        if (n.kind === 'bomb') S.score += 50;
+        else judge(4, 0);
       } else if (n.hit && sp >= n.end) {
         n.done = true;
       }
     }
 
     if (S.health <= 0) { lose(); return; }
-    if (notes.every(function (n) { return n.done; })) { nextRound(); return; }
+    if (notes.every(function (n) { return n.done; })) {
+      if (songHasTail()) { win(); return; }
+      nextRound(); return;
+    }
     draw(sp);
+  }
+  function easeU(u) {
+    if (u < 0) u = 0;
+    if (u > 1) u = 1;
+    if (still()) return 1;
+    if (NEU.juice && NEU.juice.outCubic) return NEU.juice.outCubic(u);
+    return u;
+  }
+  function spawnHazards(i) {
+    if (hazBreak === i) return;
+    hazBreak = i;
+    var g = geom();
+    S.hazards = [
+      { kind: 'coin', x: g.w * 0.3, y: 48, vx: 70, vy: -30 },
+      { kind: 'bottle', x: g.w * 0.6, y: 36, vx: -40, vy: 10, broke: false },
+      { kind: 'axe', x: g.w * 0.45, y: 64, vx: 20, vy: 50, spin: 0 }
+    ];
+  }
+  function runBreak(sp, bp) {
+    var g = geom(), u = easeU(bp.u);
+    var cx = g.w / 2, cy = g.h / 2;
+    var dt = sp - lastBrk;
+    if (!(dt > 0) || dt > 0.05) dt = 0.05;
+    lastBrk = sp;
+    S.mode = 'break';
+    if (!soulF && NEU.danmaku) soulF = NEU.danmaku.fight(g.cx, g.strumY);
+    if (!soulF) soulF = { x: g.cx, y: g.strumY, dashI: 0 };
+    spawnHazards(bp.i);
+    if (bp.name === 'in') {
+      S.arrowA = 1 - u;
+      soulF.x = g.cx + (cx - g.cx) * u;
+      soulF.y = g.strumY + (cy - g.strumY) * u;
+    } else if (bp.name === 'out') {
+      S.arrowA = u;
+      soulF.x = cx + (g.cx - cx) * u;
+      soulF.y = cy + (g.strumY - cy) * u;
+    } else {
+      S.arrowA = 0;
+      var mk = {
+        left: !!keys[LANES[0]], down: !!keys[LANES[1]],
+        up: !!keys[LANES[2]], right: !!keys[LANES[3]], focus: !!keys.focus
+      };
+      var box = { AX: 64, AY: 64, AW: Math.max(32, g.w - 128), AH: Math.max(32, g.h - 128) };
+      if (NEU.danmaku && NEU.danmaku.move) NEU.danmaku.move(soulF, mk, dt, box);
+      var hi;
+      for (hi = 0; hi < S.hazards.length; hi++) {
+        var h = S.hazards[hi];
+        h.x += h.vx * dt; h.y += h.vy * dt; h.vy += 280 * dt;
+        if (h.kind === 'axe') h.spin += dt * 4;
+        if (h.kind === 'coin') h.vy += 40 * dt;
+        if (h.kind === 'bottle' && !h.broke && h.y > g.h - 80) {
+          h.broke = true; h.vx = 0; h.vy = 0;
+          if (NEU.juice) NEU.juice.burst(h.x, h.y, 10, '#C8E8FF', 1);
+        }
+        var dx = soulF.x - h.x, dy = soulF.y - h.y;
+        if (!h.broke && dx * dx + dy * dy < 18 * 18 && !(soulF.dashI > 0)) {
+          addHealth(-0.12);
+          soulF.dashI = 0.45;
+          if (NEU.juice) NEU.juice.hit('small');
+        }
+        if (soulF.dashI > 0) soulF.dashI -= dt;
+      }
+    }
+    S.soulx = soulF.x; S.souly = soulF.y;
   }
 
   function nextRound() {
@@ -246,7 +439,56 @@
       msg.innerHTML = 'he hands you the axe. "that was rude and i respect it."' +
         '<br><small>esc to leave</small>';
     }
+    if (NEU.talk) NEU.talk(['he hands you the axe. the stall is open, if you have coins.'], 'merchant');
+    openStall();
     draw(songPos());
+  }
+  function openStall() {
+    stallOn = true;
+    stallSel = 0;
+    S.mode = 'stall';
+    var el = document.getElementById('fnfStall');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'fnfStall';
+      el.className = 'fnf__stall';
+      el.setAttribute('role', 'listbox');
+      wrap.appendChild(el);
+    }
+    el.hidden = false;
+    el.innerHTML = '';
+    var i;
+    for (i = 0; i < STALL.length; i++) {
+      (function (n) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.setAttribute('data-id', STALL[n].id);
+        b.textContent = STALL[n].name + '  ' + STALL[n].price + 'g';
+        if (n === stallSel) b.className = 'is-sel';
+        b.addEventListener('click', function () { stallSel = n; buyStall(); });
+        el.appendChild(b);
+      })(i);
+    }
+  }
+  function hideStall() {
+    stallOn = false;
+    var el = document.getElementById('fnfStall');
+    if (el) el.hidden = true;
+  }
+  function buyStall() {
+    var item = STALL[stallSel];
+    if (!item) return;
+    if (NEU.save && NEU.save.has(item.id)) {
+      if (NEU.talk) NEU.talk(['you already have it.'], 'merchant');
+      return;
+    }
+    if (NEU.save && !NEU.save.spend(item.price)) {
+      if (NEU.talk) NEU.talk(['not enough coins.'], 'merchant');
+      return;
+    }
+    if (NEU.save) NEU.save.give(item.id);
+    if (item.id === 'recall' && NEU.quest) NEU.quest.mark('a4_recall');
+    if (NEU.talk) NEU.talk(['you buy the ' + item.name + '.'], 'merchant');
   }
 
   function lose() {
@@ -349,6 +591,24 @@
     var BAND = ['#06030C', '#0A0614', '#0F091D', '#140C26', '#19102F', '#1F1439'];
     var bh = Math.ceil(g.stage / BAND.length);
     for (var i = 0; i < BAND.length; i++) { ctx.fillStyle = BAND[i]; ctx.fillRect(0, i * bh, g.w, bh); }
+    var row, col, sy, pulse;
+    ctx.fillStyle = '#3A2418';
+    for (row = 0; row < 3; row++) {
+      sy = 24 + row * 40;
+      ctx.fillRect((g.w * 0.22) | 0, sy, (g.w * 0.56) | 0, 8);
+      for (col = 0; col < 8; col++) {
+        ctx.fillStyle = (col + row) % 2 ? '#C24AE0' : '#E0C24A';
+        ctx.fillRect(((g.w * 0.24) | 0) + col * 32, sy - 20, 16, 20);
+        ctx.fillStyle = '#3A2418';
+      }
+    }
+    pulse = still() ? 0 : (beatFrac(songPos()) < 0.5 ? 4 : 0);
+    for (col = 0; col < 2; col++) {
+      var sx = col ? g.w - 96 : 32;
+      ctx.fillStyle = '#1A1020'; ctx.fillRect(sx, g.stage - 96, 64, 80);
+      ctx.fillStyle = '#2A1840'; ctx.fillRect(sx + 8, g.stage - 80, 48, 48);
+      ctx.fillStyle = '#EDE7DE'; ctx.fillRect(sx + 24 - pulse, g.stage - 64, 16 + pulse, 16 + pulse);
+    }
     ctx.fillStyle = '#2A1C42'; ctx.fillRect(0, g.stage, g.w, g.h - g.stage);
     ctx.fillStyle = '#5A3C82'; ctx.fillRect(0, g.stage, g.w, 4);
     ctx.fillStyle = '#22163A';
@@ -370,7 +630,12 @@
      the beat. No sing frames exist, so a hit leans them toward the lane. */
   function people(g, sp, t) {
     var L = NEU.engineLook;
-    if (!L) return;
+    if (!L) {
+      ctx.fillStyle = '#FF00FF';
+      ctx.fillRect(g.hisX, g.stage - 64, 48, 64);
+      ctx.fillRect(g.cx, g.stage - 64, 48, 64);
+      return;
+    }
     var cs = Math.max(3, Math.min(8, Math.floor(Math.min(g.w / 4, g.h / 2.4) / 13)));
     var bob = still() ? 0 : beatFrac(sp) < 0.25 ? cs : 0;
     var LEAN = [[-1, 0], [0, 1], [0, -1], [1, 0]];
@@ -380,6 +645,12 @@
       var x = who[side] + d[0] * cs, y = g.stage + 8 + bob + d[1] * cs;
       if (side) L.drawPlayer(ctx, x, y, 'left', 0, false, cs, 1000);
       else L.drawProp(ctx, 'merchant', null, x, y, cs, 0, 0);
+      if (t - singAt[side] < 0.2) {
+        var pose = singLane[side];
+        ctx.fillStyle = '#EDE7DE';
+        ctx.fillRect(x + (pose === 0 ? -cs * 2 : pose === 3 ? cs * 2 : 0),
+                     y - cs * 4 + (pose === 2 ? -cs * 2 : pose === 1 ? cs : 0), cs, cs);
+      }
     }
   }
 
@@ -429,9 +700,25 @@
     }
   }
 
+  function itemIcon(kind, x, y, s) {
+    var u = Math.max(2, s);
+    ctx.fillStyle = '#FF00FF';
+    if (kind === 'coin') { ctx.fillStyle = '#E0C24A'; ctx.fillRect(x + 4 * u, y + 4 * u, 8 * u, 8 * u); return; }
+    if (kind === 'bomb') { ctx.fillStyle = '#1A1020'; ctx.fillRect(x + 4 * u, y + 5 * u, 8 * u, 8 * u); ctx.fillStyle = '#E04A6B'; ctx.fillRect(x + 7 * u, y + 2 * u, 2 * u, 4 * u); return; }
+    if (kind === 'potion') { ctx.fillStyle = '#E04A6B'; ctx.fillRect(x + 5 * u, y + 4 * u, 6 * u, 10 * u); return; }
+    if (kind === 'axe') { ctx.fillStyle = '#C8C8C8'; ctx.fillRect(x + 7 * u, y + 2 * u, 2 * u, 12 * u); ctx.fillStyle = '#7BE38A'; ctx.fillRect(x + 3 * u, y + 2 * u, 10 * u, 4 * u); return; }
+    if (kind === 'mushroom') { ctx.fillStyle = '#EDE7DE'; ctx.fillRect(x + 7 * u, y + 8 * u, 3 * u, 6 * u); ctx.fillStyle = '#E04A6B'; ctx.fillRect(x + 3 * u, y + 2 * u, 11 * u, 7 * u); return; }
+    if (kind === 'recall') { ctx.fillStyle = '#4AC2E0'; ctx.fillRect(x + 5 * u, y + 3 * u, 6 * u, 11 * u); ctx.fillStyle = '#FF00FF'; ctx.fillRect(x + 6 * u, y + 6 * u, 4 * u, 4 * u); return; }
+    ctx.fillRect(x, y, 16 * u, 16 * u);
+  }
   function draw(sp) {
     var g = geom(), t = now(), s = g.s, half = (N * s) >> 1;
     var recY = g.strumY + half;        /* receptor centre line */
+    var shook = false, sway = 0, dir = (sp < S.flipUntil) ? S.flip : 1;
+    if (!still() && sp < S.swayUntil) sway = Math.round(Math.sin(sp * 6) * S.sway);
+    if (NEU.juice && NEU.juice.begin) shook = NEU.juice.begin(ctx, g.w, g.h);
+    ctx.save();
+    ctx.translate(sway, 0);
     stage(g);
     people(g, sp, t);
 
@@ -440,23 +727,31 @@
     notes.forEach(function (n) {
       if (n.end > n.t && n.hit && sp < n.end && (n.mine ? !n.done : true)) held[n.mine ? 1 : 0][n.lane] = 1;
     });
+    ctx.globalAlpha = S.arrowA;
     for (var side = 0; side < 2; side++) {
       var x0 = side ? g.mineX : g.hisX;
       for (var l = 0; l < 4; l++) {
         var f = (t - confirmAt[side][l] < 0.15 || held[side][l]) ? 2 : (side && keys[LANES[l]]) ? 1 : 0;
+        if (side && l === S.blockLane && sp < S.blockUntil) f = 1;
         arrow(f, l, x0 + l * g.pitch, g.strumY, s);
       }
     }
+    ctx.globalAlpha = 1;
 
     for (var i = 0; i < notes.length; i++) {
       var n = notes[i];
       var x = (n.mine ? g.mineX : g.hisX) + n.lane * g.pitch;
-      var y = Math.round(recY + (n.t - sp) * g.K), ye = Math.round(recY + (n.end - sp) * g.K);
+      var y = Math.round(recY + (n.t - sp) * g.K * dir), ye = Math.round(recY + (n.end - sp) * g.K * dir);
       if (ye < -64 || y > g.h + 64) continue;
       if (n.end > n.t && (n.mine ? !n.done : sp < n.end)) {
         tail(x, y, n.hit ? Math.max(y, recY) : y, ye, n.lane, s);
       }
-      if (!n.hit && !n.done) arrow(3, n.lane, x, y - half, s);
+      if (!n.hit && !n.done) {
+        ctx.globalAlpha = n.kind ? 1 : S.arrowA;
+        if (n.kind) itemIcon(n.kind, x, y - half, s);
+        else arrow(3, n.lane, x, y - half, s);
+        ctx.globalAlpha = 1;
+      }
     }
 
     /* the splash: eight pixels thrown off a SICK, gone in a quarter second */
@@ -492,18 +787,48 @@
     }
     ctx.globalAlpha = 1;
 
+    if (S.mode === 'break' && soulF) {
+      var hi;
+      for (hi = 0; hi < S.hazards.length; hi++) {
+        var hz = S.hazards[hi];
+        ctx.save();
+        ctx.translate(hz.x | 0, hz.y | 0);
+        if (hz.kind === 'axe') ctx.rotate(hz.spin || 0);
+        ctx.fillStyle = hz.kind === 'coin' ? '#E0C24A' : hz.kind === 'bottle' ? '#C8E8FF' : '#C8C8C8';
+        if (hz.broke) ctx.fillStyle = '#FF00FF';
+        ctx.fillRect(-6, -6, 12, 12);
+        ctx.restore();
+      }
+      if (NEU.danmaku && NEU.danmaku.soul) NEU.danmaku.soul.draw(ctx, soulF.x, soulF.y, 0);
+      else { ctx.fillStyle = '#FF00FF'; ctx.fillRect(soulF.x - 4, soulF.y - 4, 8, 8); }
+    }
     healthBar(g, sp);
+    ctx.restore();
+    if (NEU.juice && NEU.juice.end) NEU.juice.end(ctx, shook);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
 
   /* ── input ──────────────────────────────────────────────────────*/
   function laneOf(e) {
     var k = e.key;
-    if (k === 'ArrowLeft'  || k === 'a' || k === 'A') return 0;
-    if (k === 'ArrowDown'  || k === 's' || k === 'S') return 1;
-    if (k === 'ArrowUp'    || k === 'w' || k === 'W') return 2;
-    if (k === 'ArrowRight' || k === 'd' || k === 'D') return 3;
+    function hit(def, arrow) {
+      var b = (NEU.keys && NEU.keys.get) ? NEU.keys.get(def) : def;
+      return k === arrow || k === b || (b.length === 1 && k === b.toUpperCase());
+    }
+    if (hit('a', 'ArrowLeft')) return 0;
+    if (hit('s', 'ArrowDown')) return 1;
+    if (hit('w', 'ArrowUp')) return 2;
+    if (hit('d', 'ArrowRight')) return 3;
     return -1;
+  }
+  function stallKey(e) {
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+      stallSel = (stallSel + 1) % STALL.length; openStall(); e.preventDefault(); return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+      stallSel = (stallSel - 1 + STALL.length) % STALL.length; openStall(); e.preventDefault(); return;
+    }
+    if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z') { buyStall(); e.preventDefault(); }
   }
   addEventListener('keydown', function (e) {
     if (wrap.hidden) return;
@@ -514,12 +839,18 @@
       } else { close(); }
       return;
     }
+    if (stallOn) { stallKey(e); return; }
     if (!running && !won && (e.key === 'Enter' || e.key === 'z' || e.key === 'Z')) { e.preventDefault(); retry(); return; }
+    if (e.key === 'Shift') { keys.focus = true; return; }
+    if ((e.key === 'x' || e.key === 'X') && soulF && NEU.danmaku && NEU.danmaku.key) {
+      NEU.danmaku.key(soulF, e); e.preventDefault(); return;
+    }
     var l = laneOf(e);
     if (l >= 0) { e.preventDefault(); if (!keys[LANES[l]]) press(l); keys[LANES[l]] = true; }
   });
   addEventListener('keyup', function (e) {
     var l = laneOf(e);
+    if (e.key === 'Shift') keys.focus = false;
     if (l >= 0) { release(l); keys[LANES[l]] = false; }
   });
 
@@ -529,10 +860,12 @@
     if (NEU.quest) NEU.quest.lock(true);
     if (msg) msg.hidden = true;
     layout();
+    hideStall();
     S.health = 1; S.combo = 0; keys = {};
     running = true;
     startRound();
-    requestAnimationFrame(step);
+    if (!NEU.kernel) requestAnimationFrame(step);
+    if (NEU.kernel) NEU.kernel.push('rhythm');
   }
   function open() {
     wrap.hidden = false;
@@ -543,9 +876,11 @@
     layout();
     round = 0; S.score = 0; S.combo = 0; S.health = 1; keys = {};
     S.misses = S.judged = S.weight = 0; S.acc = 1; pops.length = splashes.length = 0;
+    hideStall(); won = false;
     running = true;
     startRound();
-    requestAnimationFrame(step);
+    if (!NEU.kernel) requestAnimationFrame(step);
+    if (NEU.kernel) NEU.kernel.push('rhythm');
   }
   /* The counter axe leaves the room for good, and the line about it
      waits until the overlay is gone (see close). */
@@ -557,6 +892,7 @@
 
   function close() {
     running = false;
+    if (NEU.kernel && NEU.kernel.current() === 'rhythm') NEU.kernel.pop();
     /* release the input claim before handing control back to the room */
     if (NEU.activeMinigame === 'rhythm') NEU.activeMinigame = null;
     wrap.hidden = true;
@@ -573,8 +909,15 @@
     else close();
   });
 
-  NEU.rhythm = { open: open, close: close, win: win,
+  if (NEU.kernel) NEU.kernel.register('rhythm', {
+    tick: function (dt) { if (running) step(performance.now()); },
+    open: open, close: close,
+    running: function () { return running; }
+  });
+
+  NEU.rhythm = { open: open, close: close, win: win, songPos: songPos,
                  get running() { return running; },
                  state: S, pops: pops, geom: geom,
-                 charts: CHARTS, bpm: BPM, WINDOW: WINDOW_MS / 1000 };
+                 charts: CHARTS, bpm: BPM, WINDOW: WINDOW_MS / 1000,
+                 sections: SECTIONS, length: SONG };
 })();

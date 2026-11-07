@@ -154,10 +154,15 @@
     ['an axe', 'not for sale', false, 'axe']
   ];
 
+  function fought() {
+    return (NEU.quest && NEU.quest.has && NEU.quest.has('a4_axe')) ||
+      (NEU.save && NEU.save.has('axe'));
+  }
   function shop(c) {
     /* Third state. The axe was refused hours ago and the refusal was a
-       person, not a price — so the way past it is also a person. */
-    if (NEU.save && NEU.save.flagged('tripping') && !NEU.save.has('axe')) {
+       person, not a price — so the way past it is also a person.
+       After the fight the board stays open, recall included. */
+    if (NEU.save && NEU.save.flagged('tripping') && !fought()) {
       c.say(["you again. you look terrible.",
              "the axe? still not for sale.",
              "...but i'll go against you for it. you look like you'd lose."], 'narr');
@@ -167,7 +172,7 @@
       }, 6000);
       return;
     }
-    if (NEU.save && NEU.save.has('recall')) {
+    if (!fought() && NEU.save && NEU.save.has('recall')) {
       c.say(["you have the one that does anything.", "the rest is atmosphere."], 'narr');
       return;
     }
@@ -204,7 +209,8 @@
       '##.........o.......#',
       '####################'
     ].join('\n'),
-    spawns: { west: { x: 1, y: 6, face: 'right' }, east: { x: 18, y: 5, face: 'left' } },
+    spawns: { west: { x: 1, y: 6, face: 'right' }, east: { x: 18, y: 5, face: 'left' },
+              garage: { x: 10, y: 3, face: 'up' } },
     entities: [
       { t: 'cityfloor', v: 'd2_alley', x: 0, y: 0 },
       P('dumpster', 4, 4),
@@ -219,7 +225,11 @@
       { t: 'npc', x: 17, y: 8, colour: '#C4705F', mush: 'mush5', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush5'); } },
       { t: 'exit', x: 19, y: 5, to: 'd3_square', spawn: 'west', style: 'stairs' },
-      { t: 'exit', x: 0, y: 6, to: 'd1_street', spawn: 'east', style: 'arch' }
+      { t: 'exit', x: 0, y: 6, to: 'd1_street', spawn: 'east', style: 'arch' },
+      /* Shut until the photograph is a flag. The sand starts on the other side. */
+      { t: 'exit', x: 10, y: 2, to: 's0_sand', spawn: 'west', locked: 'photo',
+        style: 'door', label: 'garage',
+        lines: ['a garage door, shut.', 'it is waiting on a photograph.'] }
     ]
   });
 
@@ -322,10 +332,12 @@
     return rows.join('\n');
   }
   function corridor(id, next, prev, styles, solids, odd) {
+    var spawns = { south: { x: 1, y: 4, face: 'right' }, north: { x: 22, y: 4, face: 'left' } };
+    if (id === 'e3_hall') spawns.dad = { x: 12, y: 2, face: 'down' };
     E.register(id, {
       tileset: 'home',
       tiles: grid(solids),
-      spawns: { south: { x: 1, y: 4, face: 'right' }, north: { x: 22, y: 4, face: 'left' } },
+      spawns: spawns,
       entities: [
         { t: 'cityfloor', v: id, x: 0, y: 0 },
         P('moon', 5, 1), P('moon', 19, 1),
@@ -333,7 +345,10 @@
         { t: 'exit', x: 23, y: 4, to: next, spawn: 'south', style: styles[1] },
         { t: 'exit', x: 0, y: 4, to: prev, spawn: 'north', style: styles[0] }
       ].concat(odd),
-      onEnter: function (c) { if (id === 'e1_hall') homeIn(c); }
+      onEnter: function (c) {
+        if (id === 'e1_hall') homeIn(c);
+        if (id === 'e3_hall') c.flag('dad_door', c.has('dad_card') ? 1 : 0);
+      }
     });
   }
 
@@ -351,7 +366,9 @@
     P('coatstand', 2, 2), P('chair', 17, 2), P('gclock', 21, 2, { n: 2 })
   ]);
   corridor('e3_hall', 'e4_corridor', 'e2_hall', ['door', 'curtain'], [12, 6, 21, 2], [
-    P('none', 12, 1, { lines: ['a door you do not have a key for. you do not want one.'] }),
+    { t: 'exit', x: 12, y: 1, to: 'e5_dad', spawn: 'door', style: 'door', locked: 'dad_door',
+      label: 'dad',
+      lines: ['a door you do not have a key for.', 'it wants a card.'] },
     P('pot', 12, 6), P('gclock', 21, 2, { n: 3 })
   ]);
 

@@ -99,3 +99,4 @@ fonts/README.txt
 # build + benchmark deps (migration)
 node_modules/
 dist/
+.parity/

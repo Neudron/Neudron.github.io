@@ -1258,7 +1258,11 @@
   }
 
   KK.kind('cityprop', {
-    interactive: function (e) { return typeof e.run === 'function' || !!e.lines; },
+    interactive: function (e) {
+      /* the desk seam is scenery until the note is read */
+      if (e.v === 'dadseam') return !!(NEU.save && NEU.save.flagged('dad_note'));
+      return typeof e.run === 'function' || !!e.lines;
+    },
     fire: function (e, sys) {
       if (typeof e.run === 'function') { e.run(sys.api); return; }
       /* lines talk exactly like an npc: same resume, same textbox guard */

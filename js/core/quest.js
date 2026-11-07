@@ -202,6 +202,10 @@
     }
   };
 
+  /* The photograph points here. Added when the compartment is taken,
+     so the list does not name the garage before the picture exists. */
+  NEU.quest.garage = { id: 'a4_garage', text: 'the city garage' };
+
   /* Every tick writes through. Cheap — save.js coalesces. */
   (function (q) {
     var mark = q.mark, bump = q.bump;

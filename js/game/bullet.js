@@ -1,8 +1,8 @@
 /* bullet.js — the room behind the door.
    ───────────────────────────────────────────────────────────────────
-   A thirty-second encounter, Undertale's box with Calamity's feel: the
-   thing at the far end is the clock, and its boss bar is the twenty
-   seconds draining. Three short phases, each announced in the box
+   A timed encounter, Undertale's box with Calamity's feel: the
+   thing at the far end is the clock, and its boss bar is the timer
+   draining. Three short phases, each announced in the box
    before it fires:
 
      1  the voice      rings and aimed shots, red soul
@@ -39,6 +39,8 @@
   var dm = NEU.danmaku;
   var SURVIVE   = 30;          // seconds
   var VLEN      = 20;          // Act III's seeded plan keeps its twenty seconds
+  var WALL_TELE = 0.45, WALL_CELLS = 16;
+  var LULL = 0.6;
   var PLAYER_R  = dm.soul.R;   // the TRUE hitbox
   var MAX_B     = 700;
   var BL_HALF = 24; // was 17, matches visual beam width at game scale
@@ -74,12 +76,12 @@
     { at: 0,  mode: 'red',  line: '* thirty seconds. that\'s the whole ask.',
       em: [['ring', 1.30], ['aimed', 0.95]] },
     { at: 9,  mode: 'blue', line: '* your SOUL is blue now. stay on the ground.',
-      em: [['bone', 1.25], ['blaster', 2.2], ['elec', 2.6]] },
+      em: [['bone', 1.04], ['blaster', 2.2], ['elec', 2.1]] },
     { at: 19, mode: 'red',  line: '* it is still aiming.',
-      em: [['spiral', 0.075], ['wall', 2.6], ['blaster', 3.1], ['aimed', 1.4]] },
+      em: [['spiral', 0.08625], ['wall', 3.2], ['blaster', 3.1], ['aimed', 1.4]] },
     /* the 4th: the 3rd's spiral, a touch faster (third element = spin step) */
     { at: 25, mode: 'red',  line: '* the last few seconds. stay in the open.',
-      em: [['spiral', 0.06, 0.44], ['wall', 1.8], ['aimed', 0.9]] }
+      em: [['spiral', 0.069, 0.374], ['wall', 2.3], ['aimed', 0.9]] }
   ];
 
   /* Undertale's blaster: 6 frames of 43x57, mouth down. 0 = charging,
@@ -111,7 +113,7 @@
     '.#...'
   ];
 
-  var blasters = [], bones = [];
+  var blasters = [], bones = [], wallTelegraphs = [], grazeSparks = [];
   var BL_CHARGE = 0.85, BL_FIRE = 0.42;
   var AIM_TELE = 0.45, aims = [];
   /* The beam's ghost: the last TELE_LEAD s of the charge show the real
@@ -169,13 +171,14 @@
 
   var running = false, won = false;
   /* Act III variant: a seeded plan of blocks, and the graze meter. */
-  var variant = false, plan = null, qi = 0, attempt = 0;
+  var variant = false, plan = null, planRng = null, qi = 0, attempt = 0;
   var meter = 0, lastGz = -9;
   var t = 0, hp = 3, inv = 0, last = 0;
   var F = dm.fight(0, 0), keys = {};
   var bullets = [], emitters = [], phase = 0, phaseAt = 0;
   var AW = 0, AH = 0, AX = 0, AY = 0;     // box rect, canvas space
   var BAX = 0, BAW = 0;                    // the box's own rect, before the squeeze
+  var transitionAt = -9, transitionUntil = -9;
   var cheat = '';                          // the 69420 buffer
 
   /* ── layout ─────────────────────────────────────────────────────── */
@@ -194,19 +197,21 @@
   }
   addEventListener('resize', function () { if (running) layout(); });
 
-  /* Phase 4: the walls close in over 1.5 s, 13% a side, then hold. */
+  /* Phase 4: the walls close in over 1.5 s, 9% a side, then hold. */
   function squeezeBox() {
     if (!running) return;                  // open() lays out before its plan exists
-    var s =(phase && phase === table().length) ? Math.min(1, (t - phaseAt) / 1.5) : 0;
-    s = s * s * (3 - 2 * s);
-    var ins = (BAW * 0.13 * s) | 0; AX = BAX + ins; AW = BAW - ins * 2;
+    var s = (phase && phase === table().length) ? Math.min(1, (t - phaseAt) / 1.5) : 0;
+    var ease;
+    if (reducedFx()) ease = s ? 1 : 0;
+    else ease = 1 + 2.70158 * Math.pow(s - 1, 3) + 1.70158 * Math.pow(s - 1, 2);
+    var ins = (BAW * 0.09 * ease) | 0; AX = BAX + ins; AW = BAW - ins * 2;
   }
 
   function add(x, y, vx, vy, r, c) { spot(x, y); dm.shot(bullets, x, y, vx, vy, r, c, 0, MAX_B); }
 
   /* Spawn markers: the first shot of each emitter leaves a 2px ring on the
      box's rim for 0.35 s, at its spawn point projected onto the rim. */
-  var curE = null, marks = [], flashAt = -9, grazeFx = -9;
+  var curE = null, marks = [], grazeFx = -9;
   function spot(x, y) {
     if (!curE || curE.shown) return;
     curE.shown = true;
@@ -224,6 +229,7 @@
      the curve is the content once there is no finish line. */
   /* The run's length: Act III's plan is twenty seconds, the room is thirty. */
   function span() { return variant ? VLEN : SURVIVE; }
+  function durationText() { return variant ? 'twenty seconds' : 'thirty seconds'; }
   function ramp() {
     return endless ? Math.min(2.4, t / SURVIVE) : Math.min(1, t / span());
   }
@@ -238,14 +244,18 @@
   function table() { return variant ? plan.phases : PHASES; }
   function enterPhase(n) {
     var P = table()[n - 1];
-    phase = n; phaseAt = t;
+    phase = n; phaseAt = t; transitionAt = t;
+    transitionUntil = t + (reducedFx() ? 0 : LULL);
+    for (var wi = 0; wi < wallTelegraphs.length; wi++)
+      if (wallTelegraphs[wi].at < transitionUntil + WALL_TELE)
+        wallTelegraphs[wi].at = transitionUntil + WALL_TELE;
     dm.soulMode(F, P.mode);
-    emitters = [];
+    emitters = []; aims = [];
     for (var i = 0; i < (P.em || []).length; i++)
       emitters.push({ kind: P.em[i][0], every: P.em[i][1], next: t + TELE + i * 0.3, ang: 0,
                       spin: P.em[i][2], shown: false });
-    /* a phase change: the box flashes white and the soul is hit "small" */
-    if (n > 1) { flashAt = t; if (NEU.juice) NEU.juice.hit('small'); }
+    /* The short phase pause gives the next pattern room to read. */
+    if (n > 1 && NEU.juice) NEU.juice.hit('small');
   }
 
   /* ── Act III variant: the plan ────────────────────────────────────
@@ -261,15 +271,16 @@
   var VBLOCK = {
     ring:    { dur: 2.4, at: [0.5, 1.8], kind: 'ring' },
     aimed:   { dur: 2.4, at: [0.5, 1.1, 1.7, 2.3], kind: 'aimed' },
-    pair:    { dur: 2.4, at: [0.5, 1.1], kind: 'elec' },
-    bone:    { dur: 4.5, at: [0.5, 1.2, 1.9], kind: 'bone' },
+    pair:    { dur: 2.4, at: [0.4, 0.9], kind: 'elec' },
+    bone:    { dur: 4.5, at: [0.4, 1, 1.6, 2.2], kind: 'bone' },
     blaster: { dur: 2.0, at: [0.6], kind: 'blaster' },
-    triple:  { dur: 3.0, at: [0.5, 1.1, 1.7], kind: 'elec' }
+    triple:  { dur: 3.0, at: [0.4, 0.9, 1.4], kind: 'elec' }
   };
   function rng(seed) {
     var s = (seed * 7919 + 13) % 233280;
     return function () { s = (s * 9301 + 49297) % 233280; return s / 233280; };
   }
+  function wallRandom() { return variant && planRng ? planRng() : Math.random(); }
   function shuffle(list, r) {
     var a = list.slice();
     for (var i = a.length - 1; i > 0; i--) {
@@ -352,7 +363,7 @@
       else { sx = AX - 16; sy = AY + Math.random() * AH; }
       var base = Math.atan2(F.y - sy, F.x - sx);
       var kk = Math.min(k, 1.6);
-      var cnt = 3 + Math.round(kk * 4), spd = 150 + kk * 130;
+      var cnt = 2 + Math.round(kk * 3), spd = 120 + kk * 104;
       spot(sx, sy);
       aims.push({ sx: sx, sy: sy, base: base, cnt: cnt, spd: spd, t0: t });
     } else if (e.kind === 'spiral') {
@@ -372,23 +383,26 @@
       /* Undertale's blue-soul bone: slides along the floor, jump it. */
       var left = (e.ang = 1 - e.ang) === 1;
       spot(left ? AX - 8 : AX + AW + 8, AY + AH);
-      bones.push({ x: left ? AX - 8 : AX + AW + 8, vx: (left ? 1 : -1) * (150 + k * 60),
+      bones.push({ x: left ? AX - 8 : AX + AW + 8, vx: (left ? 1 : -1) * (180 + k * 72),
                    h: 18 + ((Math.random() * 12) | 0) });
     } else if (e.kind === 'wall') {
-      /* A line with one gap. A wall with no gap is a cutscene. */
-      var vertical = Math.random() < 0.5;
-      var gap = 0.18 + Math.random() * 0.5;
-      var cells = 16, sp3 = 104 + k * 46;
-      for (var q = 0; q < cells; q++) {
-        var f = q / (cells - 1);
-        if (Math.abs(f - gap) < 0.13) continue;
-        if (vertical) {
-          var fromTop = Math.random() < 0.5;
-          add(AX + f * AW, fromTop ? AY - 14 : AY + AH + 14, 0, fromTop ? sp3 : -sp3, 4, PAL.dim);
-        } else {
-          var fromLeft = Math.random() < 0.5;
-          add(fromLeft ? AX - 14 : AX + AW + 14, AY + f * AH, fromLeft ? sp3 : -sp3, 0, 4, PAL.dim);
-        }
+      /* The ghost and the delayed wall share this exact gap and direction. */
+      wallTelegraphs.push({ at: t + WALL_TELE, vertical: wallRandom() < 0.5,
+                            gap: 3 + ((wallRandom() * 10) | 0),
+                            fromStart: wallRandom() < 0.5, speed: 104 + k * 46 });
+    }
+  }
+
+  function spawnWall(w) {
+    var step = w.vertical ? AW / WALL_CELLS : AH / WALL_CELLS;
+    for (var q = 0; q < WALL_CELLS; q++) {
+      if (q === w.gap) continue;
+      if (w.vertical) {
+        add(AX + q * step, w.fromStart ? AY - 14 : AY + AH + 14,
+            0, w.fromStart ? w.speed : -w.speed, 4, PAL.dim);
+      } else {
+        add(w.fromStart ? AX - 14 : AX + AW + 14, AY + q * step,
+            w.fromStart ? w.speed : -w.speed, 0, 4, PAL.dim);
       }
     }
   }
@@ -413,7 +427,7 @@
   var beatAt = -Infinity;
   function step(now) {
     if (!running) return;
-    requestAnimationFrame(step);
+    if (!NEU.kernel) requestAnimationFrame(step);
 
     var dt = Math.max(0, Math.min(0.033, (now - last) / 1000)); last = now;
     if (NEU.juice && NEU.juice.frozen()) { draw(); return; }
@@ -425,17 +439,26 @@
     dm.tick(F, dt, null);
     var bdt = dt * dm.slow(F);           // adrenaline's first beat slows the room
 
-    if (variant) {
+    if (t >= transitionUntil && variant) {
       while (qi < plan.events.length && t >= plan.events[qi].t) fire(plan.events[qi++].e);
     }
-    for (var i = 0; i < emitters.length; i++) {
-      var e = emitters[i];
-      if (t >= e.next) { e.next = t + e.every; curE = e; fire(e); curE = null; }
+    if (t >= transitionUntil) {
+      for (var i = 0; i < emitters.length; i++) {
+        var e = emitters[i];
+        if (t >= e.next) { e.next = t + e.every; curE = e; fire(e); curE = null; }
+      }
+      var kw = [];
+      for (var wi = 0; wi < wallTelegraphs.length; wi++) {
+        if (t >= wallTelegraphs[wi].at) spawnWall(wallTelegraphs[wi]);
+        else kw.push(wallTelegraphs[wi]);
+      }
+      wallTelegraphs = kw;
     }
 
     var ka = [];
     for (var ai = 0; ai < aims.length; ai++) {
       var a = aims[ai];
+      if (t < transitionUntil) { ka.push(a); continue; }
       if (t - a.t0 < AIM_TELE) { ka.push(a); continue; }
       for (var j = 0; j < a.cnt; j++) {
         var o = (j - (a.cnt - 1) / 2) * 0.17;
@@ -596,6 +619,9 @@
     meter = Math.min(100, meter + GRAZE_GAIN);
     if (meter >= 100) pulse();
     grazeFx = t;
+    var dirs = [[-2, -1], [1, -2], [2, 1]];
+    if (!reducedFx()) for (var i = 0; i < dirs.length; i++)
+      grazeSparks.push({ x: F.x | 0, y: F.y | 0, vx: dirs[i][0], vy: dirs[i][1], at: t });
     if (NEU.juice) NEU.juice.burst(F.x, F.y, 4, '#FFFFFF', 90);
     if (t - lastGz >= GRAZE_GAP) {
       lastGz = t;
@@ -694,15 +720,49 @@
     if (bl.elec) dm.soul.stamp(ctx, BOLT, x, y, 3, '#FFF06A');
   }
 
+  function drawWallTelegraphs() {
+    var keep = [];
+    for (var i = 0; i < wallTelegraphs.length; i++) {
+      var w = wallTelegraphs[i], left = WALL_TELE - (w.at - t);
+      if (left < 0 || left >= WALL_TELE) continue;
+      keep.push(w);
+      var alpha = left < 0.15 ? 0.1 : left < 0.3 ? 0.18 : 0.28;
+      var cw = (AW / WALL_CELLS) | 0, ch = (AH / WALL_CELLS) | 0;
+      ctx.save(); ctx.globalAlpha = alpha; ctx.fillStyle = PAL.dim;
+      for (var q = 0; q < WALL_CELLS; q++) {
+        if (w.vertical) ctx.fillRect((AX + q * AW / WALL_CELLS) | 0, w.fromStart ? AY : AY + AH - 4, cw, 4);
+        else ctx.fillRect(w.fromStart ? AX : AX + AW - 4, (AY + q * AH / WALL_CELLS) | 0, 4, ch);
+      }
+      ctx.globalAlpha = 1; ctx.strokeStyle = PAL.bone; ctx.lineWidth = 2;
+      if (w.vertical) ctx.strokeRect((AX + w.gap * AW / WALL_CELLS) | 0, w.fromStart ? AY - 1 : AY + AH - 3, cw, 6);
+      else ctx.strokeRect(w.fromStart ? AX - 1 : AX + AW - 3, (AY + w.gap * AH / WALL_CELLS) | 0, 6, ch);
+      ctx.restore();
+    }
+    wallTelegraphs = keep;
+  }
+
+  function drawGrazeSparks() {
+    var keep = [];
+    ctx.fillStyle = PAL.ui;
+    for (var i = 0; i < grazeSparks.length; i++) {
+      var p = grazeSparks[i], age = t - p.at;
+      if (age >= 0.28) continue;
+      keep.push(p);
+      ctx.fillRect((p.x + p.vx * age * 12) | 0, (p.y + p.vy * age * 12) | 0, 2, 2);
+    }
+    grazeSparks = keep;
+  }
+
   function draw() {
     var w = innerWidth, h = innerHeight;
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
     box();
+    drawWallTelegraphs();
     if (phase && phase === table().length && t - phaseAt < 1.5) {
       /* the walls' final stop, telegraphed */
       ctx.fillStyle = PAL.box; ctx.globalAlpha = 0.35;
-      ctx.fillRect(BAX + BAW * 0.13 - 1, AY, 2, AH);
-      ctx.fillRect(BAX + BAW * 0.87 - 1, AY, 2, AH);
+      ctx.fillRect(BAX + BAW * 0.09 - 1, AY, 2, AH);
+      ctx.fillRect(BAX + BAW * 0.91 - 1, AY, 2, AH);
       ctx.globalAlpha = 1;
     }
 
@@ -741,7 +801,7 @@
       ctx.fillRect((b.x - b.r) | 0, (b.y - b.r) | 0, s, s);
     }
     ctx.restore();
-    /* spawn markers, on the rim only; the phase flash is the box's outline */
+    /* spawn markers, on the rim only */
     marks = marks.filter(function (m) { return t - m.t0 < 0.35; });
     if (marks.length) {
       ctx.save();
@@ -753,12 +813,8 @@
       }
       ctx.restore();
     }
-    if (t - flashAt < 0.12) {
-      ctx.lineWidth = 4; ctx.strokeStyle = PAL.box;
-      ctx.strokeRect(AX - BORDER - 2, AY - BORDER - 2, AW + BORDER * 2 + 4, AH + BORDER * 2 + 4);
-    }
-
     dm.drawFX(ctx, F, inv);
+    drawGrazeSparks();
     if (t - pulseAt < 0.3) {
       var pk = (t - pulseAt) / 0.3;
       ctx.globalAlpha = 1 - pk; ctx.lineWidth = 3; ctx.strokeStyle = PAL.meter;
@@ -780,6 +836,12 @@
       ctx.fillStyle = '#FFFFFF';
       ctx.fillText(table()[phase - 1].line, AX + 16, AY + 16, AW - 32);
     }
+    if (phase && t - transitionAt < LULL) {
+      ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
+      ctx.fillStyle = PAL.ui;
+      ctx.fillText('PHASE ' + phase, AX + AW / 2, AY - BORDER - 24);
+      ctx.textAlign = 'left';
+    }
 
     /* the win's soul ring: it grows out from the soul and fades */
     if (won && outroF > 0 && !reducedFx()) {
@@ -798,7 +860,7 @@
        finish, so the bar drains with the difficulty and the name is
        the clock counting up. */
     dm.hud(ctx, F, { w: w, h: h, AY: AY, AH: AH,
-                     name: endless ? t.toFixed(1) + 's, endless' : 'thirty seconds',
+                     name: endless ? t.toFixed(1) + 's, endless' : durationText(),
                      hp: endless ? 1 - ramp() / 2.4 : span() - t,
                      max: endless ? 1 : span(),
                      ticks: endless ? null : table().slice(1).map(function (p) { return 1 - p.at / span(); }),
@@ -837,10 +899,13 @@
     F = dm.fight(0, 0);
     layout();
     F.x = AX + AW / 2; F.y = AY + AH - 60;
-    bullets = []; blasters = []; bones = []; aims = [];
-    meter = 0; lastGz = -9; grazeFx = -9; flashAt = -9; pulseAt = -9; marks = [];
+    bullets = []; blasters = []; bones = []; aims = []; wallTelegraphs = []; grazeSparks = [];
+    meter = 0; lastGz = -9; grazeFx = -9; pulseAt = -9; marks = [];
     cell = 0; cellLostAt = 0;
-    plan = variant ? buildPlan(attempt++) : null; qi = 0;
+    var seed = attempt++;
+    plan = variant ? buildPlan(seed) : null;
+    planRng = variant ? rng(seed) : null;
+    qi = 0;
     PAL = variant ? PAL_III : PAL_II;
     enterPhase(1);
     keys = {};
@@ -848,7 +913,8 @@
     running = true; last = performance.now();
     if (msg) msg.hidden = true;
     draw();
-    requestAnimationFrame(step);
+    if (!NEU.kernel) requestAnimationFrame(step);
+    if (NEU.kernel) NEU.kernel.push('bullet');
   }
 
   /* ── death ────────────────────────────────────────────────────────
@@ -908,11 +974,11 @@
     if (msg) {
       msg.hidden = false;
       msg.innerHTML = good
-        ? '<b>you made it.</b><br>thirty seconds. take the dog food?<br><small>esc to leave</small>'
+        ? '<b>you made it.</b><br>' + durationText() + '. take the dog food?<br><small>esc to leave</small>'
         : '<b>ouch.</b><br>enter to try again &middot; esc to leave';
     }
     if (good) {
-      announce('you made it. thirty seconds. take the dog food?');
+      announce('you made it. ' + durationText() + '. take the dog food?');
       if (NEU.quest) NEU.quest.mark('survive');
       if (NEU.grantDogFood) NEU.grantDogFood();
     }
@@ -987,6 +1053,7 @@
   }
   function close() {
     running = false;
+    if (NEU.kernel && NEU.kernel.current() === 'bullet') NEU.kernel.pop();
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
@@ -1005,6 +1072,12 @@
     if (NEU.activeMinigame !== 'bullet') return;
     if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Bullet Hell', close);
     else close();
+  });
+
+  if (NEU.kernel) NEU.kernel.register('bullet', {
+    tick: function (dt) { if (running) step(performance.now()); },
+    open: open, close: close,
+    running: function () { return running; }
   });
 
   NEU.bullet = { open: open, close: close, get endless() { return endless; }, get running() { return running; },

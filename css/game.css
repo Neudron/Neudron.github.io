@@ -136,3 +136,755 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   max-width: none; max-height: none;
   pointer-events: none; image-rendering: pixelated;
 }
+
+/* bug tracker #7: the bottom-left "inside" chip is gone; the cube door (NEU.tryDoor) is the way in */
+#insideChip { display: none !important; }
+
+/* ── the pot: witch's cauldron, torn recipe, stepping brew (WO W1.1) ──
+   All of this lives inside #craft (z 76, under .tbox at 96); no new
+   z-indexes are needed. Font sizes stay in 16px steps. Bubbles and
+   steam are pure CSS (box-shadow pixels plus keyframes), and
+   prefers-reduced-motion switches them off. */
+
+/* torn parchment card at the left of the cauldron: ragged edge, a missing
+   corner, rotated slightly, "an old recipe" at 16px */
+.craft__recipe { position: relative; width: 176px; padding: 14px 10px 16px; margin-right: 10px; background: #CFC6B4; border: 2px solid #A89F8C; clip-path: polygon(2% 0, 88% 0, 100% 10%, 92% 16%, 100% 26%, 94% 32%, 100% 42%, 88% 48%, 100% 58%, 86% 66%, 100% 76%, 92% 84%, 100% 92%, 88% 100%, 0 100%, 0 8%, 6% 2%); transform: rotate(-3deg); }
+.craft__rc-title { margin: 0 0 10px; font: 400 16px/1 var(--font-display); color: #7A6E58; }
+.craft__rc-grid { display: grid; grid-template-columns: repeat(3, 32px); gap: 6px; margin-top: 8px; }
+.craft__rc-cell { position: relative; width: 32px; height: 32px; background: #EDE7DE; border-radius: 4px; }
+.craft__rc-cell img { width: 16px; height: 16px; opacity: 0.35; image-rendering: pixelated; }
+.craft__rc-smudge { position: relative; }
+.craft__rc-smudge::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 48%; height: 48%; background: #8E7F68; border-radius: 60% 40% 55% 45%; opacity: 0.6; }
+
+/* cauldron: dark iron bowl (#22222E, 4px #5C5C70 rim), stepped-gradient
+   brew (#3B1F5C -> #6A3FA0 -> #B892FF) under the grid in the mouth */
+.craft__cauldron { position: relative; width: min(400px, 94vw); height: 520px; }
+.craft__bowl { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: 100%; height: 52%; background: #22222E; border-radius: 48% 48% 38% 38% / 75% 75% 25% 25%; }
+.craft__rim { position: absolute; left: 50%; bottom: 66%; transform: translate(-50%, 50%); width: 122%; height: 26px; background: #5C5C70; border-radius: 50%; }
+.craft__brew { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); width: 78%; height: 26%; background: linear-gradient(to top, #3B1F5C 33%, #6A3FA0 33%, #6A3FA0 66%, #B892FF 66%); border-radius: 42% 42% 28% 28% / 70% 70% 20% 20%; overflow: hidden; }
+.craft__brew::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 160%; height: 160%;
+  box-shadow: 10px 14px #EDE7DE, -16px 42px #EDE7DE, 24px 70px #EDE7DE, -8px 96px #EDE7DE, 32px 124px #EDE7DE, -20px 150px #EDE7DE, 14px 180px #EDE7DE;
+  opacity: 0.75; image-rendering: pixelated; animation: craftBubbles 6s steps(8) infinite; }
+@keyframes craftBubbles { to { transform: translate(-50%, -150%); opacity: 0; } }
+
+/* faint steam pixels above the pot */
+.craft__steam { position: absolute; left: 50%; top: 4px; transform: translateX(-50%); width: 150px; height: 64px; opacity: 0.55; }
+.craft__steam::after { content: ''; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 100%; height: 100%;
+  box-shadow: 10px -12px #EDE7DE, -8px -26px #EDE7DE, 4px -42px #EDE7DE, -12px -56px #EDE7DE, 2px -74px #EDE7DE;
+  image-rendering: pixelated; animation: craftSteam 7s steps(8) infinite; }
+@keyframes craftSteam { to { transform: translateX(-50%) translateY(-62px); opacity: 0; } }
+
+/* slots: dark stone cells; hover and focus get a lilac 2px outline and a
+   small bounce; recipe-needed empty cells ghost a 20% mushroom outline */
+.craft__cell { --bounce: craftBounce .2s both; }
+.craft__cell:hover { outline: 2px solid #C3B1E1; outline-offset: 2px; transform: translateY(-2px); transition: transform .18s var(--bounce); }
+.craft__cell:focus-visible { outline: 2px solid #C3B1E1; outline-offset: 2px; transform: translateY(-2px); transition: transform .18s var(--bounce); }
+@keyframes craftBounce { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+.craft__cell--ghost img { opacity: 0.2; }
+.craft__cell--ghost { box-shadow: inset 0 0 0 2px rgba(237,231,222,0.25); }
+
+/* calm motion: no bubbles, no steam, no bounce */
+@media (prefers-reduced-motion: reduce) {
+  .craft__brew::after { animation: none; }
+  .craft__steam::after { animation: none; }
+  .craft__cell:hover { transform: none; transition: none; }
+  .craft__cell:focus-visible { transform: none; transition: none; }
+}
+
+
+/* ── soup drink beat (inventory.js W1.2) ─────────────────────────
+   Bowl icon tips right, three integer-pixel steam puffs rise from it,
+   ~0.8 s total. prefers-reduced-motion: no animation at all. */
+@keyframes inv-soup-tip { 0% { transform: rotate(0); } 50% { transform: rotate(32deg); } 100% { transform: rotate(32deg); } }
+@keyframes inv-soup-steam { 0% { opacity: 0.7; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-16px); } }
+.inv__soup-drink img {
+  animation: inv-soup-tip 0.8s steps(4) both;
+  transform-origin: bottom right;
+}
+.inv__soup-drink::after {
+  content: '';
+  position: absolute; left: 56px; top: 2px;
+  width: 4px; height: 4px;
+  box-shadow: 0 0 0 0 #fff, 6px -3px 0 0 #fff, -4px -6px 0 0 #fff;
+  animation: inv-soup-steam 0.8s steps(4) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv__soup-drink img { animation: none; }
+  .inv__soup-drink::after { animation: none; display: none; }
+}
+
+
+/* ── crack: liquid chrome, arrow hint, red portal (WO W1.3) ──────
+   Override style.css rules from game.css with #panel specificity.
+   The stepped metallic ramp + specular sweep is the "liquid chrome"
+   look; prefers-reduced-motion kills all animation. */
+
+/* specular band sweeping across the chrome ramp */
+@keyframes crackSweep {
+  0%   { background-position: -80px 0; }
+  100% { background-position: 80px 0; }
+}
+
+/* bobbing arrow hint */
+@keyframes crackBob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(-6px); }
+}
+
+/* portal pulse */
+@keyframes crackPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+
+/* liquid chrome crack: bigger, jagged, stepped metallic fill */
+#panel #crack {
+  width: 48px; min-height: 48px; height: 48px;
+  right: 8px; bottom: 8px;
+}
+#panel #crack::before {
+  width: 48px; height: 48px;
+}
+#panel #crack::after {
+  clip-path: polygon(10% 0, 35% 15%, 55% 0, 70% 20%, 100% 35%, 85% 55%, 100% 75%, 75% 80%, 60% 100%, 40% 85%, 20% 100%, 5% 70%, 0 45%, 15% 30%);
+  background: linear-gradient(135deg, #F4F6FA 0%, #F4F6FA 20%, #C9CED8 20%, #C9CED8 40%, #8C93A3 40%, #8C93A3 60%, #4A5060 60%, #4A5060 80%, #1B1E26 80%, #1B1E26 100%);
+  background-size: 160px 160px;
+  animation: crackSweep 2.4s steps(6) infinite;
+  outline: 2px solid #1B1E26;
+  filter: drop-shadow(0 0 6px rgba(200,206,216,.6));
+}
+#panel #crack[data-n="1"] { transform: scale(1.5); }
+#panel #crack[data-n="2"] { transform: scale(2.4); }
+#panel #crack[data-n="2"]::after {
+  filter: drop-shadow(0 0 14px rgba(200,206,216,.9));
+}
+
+/* up-arrow hint: bobbing pixel arrow + text */
+.crack-hint {
+  position: fixed; z-index: 74;
+  top: 48px; left: 50%; transform: translateX(-50%);
+  color: #C9CED8; font-size: 16px; text-align: center;
+  pointer-events: none;
+  animation: crackBob 1.6s steps(4) infinite;
+}
+.crack-hint::before {
+  content: '▲'; display: block; font-size: 32px; line-height: 1;
+}
+
+/* red chrome portal: big, pulsing, unmissable */
+#panel #crack.is-portal {
+  width: 96px; height: 96px; min-height: 96px;
+  right: 4px; bottom: 4px;
+}
+#panel #crack.is-portal::after {
+  clip-path: circle(50%);
+  background: linear-gradient(135deg, #FFE3E3 0%, #FFE3E3 20%, #FF6B6B 20%, #FF6B6B 40%, #C2405F 40%, #C2405F 60%, #8C2F4A 60%, #8C2F4A 80%, #2A0A12 80%, #2A0A12 100%);
+  background-size: 200px 200px;
+  animation: crackSweep 2.4s steps(6) infinite;
+  outline: 2px solid #2A0A12;
+  filter: drop-shadow(0 0 20px rgba(255,107,107,.85));
+}
+#panel #crack.is-portal {
+  animation: crackPulse 1.2s steps(4) infinite;
+}
+
+/* calm motion: static chrome, no sweep/bob/pulse */
+@media (prefers-reduced-motion: reduce) {
+  #panel #crack::after { animation: none; }
+  #panel #crack.is-portal { animation: none; }
+  #panel #crack.is-portal::after { animation: none; }
+  .crack-hint { animation: none; }
+}
+
+
+/* ── Settings: Final Fantasy III Pixel Remaster CONFIG (WO W1.7) ─
+   Stepped vertical ramp #2B3FB0 → #1A2A8A → #0E1A5C (3 bands),
+   2px #F4F4F4 rounded (4px) border with 1px dark outer line,
+   two-pane layout with category list left and option rows right,
+   white pointing-hand cursor beside focused row.
+   All font sizes are multiples of 16px. */
+
+@keyframes settHandBob {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(4px); }
+}
+
+.sett__box {
+  width: min(720px, 94vw);
+  max-height: calc(100vh - 48px);
+  background: linear-gradient(180deg, #2B3FB0 0%, #2B3FB0 33%, #1A2A8A 33%, #1A2A8A 66%, #0E1A5C 66%, #0E1A5C 100%);
+  border: 2px solid #F4F4F4;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px #050814, 0 16px 48px rgba(0, 0, 0, 0.85);
+  color: #F4F4F4;
+  padding: 24px;
+  font-size: 16px;
+}
+
+.sett__h {
+  font: 400 32px/1 var(--font-quest, monospace);
+  color: #F4F4F4;
+  margin: 0 0 16px;
+  text-shadow: 2px 2px 0 #050814;
+}
+
+.sett__x {
+  border-color: #F4F4F4;
+  color: #F4F4F4;
+  border-radius: 4px;
+}
+.sett__x:hover, .sett__x:focus-visible {
+  background: #2B3FB0;
+  border-color: #FFFFFF;
+}
+
+.sett__two-pane {
+  display: flex;
+  gap: 20px;
+  min-height: 340px;
+}
+
+.sett__cats {
+  flex: 0 0 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-right: 2px solid rgba(244, 244, 244, 0.3);
+  padding-right: 12px;
+}
+
+.sett__cat {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px 8px 24px;
+  font: 400 16px/1 var(--font, monospace);
+  color: #F4F4F4;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sett__cat:hover {
+  background: rgba(43, 63, 176, 0.5);
+}
+
+.sett__cat[aria-selected="true"],
+.sett__cat.is-active {
+  background: #1A2A8A;
+  border-color: #F4F4F4;
+  color: #FFFFFF;
+}
+
+.sett__panes {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 160px);
+  padding-right: 8px;
+}
+
+.sett__pane[hidden] {
+  display: none !important;
+}
+
+.sett__pane {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sett__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 8px 10px 24px;
+  border-top: 1px dotted rgba(244, 244, 244, 0.3);
+  font-size: 16px;
+  color: #F4F4F4;
+}
+
+.sett__row:first-child {
+  border-top: 0;
+}
+
+.sett__row:hover,
+.sett__row:focus-within,
+.sett__row.is-focused {
+  background: rgba(43, 63, 176, 0.35);
+}
+
+.sett__lbl {
+  font: 400 16px/1.4 var(--font, monospace);
+  color: #F4F4F4;
+}
+
+.sett__lbl small {
+  display: block;
+  margin-top: 4px;
+  color: #C9CED8;
+  font-size: 16px;
+}
+
+.sett__dots {
+  flex: 1 1 auto;
+  border-bottom: 2px dotted rgba(244, 244, 244, 0.4);
+  margin: 0 8px;
+  height: 1px;
+}
+
+.sett__val-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: #F4F4F4;
+}
+
+.sett__arrow {
+  font-size: 16px;
+  color: #F4F4F4;
+  user-select: none;
+}
+
+.sett__sw {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 80px;
+  min-height: 44px;
+  padding: 0 12px;
+  font: 400 16px/1 var(--font, monospace);
+  color: #F4F4F4;
+  background: rgba(14, 26, 92, 0.7);
+  border: 2px solid #F4F4F4;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sett__sw::after { display: none; }
+.sett__sw[aria-checked="true"] {
+  background: #2B3FB0;
+  border-color: #FFFFFF;
+}
+.sett__sw:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 2px;
+}
+
+.sett__key,
+.sett__key-ext {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 44px;
+  padding: 0 12px;
+  font: 400 16px/1 var(--font, monospace);
+  color: #F4F4F4;
+  background: rgba(14, 26, 92, 0.7);
+  border: 2px solid #F4F4F4;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sett__key:hover, .sett__key-ext:hover {
+  border-color: #FFFFFF;
+  background: #2B3FB0;
+}
+.sett__key:focus-visible, .sett__key-ext:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 2px;
+}
+
+.sett__act {
+  min-height: 44px;
+  padding: 0 16px;
+  font: 400 16px/1 var(--font, monospace);
+  color: #F4F4F4;
+  background: rgba(14, 26, 92, 0.7);
+  border: 2px solid #F4F4F4;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sett__act:hover, .sett__act:focus-visible {
+  border-color: #FFFFFF;
+  background: #2B3FB0;
+}
+
+.sett__seg {
+  border: 2px solid #F4F4F4;
+  border-radius: 4px;
+  background: rgba(14, 26, 92, 0.7);
+}
+.sett__opt {
+  font-size: 16px;
+  color: #F4F4F4;
+  border-left: 2px solid #F4F4F4;
+}
+.sett__opt[aria-checked="true"] {
+  background: #2B3FB0;
+  color: #FFFFFF;
+}
+
+.sett__hand,
+.sett__cat:focus-visible::before,
+.sett__cat[aria-selected="true"]::before,
+.sett__row:focus-within::before,
+.sett__row.is-focused::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 16px 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23F4F4F4' d='M0 6h6V4h2V2h4v2h2v4h2v2h-2v2h-4v2H6v-2H4v-2H0V6z'/%3E%3Cpath fill='%230E1A5C' d='M1 7h5V5h2V3h4v2h2v4h2v1h-2v2h-4v1H6v-1H4v-2H1V7z'/%3E%3Cpath fill='%23FFFFFF' d='M2 8h4V6h2V4h3v1h1v3h2v1h-2v1h-3v1H6v-1H4v-1H2V8z'/%3E%3C/svg%3E");
+  animation: settHandBob 0.8s steps(2) infinite;
+}
+
+/* Reduced motion: no cursor bob */
+@media (prefers-reduced-motion: reduce) {
+  .sett__hand,
+  .sett__cat:focus-visible::before,
+  .sett__cat[aria-selected="true"]::before,
+  .sett__row:focus-within::before,
+  .sett__row.is-focused::before {
+    animation: none;
+  }
+}
+
+/* C menu: ITEMS / EQUIP (W2.2). Keep the frame under .tbox at z 76. */
+.inv {
+  top: 50%; width: min(1152px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+  transform: translate(-50%, -50%); overflow: auto; padding: 16px;
+  border: 2px solid #fff; box-shadow: inset 0 0 0 2px #000, inset 0 0 0 4px #fff;
+  font: 400 16px/1.25 var(--font);
+}
+.inv__top { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; border-bottom: 2px solid #fff; }
+.inv__tabs { display: flex; align-items: stretch; gap: 16px; }
+.inv__tab { display: inline-flex; align-items: center; gap: 8px; border: 0; padding: 8px 16px; color: #fff; background: transparent; font: inherit; cursor: pointer; }
+.inv__tab canvas { width: 16px; height: 16px; image-rendering: pixelated; }
+.inv__tab.is-sel { color: #ff0; outline: 2px solid #ff0; outline-offset: -2px; }
+.inv__coins { white-space: nowrap; color: #fff; }
+.inv__body { display: grid; grid-template-columns: 160px 256px 224px minmax(256px, 1fr); gap: 16px; min-height: 288px; padding: 16px 0; }
+.inv__body section { min-width: 0; border: 2px solid #fff; padding: 8px; }
+.inv__body h2 { margin: 0 0 8px; color: #fff; font: inherit; }
+.inv__char { text-align: center; }
+.inv__portrait { display: block; width: 80px; height: 120px; margin: 16px auto; image-rendering: pixelated; }
+.inv__slots { display: grid; gap: 8px; }
+.inv__slot { display: grid; grid-template-columns: 32px 1fr; align-items: center; min-height: 48px; }
+.inv__slot > span:first-child { grid-row: span 2; font-size: 16px; }
+.inv__slot b { font-weight: normal; color: #bbb; }
+.inv__slot.is-focus { color: #ff0; outline: 2px solid #ff0; }
+.inv__slot.is-focus b { color: #ff0; }
+.inv__statlines { display: grid; gap: 16px; }
+.inv__statlines b { font-weight: normal; }
+.inv__statlines .is-up { color: #5f6; }
+.inv__statlines .is-down { color: #f55; }
+.inv__statlines .is-fx { color: #fa4; }
+.inv__inventory { grid-column: 1 / -1; }
+.inv__inventory.is-equip { grid-column: auto; }
+.inv__list { max-height: 240px; overflow: auto; }
+.inv__list li { min-height: 40px; padding: 4px 4px 4px 40px; gap: 8px; }
+.inv__list li::before { width: 16px; height: 16px; margin-top: -8px; background: none; content: '♥'; color: #f55; font-size: 16px; }
+.inv__list li.is-sel { outline: 2px solid #ff0; }
+.inv__list li.is-unusable { color: #666; }
+.inv__list li.is-equipped span::after { content: '  EQUIPPED'; color: #aaa; }
+.inv__icon { width: 16px; height: 16px; image-rendering: pixelated; }
+.inv__desc { min-height: 48px; border: 2px solid #fff; padding: 8px; }
+.inv__body[hidden], .inv__body section[hidden] { display: none; }
+@media (max-width: 800px) {
+  .inv__body { grid-template-columns: 1fr 1fr; }
+  .inv__inventory { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
+}
+
+.kernel-play { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.kernel-play canvas { display: block; width: min(100vw, 166.67vh); height: auto; aspect-ratio: 5 / 3; image-rendering: pixelated; }
+.plat { position: fixed; inset: 0; z-index: 76; background: #0b0a12; }
+.plat canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+.cards { position: fixed; inset: 0; z-index: 80; background: #000; }
+.cards canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; image-rendering: pixelated; }
+
+/* Mage shop (js/act4/mage.js). Undertale split: art, menu, dialogue. z 76, under .tbox. */
+.mage {
+  position: fixed; inset: 0; z-index: 76;
+  display: flex; flex-direction: column;
+  background: #000; color: #fff;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+.mage[hidden] { display: none !important; }
+.mage__art { flex: 3 1 60%; min-height: 0; margin: 16px 16px 0; border: 4px solid #fff; background: #1C1814; }
+.mage__art canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; image-rendering: pixelated; }
+.mage__dock { flex: 2 1 40%; display: flex; gap: 16px; padding: 16px; min-height: 0; }
+.mage__menu, .mage__box {
+  border: 4px solid #fff; padding: 16px; min-width: 0; overflow: auto; background: #000;
+}
+.mage__menu { flex: 2 1 40%; }
+.mage__box { flex: 3 1 60%; }
+.mage__say { margin: 0; font: 400 16px/1.35 var(--font, monospace); color: #fff; }
+.mage__row {
+  position: relative; display: block; width: 100%;
+  margin: 0; padding: 0 0 0 32px; min-height: 32px;
+  text-align: left; color: #fff; background: transparent;
+  border: 0; font: 400 16px/2 var(--font, monospace); cursor: pointer;
+}
+.mage__row.is-sel { color: #ff0; }
+.mage__row.is-sel::before {
+  content: '\2665'; position: absolute; left: 0; top: 0;
+  color: #f00; font-size: 16px;
+}
+.mage__p { float: right; color: #fff; }
+@media (prefers-reduced-motion: reduce) {
+  .mage, .mage * { animation: none !important; transition: none !important; }
+}
+
+/* Card duel (js/act4/cards.js). The picture is the canvas; this only
+   parks the overlay. Motion lives in the draw, and stops with the media query. */
+.cards[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .cards, .cards * { animation: none !important; transition: none !important; }
+}
+
+/* Exo Mechs (js/act4/boss-exo.js). z 76, under .tbox. */
+.exo {
+  position: fixed; inset: 0; z-index: 76;
+  background: #101820; color: #fff;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+.exo[hidden] { display: none !important; }
+.exo canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.exo__pick {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  min-width: 320px;
+}
+.exo__pick button {
+  display: block; width: 100%; min-height: 48px; margin: 0 0 16px;
+  padding: 0 16px; text-align: left; color: #fff; background: #000;
+  border: 4px solid #fff; font: 400 16px/2 var(--font, monospace); cursor: pointer;
+}
+.exo__pick button.is-sel { color: #ff0; border-color: #ff0; }
+.exo__vuln {
+  position: absolute; top: 16px; left: 0; right: 0; margin: 0;
+  text-align: center; font: 400 32px/1 var(--font, monospace); pointer-events: none;
+}
+.exo__hud {
+  position: absolute; left: 16px; bottom: 16px; margin: 0;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+.exo__quit {
+  position: absolute; top: 16px; right: 16px;
+  font: 400 16px/1 var(--font, monospace); color: #fff; background: transparent; border: 0;
+}
+.exo__keys {
+  position: absolute; right: 16px; bottom: 16px; margin: 0;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+@media (prefers-reduced-motion: reduce) {
+  .exo, .exo * { animation: none !important; transition: none !important; }
+}
+
+/* Merchant stall after the rap (rhythm.js). Sits inside #fnf, under .tbox. */
+.fnf__stall {
+  position: absolute; left: 16px; right: 16px; bottom: 128px; z-index: 4;
+  max-width: 640px; margin: 0 auto; box-sizing: border-box;
+  padding: 16px; background: #000; color: #fff;
+  border: 4px solid #fff;
+  font: 400 16px/1.5 "Determination Mono", "Pixelify Sans", monospace;
+}
+.fnf__stall[hidden] { display: none !important; }
+.fnf__stall button {
+  display: block; width: 100%; min-height: 32px; margin: 0 0 8px; padding: 0 16px;
+  text-align: left; color: #fff; background: #000; border: 0; cursor: pointer;
+  font: 400 16px/2 "Determination Mono", "Pixelify Sans", monospace;
+}
+.fnf__stall button.is-sel { color: #ff0; }
+@media (prefers-reduced-motion: reduce) {
+  .fnf, .fnf * { animation: none !important; transition: none !important; }
+}
+
+/* Painter lightning (rooms-p.js). Under .tbox (96). */
+.bolt {
+  position: fixed; inset: 0; z-index: 80;
+  background: #0a0a0c;
+}
+.bolt[hidden] { display: none !important; }
+.bolt canvas {
+  display: block; width: 100%; height: 100%;
+  image-rendering: pixelated;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bolt, .bolt * { animation: none !important; transition: none !important; }
+}
+
+/* Minecart (js/act4/cart.js). Under .tbox (96). */
+.cart { position: fixed; inset: 0; z-index: 76; background: #140e0a; }
+.cart[hidden] { display: none !important; }
+.cart canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+.cart__hint {
+  position: absolute; left: 16px; bottom: 16px; margin: 0; color: #f0d8a8;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cart, .cart * { animation: none !important; transition: none !important; }
+}
+
+/* Elevator (js/act4/elevator.js). Under .tbox (96), over the cart. */
+.elv { position: fixed; inset: 0; z-index: 77; background: #14110e; }
+.elv[hidden] { display: none !important; }
+.elv canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+.elv__screen {
+  position: absolute; left: 50%; top: 32px; transform: translateX(-50%);
+  margin: 0; min-width: 288px; padding: 8px 16px; text-align: center;
+  color: #b7ff9a; background: #10160f; border: 4px solid #3a4634;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+.elv__pad { position: absolute; left: 0; right: 0; bottom: 32px; text-align: center; }
+.elv__pad button {
+  min-width: 64px; min-height: 48px; margin: 0 16px; color: #f4efe4;
+  background: #2a241c; border: 4px solid #8a7a62; cursor: pointer;
+  font: 400 32px/1 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .elv, .elv * { animation: none !important; transition: none !important; }
+}
+
+/* Draedon (js/act4/boss-draedon.js). z 76, under .tbox. */
+.draedon {
+  position: fixed; inset: 0; z-index: 76;
+  background: #101820; color: #fff;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+.draedon[hidden] { display: none !important; }
+.draedon canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.draedon__vuln {
+  position: absolute; top: 16px; left: 0; right: 0; margin: 0;
+  text-align: center; font: 400 32px/1 var(--font, monospace); pointer-events: none;
+}
+.draedon__bang {
+  position: absolute; left: 16px; top: 64px; margin: 0;
+  color: #ff0; font: 700 64px/1 var(--font, monospace); pointer-events: none;
+}
+.draedon__prompt {
+  position: absolute; left: 96px; top: 80px; margin: 0;
+  color: #ff0; font: 700 32px/1 var(--font, monospace); pointer-events: none;
+}
+.draedon__count {
+  position: absolute; left: 0; right: 0; top: 160px; margin: 0;
+  text-align: center; color: #fff; font: 400 64px/1 var(--font, monospace);
+  pointer-events: none;
+}
+.draedon__hud {
+  position: absolute; left: 16px; bottom: 16px; margin: 0;
+  font: 400 16px/1.25 var(--font, monospace);
+}
+.draedon__quit {
+  position: absolute; top: 16px; right: 16px;
+  font: 400 16px/1 var(--font, monospace); color: #fff; background: transparent; border: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .draedon, .draedon * { animation: none !important; transition: none !important; }
+}
+
+/* Snail station (js/act4/snail.js). Under .tbox (96). */
+.snail { position: fixed; inset: 0; z-index: 76; background: #1a120c; }
+.snail[hidden] { display: none !important; }
+.snail canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.snail__list {
+  position: absolute; left: 16px; top: 16px; margin: 0; padding: 16px;
+  list-style: none; background: #000; color: #fff; border: 4px solid #fff;
+  font: 400 16px/2 "Determination Mono", "Pixelify Sans", monospace;
+}
+.snail__list li { min-height: 32px; padding: 0 16px; }
+.snail__list li.is-sel { color: #ff0; }
+.snail__hint {
+  position: absolute; left: 16px; bottom: 16px; margin: 0; color: #f0d8a8;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .snail, .snail * { animation: none !important; transition: none !important; }
+}
+
+/* Desk note (js/act4/note.js). Centred, under .tbox (96). */
+.note {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 78; background: #120e0c; border: 4px solid #5a4634;
+}
+.note[hidden] { display: none !important; }
+.note canvas { display: block; width: min(960px, 100vw - 32px); height: auto; aspect-ratio: 16 / 9; image-rendering: pixelated; }
+.note__hint {
+  margin: 0; padding: 0 16px 16px; color: #e4d8c0;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .note, .note * { animation: none !important; transition: none !important; }
+}
+
+/* Village lockdown (js/act4/chase.js). Under .tbox (96). */
+#sAlarm.s-alarm {
+  position: fixed; left: 0; right: 0; top: 0; height: 16px;
+  z-index: 76; pointer-events: none; background: #E23B55;
+  animation: s-alarm 800ms steps(2, end) infinite;
+}
+@keyframes s-alarm {
+  from { opacity: 1; }
+  to { opacity: 0.15; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #sAlarm.s-alarm { animation: none; opacity: 0.85; }
+}
+
+/* Supreme finale (js/act4/finale.js). Under .tbox (96). */
+.finale { position: fixed; inset: 0; z-index: 76; background: #07060c; }
+.finale[hidden] { display: none !important; }
+.finale canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.finale__word {
+  position: absolute; left: 0; right: 0; top: 32px; margin: 0;
+  text-align: center; color: #e8d4ff; pointer-events: none;
+  font: 400 64px/1 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .finale, .finale * { animation: none !important; transition: none !important; }
+}
+
+/* Flying chair (js/act4/chair.js). Replaces the snail menu. Under .tbox (96). */
+.chair { position: fixed; inset: 0; z-index: 76; background: #120818; }
+.chair[hidden] { display: none !important; }
+.chair__list {
+  position: absolute; left: 16px; top: 16px; margin: 0; padding: 16px;
+  list-style: none; background: #000; color: #fff; border: 4px solid #e8d4ff;
+  font: 400 16px/2 "Determination Mono", "Pixelify Sans", monospace;
+}
+.chair__list li { min-height: 32px; padding: 0 16px; }
+.chair__list li.is-sel { color: #ff0; }
+.chair__hint {
+  position: absolute; left: 16px; bottom: 16px; margin: 0; color: #e8d4ff;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chair, .chair * { animation: none !important; transition: none !important; }
+}
+
+/* Photograph (js/act4/photo.js). Centred, under .tbox (96). */
+.photo {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 78; background: #12161e; border: 4px solid #5a4634;
+}
+.photo[hidden] { display: none !important; }
+.photo canvas { display: block; width: min(960px, 100vw - 32px); height: auto; aspect-ratio: 16 / 9; image-rendering: pixelated; }
+.photo__mark, .photo__hint {
+  margin: 0; padding: 0 16px 16px; color: #e4d8c0;
+  font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
+}
+.photo__mark { color: #b01018; }
+@media (prefers-reduced-motion: reduce) {
+  .photo, .photo * { animation: none !important; transition: none !important; }
+}

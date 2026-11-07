@@ -24,7 +24,8 @@
   var el = document.getElementById('crack');
   if (!el) { NEU.crack = { arm: function () {} }; return; }
 
-  var armed = false, clicks = 0, opened = false, timer = null, actx = null;
+  var armed = false, clicks = 0, opened = false, transitioning = false, timer = null, actx = null;
+  var hintEl = null;
 
   var NOISE = [
     'something behind the panel makes a noise. it is not a good noise.',
@@ -32,20 +33,85 @@
     ''
   ];
 
+  function showHint() {
+    if (hintEl) return;
+    if (NEU.quest && NEU.quest.has('a4_crack')) return;
+    hintEl = document.createElement('div');
+    hintEl.className = 'crack-hint';
+    hintEl.textContent = 'something cracked inside the cube';
+    document.body.appendChild(hintEl);
+  }
+
+  function hideHint() {
+    if (!hintEl) return;
+    if (hintEl.parentNode) hintEl.parentNode.removeChild(hintEl);
+    hintEl = null;
+  }
+
+  function reducedMotion() {
+    try {
+      if (NEU.motion && NEU.motion.reduced) return NEU.motion.reduced();
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) { return false; }
+  }
+
+  function enterDungeon() {
+    if (NEU.plat && NEU.plat.open) NEU.plat.open('d0');
+  }
+
+  function transitionToDungeon() {
+    var panel = document.getElementById('panel'), flash, rect, crackRect, oldTransition, oldTransform;
+    transitioning = true;
+    if (panel) {
+      oldTransition = panel.style.transition;
+      oldTransform = panel.style.transform;
+      panel.style.transition = 'transform 900ms cubic-bezier(.18,.72,.16,1), opacity 900ms ease';
+      if (reducedMotion()) {
+        panel.style.opacity = '0.08';
+      } else {
+        rect = panel.getBoundingClientRect();
+        crackRect = el.getBoundingClientRect();
+        panel.style.transformOrigin = (crackRect.left + crackRect.width / 2 - rect.left) + 'px ' +
+          (crackRect.top + crackRect.height / 2 - rect.top) + 'px';
+        panel.style.transform = 'scale(0.06)';
+        flash = document.createElement('div');
+        flash.setAttribute('aria-hidden', 'true');
+        flash.style.cssText = 'position:fixed;inset:0;z-index:99;pointer-events:none;background:#D9203F;opacity:.55;transition:opacity 180ms ease';
+        document.body.appendChild(flash);
+        window.setTimeout(function () {
+          flash.style.opacity = '0';
+          window.setTimeout(function () { if (flash.parentNode) flash.parentNode.removeChild(flash); }, 200);
+        }, 20);
+      }
+      void panel.offsetWidth;
+    }
+    timer = window.setTimeout(function () {
+      if (panel) {
+        panel.style.transition = oldTransition || '';
+        panel.style.transform = oldTransform || '';
+        panel.style.transformOrigin = '';
+        panel.style.opacity = '';
+      }
+      transitioning = false;
+      timer = null;
+      enterDungeon();
+    }, 900);
+  }
+
   function arm() {
     if (armed) return;
     armed = true;
     el.hidden = false;
     requestAnimationFrame(function () { el.classList.add('is-in'); });
     if (NEU.save) NEU.save.flag('crack_armed', 1);
+    showHint();
   }
 
   function hit() {
     if (!armed) return;
-    /* The portal stays clickable: a reload between opening and fighting
-       used to leave it inert forever. He cannot be re-summoned once dead. */
+    /* The portal stays open across visits and reloads. */
     if (opened) {
-      if (!(NEU.save && NEU.save.flagged('polt_dead')) && NEU.polt && NEU.polt.open) NEU.polt.open();
+      if (!transitioning) enterDungeon();
       return;
     }
     clicks++;
@@ -73,29 +139,25 @@
     el.setAttribute('data-n', String(clicks));
 
     if (clicks === 1 && NEU.quest) NEU.quest.mark('a4_crack');
+    hideHint();
     if (NOISE[clicks - 1] && NEU.talk) NEU.talk([NOISE[clicks - 1]], 'narr');
 
     if (clicks >= 3) {
       opened = true;
+      if (NEU.save) NEU.save.flag('crack_portal', 1);
       el.classList.add('is-portal');
       if (NEU.talk) NEU.talk(['it is not a crack. it is a hole, and it is round now.'], 'narr');
-      timer = setTimeout(function () {
-        if (NEU.polt) NEU.polt.open();
-      }, 2400);
+      transitionToDungeon();
     }
   }
 
-  /* Quitting the fight without killing him puts the crack back. A
-     crack that stayed "opened" forever would be a dead end with no
-     exit: the finale never resolves, the save stays stuck at a portal
-     that will not open again. The three clicks are cheap; losing the
-     whole endgame is not. */
+  /* Keep the portal available even when other scenes return control. */
   function reset() {
-    if (!armed || !opened) return;
-    opened = false; clicks = 0;
-    el.classList.remove('is-portal');
+    if (opened) return;
+    if (!armed) return;
+    clicks = 0;
     el.setAttribute('data-n', '0');
-    if (timer) { clearTimeout(timer); timer = null; }
+    if (timer) { window.clearTimeout(timer); timer = null; transitioning = false; }
     if (NEU.save) NEU.save.flag('crack_clicks', 0);
   }
 
@@ -106,7 +168,13 @@
   if (NEU.save && NEU.save.flagged('crack_armed')) {
     arm();
     clicks = (NEU.save.flag('crack_clicks') || 0);
-    if (clicks >= 3) { opened = true; el.classList.add('is-portal'); }
+    if (clicks >= 3 || NEU.save.flagged('crack_portal')) {
+      clicks = Math.max(3, clicks);
+      opened = true;
+      el.classList.add('is-portal');
+      el.setAttribute('data-n', String(clicks));
+      if (!NEU.save.flagged('crack_portal')) NEU.save.flag('crack_portal', 1);
+    }
   }
 
   NEU.crack = { arm: arm, hit: hit, reset: reset,
