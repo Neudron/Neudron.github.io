@@ -238,7 +238,7 @@
     ctx.fillRect(x, y, 4, CH);
     ctx.fillRect(x + CW - 4, y, 4, CH);
     if (icon) for (r = 0; r < icon.length; r++) for (c = 0; c < 5; c++) if (icon[r].charAt(c) === '1') {
-      ctx.fillRect(x + 26 + c * 4, y + 18 + r * 4, 4, 4);
+      ctx.fillRect(x + 16 + c * 8, y + 16 + r * 8, 8, 8);
     }
     num = id === 'HEAL' ? '+3' : '3';
     ctx.fillStyle = '#1A120C';
@@ -282,10 +282,18 @@
     ctx.fillStyle = '#5C3A1E';
     ctx.fillRect(120, 228, 400, 24);
     ctx.fillRect(64, 252, 512, 78);
+    ctx.fillStyle = '#2A1248';
+    ctx.fillRect(300, 46, 40, 16);
+    ctx.fillRect(288, 62, 64, 8);
     ctx.fillStyle = '#E4C8A8';
-    ctx.fillRect(308, 70, 24, 20);
+    ctx.fillRect(312, 70, 16, 16);
+    ctx.fillStyle = '#1A120C';
+    ctx.fillRect(314, 74, 4, 4);
+    ctx.fillRect(322, 74, 4, 4);
     ctx.fillStyle = '#3B1F5C';
     ctx.fillRect(292, 90, 56, 34);
+    ctx.fillStyle = '#6A3FA0';
+    ctx.fillRect(292, 108, 56, 8);
     ctx.fillRect(284, 124, 72, 28);
     for (i = 0; i < 4; i++) {
       ctx.fillStyle = '#1E3A5F';

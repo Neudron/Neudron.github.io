@@ -172,12 +172,30 @@
     for (i = 0; i < candles.length; i += 2) kinds.candle.draw(c, candles[i], candles[i + 1], flickT);
   }
 
-  NEU.dungeonLook = { tileset: 'dungeon', hz: HZ, candleOn: candleOn, paint: paint, flick: flick, last: null, canvas: null };
+  function fillGap(c, camX, camY, level) {
+    if (!c || !level) return;
+    var prev = last, x0, y0, x1, y1, x, y, sx, sy;
+    last = null;
+    cur = BANDS[bandOf(level.id)] || BANDS.blue;
+    x0 = (Math.floor(camX / 16) - 1) | 0;
+    y0 = (Math.floor(camY / 16) - 1) | 0;
+    x1 = (Math.floor((camX + 640) / 16) + 1) | 0;
+    y1 = (Math.floor((camY + 360) / 16) + 1) | 0;
+    for (y = y0; y <= y1; y++) for (x = x0; x <= x1; x++) {
+      if (x >= 0 && y >= 0 && x < level.w && y < level.h) continue;
+      sx = (x * 16 - camX) | 0;
+      sy = (y * 16 - camY) | 0;
+      drawBack(c, sx, sy, x, y);
+    }
+    last = prev;
+  }
+
+  NEU.dungeonLook = { tileset: 'dungeon', hz: HZ, candleOn: candleOn, paint: paint, flick: flick, fillGap: fillGap, last: null, canvas: null };
   if (document && document.createElement) {
     var origCreate = document.createElement;
     document.createElement = function (tag) {
       var el = origCreate.call(document, tag);
-      if (el && String(tag).toLowerCase() === 'canvas') {
+      if (el && String(tag).toLowerCase() === 'canvas' && NEU.plat && NEU.plat._baking) {
         bake = el;
         NEU.dungeonLook.canvas = el;
       }

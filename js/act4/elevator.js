@@ -174,20 +174,41 @@
     ctx.fillRect(x + 10, y0 - 6 + n * 2, 4, 36);
     ctx.fillRect(x - 6 + n * 2, y0 + 10, 36, 4);
   }
+  function steelSlab(x0, w0, seamRight) {
+    var cols, i, step, rw, x, ry, rx;
+    if (w0 < 1) return;
+    if (w0 < 12) {
+      ctx.fillStyle = '#8e98a2';
+      ctx.fillRect(x0, 0, w0, H);
+      ctx.fillStyle = '#1c2128';
+      ctx.fillRect(seamRight ? x0 + w0 - 2 : x0, 0, 2, H);
+      return;
+    }
+    cols = ['#5c656e', '#8e98a2', '#d5dde4'];
+    step = (w0 / 3) | 0;
+    for (i = 0; i < 3; i++) {
+      rw = i === 2 ? w0 - step * 2 : step;
+      if (seamRight) x = x0 + i * step;
+      else if (i === 2) x = x0;
+      else x = x0 + w0 - (i + 1) * step;
+      ctx.fillStyle = cols[i];
+      ctx.fillRect(x, 0, rw, H);
+    }
+    ctx.fillStyle = '#1c2128';
+    ctx.fillRect(seamRight ? x0 + w0 - 4 : x0, 0, 4, H);
+    ctx.fillStyle = '#242c34';
+    for (ry = 16; ry < H - 4; ry += 32) {
+      for (rx = 10; rx < w0 - 10; rx += 16) ctx.fillRect(x0 + rx, ry, 2, 2);
+    }
+  }
   function drawDoors() {
     var span = ((1 - door) * (W / 2)) | 0;
     var ext = (piston * 48) | 0;
     var i, p;
     if (span < 0) span = 0;
     drawMountain();
-    ctx.fillStyle = '#9aa3ad';
-    ctx.fillRect(0, 0, span, H);
-    ctx.fillRect(W - span, 0, span, H);
-    ctx.fillStyle = '#d5dde4';
-    if (span > 4) {
-      ctx.fillRect(span - 4, 0, 4, H);
-      ctx.fillRect(W - span, 0, 4, H);
-    }
+    steelSlab(0, span, true);
+    steelSlab(W - span, span, false);
     ctx.fillStyle = '#c8b49a';
     for (i = 0; i < dust.length; i++) {
       p = dust[i];

@@ -609,9 +609,33 @@
     phaseFlashes += 1;
   }
 
+  /* look-dungeon.js BANDS: blue back wall, green fog, pink bottom chamber. */
+  var BRICK = {
+    1: { wall: '#24325C', mort: '#1A2340' },
+    2: { wall: '#24325C', mort: '#1A2340' },
+    3: { wall: '#4A1848', mort: '#602050' }
+  };
+  function drawBricks() {
+    var pal = BRICK[phase] || BRICK[1];
+    var y;
+    ctx.fillStyle = pal.wall;
+    ctx.fillRect(AX | 0, AY | 0, AW | 0, AH | 0);
+    ctx.fillStyle = pal.mort;
+    for (y = 15; y < AH; y += 16) ctx.fillRect(AX | 0, (AY + y) | 0, AW | 0, 1);
+    if (phase === 2) {
+      for (y = 0; y < AH; y += 32) {
+        ctx.fillStyle = (y & 32) ? '#0A4020' : '#158039';
+        ctx.fillRect(AX | 0, (AY + y) | 0, AW | 0, Math.min(16, (AH - y) | 0));
+        ctx.fillStyle = '#7FE3C4';
+        ctx.fillRect(AX | 0, (AY + y) | 0, AW | 0, 2);
+      }
+    }
+  }
   function frame() {
     var look = PHASE_LOOK[phase] || PHASE_LOOK[1];
-    ctx.fillStyle = look.field; ctx.fillRect(AX, AY, AW, AH);
+    ctx.fillStyle = look.field;
+    ctx.fillRect(AX | 0, AY | 0, AW | 0, AH | 0);
+    drawBricks();
     ctx.fillStyle = look.rim;
     ctx.fillRect(AX - 3, AY - 3, AW + 6, 3); ctx.fillRect(AX - 3, AY + AH, AW + 6, 3);
     ctx.fillRect(AX - 3, AY, 3, AH); ctx.fillRect(AX + AW, AY, 3, AH);
@@ -802,9 +826,15 @@
     }
 
     if (line && nowMs - lineT < 5000) {
+      var ty = (AY - 16) | 0;
+      var hudTop = Math.min(AY + AH + 24, innerHeight - 52) | 0;
+      if (ty + 16 > hudTop) ty = (hudTop - 16) | 0;
+      if (ty < 32) ty = 32;
       ctx.fillStyle = COL.bone;
       ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
-      ctx.fillText(line, AX, AY + AH + 80, Math.min(AW, innerWidth));
+      ctx.textBaseline = 'top';
+      ctx.fillText(line, AX, ty, Math.min(AW, innerWidth));
+      ctx.textBaseline = 'alphabetic';
     }
   }
 

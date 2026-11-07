@@ -163,7 +163,7 @@
     var origCreate = document.createElement;
     document.createElement = function (tag) {
       var el = origCreate.call(document, tag);
-      if (el && String(tag).toLowerCase() === 'canvas') lastCanvas = el;
+      if (el && String(tag).toLowerCase() === 'canvas' && NEU.plat && NEU.plat._baking) lastCanvas = el;
       return el;
     };
   }
@@ -210,6 +210,7 @@
     orig = ctx.drawImage;
     ctx.drawImage = function (img, dx, dy) {
       var camX = -(dx || 0), camY = -(dy || 0), r;
+      if (arguments.length > 3) return orig.apply(this, arguments);
       if (NEU.mountain.mood) sky(this, camX, camY, NEU.mountain.mood);
       r = orig.apply(this, arguments);
       return r;

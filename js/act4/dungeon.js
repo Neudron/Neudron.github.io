@@ -145,8 +145,11 @@
     scale = Math.min(w / 640, h / 360) || 1;
     ox = (w - 640 * scale) / 2;
     oy = (h - 360 * scale) / 2;
-    camX = Math.max(0, Math.min(P.state.x - 320, Math.max(0, L.w * 16 - 640)));
-    camY = Math.max(0, Math.min(P.state.y - 180, Math.max(0, L.h * 16 - 360)));
+    if (P.cam) { camX = P.cam().x; camY = P.cam().y; }
+    else {
+      camX = Math.max(0, Math.min(P.state.x - 320, Math.max(0, L.w * 16 - 640)));
+      camY = Math.max(0, Math.min(P.state.y - 180, Math.max(0, L.h * 16 - 360)));
+    }
     if (c.save) c.save();
     if (c.setTransform) c.setTransform(scale, 0, 0, scale, ox, oy);
     try { c.imageSmoothingEnabled = false; } catch (e1) {}

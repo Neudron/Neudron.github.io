@@ -315,6 +315,83 @@
     ctx.fillStyle = col;
     ctx.fillRect(x | 0, y | 0, w | 0, h | 0);
   }
+  function clipArena(fn) {
+    var can = ctx.save && ctx.beginPath && ctx.rect && ctx.clip && ctx.restore;
+    if (can) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(box.AX | 0, box.AY | 0, box.AW | 0, box.AH | 0);
+      ctx.clip();
+    }
+    fn();
+    if (can) ctx.restore();
+  }
+  function drawAres(c, x, y) {
+    x = x | 0; y = y | 0;
+    c.fillStyle = '#102028';
+    c.fillRect(x - 48, y + 28, 96, 12);
+    c.fillStyle = '#7FE3C4';
+    c.fillRect(x - 28, y + 26, 56, 4);
+    c.fillStyle = '#E04A3A';
+    c.fillRect(x - 64, y - 28, 36, 14);
+    c.fillStyle = '#3BE2C8';
+    c.fillRect(x + 28, y - 28, 36, 14);
+    c.fillStyle = '#7C5CFF';
+    c.fillRect(x - 64, y + 8, 36, 14);
+    c.fillStyle = '#E6C15A';
+    c.fillRect(x + 28, y + 8, 36, 14);
+    c.fillStyle = '#8A939C';
+    c.fillRect(x - 24, y - 48, 48, 72);
+    c.fillStyle = '#C5D0D8';
+    c.fillRect(x - 14, y - 32, 28, 18);
+    c.fillStyle = '#E04A3A';
+    c.fillRect(x - 12, y - 24, 24, 4);
+  }
+  function drawTwin(c, x, y, body, lens) {
+    x = x | 0; y = y | 0;
+    c.fillStyle = body;
+    c.fillRect(x, y - 48, 40, 96);
+    c.fillStyle = '#F4F4F4';
+    c.fillRect(x + 4, y - 40, 32, 18);
+    c.fillStyle = lens;
+    c.fillRect(x + 8, y - 14, 24, 16);
+    c.fillStyle = '#101418';
+    c.fillRect(x + 14, y - 8, 12, 6);
+    c.fillStyle = '#2A3038';
+    c.fillRect(x - 4, y + 40, 48, 8);
+  }
+  function drawTwins(c, x, y) {
+    drawTwin(c, (x - 72) | 0, y, '#E23B3B', '#F4F4F4');
+    drawTwin(c, (x + 16) | 0, y, '#3BE26A', '#7CFFB2');
+  }
+  function drawThanatos(x, y, open) {
+    var s, sx, sy;
+    x = x | 0; y = y | 0;
+    /* ThanatosHeadBehaviorOverride.cs:54 SegmentCount 100.
+       ThanatosSegmentBehaviorOverride.cs:104 open every 12th while the head is open. */
+    for (s = 0; s < 100; s++) {
+      sx = x - 24 - s * 6;
+      sy = y - 8 + (s % 2) * 4;
+      ctx.fillStyle = (open && s % 12 === 11) ? '#FFC46A' : '#7A8794';
+      ctx.fillRect(sx | 0, sy | 0, 16, 16);
+    }
+    ctx.fillStyle = '#5C656E';
+    ctx.fillRect(x - 112, y - 4, 96, 16);
+    ctx.fillStyle = open ? '#FFC46A' : '#C5D0D8';
+    ctx.fillRect(x - 28, y - 28, 48, 36);
+    ctx.fillStyle = '#E04A3A';
+    ctx.fillRect(x - 10, y - 14, 22, 6);
+  }
+  NEU.exoPaint = {
+    ares: function (c, x, y) { drawAres(c, x, y); },
+    twins: function (c, x, y) { drawTwins(c, x, y); },
+    thanatos: function (c, x, y, open) {
+      var prev = ctx;
+      ctx = c;
+      drawThanatos(x, y, open);
+      ctx = prev;
+    }
+  };
   function drawShape(s, col) {
     var k, px, py;
     if (!s) return;
@@ -332,47 +409,98 @@
     }
   }
   function draw() {
-    var s, open, sx, sy, shift, col, k;
+    var open, shift, k, y, x, span, w, h;
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
+    w = window.innerWidth || 800;
+    h = window.innerHeight || 600;
     ctx.fillStyle = LOOK[phase] || '#FF00FF';
-    ctx.fillRect(0, 0, window.innerWidth || 800, window.innerHeight || 600);
-    for (k = 0; k < 4; k++) {
-      shift = REDUCE ? 0 : ((fightFrame * (k + 1)) % 32);
-      band((box.AX - shift) | 0, (box.AY + 40 + k * 48) | 0, box.AW + 32, 8, k % 2 ? '#1C2830' : '#243240');
-    }
+    ctx.fillRect(0, 0, w, h);
     band(box.AX, box.AY, box.AW, box.AH, '#07080C');
-    if (NEU.thanatosAtk) {
-      drawShape(NEU.thanatosAtk.telegraph(), '#FFD2A0');
-      drawShape(NEU.thanatosAtk.hazard(), '#FF5A3C');
-    }
-    if (NEU.exoCombos) NEU.exoCombos.draw(ctx);
-    if (mechs.thanatos.alive) {
-      open = ventsOpen();
-      /* ThanatosHeadBehaviorOverride.cs:54 SegmentCount 100.
-         ThanatosSegmentBehaviorOverride.cs:104 open every 12th while the head is open. */
-      for (s = 0; s < 100; s++) {
-        sx = bodies.thanatos.x - s * 6;
-        sy = bodies.thanatos.y + (s % 2);
-        ctx.fillStyle = (open && s % 12 === 11) ? '#FFC46A' : '#7A8794';
-        ctx.fillRect(sx | 0, sy | 0, 5, 5);
+    clipArena(function () {
+      for (k = 0; k < 4; k++) {
+        y = (box.AY + 24 + k * 48) | 0;
+        if (y < box.AY || y + 8 > box.AY + box.AH) continue;
+        band(box.AX, y, box.AW, 8, k % 2 ? '#1C2830' : '#243240');
+        if (!REDUCE) {
+          shift = (fightFrame * (k + 1)) % box.AW;
+          span = 32;
+          x = box.AX + shift;
+          if (x + span > box.AX + box.AW) x = box.AX + box.AW - span;
+          band(x, y, span, 8, k % 2 ? '#243240' : '#1C2830');
+        }
       }
-      ctx.fillStyle = open ? '#FFC46A' : '#C5D0D8';
-      ctx.fillRect(bodies.thanatos.x | 0, (bodies.thanatos.y - 6) | 0, 14, 10);
-    }
-    if (mechs.ares.alive) {
-      band(bodies.ares.x - 16, bodies.ares.y - 24, 32, 48, '#8A939C');
-      band(bodies.ares.x - 8, bodies.ares.y - 8, 16, 8, '#E04A3A');
-    }
-    if (mechs.twins.alive) {
-      band(bodies.twins.x - 20, bodies.twins.y, 12, 12, '#E23B3B');
-      band(bodies.twins.x + 8, bodies.twins.y, 12, 12, '#3BE2C8');
-    }
+      if (NEU.thanatosAtk) {
+        drawShape(NEU.thanatosAtk.telegraph(), '#FFD2A0');
+        drawShape(NEU.thanatosAtk.hazard(), '#FF5A3C');
+      }
+      if (NEU.exoCombos) NEU.exoCombos.draw(ctx);
+      if (mechs.thanatos.alive) {
+        open = ventsOpen();
+        drawThanatos(bodies.thanatos.x, bodies.thanatos.y, open);
+      }
+      if (mechs.ares.alive) drawAres(ctx, bodies.ares.x, bodies.ares.y);
+      if (mechs.twins.alive) drawTwins(ctx, bodies.twins.x, bodies.twins.y);
+    });
     if (NEU.danmaku && NEU.danmaku.soul) NEU.danmaku.soul.draw(ctx, F.x, F.y, false);
     if (kit) kit.draw(ctx);
-    ctx.font = '32px "Determination Mono","Pixelify Sans",monospace';
-    ctx.fillStyle = ventsOpen() ? '#FFC46A' : '#8A8598';
-    ctx.fillText(ventsOpen() ? 'VULNERABLE' : 'INVULNERABLE', box.AX | 0, (box.AY - 8) | 0);
+  }
+  function keysEl() {
+    var list = document.getElementsByClassName('exo__keys');
+    return list && list.length ? list[0] : null;
+  }
+  function chooseHint(show) {
+    var el = keysEl(), t, i;
+    if (!el) return;
+    if (!el.getAttribute('data-full')) el.setAttribute('data-full', el.textContent);
+    t = el.getAttribute('data-full');
+    if (show) { el.textContent = t; return; }
+    i = t.indexOf('1 2 3');
+    if (i < 0) return;
+    el.textContent = t.slice(0, i).replace(/[\s\u00a0·.\u00b7]+$/, '');
+  }
+  function paintIcon(cv, id) {
+    var g = cv.getContext ? cv.getContext('2d') : null;
+    if (!g || !g.fillRect) return;
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = '#000000';
+    g.fillRect(0, 0, 32, 32);
+    if (id === 'ares') {
+      g.fillStyle = '#8A939C'; g.fillRect(8, 4, 16, 24);
+      g.fillStyle = '#E04A3A'; g.fillRect(0, 8, 8, 6);
+      g.fillStyle = '#3BE2C8'; g.fillRect(24, 8, 8, 6);
+      g.fillStyle = '#7C5CFF'; g.fillRect(0, 18, 8, 6);
+      g.fillStyle = '#E6C15A'; g.fillRect(24, 18, 8, 6);
+    } else if (id === 'twins') {
+      g.fillStyle = '#E23B3B'; g.fillRect(2, 4, 12, 24);
+      g.fillStyle = '#F4F4F4'; g.fillRect(4, 8, 8, 6);
+      g.fillStyle = '#3BE26A'; g.fillRect(18, 4, 12, 24);
+      g.fillStyle = '#F4F4F4'; g.fillRect(20, 8, 8, 6);
+    } else {
+      g.fillStyle = '#7A8794'; g.fillRect(2, 14, 22, 8);
+      g.fillStyle = '#C5D0D8'; g.fillRect(18, 8, 12, 10);
+      g.fillStyle = '#FFC46A'; g.fillRect(6, 16, 4, 4);
+    }
+  }
+  function mountIcons() {
+    var buttons, n, cv, id;
+    if (!pickEl) return;
+    buttons = pickEl.getElementsByTagName('button');
+    for (n = 0; n < buttons.length; n++) {
+      if (buttons[n].getElementsByTagName('canvas').length) continue;
+      id = buttons[n].getAttribute('data-mech');
+      cv = document.createElement('canvas');
+      cv.width = 32;
+      cv.height = 32;
+      cv.setAttribute('aria-hidden', 'true');
+      cv.style.width = '32px';
+      cv.style.height = '32px';
+      cv.style.verticalAlign = 'middle';
+      cv.style.marginRight = '16px';
+      cv.style.imageRendering = 'pixelated';
+      paintIcon(cv, id);
+      buttons[n].insertBefore(cv, buttons[n].firstChild);
+    }
   }
   function paintSel() {
     var buttons, n;
@@ -393,6 +521,7 @@
     finId = ORDER[(at + 2) % 3];
     sel = at;
     paintSel();
+    chooseHint(false);
     layout();
     ensureKit();
     resetFight();
@@ -443,6 +572,7 @@
     mode = 'select';
     held = {};
     if (pickEl) pickEl.hidden = false;
+    chooseHint(true);
     if (vulnEl) vulnEl.textContent = '';
     paintSel();
     layout();
@@ -461,6 +591,7 @@
     if (NEU.activeMinigame === 'exo') NEU.activeMinigame = null;
   }
 
+  mountIcons();
   if (pickEl) {
     var buttons = pickEl.getElementsByTagName('button');
     for (i = 0; i < buttons.length; i++) {

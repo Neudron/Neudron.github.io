@@ -65,6 +65,13 @@
     list = unlocked();
     if (sel >= list.length) sel = list.length ? list.length - 1 : 0;
     while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+    if (!list.length) {
+      li = document.createElement('li');
+      li.textContent = '* nowhere yet.';
+      listEl.appendChild(li);
+      listEl.hidden = phase !== 'menu';
+      return;
+    }
     for (i = 0; i < list.length; i++) {
       li = document.createElement('li');
       li.setAttribute('data-stop', list[i].id);

@@ -23,7 +23,6 @@
     SlowLaserRayAndPlasmaBlasts: { duration: 80, warn: 27, hit: 54, shape: 'sweep', n: 5, r: 48 },
     ThermonuclearBlitz: { duration: 120, warn: 27, hit: 54, shape: 'blitz', n: 1, r: 64 }
   };
-  var COL = { artemis: '#E23B3B', apollo: '#3BE26A', white: '#F4F4F4' };
   var REDUCE = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   var live = false, won = false, sig = false, finalOn = false, twinsHp = 1000, lastFrame = -1, musicSent = false;
 
@@ -153,23 +152,13 @@
   function draw(st) {
     var cv = document.getElementById('exoCanvas');
     var ctx = cv && cv.getContext ? cv.getContext('2d') : null;
-    var list, i, body, col, ar, cx, cy;
+    var ar, cx, cy;
     if (!ctx || !ctx.fillRect) return;
     ctx.imageSmoothingEnabled = false;
     ar = arena();
     cx = (ar.AX + ar.AW - 96) | 0;
     cy = (ar.AY + 88) | 0;
-    list = st.pair || [];
-    for (i = 0; i < list.length; i++) {
-      body = list[i];
-      col = COL[body.id] || '#FF00FF';
-      ctx.fillStyle = col;
-      ctx.fillRect(body.x | 0, body.y | 0, 12, 12);
-      ctx.fillStyle = COL.white;
-      ctx.fillRect((body.x + 4) | 0, (body.y + 4) | 0, 4, 4);
-    }
-    ctx.fillStyle = open ? '#FFC46A' : '#C5D0D8';
-    ctx.fillRect(cx - 2, cy - 10, 8, 4);
+    if (NEU.exoPaint && NEU.exoPaint.twins) NEU.exoPaint.twins(ctx, cx, cy);
   }
   function publish() {
     var st = NEU.exo.state, word;

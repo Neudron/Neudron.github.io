@@ -349,8 +349,29 @@
       }
     }
   }
+  function drawDraedon() {
+    var x = boss.x | 0, y = boss.y | 0;
+    ctx.fillStyle = '#0E2A32';
+    ctx.fillRect(x - 40, y + 20, 80, 14);
+    ctx.fillStyle = '#1A6A78';
+    ctx.fillRect(x - 28, y + 16, 56, 8);
+    ctx.fillStyle = '#7FE3C4';
+    ctx.fillRect(x - 16, y + 14, 32, 4);
+    ctx.fillStyle = '#2A3038';
+    ctx.fillRect(x - 36, y + 8, 56, 12);
+    ctx.fillStyle = '#8A939C';
+    ctx.fillRect(x + 16, y - 4, 28, 10);
+    ctx.fillStyle = '#E04A3A';
+    ctx.fillRect(x + 40, y - 8, 8, 14);
+    ctx.fillStyle = '#4A6670';
+    ctx.fillRect(x - 20, y - 36, 40, 48);
+    ctx.fillStyle = '#1A1C20';
+    ctx.fillRect(x - 16, y - 48, 32, 16);
+    ctx.fillStyle = '#E23B3B';
+    ctx.fillRect(x - 12, y - 40, 24, 4);
+  }
   function draw() {
-    var w, h, k, shift, i, y;
+    var w, h, k, shift, i, y, can;
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
     w = window.innerWidth || 800;
@@ -362,19 +383,24 @@
       band((box.AX - shift) | 0, (box.AY + 48 + k * 48) | 0, box.AW + 32, 8, k % 2 ? '#1C2830' : '#243240');
     }
     band(box.AX, box.AY, box.AW, box.AH, '#07080C');
+    can = ctx.save && ctx.beginPath && ctx.rect && ctx.clip && ctx.restore;
+    if (can) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(box.AX | 0, box.AY | 0, box.AW | 0, box.AH | 0);
+      ctx.clip();
+    }
     drawShape(tele, '#FFD2A0');
     drawShape(haz, '#FF5A3C');
+    if (can) ctx.restore();
     if (mode === 'nuke' || mode === 'fall' || mode === 'wake') {
       for (i = 0; i < fog; i++) {
         y = (h - (i + 1) * 32) | 0;
         band(0, y, w, 32, i % 2 ? '#145C28' : '#39A84A');
       }
     }
-    /* robes, visor, chair. Drawn, so a missing sheet is not a gap. */
-    band(boss.x - 16, boss.y - 28, 32, 36, '#4A6670');
-    band(boss.x - 10, boss.y - 36, 20, 10, '#1A1C20');
-    band(boss.x - 6, boss.y - 32, 12, 2, '#E23B3B');
-    band(boss.x - 18, boss.y + 8, 36, 8, '#2A3038');
+    /* robes, visor, chair, mech arm, hover glow. Drawn, so a missing sheet is not a gap. */
+    drawDraedon();
     if (mode === 'fall' || mode === 'wake' || mode === 'nuke') {
       band((box.AX + box.AW / 2 - 24) | 0, bodyY | 0, 48, 16, '#C4A574');
       band((box.AX + box.AW / 2 - 28) | 0, (bodyY + 12) | 0, 56, 8, '#3A2A22');
@@ -387,9 +413,6 @@
     else band(F.x - 8, F.y - 8, 16, 16, '#FF00FF');
     if (kit) kit.draw(ctx);
     if (flash && !REDUCE) band(0, 0, w, h, '#FFFFFF');
-    ctx.font = '32px monospace';
-    ctx.fillStyle = vulnerableNow() ? '#FFC46A' : '#8A8598';
-    ctx.fillText(vulnerableNow() ? 'VULNERABLE' : 'INVULNERABLE', box.AX | 0, (box.AY - 8) | 0);
   }
   function frameOnce() {
     flash = 0;

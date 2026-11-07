@@ -109,7 +109,8 @@
     if (!ctx || ctx._mtn || !ctx.drawImage) return;
     orig = ctx.drawImage;
     ctx.drawImage = function (img, dx, dy) {
-      var camX = -(dx || 0), camY = -(dy || 0), shook = false, r;
+      var camX = -(dx || 0), camY = -(dy || 0), shook = false, r, levelBlit = arguments.length <= 3;
+      if (!levelBlit) return orig.apply(this, arguments);
       if (NEU.mountain && NEU.mountain.active) {
         try { this.imageSmoothingEnabled = false; } catch (e1) {}
         if (NEU.juice && NEU.juice.begin) shook = !!NEU.juice.begin(this, 640, 360);
@@ -139,7 +140,7 @@
     var origCreate = document.createElement;
     document.createElement = function (tag) {
       var el = origCreate.call(document, tag);
-      if (el && String(tag).toLowerCase() === 'canvas') bake = el;
+      if (el && String(tag).toLowerCase() === 'canvas' && NEU.plat && NEU.plat._baking) bake = el;
       return el;
     };
   }

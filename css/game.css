@@ -606,11 +606,13 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
 }
 
+.kernel-play { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.kernel-play canvas { display: block; width: min(100vw, 166.67vh); height: auto; aspect-ratio: 5 / 3; image-rendering: pixelated; }
 .plat { position: fixed; inset: 0; z-index: 76; background: #0b0a12; }
 .plat canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 
 .cards { position: fixed; inset: 0; z-index: 80; background: #000; }
-.cards canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.cards canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; image-rendering: pixelated; }
 
 /* Mage shop (js/act4/mage.js). Undertale split: art, menu, dialogue. z 76, under .tbox. */
 .mage {
@@ -621,7 +623,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 }
 .mage[hidden] { display: none !important; }
 .mage__art { flex: 3 1 60%; min-height: 0; margin: 16px 16px 0; border: 4px solid #fff; background: #1C1814; }
-.mage__art canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.mage__art canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; image-rendering: pixelated; }
 .mage__dock { flex: 2 1 40%; display: flex; gap: 16px; padding: 16px; min-height: 0; }
 .mage__menu, .mage__box {
   border: 4px solid #fff; padding: 16px; min-width: 0; overflow: auto; background: #000;
@@ -817,7 +819,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   z-index: 78; background: #120e0c; border: 4px solid #5a4634;
 }
 .note[hidden] { display: none !important; }
-.note canvas { display: block; width: 320px; height: 180px; image-rendering: pixelated; }
+.note canvas { display: block; width: min(960px, 100vw - 32px); height: auto; aspect-ratio: 16 / 9; image-rendering: pixelated; }
 .note__hint {
   margin: 0; padding: 0 16px 16px; color: #e4d8c0;
   font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;
@@ -877,7 +879,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   z-index: 78; background: #12161e; border: 4px solid #5a4634;
 }
 .photo[hidden] { display: none !important; }
-.photo canvas { display: block; width: 320px; height: 180px; image-rendering: pixelated; }
+.photo canvas { display: block; width: min(960px, 100vw - 32px); height: auto; aspect-ratio: 16 / 9; image-rendering: pixelated; }
 .photo__mark, .photo__hint {
   margin: 0; padding: 0 16px 16px; color: #e4d8c0;
   font: 400 16px/1.25 "Determination Mono", "Pixelify Sans", monospace;

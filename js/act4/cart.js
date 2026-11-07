@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
-  var STEP = 1 / 60, RIDE = 4500, MID = 2250, HOLE = 48, HIT = 18, TELE = 30, AIR = 36;
+  var STEP = 1 / 60, RIDE = 4500, MID = 2250, HOLE = 48, HIT = 18, TELE = 30, AIR = 36, RAIL = 27;
   var EV = [], CLEAR, overlay, canvas, ctx;
   var live = false, reduced = false;
   var frames, lane, jumpN, dead, done, phase, holeN, checkpoint, cpLane, sparks, dust, held, sent;
@@ -108,8 +108,31 @@
     if (u < 0) u = 0;
     return (240 + ((48 + i * 112) - 240) * u) | 0;
   }
+  function railHot(i) {
+    var k, ev, left;
+    for (k = 0; k < EV.length; k++) {
+      ev = EV[k];
+      if (ev.kind !== 'cart' || ev.lane !== i) continue;
+      left = ev.f - frames;
+      if (left > 0 && left <= RAIL) return true;
+    }
+    return false;
+  }
+  function drawRide(px, py) {
+    ctx.fillStyle = '#c45a28';
+    ctx.fillRect(px - 14, py, 28, 12);
+    ctx.fillStyle = '#14110e';
+    ctx.fillRect(px - 12, py + 10, 6, 6);
+    ctx.fillRect(px + 6, py + 10, 6, 6);
+    ctx.fillStyle = '#3a2418';
+    ctx.fillRect(px - 4, py - 10, 8, 8);
+    ctx.fillStyle = '#f0d8a8';
+    ctx.fillRect(px - 3, py - 16, 6, 6);
+    ctx.fillStyle = '#fff6c0';
+    ctx.fillRect(px - 2, py - 4, 4, 4);
+  }
   function draw() {
-    var i, y, ev, u, x, py, px, p, shook;
+    var i, y, ev, u, s, x, bw, bh, ww, py, px, p, shook;
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
     shook = NEU.juice && NEU.juice.begin ? NEU.juice.begin(ctx, 480, 270) : false;
@@ -127,7 +150,7 @@
       ctx.fillRect(440, y | 0, 24, 32);
     }
     for (i = 0; i < 4; i++) {
-      ctx.fillStyle = i === lane ? '#8a6848' : '#4a3428';
+      ctx.fillStyle = railHot(i) ? '#ffe080' : (i === lane ? '#8a6848' : '#4a3428');
       for (y = 36; y <= 250; y += 8) ctx.fillRect(railX(i, y), y, 4, 6);
     }
     for (i = 0; i < EV.length; i++) {
@@ -139,23 +162,27 @@
       if (ev.kind !== 'cart' || frames < ev.f - 150 || frames > ev.f + 8) continue;
       u = 1 - (ev.f - frames) / 150;
       if (u < 0) u = 0;
+      if (u > 1) u = 1;
+      s = 0.3 + 0.7 * u;
       y = (28 + u * 170) | 0;
       x = railX(ev.lane, y);
+      bw = Math.round(16 * s);
+      bh = Math.round(10 * s);
+      ww = Math.round(4 * s);
+      if (bw < 2) bw = 2;
+      if (bh < 2) bh = 2;
+      if (ww < 2) ww = 2;
       ctx.fillStyle = '#6a5038';
-      ctx.fillRect(x - 8, y, 16, 10);
-      if (frames >= ev.f - TELE && frames < ev.f) {
-        ctx.fillStyle = '#ffe080';
-        ctx.fillRect(x - 2, y + 2, 4, 4);
-      }
+      ctx.fillRect(x - (bw >> 1), y, bw, bh);
+      ctx.fillStyle = '#14110e';
+      ctx.fillRect(x - (bw >> 1), y + bh - 2, ww, ww);
+      ctx.fillRect(x + (bw >> 1) - ww, y + bh - 2, ww, ww);
     }
     py = 186 - (jumpN > 0 ? 18 : 0);
     px = railX(lane, 200);
     ctx.fillStyle = '#2a160e';
     ctx.fillRect(px - 16, py + 12, 32, 6);
-    ctx.fillStyle = '#c45a28';
-    ctx.fillRect(px - 14, py, 28, 14);
-    ctx.fillStyle = '#f0d8a8';
-    ctx.fillRect(px - 4, py + 2, 6, 4);
+    drawRide(px, py);
     for (i = 0; i < dust.length; i++) {
       p = dust[i];
       ctx.fillStyle = '#8a7058';

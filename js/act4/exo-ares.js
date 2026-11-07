@@ -23,7 +23,6 @@
     PrecisionBlasts: { duration: 120, warn: 27, hit: 54, shape: 'blast', n: 6, r: 64 }
   };
   var CANNON = ['laser', 'tesla', 'plasma', 'gauss'];
-  var COL = { laser: '#E04A3A', tesla: '#3BE2C8', plasma: '#7C5CFF', gauss: '#E6C15A' };
   var REDUCE = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   var live = false, won = false, sig = false, finalOn = false, aresHp = 1000, lastFrame = -1, musicSent = false;
 
@@ -152,26 +151,13 @@
   function draw(st) {
     var cv = document.getElementById('exoCanvas');
     var ctx = cv && cv.getContext ? cv.getContext('2d') : null;
-    var list, i, arm, col, ar, cx, cy;
+    var ar, cx, cy;
     if (!ctx || !ctx.fillRect) return;
     ctx.imageSmoothingEnabled = false;
     ar = arena();
     cx = (ar.AX + 96) | 0;
     cy = (ar.AY + 88) | 0;
-    ctx.fillStyle = '#5C656E';
-    ctx.fillRect(cx - 10, cy - 16, 20, 32);
-    ctx.fillStyle = '#8A939C';
-    ctx.fillRect(cx - 6, cy - 10, 12, 20);
-    ctx.fillStyle = open ? '#FFC46A' : '#C5D0D8';
-    ctx.fillRect(cx - 4, cy - 2, 8, 4);
-    list = st.arms || [];
-    for (i = 0; i < list.length; i++) {
-      arm = list[i];
-      col = COL[arm.id] || '#FF00FF';
-      ctx.fillStyle = col;
-      ctx.fillRect(arm.x | 0, arm.y | 0, 8, 12);
-      ctx.fillRect((arm.x + 2) | 0, (arm.y + 12) | 0, 4, 8);
-    }
+    if (NEU.exoPaint && NEU.exoPaint.ares) NEU.exoPaint.ares(ctx, cx, cy);
   }
   function publish() {
     var st = NEU.exo.state, word;

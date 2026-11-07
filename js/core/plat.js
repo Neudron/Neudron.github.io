@@ -13,7 +13,7 @@
     return { x: 0, y: 0, vx: 0, vy: 0, face: 1, dashes: 1, onGround: false,
       stamina: 110, dead: 0, coyote: 0, jumpBuffer: 0, varJump: 0,
       dashTime: 0, dashCooldown: 0, dashX: 0, dashY: 0,
-      wallTime: 0, forceX: 0, forceDir: 0, pogo: false, squash: 0, stretch: 0 };
+      wallTime: 0, forceX: 0, forceDir: 0, pogo: false, squash: 0, stretch: 0, walked: 0 };
   }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function approach(v, target, delta) { return v < target ? Math.min(target, v + delta) : Math.max(target, v - delta); }
@@ -215,6 +215,7 @@
     for (i = 0; i < current.entities.length; i++) if (kinds[current.entities[i].t] && kinds[current.entities[i].t].tick) kinds[current.entities[i].t].tick(current.entities[i], dt);
     if (player.x < -24 || player.y > current.h * TILE + 64) die();
     player.squash = Math.max(0, player.squash - dt); player.stretch = Math.max(0, player.stretch - dt);
+    if (player.onGround && Math.abs(player.vx) > 8) player.walked += Math.abs(player.vx) * dt;
     for (i = afterimages.length - 1; i >= 0; i--) { afterimages[i].t -= dt; if (afterimages[i].t <= 0) afterimages.splice(i, 1); }
     return getState();
   }
@@ -226,16 +227,44 @@
   }
   function bake() {
     if (!current || !document.createElement) return;
-    baked = document.createElement('canvas'); baked.width = current.w * TILE; baked.height = current.h * TILE;
+    api._baking = true;
+    baked = document.createElement('canvas');
+    api._baking = false;
+    baked.width = current.w * TILE; baked.height = current.h * TILE;
     var c = baked.getContext('2d'); if (!c) return;
-    var colors = current.tileset === 'mountain' ? ['#14202b', '#516d74', '#99b6aa'] : ['#181725', '#51455c', '#b892ff'];
-    c.fillStyle = colors[0]; c.fillRect(0, 0, baked.width, baked.height);
+    c.imageSmoothingEnabled = false;
+    var mountain = current.tileset === 'mountain';
+    var colors = mountain ? ['#516d74', '#516d74', '#99b6aa'] : ['#181725', '#51455c', '#b892ff'];
+    if (mountain) { if (c.clearRect) c.clearRect(0, 0, baked.width, baked.height); }
+    else { c.fillStyle = colors[0]; c.fillRect(0, 0, baked.width, baked.height); }
     for (var y = 0; y < current.h; y++) for (var x = 0; x < current.w; x++) {
       var ch = cell(x, y), px = x * TILE, py = y * TILE;
       if (ch === '#' || ch === 'x') { c.fillStyle = ch === 'x' ? '#9a4263' : colors[1]; c.fillRect(px, py, TILE, TILE); c.fillStyle = colors[2]; c.fillRect(px, py, TILE, 2); }
       else if (ch === '=') { c.fillStyle = colors[2]; c.fillRect(px, py, TILE, 3); }
-      else if (ch === '^' || ch === 'v' || ch === '<' || ch === '>') { c.fillStyle = '#ff5577'; c.fillRect(px + 4, py + 4, 8, 8); }
+      else if (ch === '^' || ch === 'v' || ch === '<' || ch === '>') spikeTile(c, px, py, ch);
     }
+  }
+  function spikeTile(c, px, py, ch) {
+    var body = '#FF5577', tip = '#FFD0DC';
+    if (ch === '^') {
+      c.fillStyle = tip; c.fillRect(px + 7, py + 2, 2, 4);
+      c.fillStyle = body; c.fillRect(px + 4, py + 6, 8, 4); c.fillRect(px + 2, py + 10, 12, 6);
+    } else if (ch === 'v') {
+      c.fillStyle = body; c.fillRect(px + 2, py, 12, 6); c.fillRect(px + 4, py + 6, 8, 4);
+      c.fillStyle = tip; c.fillRect(px + 7, py + 10, 2, 4);
+    } else if (ch === '<') {
+      c.fillStyle = tip; c.fillRect(px + 2, py + 7, 4, 2);
+      c.fillStyle = body; c.fillRect(px + 6, py + 4, 4, 8); c.fillRect(px + 10, py + 2, 6, 12);
+    } else {
+      c.fillStyle = body; c.fillRect(px, py + 2, 6, 12); c.fillRect(px + 6, py + 4, 4, 8);
+      c.fillStyle = tip; c.fillRect(px + 10, py + 7, 4, 2);
+    }
+  }
+  function placeCamera() {
+    var worldH = current.h * TILE, worldW = current.w * TILE;
+    camera.x = clamp(player.x - 320, 0, Math.max(0, worldW - 640));
+    if (worldH < 360) camera.y = (worldH - 360) / 2;
+    else camera.y = clamp(player.y - 180, 0, Math.max(0, worldH - 360));
   }
   function draw() {
     if (!ctx || !current || !live) return;
@@ -243,22 +272,25 @@
     var h = canvas.height = window.innerHeight * (window.devicePixelRatio || 1);
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#0b0a12'; ctx.fillRect(0, 0, w, h);
     var scale = Math.min(w / 640, h / 360), ox = (w - 640 * scale) / 2, oy = (h - 360 * scale) / 2;
-    camera.x = clamp(player.x - 320, 0, Math.max(0, current.w * TILE - 640));
-    camera.y = clamp(player.y - 180, 0, Math.max(0, current.h * TILE - 360));
+    placeCamera();
     ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale); ctx.imageSmoothingEnabled = false;
+    if (current.h * TILE < 360 && current.tileset === 'dungeon' && NEU.dungeonLook && NEU.dungeonLook.fillGap) {
+      NEU.dungeonLook.fillGap(ctx, camera.x, camera.y, current);
+    }
     if (baked) ctx.drawImage(baked, -camera.x, -camera.y);
     var ai;
     if (!reduced) for (ai = 0; ai < afterimages.length; ai++) {
+      ctx.save();
       ctx.globalAlpha = (afterimages[ai].t / 0.12) * 0.28;
-      ctx.fillStyle = player.dashes ? '#B892FF' : '#8A8598';
-      ctx.fillRect(afterimages[ai].x - camera.x - 12, afterimages[ai].y - camera.y - 32, 24, 32);
+      drawHero(ctx, afterimages[ai].x - camera.x, afterimages[ai].y - camera.y, player.face, false);
+      ctx.restore();
     }
     ctx.globalAlpha = 1;
     var i, e;
     for (i = 0; i < current.entities.length; i++) {
       e = current.entities[i]; if (!e.dead) drawEntity(e, ctx, camera.x, camera.y);
     }
-    if (player.dead <= 0) drawPlayer(ctx, camera.x, camera.y);
+    if (player.dead <= 0) drawHero(ctx, player.x - camera.x, player.y - camera.y, player.face, player.onGround);
     if (player.dead <= 0 && player.swing > 0) {
       ctx.fillStyle = '#fff0a6'; ctx.globalAlpha = Math.min(1, player.swing / 0.12);
       ctx.fillRect(player.x - camera.x + player.face * 12, player.y - camera.y - 24, player.face * 12, 3);
@@ -267,19 +299,46 @@
     }
     ctx.restore();
   }
-  function drawEntity(e, c, x, y) {
-    var px = e.x * TILE - x, py = e.y * TILE - y;
-    c.fillStyle = e.t === 'refill' ? '#64e8ff' : e.t === 'spring' ? '#ffcf4a' : e.t === 'exit' ? '#a9ff8a' : e.t === 'coin' ? '#ffe35a' : e.t === 'checkpoint' ? '#ff8ac8' : '#b892ff';
-    if (e.t === 'zip' || e.t === 'crumble' || e.t === 'door') c.fillRect(px, py, 16, 16);
-    else { c.fillRect(px + 4, py + 4, 8, 8); }
+  var ART = {
+    spike: { p: { a: '#FF5577', b: '#FFD0DC' }, r: ['...b....', '...b....', '..aaa...', '.aaaaa..', 'aaaaaaa.'] },
+    refill: { p: { a: '#146878', b: '#64E8FF', c: '#E8FFFF' }, r: ['...cc...', '..cbbc..', '.cbaabc.', '..cbbc..', '...aa...'] },
+    spring: { p: { a: '#8A6410', b: '#FFCF4A' }, r: ['bbbbbbbb', 'a......a', 'bbbbbbbb', 'a......a', 'bbbbbbbb'] },
+    zip: { p: { a: '#1A3058', b: '#7AA2FF' }, r: ['aaaaaaaa', 'abbbbbba', 'ab.bb.ba', 'abbbbbba', 'aaaaaaaa'] },
+    crumble: { p: { a: '#6A4030', b: '#C4846A' }, r: ['bbbbbbbb', 'bb.bb.bb', 'b.bbbb.b', 'bbbb.bbb', 'aaaaaaaa'] },
+    barrier: { p: { a: '#E23B4A', b: '#FFD0D4' }, r: ['a......a', '.a....a.', '..aaaa..', '.a....a.', 'a......a'] },
+    pogo: { p: { a: '#146848', b: '#3DDC97' }, r: ['..bbbb..', '.baaabb.', '.baabb..', '.babb...', '..aa....'] },
+    checkpoint: { p: { a: '#802048', b: '#FF8AC8', c: '#FFF0F6' }, r: ['c.......', 'bbbb....', 'bbbb....', 'a.......', 'a.......'] },
+    door: { p: { a: '#3A2418', b: '#8A5A32', c: '#E8C878' }, r: ['aaaaaaaa', 'abbbbbba', 'abbcbbba', 'abbbbbba', 'abbbbbba', 'aaaaaaaa'] },
+    skull: { p: { a: '#C4A882', b: '#F4E4CC', c: '#1A120C' }, r: ['..bbbb..', '.bcccb.', '.b.bb.b.', '..bbbb..', '..a..a..'] },
+    exit: { p: { a: '#1A4020', b: '#A9FF8A' }, r: ['..bbbb..', '.b....b.', '.b....b.', 'bbbbbbbb'] },
+    coin: { p: { a: '#A07810', b: '#FFE35A' }, r: ['..bbbb..', '.baaab..', '.baaab..', '..bbbb..'] },
+    bossdoor: { p: { a: '#E8D2B0', b: '#1A120C', c: '#C4A882' }, r: ['..aaaa..', '.abbba.', '.a.aa.a.', '..cccc..', '.cc..cc.'] }
+  };
+  function blit(c, art, x, y) {
+    var rows = art.r, pal = art.p, r, i, ch;
+    x = x | 0; y = y | 0;
+    for (r = 0; r < rows.length; r++) for (i = 0; i < rows[r].length; i++) {
+      ch = rows[r].charAt(i);
+      if (ch === '.' || !pal[ch]) continue;
+      c.fillStyle = pal[ch];
+      c.fillRect(x + i * 2, y + r * 2, 2, 2);
+    }
   }
-  function drawPlayer(c, x, y) {
-    var px = player.x - x - 12, py = player.y - y - 32;
-    var sx = player.squash > 0 ? 1.12 : 1, sy = player.squash > 0 ? 0.88 : 1;
-    if (player.stretch > 0 || (player.varJump > 0 && player.vy < 0)) { sx = 0.88; sy = 1.12; }
-    c.fillStyle = player.dashes ? '#B892FF' : '#8A8598';
-    c.save(); c.translate(px + 12, py + 16); c.scale(sx, sy); c.fillRect(-12, -16, 24, 32); c.restore();
-    c.fillStyle = '#f4f0ff'; c.fillRect(px + (player.face > 0 ? 16 : 4), py + 8, 4, 4);
+  function drawEntity(e, c, x, y) {
+    var px = (e.x * TILE - x) | 0, py = (e.y * TILE - y) | 0, kind = kinds[e.t];
+    if (kind && kind.draw) { kind.draw(c, px, py, e); return; }
+    if (ART[e.t]) { blit(c, ART[e.t], px, py); return; }
+    c.fillStyle = '#FF00FF';
+    c.fillRect(px, py, 16, 16);
+  }
+  function drawHero(c, wx, wy, face, moving) {
+    var look = NEU.engineLook;
+    if (look && look.drawPlayer) {
+      look.drawPlayer(c, wx, wy, face > 0 ? 'right' : 'left', player.walked || 0, !!moving && !reduced, 2, 1000, { settle: player.squash > 0 && !reduced });
+      return;
+    }
+    c.fillStyle = '#FF00FF';
+    c.fillRect((wx - 12) | 0, (wy - 32) | 0, 24, 32);
   }
   function open(id, opts) {
     if (!levels[id]) return false;
@@ -372,7 +431,8 @@
 
   var api = { level: level, open: open, close: close, running: function () { return live; },
     get state() { return getStateSafe(); }, step: step, replay: replay,
-    get levels() { return levels; }, _kinds: kinds };
+    get levels() { return levels; }, _kinds: kinds,
+    cam: function () { return { x: camera.x, y: camera.y }; } };
   NEU.plat = api;
   if (NEU.kernel) NEU.kernel.register('plat', { tick: tick, open: open, close: close, running: function () { return live; } });
   document.addEventListener('keydown', function (e) {

@@ -54,6 +54,12 @@
     list = visited();
     if (sel >= list.length) sel = list.length ? list.length - 1 : 0;
     while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+    if (!list.length) {
+      li = document.createElement('li');
+      li.textContent = '* nowhere yet.';
+      listEl.appendChild(li);
+      return;
+    }
     for (i = 0; i < list.length; i++) {
       li = document.createElement('li');
       li.setAttribute('data-room', list[i]);

@@ -5,7 +5,7 @@
   'use strict';
   var NEU = window.NEU = window.NEU || {};
 
-  var W = 320, H = 180;
+  var W = 320, H = 180, BEAM_X = 40;
   var START = 28, REST = 132, FIRE = 150;
   var BANDS = ['#07060C', '#1A1030', '#3A1464', '#6A2CFF', '#120814'];
   var GRANTS = ['phaseslayer', 'pulse_rifle', 'exoblade', 'magnomaly', 'flying_chair'];
@@ -105,6 +105,20 @@
     g.fillRect(-o, y, W, 16);
     g.fillRect(W - o, y, W, 16);
   }
+  function drawHood() {
+    var x = 18, y = 124, s = 2;
+    function R(px, py, w, h, col) {
+      g.fillStyle = col;
+      g.fillRect((x + px * s) | 0, (y + py * s) | 0, (w * s) | 0, (h * s) | 0);
+    }
+    R(-6, -3, 12, 3, '#1A1420');
+    R(-5, -20, 10, 18, '#100E16');
+    R(-4, -26, 8, 8, '#100E16');
+    R(-1, -24, 2, 8, '#100E16');
+    R(-2, -18, 2, 2, '#E4E0D4');
+    R(1, -18, 2, 2, '#E4E0D4');
+    R(5, -14, 6, 3, '#100E16');
+  }
   function drawBody() {
     var x = 132, y = Math.round(bodyY);
     if (skin <= 0) {
@@ -137,18 +151,19 @@
     g.fillRect(0, 0, W, H);
     band('#1A1030', 150, layers[0]);
     band('#3A1464', 166, layers[1]);
-    bw = Math.round(beam * W);
+    bw = Math.round(beam * (W - BEAM_X));
     if (bw > 0) {
       for (i = 0; i < BANDS.length; i++) {
         g.fillStyle = BANDS[i];
-        g.fillRect(0, 8 + i * 24, bw, 24);
+        g.fillRect(BEAM_X, 8 + i * 24, bw, 24);
       }
       g.fillStyle = '#FFFFFF';
       for (i = 0; i < 12; i++) {
         y = 16 + ((i * 18) % 100);
-        g.fillRect(Math.round((i * 26) % Math.max(bw, 1)), y, 2, 2);
+        g.fillRect(BEAM_X + Math.round((i * 26) % Math.max(bw, 1)), y, 2, 2);
       }
     }
+    drawHood();
     g.fillStyle = '#3A2414';
     g.fillRect(188, 156, 28, 8);
     g.fillStyle = '#E25822';
@@ -159,11 +174,6 @@
     for (i = 0; i < parts.length; i++) {
       g.fillStyle = parts[i].c;
       g.fillRect(Math.round(parts[i].x), Math.round(parts[i].y), 2, 2);
-    }
-    if (beam >= 0.85) {
-      g.font = '64px monospace';
-      g.fillStyle = '#E8D4FF';
-      g.fillText('Supreme.', 16, 96);
     }
     if (shookNow && NEU.juice.end) NEU.juice.end(g, shookNow);
     if (NEU.juice && NEU.juice.overlay) NEU.juice.overlay(g, W, H);
