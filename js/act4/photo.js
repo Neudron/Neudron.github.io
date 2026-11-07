@@ -199,6 +199,8 @@
       if (NEU.quest && NEU.quest.garage) NEU.quest.add(NEU.quest.garage, 'IV the woods');
       speak(HINTS);
     }
+    /* The alley lock reads the flag, not the pocket. */
+    NEU.save.flag('photo', 1);
     open();
     return true;
   }

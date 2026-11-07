@@ -288,6 +288,7 @@
     if (opts.spawn) current.spawn = opts.spawn;
     player.x = (current.spawn.x + 0.5) * TILE; player.y = (current.spawn.y + 1) * TILE;
     accumulator = 0; afterimages = []; live = true; paused = false; if (overlay) overlay.hidden = false; bake(); draw();
+    NEU.activeMinigame = 'plat';
     if (NEU.kernel) NEU.kernel.push('plat'); return true;
   }
   function cloneLevel(src) {
@@ -296,7 +297,13 @@
     out.entities = src.entities.map(function (e) { var v = {}, p; for (p in e) if (Object.prototype.hasOwnProperty.call(e, p)) v[p] = e[p]; return v; });
     return out;
   }
-  function close() { if (!live) return; live = false; if (overlay) overlay.hidden = true; if (NEU.kernel && NEU.kernel.current() === 'plat') NEU.kernel.pop(); }
+  function close() {
+    if (!live) return;
+    live = false;
+    if (overlay) overlay.hidden = true;
+    if (NEU.activeMinigame === 'plat') NEU.activeMinigame = null;
+    if (NEU.kernel && NEU.kernel.current() === 'plat') NEU.kernel.pop();
+  }
   function tick(dt) {
     if (!live || paused) return;
     accumulator += Math.min(0.25, Math.max(0, dt)) / 1000;
@@ -308,6 +315,7 @@
     var oldLevel = current, oldPlayer = player, oldLive = live, oldPaused = paused;
     var oldAccumulator = accumulator, oldImages = afterimages, oldBaked = baked;
     var oldStack = NEU.kernel ? NEU.kernel.stack.slice() : null;
+    var oldMini = NEU.activeMinigame;
     if (!open(id)) return { reached: false, deaths: 0, frames: 0 };
     replaying = true;
     var frames = 0, deaths = 0, i, j, pair, state, wasDead = false;
@@ -321,12 +329,22 @@
     live = oldLive; current = oldLevel; player = oldPlayer; paused = oldPaused;
     accumulator = oldAccumulator; afterimages = oldImages; baked = oldBaked;
     if (oldStack && NEU.kernel) { NEU.kernel.stack.length = 0; for (i = 0; i < oldStack.length; i++) NEU.kernel.stack.push(oldStack[i]); }
+    NEU.activeMinigame = oldMini;
     if (overlay) overlay.hidden = !live; return { reached: reached, deaths: deaths, frames: frames };
   }
   function getStateSafe() { return live ? getState() : null; }
+  function routed(e) {
+    var r = (NEU.keys && NEU.keys.route) ? NEU.keys.route(e.key, {}) : { to: e.key, swallow: false };
+    if (r.swallow) return null;
+    return r.to;
+  }
+  function onTop() { return !NEU.kernel || NEU.kernel.current() === 'plat'; }
   function onKey(e) {
-    var k = e.key, down = e.type === 'keydown';
-    if (!live) return;
+    var k, down;
+    if (!live || !onTop()) return;
+    k = routed(e);
+    if (k == null) return;
+    down = e.type === 'keydown';
     if (k === 'Escape' && down) { close(); e.preventDefault(); return; }
     if (k === 'ArrowLeft' || k === 'a' || k === 'A') keys.left = down;
     if (k === 'ArrowRight' || k === 'd' || k === 'D') keys.right = down;
@@ -358,6 +376,9 @@
   NEU.plat = api;
   if (NEU.kernel) NEU.kernel.register('plat', { tick: tick, open: open, close: close, running: function () { return live; } });
   document.addEventListener('keydown', function (e) {
-    if (live && e.key === 'Escape') { paused = true; }
+    var k;
+    if (!live || !onTop()) return;
+    k = routed(e);
+    if (k === 'Escape') paused = true;
   });
 })();

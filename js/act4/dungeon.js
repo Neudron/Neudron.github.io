@@ -178,6 +178,8 @@
       if (has) {
         e.dead = true;
         NEU.dungeon.bossOpen = true;
+        P.close();
+        if (NEU.polt && NEU.polt.open) NEU.polt.open();
       } else {
         NEU.dungeon.bossOpen = false;
         NEU.dungeon.bossLine = '* a bone lock. it wants a key.';

@@ -362,16 +362,21 @@
   }
 
   addEventListener('keydown', function (e) {
+    var k, r;
     if (!active || wrap.hidden) return;
-    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { move(-1); e.preventDefault(); return; }
-    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { move(1); e.preventDefault(); return; }
-    if (e.key === 'Escape') {
+    if (NEU.kernel && NEU.kernel.current() !== 'mage') return;
+    r = (NEU.keys && NEU.keys.route) ? NEU.keys.route(e.key, {}) : { to: e.key, swallow: false };
+    if (r.swallow) return;
+    k = r.to;
+    if (k === 'ArrowUp' || k === 'w' || k === 'W') { move(-1); e.preventDefault(); return; }
+    if (k === 'ArrowDown' || k === 's' || k === 'S') { move(1); e.preventDefault(); return; }
+    if (k === 'Escape') {
       e.preventDefault();
       if (mode !== 'main') { mode = 'main'; sel = 0; render(); return; }
       exitAction();
       return;
     }
-    if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z') {
+    if (k === 'Enter' || k === 'z' || k === 'Z') {
       e.preventDefault();
       if (Math.floor(shown) < full.length) { shown = full.length; paintSay(); return; }
       confirm();

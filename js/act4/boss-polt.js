@@ -887,9 +887,7 @@
     wrap.hidden = true;
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
-    if (NEU.save && NEU.save.flagged('polt_dead') && NEU.act4 && NEU.act4.ending) {
-      NEU.act4.ending();
-    } else if (NEU.crack && NEU.crack.reset) {
+    if (!(NEU.save && NEU.save.flagged('polt_dead')) && NEU.crack && NEU.crack.reset) {
       /* Left without killing him: put the crack back so the finale
          is still reachable. A permanent "opened" crack is a save
          that can never finish the game. */

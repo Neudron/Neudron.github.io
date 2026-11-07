@@ -13,8 +13,15 @@
     if (NEU.motion && NEU.motion.reduced) return !!NEU.motion.reduced();
     try { return !!matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
   }
+  function figureMet() {
+    return !!(NEU.save && NEU.save.flagged && NEU.save.flagged('s_figure'));
+  }
   function lockdown() {
     if (!NEU.save || !NEU.save.flagged) return false;
+    if (figureMet()) {
+      if (NEU.chase) NEU.chase.over = true;
+      return false;
+    }
     return !!(NEU.save.flagged('s_lockdown') || NEU.save.flagged('draedon_won'));
   }
   function openTile(room, x, y) {
@@ -233,7 +240,7 @@
     SPEED: SPEED,
     PERIOD: PERIOD,
     catches: 0,
-    over: false,
+    over: figureMet(),
     step: step,
     arrive: arrive,
     bind: function (room) {

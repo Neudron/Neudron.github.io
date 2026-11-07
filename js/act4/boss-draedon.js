@@ -135,7 +135,6 @@
     fog = 0;
     didBoom = false;
     paintPhase();
-    if (NEU.save) NEU.save.flag('draedon_won', 1);
     if (!shattered && NEU.juice && NEU.juice.shatter) {
       shattered = 1;
       NEU.juice.shatter({
@@ -387,7 +386,7 @@
     } else if (NEU.danmaku && NEU.danmaku.soul) NEU.danmaku.soul.draw(ctx, F.x, F.y, false);
     else band(F.x - 8, F.y - 8, 16, 16, '#FF00FF');
     if (kit) kit.draw(ctx);
-    if (flash) band(0, 0, w, h, '#FFFFFF');
+    if (flash && !REDUCE) band(0, 0, w, h, '#FFFFFF');
     ctx.font = '32px monospace';
     ctx.fillStyle = vulnerableNow() ? '#FFC46A' : '#8A8598';
     ctx.fillText(vulnerableNow() ? 'VULNERABLE' : 'INVULNERABLE', box.AX | 0, (box.AY - 8) | 0);

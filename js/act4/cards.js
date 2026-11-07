@@ -135,12 +135,26 @@
     }
   }
 
+  /* Both decks and both hands empty, both still up: the duel has nowhere
+     to go. Higher HP wins. A tie is a loss. */
+  function settle() {
+    if (!state || state.over) return;
+    drawUp('you');
+    drawUp('mage');
+    if (state.you.hand.length || state.mage.hand.length) return;
+    state.over = true;
+    state.result = state.you.hp > state.mage.hp ? 'win' : 'lose';
+  }
+
   function play(idx) {
     if (!state) return state;
-    act('you', idx);
     if (!state.over) {
-      var mi = mageIndex();
-      if (mi >= 0) act('mage', mi);
+      act('you', idx);
+      if (!state.over) {
+        var mi = mageIndex();
+        if (mi >= 0) act('mage', mi);
+      }
+      settle();
     }
     if (state.result === 'win') grant();
     if (state.result === 'lose') { close(); dungeonDeath(); }
@@ -328,9 +342,18 @@
   }
 
   function onKey(e) {
-    var k, n;
+    var k, n, r;
     if (!active || !state) return;
-    k = e.key;
+    if (NEU.kernel && NEU.kernel.current() !== 'cards') return;
+    r = (NEU.keys && NEU.keys.route) ? NEU.keys.route(e.key, {}) : { to: e.key, swallow: false };
+    if (r.swallow) return;
+    k = r.to;
+    if (k === 'Escape') {
+      close();
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
     if (k === 'ArrowLeft' || k === 'ArrowRight') {
       n = state.you.hand.length;
       if (n && !state.over) state.sel = (state.sel + (k === 'ArrowLeft' ? -1 : 1) + n) % n;

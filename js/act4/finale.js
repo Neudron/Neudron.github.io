@@ -178,6 +178,7 @@
     return snapshot();
   }
   function close() {
+    if (live) grant();
     live = false;
     if (NEU.activeMinigame === 'finale') NEU.activeMinigame = null;
     if (off) off();
@@ -191,6 +192,7 @@
   function onKey(e) {
     var k;
     if (!live || e.type !== 'keydown') return;
+    if (NEU.kernel && NEU.kernel.current() !== 'finale') return;
     if (NEU.tboxOpen && NEU.tboxOpen()) return;
     k = routeKey(e);
     if (k === 'x' || k === 'Escape' || ((k === 'z' || k === 'Enter' || k === ' ') && granted)) close();

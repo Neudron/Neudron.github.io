@@ -205,6 +205,8 @@
     st.overdrive = true;
     if (NEU.save) NEU.save.flag('exo_won', 1);
     label('INVULNERABLE');
+    /* Mechs are dead. Draedon stays. */
+    if (NEU.draedon && NEU.draedon.open) NEU.draedon.open();
   }
   function resetLocal() {
     aresHp = 1000;

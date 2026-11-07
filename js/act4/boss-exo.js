@@ -85,8 +85,10 @@
     compPresent = !!(compSummoned && comp && comp.alive);
     finAlive = !!(finSummoned && fin && fin.alive);
     total = (ini.alive ? 1 : 0) + (compPresent ? 1 : 0) + (finAlive ? 1 : 0);
-    /* ExoMechManagement.cs:123-144 */
-    if (finSummoned && !finAlive) return total === 1 ? 6 : 3;
+    /* ExoMechManagement.cs:123-144.
+       Phase 6 is the last mech still up, including Thanatos when it is finId. */
+    if (total === 1 && (finSummoned || (compSummoned && comp && !comp.alive))) return 6;
+    if (finSummoned && !finAlive) return 3;
     if (finAlive && finId === initialId) return 5;
     if (compPresent) return 4;
     if (ratio <= P3) return 3;
@@ -255,7 +257,9 @@
       F: F, box: box,
       adapter: {
         targets: targets,
-        damage: function (t, n) { if (t && t.id) damage(t.id, n); },
+        damage: function (t, n) {
+          if (t && t.id && NEU.exo && NEU.exo.damage) NEU.exo.damage(t.id, n);
+        },
         hurtPlayer: hurtPlayer
       }
     });

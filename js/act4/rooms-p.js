@@ -97,6 +97,10 @@
 
   function tryLeave(api) {
     var path;
+    if (NEU.save && (NEU.save.flagged('mtn_heaven') || NEU.save.flagged('mtn_evil'))) {
+      if (api && api.go) api.go('a1_clearing');
+      return;
+    }
     if (pending || live) return;
     path = NEU.save && NEU.save.flag('mtn_path');
     if (path !== 'heaven' && path !== 'evil') {
@@ -140,6 +144,7 @@
       { t: 'painter', x: 5, y: 6 },
       { t: 'work', x: 14, y: 3, path: 'heaven' },
       { t: 'work', x: 18, y: 3, path: 'evil' },
+      { t: 'exit', x: 11, y: 1, to: 'a1_clearing', spawn: 'default', style: 'door' },
       { t: 'trigger', x: 11, y: 7, run: tryLeave }
     ],
     onEnter: function () { nag = false; pending = false; }

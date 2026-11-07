@@ -185,11 +185,22 @@
      ground; the campfire one cell north is solid, so the portal cannot
      sit on the fire. Sheen steps every 400 ms (under 3 Hz) and holds
      still when motion is reduced. */
-  var crackAt = 0;
+  /* One open per visit to the cell. Esc while still standing on it
+     must not open the dungeon again; walking off re-arms it. */
+  var crackLatched = false;
+  function onCrack(api) {
+    var p = api && api.player, T = (NEU.engine && NEU.engine.TILE) || 16;
+    var x0, y0;
+    if (!p) return false;
+    x0 = 13 * T; y0 = 7 * T;
+    return p.x >= x0 && p.x <= x0 + T && p.y >= y0 && p.y <= y0 + T;
+  }
+  function woodsCrackArm(api) {
+    if (!onCrack(api)) crackLatched = false;
+  }
   function woodsCrackOpen() {
-    var n = Date.now();
-    if (n - crackAt < 500) return;
-    crackAt = n;
+    if (crackLatched) return;
+    crackLatched = true;
     if (NEU.plat && NEU.plat.open) NEU.plat.open('d0');
   }
   function crackReduced() {
@@ -266,6 +277,7 @@
       P('bush', 22, 8), P('ferns', 9, 10)
     ]);
     if (NEU.save && NEU.save.flagged && NEU.save.flagged('tv_restored')) {
+      list.push({ t: 'trigger', x: 0, y: 0, w: 24, h: 13, run: woodsCrackArm });
       list.push({ t: 'crack', x: 13, y: 7 });
       list.push({ t: 'trigger', x: 13, y: 7, run: woodsCrackOpen });
       list.push({ t: 'npc', x: 13, y: 5, colour: '#100E16', skin: 'hood', look: 'hood', who: 'narr',
@@ -324,6 +336,7 @@
               north: { x: 10, y: 3, face: 'down' } },
     get entities() { return a1Entities(); },
     onEnter: function (c) {
+      crackLatched = false;
       if (c.flagged('a1_seen')) return;
       c.flag('a1_seen', 1);
       say(c, ['it is very dark, and the ground is very cold.',

@@ -40,13 +40,16 @@
     if (NEU.juice.hit) NEU.juice.hit('medium');
     if (NEU.juice.burst) NEU.juice.burst(s.x, s.y - 16, 12, '#E8EEF2', 90);
   }
+  function arrive(id) {
+    if (!NEU.engine || !NEU.engine.rooms || NEU.engine.rooms.indexOf(id) < 0) return;
+    if (NEU.engine.running && NEU.engine.warp) NEU.engine.warp(id, 'door');
+    else if (NEU.engine.enter) NEU.engine.enter(id, 'door');
+  }
   function summit() {
-    var rooms;
     if (NEU.save && NEU.save.flag) NEU.save.flag('mtn_summit', 1);
     puff();
     P.close();
-    rooms = NEU.engine && NEU.engine.rooms;
-    if (rooms && rooms.indexOf('p1_tavern') >= 0 && typeof NEU.engine.go === 'function') NEU.engine.go('p1_tavern');
+    arrive('p1_tavern');
   }
   function makeExit(n) {
     return function () {
@@ -218,10 +221,7 @@
     if (NEU.save && NEU.save.flag) NEU.save.flag(which, 1);
     puff();
     P.close();
-    if (NEU.engine && NEU.engine.rooms && NEU.engine.rooms.indexOf('p1_tavern') >= 0) {
-      if (NEU.engine.running && NEU.engine.warp) NEU.engine.warp('p1_tavern', 'door');
-      else if (NEU.engine.enter) NEU.engine.enter('p1_tavern', 'door');
-    }
+    arrive('p1_tavern');
   }
   function descentExit(prefix, i) {
     return function () {
