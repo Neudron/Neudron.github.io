@@ -103,7 +103,7 @@
     ].join('\n'),
     /* portal: the painted door in the north wall, one tile inside it. The
        pot's exit lands here; `east` is the alley side. */
-    spawns: { fire: { x: 1, y: 7, face: 'right' }, east: { x: 24, y: 7, face: 'left' },
+    spawns: { fire: { x: 1, y: 7, face: 'right' }, stall: { x: 10, y: 6, face: 'up' }, east: { x: 24, y: 7, face: 'left' },
               portal: { x: 6, y: 3, face: 'down' } },
     entities: [
       { t: 'cityfloor', v: 'd1_street', x: 0, y: 0 },
@@ -178,6 +178,20 @@
     }
     return cutEl;
   }
+  /* The black cut, shared: black in, mid() runs behind it, black out. */
+  NEU.cut = function (mid) {
+    var el = cutFx(), still = !!(NEU.motion && NEU.motion.reduced ? NEU.motion.reduced() : window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ||
+      !!(NEU.settings && NEU.settings.reduced);
+    var d = still ? 0 : 500;
+    el.style.transitionDuration = d + 'ms';
+    el.style.pointerEvents = 'auto';
+    el.style.opacity = '1';
+    setTimeout(function () {
+      mid();
+      el.style.opacity = '0';
+      setTimeout(function () { el.style.pointerEvents = 'none'; }, d);
+    }, d);
+  };
   function toCombat(c, start) {
     cutFx();
     var reduced = !!(NEU.motion && NEU.motion.reduced ? NEU.motion.reduced() : window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);

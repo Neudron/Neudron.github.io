@@ -1097,8 +1097,19 @@
         if (b.y < AY || b.y > AY + AH) { b.vy = -b.vy; b.y = Math.min(AY + AH, Math.max(AY, b.y)); }
         b.bounce--;
       }
-      if (NEU.scalAtk.rim(b)) { if (b.onEnd) fire.push(b); continue; }
-      if (b.x < AX - 60 || b.x > AX + AW + 60 || b.y < AY - 60 || b.y > AY + AH + 60) continue;
+      if (NEU.scalAtk.rim(b)) {
+        /* the clamp that moved it ends the bullet. Its flare must not outlive
+           it: zero the fuse the way dropBullets does, or scal-attacks keeps
+           drawing a ghost hugging the wall until the fuse runs out. */
+        if (b.fuse !== undefined) b.fuse = 0;
+        if (b.onEnd) fire.push(b);
+        continue;
+      }
+      if (b.x < AX - 60 || b.x > AX + AW + 60 || b.y < AY - 60 || b.y > AY + AH + 60) {
+        /* leaving the arena ends the bullet AND its flare record */
+        if (b.fuse !== undefined) b.fuse = 0;
+        continue;
+      }
       keep.push(b);
       if (inv <= 0 && mode !== 'won') {
         var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
@@ -2256,18 +2267,6 @@
     if (NEU.engine) NEU.engine.enter(NEU.save && NEU.save.flagged('scal_dead') ? 'b7_altar' : 'b8_arena',
                                      NEU.save && NEU.save.flagged('scal_dead') ? 'north' : 'west');
   }
-
-  /* The quit button is the bullet minigame's, shared with this fight —
-     route it like the keyboard ESC instead of letting the other game's
-     handler run against a fight it knows nothing about. */
-  var bhQuitBtn = document.getElementById('bhQuit');
-  if (bhQuitBtn) bhQuitBtn.addEventListener('click', function () {
-    if (!active || NEU.activeMinigame !== 'scal') return;
-    if (mode === 'won' || dying) { close(); return; }
-    if (NEU.engine && NEU.engine.confirmExit) {
-      NEU.engine.confirmExit('Supreme Calamitas', close);
-    } else { close(); }
-  });
 
   /* F8 opens the fight from anywhere — a dev command for testing the
      fight without re-walking the castle. */

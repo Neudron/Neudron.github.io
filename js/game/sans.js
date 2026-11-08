@@ -550,7 +550,7 @@
      One delegated listener per gesture, not one per button. A hover
      plays once per element until the pointer or focus moves to another
      one. Only the menu controls in UI_SEL make a sound. */
-  var UI_SEL = '.sett button, .shop__row, .shop__quit, #confirmExit button, .quiz__o, .bh__quit';
+  var UI_SEL = '.sett button, .shop__row, #confirmExit button, .quiz__o';
   var lastUi = null;
   function uiEl(e) {
     var t = e.target;
@@ -650,7 +650,10 @@
                /* real mod filenames — HoodlessHeadIcon/HoodedHeadIcon from
                   NPCs/SupremeCalamitas/, see js/data/sheets.js scalFace* */
                scal: 'img/act4/calamity/HoodlessHeadIcon.png',
-               scalHood: 'img/act4/calamity/HoodedHeadIcon.png' };
+               scalHood: 'img/act4/calamity/HoodedHeadIcon.png',
+               /* the mushroom's cap, sitting: one 28x35 cell of the dance sheet,
+                  cropped to the head by the .is-mush recipe below */
+               mush: 'img/act4/undertale/mushroom-dance.png' };
 
   /* No face in FACE hides the portrait; it used to keep the previous
      speaker's, which is how narration and the witch wore Sans's. */
@@ -659,6 +662,15 @@
     if (tface) tface.hidden = !src;
     if (src && tfaceImg && tfaceImg.getAttribute('src') !== src) {
       tfaceImg.setAttribute('src', src);
+    }
+    /* the mushroom head is a cell of a wide sheet: frame it as a cap */
+    if (tfaceImg) {
+      if (who === 'mush') tfaceImg.classList.add('is-mush');
+      else tfaceImg.classList.remove('is-mush');
+    }
+    if (tface) {
+      if (who === 'mush') tface.classList.add('is-mush');
+      else tface.classList.remove('is-mush');
     }
     /* shrug while talking; setFace() = closed */
     var p = shSrc(who === 'sans' ? 'sansShrug' : 'sansIdle');
@@ -2528,6 +2540,7 @@
   }
 
   NEU.sans = {
+    openPanel: openPanel,
     get state()   { return state; },
     get asleep()  { return asleep; },
     get wantSleep(){ return wantSleep; },

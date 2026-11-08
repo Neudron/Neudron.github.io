@@ -30,7 +30,7 @@
   if (!ctx) { NEU.rhythm = { open: function () {} }; return; }
   var msg = document.getElementById('fnfMsg');
   var hintEl = wrap.querySelector('.bh__keys');   /* the key hint: it rides the floor, off the valance */
-  var won = false;                    // set by win, cashed in by close
+  var won = false, winAt = 0;                    // set by win, cashed in by close
 
   var LANES = ['left', 'down', 'up', 'right'];
   var LANECOL = ['#C24AE0', '#4AC2E0', '#7BE38A', '#E04A6B'];
@@ -55,6 +55,7 @@
   var HEALTH = [0.03, 0.015, 0, -0.02, -0.08];
   var BREAK = [false, false, true, true, true];
   var HEALTH_MAX = 2;
+  var DRAIN_T = 0.55;                   /* s: how long a soul hit reads on the bar */
 
   /* Three rounds. Each is a list of [beat, lane, holdBeats?]; his notes
      play on their beats and yours on the same beats four bars later. */
@@ -80,7 +81,10 @@
     [10.6, 0, 'mushroom'], [11.8, 1, 'recall'],
     [33, 0, 'coin'], [34.2, 1, 'bomb'], [35.4, 2, 'potion'], [36.6, 3, 'axe'],
     [59, 1, 'mushroom'], [60.5, 2, 'recall'], [62, 0, 'coin'],
-    [85, 3, 'axe'], [86.5, 1, 'bomb'], [88, 0, 'potion'], [103.6, 0, 'coin']
+    [85, 3, 'axe'], [86.5, 1, 'bomb'], [88, 0, 'potion'], [103.6, 0, 'coin'],
+    /* more mushrooms from above, one every ~7 s, clear of the dodge windows */
+    [24.5, 3, 'mushroom'], [31, 1, 'mushroom'], [38, 2, 'mushroom'],
+    [53.5, 0, 'mushroom'], [80, 2, 'mushroom'], [89.5, 1, 'mushroom']
   ];
   var TAUNT = [
     ["you want the axe.", "the axe wants a reason."],
@@ -96,7 +100,8 @@
             misses: 0, consecMiss: 0, acc: 1, judged: 0, weight: 0,
             section: 0, mode: 'chart', arrowA: 1, sway: 0, swayUntil: 0,
             blockLane: -1, blockUntil: 0,
-            soulx: 0, souly: 0, hazards: [], pattern: 0, spawnN: 0, paused: false, introT: 0 };
+            soulx: 0, souly: 0, hazards: [], pattern: 0, spawnN: 0, paused: false, introT: 0,
+            drainFrom: 1, drainTo: 1, drainT: 0 };
   var pops = [], splashes = [];
   var raf = 0, soulF = null, hazBreak = -1, lastBrk = 0, loopSrc = null;
   var introOn = false, boomed = false, crowdCache = null;
@@ -246,6 +251,21 @@
   }
 
   function addHealth(d) { S.health = Math.min(HEALTH_MAX, Math.max(0, S.health + d)); }
+
+  /* Getting hit has to read on the bar at a glance: the green you lost is a
+     white-hot draining strip that cools down (healthBar), the icons jump,
+     the screen takes a medium shake and sparks burst at the soul. */
+  function soulHit() {
+    S.drainFrom = S.health / HEALTH_MAX;
+    addHealth(-0.12);
+    S.drainTo = S.health / HEALTH_MAX;
+    S.drainT = performance.now();
+    soulF.dashI = 0.45;
+    if (NEU.juice) {
+      NEU.juice.hit('medium');
+      NEU.juice.burst(soulF.x, soulF.y - 10, 9, '#E04A6B', 1.3);
+    }
+  }
 
   /* r: 0 sick, 1 good, 2 bad, 3 shit, 4 miss. ms: the timing error. */
   function judge(r, m, free) {
@@ -510,9 +530,7 @@
         if (h.broke) h.age += dt;
         var dx = soulF.x - h.x, dy = soulF.y - h.y;
         if (!h.broke && dx * dx + dy * dy < HIT_R * HIT_R && !(soulF.dashI > 0)) {
-          addHealth(-0.12);
-          soulF.dashI = 0.45;
-          if (NEU.juice) NEU.juice.hit('small');
+          soulHit();
         }
       }
       /* cull what has left the arena, and glass that has lain on the floor a while */
@@ -533,13 +551,19 @@
   function win() {
     running = false;
     won = true;
+    winAt = performance.now();
+    if (NEU.juice) { NEU.juice.hit('big'); NEU.juice.burst(geom().hisX, geom().stage - 40, 18, '#FFD34E', 1.6); }
+    outro();
     if (msg) { placeMsg(false); msg.hidden = true; }   /* the talk box says it; the stall carries the esc hint */
-    /* the axe comes by hand-over; the stall opens only when the hand-over lands */
-    /* the stall's own line carries the hand-over text, so no talk box lands on top of the menu */
-    NEU.shop.handover('axe', function () {
-      if (NEU.quest) NEU.quest.mark('a4_axe');
-    });
+    /* The axe comes by hand-over, but only once the band is off the stage:
+       the stall must wait for close(), not sit on top of the win screen. */
     draw(songPos());
+  }
+  /* SONG CLEAR: a short loop so the beaten pose and the title animate */
+  function outro() {
+    if (!won || wrap.hidden) return;
+    draw(songPos());
+    if (performance.now() - winAt < 1500) requestAnimationFrame(outro);
   }
   /* the soul controls, as keycaps: Z retries, X dashes, the arrows move */
   function keycap(k) {
@@ -901,6 +925,7 @@
     for (var side = 0; side < 2; side++) {
       var age = t - singAt[side], sing = age < 0.18 && age >= 0, pose = singLane[side];
       var x = who[side], y = g.stage + 8 + bob + ((sing && pose === 1 && !still()) ? cs : 0);
+      if (won && !side) y += 3 * cs;      /* beaten: he slumps */
       /* the figure is 9 cells wide and 13 tall, feet at y */
       var x0 = Math.round(x - 4.5 * cs), y0 = y - 13 * cs, shY = y0 + (side ? 7 : 8) * cs;
       if (side) L.drawPlayer(ctx, x, y, 'left', 0, false, cs, performance.now());
@@ -1076,8 +1101,28 @@
     var split = bx + Math.round(bw * (1 - S.health / HEALTH_MAX));
     ctx.fillStyle = '#E04A6B'; ctx.fillRect(bx, by, split - bx, 16);
     ctx.fillStyle = '#7BE38A'; ctx.fillRect(split, by, bx + bw - split, 16);
+    /* a soul hit: the strip of green you lost flares white-hot, pulses twice,
+       and cools; the split edge burns for the first beat of the drain */
+    if (S.drainFrom !== S.drainTo) {
+      var age = (performance.now() - S.drainT) / 1000;
+      if (age >= DRAIN_T) {
+        S.drainFrom = S.drainTo;          /* back to rest */
+      } else {
+        var ga0 = 1 - age / DRAIN_T;
+        var gpulse = 0.5 + 0.5 * Math.cos(age / DRAIN_T * Math.PI * 2);
+        var gz0 = bx + Math.round(bw * (1 - S.drainFrom));
+        ctx.globalAlpha = Math.min(1, 0.3 * ga0 + 0.7 * gpulse * ga0);
+        ctx.fillStyle = '#F8FFE8';
+        ctx.fillRect(gz0, by, split - gz0, 16);
+        ctx.globalAlpha = ga0;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(split, by, 2, 16);
+        ctx.globalAlpha = 1;
+      }
+    }
     ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.fillRect(bx, by, bw, 4);
     var is = (!still() && beatFrac(sp) < 0.15) ? 5 : 4;
+    if (S.drainFrom !== S.drainTo) is = 7;    /* the heads jump when you are hit */
     icon(0, split - 6 * is + 4, by + 8, is);
     icon(1, split + 6 * is - 4, by + 8, is);
     ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
@@ -1269,6 +1314,11 @@
       }
     }
 
+    if (won) {
+      ctx.globalAlpha = still() ? 1 : Math.min(1, (performance.now() - winAt) / 300);
+      text('SONG CLEAR', g.w / 2, g.popY, g.w < 600 ? 48 : 96, '#FFD34E');
+      ctx.globalAlpha = 1;
+    }
     /* 3-2-1-GO in big numerals over your lane, fading through each beat */
     if (S.countdown) {
       ctx.globalAlpha = still() ? 1 : 1 - beatFrac(sp) * 0.7;
@@ -1303,8 +1353,10 @@
       ctx.globalAlpha = 0.6; ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, g.w, g.h); ctx.globalAlpha = 1;
       text('PAUSED', g.w / 2, g.h / 2 - 16, 48, '#FFFFFF');
       text('ESC to resume', g.w / 2, g.h / 2 + 32, 16, '#EDE7DE');
+      text('X or tap to leave', g.w / 2, g.h / 2 + 56, 16, '#EDE7DE');
     }
     ctx.restore();
+    if (NEU.juice && NEU.juice.drawParts) NEU.juice.drawParts(ctx, 1 / 60);
     if (NEU.juice && NEU.juice.end) NEU.juice.end(ctx, shook);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
@@ -1324,6 +1376,12 @@
   }
   addEventListener('keydown', function (e) {
     if (wrap.hidden) return;
+    if (won && (e.key === 'Escape' || e.key === 'Enter' || e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      if (performance.now() - winAt > 600) close();
+      return;
+    }
+    if (S.paused && (e.key === 'x' || e.key === 'X')) { e.preventDefault(); leavePrompt(); return; }
     if (e.key === 'Escape') {
       e.preventDefault();
       if (running) { togglePause(); return; }   /* ESC pauses and resumes; Quit leaves */
@@ -1346,6 +1404,13 @@
     if (l >= 0) { release(l); keys[LANES[l]] = false; }
   });
 
+  /* the paused song's way out (the esc button is gone): X, or a tap */
+  function leavePrompt() {
+    if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Rhythm Game', close);
+    else close();
+  }
+  wrap.addEventListener('click', function () { if (S.paused) leavePrompt(); });
+
   function retry() {
     wrap.hidden = false;
     document.body.classList.add('is-playing');
@@ -1353,6 +1418,7 @@
     if (msg) { msg.hidden = true; placeMsg(false); }
     layout();
     S.health = 1; S.paused = false; keys = {};
+    S.drainFrom = 1; S.drainTo = 1;       /* the win bar starts at rest */
     resetScore();
     running = true;
     startRound(false);
@@ -1377,6 +1443,7 @@
     if (msg) { msg.hidden = true; placeMsg(false); }
     layout();
     round = 0; S.health = 1; S.paused = false; keys = {};
+    S.drainFrom = 1; S.drainTo = 1;       /* the win bar starts at rest */
     resetScore(); splashes.length = 0;
     won = false;
     running = true;
@@ -1385,14 +1452,28 @@
     if (NEU.kernel) NEU.kernel.push('rhythm');
   }
   /* The counter axe leaves the room for good, and the line about it
-     waits until the overlay is gone (see close). */
+     waits until the overlay is gone (see close). The axe is a cityprop
+     carrying its kind in v; it has no sheet of its own. */
   function takeAxe() {
     var api = NEU.engine && NEU.engine.api;
-    var axe = api && api.ents().filter(function (e) { return e.sheet === 'axe'; })[0];
-    if (axe && NEU.take) NEU.take(axe, 'axe');
+    var axe = api && api.ents().filter(function (e) {
+      return e.t === 'cityprop' && e.v === 'axe';
+    })[0];
+    if (!axe) return;
+    axe.dead = true;
+    if (NEU.save) NEU.save.flag('gone:' + 'd1_street' + ':' + (axe.mush || axe.x + ',' + axe.y), 1);
   }
 
+  /* A win leaves through the black cut: black in, rooms swap behind it, the
+     stall hand-over opens on the black, black out. */
+  var closing = false;
   function close() {
+    if (closing) return;
+    if (!won || !NEU.cut) { leave(); return; }
+    closing = true; running = false;
+    NEU.cut(function () { closing = false; leave(); });
+  }
+  function leave() {
     running = false;
     if (raf && window.cancelAnimationFrame) cancelAnimationFrame(raf);
     raf = 0;
@@ -1404,16 +1485,15 @@
     /* the engine re-adds is-playing itself for the room it enters next */
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
-    if (NEU.engine) NEU.engine.enter('d1_street', 'fire');
-    if (won) { won = false; takeAxe(); }
+    if (NEU.engine) NEU.engine.enter('d1_street', 'stall');
+    /* the stall opens only when the hand-over lands: the band is gone first,
+       the counter axe is gone, and only then does he come around the till */
+    if (won) {
+      won = false;
+      takeAxe();
+      NEU.shop.handover('axe', function () { if (NEU.quest) NEU.quest.mark('a4_axe'); });
+    }
   }
-
-  var q = document.getElementById('fnfQuit');
-  if (q) q.addEventListener('click', function () {
-    /* same path as ESC: a confirmed exit, since the round is on the line */
-    if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Rhythm Game', close);
-    else close();
-  });
 
   if (NEU.kernel) NEU.kernel.register('rhythm', {
     tick: function (dt) { if (running) step(performance.now()); },
@@ -1425,5 +1505,5 @@
                  get running() { return running; }, get notes() { return notes; },
                  state: S, pops: pops, geom: geom, noteY: noteY, dirOf: dirOf,
                  charts: CHARTS, bpm: BPM, WINDOW: WINDOW_MS / 1000,
-                 sections: SECTIONS, length: SONG };
+                 sections: SECTIONS, length: SONG, soulHit: soulHit };
 })();

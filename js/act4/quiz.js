@@ -56,7 +56,6 @@
   var elBar  = $('quizBar');
   var elSay  = $('quizSay');
   var elEnd  = $('quizEnd');
-  var elQuit = $('quizQuit');
   var beams  = wrap.querySelectorAll('.quiz__beam');
   function lights(on) { for (var k = 0; k < beams.length; k++) beams[k].hidden = !on; }
 
@@ -489,8 +488,8 @@
     later(function () { pose('cheer', 'grin'); host(TENNA.intro[0]); }, 450);
     later(function () { pose('point', 'wink'); host(TENNA.intro[1]); }, 1900);
     later(function () { pose('shrug', 'smug'); host(TENNA.intro[2]); }, 3300);
-    /* No options exist yet, so the quit button is the way in. */
-    if (elQuit && elQuit.focus) elQuit.focus();
+    /* No options exist yet: focus rests on the overlay itself. */
+    if (wrap.focus) { wrap.setAttribute('tabindex', '-1'); wrap.focus(); }
     later(ask, 4700);
   }
 
@@ -1110,12 +1109,7 @@
 
   /* a click or tap anywhere on the finale goes on, like a key */
   wrap.addEventListener('click', function (e) {
-    if (ended && e.target !== elQuit) skip();
-  });
-  if (elQuit) elQuit.addEventListener('click', function () {
-    if (ended) { skip(); return; }
-    /* same path as ESC: confirmExit('Quiz', close) */
-    leave();
+    if (ended) skip();
   });
 
   if (NEU.kernel) NEU.kernel.register('quiz', {

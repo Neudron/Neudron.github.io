@@ -340,7 +340,7 @@
     if (e.key === 'ArrowLeft')  { e.preventDefault(); pick(sel - 1); return; }
     if (e.key === 'ArrowRight') { e.preventDefault(); pick(sel + 1); return; }
     if (e.key === 'Tab') {
-      var focusables = [elPlay, q].filter(function (el) { return el && !el.hidden; });
+      var focusables = [elPlay].filter(function (el) { return el && !el.hidden; });
       if (focusables.length) {
         var idx = focusables.indexOf(document.activeElement);
         if (e.shiftKey) {
@@ -354,17 +354,11 @@
       return;
     }
     if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z' || e.key === ' ') {
-      /* Enter on the quit button means "close", and the native click
-         already handles that. Stealing it to launch would start a
-         game the player just tried to leave. */
-      if (document.activeElement === q) return;
       e.preventDefault(); launch();
     }
   });
 
   if (elPlay) elPlay.addEventListener('click', launch);
-  var q = document.getElementById('deckQuit');
-  if (q) q.addEventListener('click', close);
 
   if (NEU.kernel) NEU.kernel.register('deck', {
     tick: function (dt) {},

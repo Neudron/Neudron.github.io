@@ -490,7 +490,7 @@
     if (wrap.hidden) return;
     k = routed(e);
     if (!k) return;
-    if (k === 'Escape') { close(); return; }
+    if (k === 'Escape') { if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Exo Mechs', close); else close(); return; }
     if (mode === 'select') {
       if (k === '1' || k === '2' || k === '3') { pick(ORDER[Number(k) - 1]); return; }
       if (k === 'ArrowDown' || k === 's') { sel = (sel + 1) % 3; paintSel(); return; }
@@ -552,8 +552,6 @@
       });
     }
   }
-  var quit = document.getElementById('exoQuit');
-  if (quit) quit.addEventListener('click', close);
   addEventListener('keydown', onDown);
   addEventListener('keyup', onUp);
   addEventListener('resize', function () { if (!wrap.hidden) layout(); });

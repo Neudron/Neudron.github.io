@@ -17,7 +17,8 @@
   'use strict';
   var NEU = window.NEU = window.NEU || {};
 
-  var START = 'a1_clearing';
+  var START = 'a1_clearing';         /* the recall potion lands here */
+  var HOME = 'e6_room';             /* a fresh boot starts in your bedroom, sans at your left */
 
   /* Act IV's objectives are grouped, because a flat list of forty-five
      is not a list, it is wallpaper. quest.js shows one act at a time. */
@@ -63,10 +64,10 @@
     var s = (NEU.save && NEU.save.data) || {};
     var rooms = (NEU.engine && NEU.engine.rooms) || [];
     var resume = s.room && rooms.indexOf(s.room) >= 0;
-    var room = resume ? s.room : START;
+    var room = resume ? s.room : HOME;
     var spawn = resume ? (s.spawn || 'default') : 'default';
 
-    if (room !== START && NEU.talk) {
+    if (room !== HOME && NEU.talk) {
       NEU.talk(['you were already somewhere. you are there again.'], 'narr');
     }
     return NEU.engine.enter(room, spawn);
@@ -95,18 +96,12 @@
     if (already) return;
     document.body.classList.remove('is-trip');
     document.body.classList.add('is-awake');
-    var lines = [
-      ["you're awake.", 'sans'],
-      ["you've been out about four hours. toby sat with you.", 'sans'],
-      ["you fought a witch. you took her ashes. you went through a door made of fire.", 'sans'],
-      ["you bought a potion off a man who doesn't own a shop.", 'sans'],
-      ["you went home. you broke a television. you did a quiz.", 'sans'],
-      ["then you punched a vending machine and ate something you found in it.", 'sans'],
-      ["the soup was your idea. i want that on the record.", 'sans'],
-      ["anyway. i'm going to sit down.", 'sans']
-    ];
-    if (NEU.talk) NEU.talk(lines.map(function (l) { return l[0]; }), 'sans');
-    setTimeout(settle, lines.length * 3200);
+    /* The soup drops you in your own bed. The door stays shut (must_leave)
+       until you power the console off at the desk: that is rooms-e's job,
+       and it calls settle() when it is done. */
+    if (NEU.save) NEU.save.flag('must_leave', 1);
+    if (NEU.cut && NEU.engine) NEU.cut(function () { NEU.engine.enter('e6_room', 'bed'); });
+    else if (NEU.engine) NEU.engine.enter('e6_room', 'bed');
   }
 
   /* After the soup the page used to say nothing about what came next. A
@@ -148,6 +143,7 @@
     var chair = document.getElementById('armchair');
     if (chair) { chair.hidden = false; requestAnimationFrame(function () { chair.classList.add('is-in'); }); }
     if (NEU.crack) NEU.crack.arm();
+    if (NEU.sans && NEU.sans.openPanel) NEU.sans.openPanel();
     if (NEU.talk) {
       NEU.talk(['toby gets up and goes. he does not look back, because he is a dog.',
                 'he sits down in a chair that was not there a minute ago and turns the console on.',

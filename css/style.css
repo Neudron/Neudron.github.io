@@ -974,20 +974,11 @@ body.is-playing { overflow: hidden; }
   white-space: nowrap;
 }
 .bh__msg small { color: var(--dim); }
-.bh__quit {
-  position: absolute; right: 20px; top: 20px;
-  font: 400 16px/1 var(--font);
-  color: var(--dim); background: none;
-  border: 2px solid var(--edge); padding: 8px 14px;
-  /* a thumb needs 44px (Apple HIG); this button quits fights */
-  min-height: 44px; min-width: 44px;
-  cursor: pointer;
-}
-.bh__quit:hover { color: var(--text); border-color: var(--accent); }
 .bh__keys {
   position: absolute; left: 0; right: 0; bottom: 18px;
   margin: 0; text-align: center;
   font: 400 16px/1 var(--font); color: var(--dim);
+  display: none;              /* bottom control hints: shops only, by request */
 }
 
 /* ── the dog ──────────────────────────────────────────────────────*/
@@ -1184,7 +1175,7 @@ body.is-blackout::before {
 /* Walk mode paints the character straight onto the page, so the layer
    itself must be see-through and must not eat clicks. */
 .dk.is-walk { background: transparent; pointer-events: none; }
-.dk.is-walk .bh__quit, .dk.is-walk .bh__keys { pointer-events: auto; }
+.dk.is-walk .bh__keys { pointer-events: auto; }
 .dk canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 
 /* ── the sprite inspector ─────────────────────────────────────────
@@ -1364,7 +1355,7 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 .quiz__timer i { display: block; height: 100%; width: 100%; background: #FFFF00; }
 .quiz__timer i.is-low { background: #FF0000; }
 /* a big screen gets Deltarune's own scale: 2x text, 2x soul */
-@media (min-width: 1100px) and (min-height: 760px) {
+@media (min-width: 1100px) and (min-height: 900px) {
   .quiz__stage { width: min(100vw, calc((100vh - 400px) * 1.8)); }
   .quiz__host, .quiz__q, .quiz__o { font-size: 32px; }
   .quiz__host { grid-template-columns: 48px 1fr; }
@@ -1444,7 +1435,7 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
    The black around it is .quiz itself, so nothing shows through. */
 .quiz.is-on .quiz__tv { animation: quizCrtOn .55s ease-out both; }
 .quiz.is-off .quiz__tv { animation: quizCrtOff .62s ease-in forwards; }
-.quiz.is-off .quiz__fx, .quiz.is-off .bh__quit, .quiz.is-off .bh__keys { opacity: 0; transition: opacity .2s; }
+.quiz.is-off .quiz__fx, .quiz.is-off .bh__keys { opacity: 0; transition: opacity .2s; }
 @keyframes quizCrtOn {
   0%   { transform: scale(.02, .004); filter: brightness(5); }
   45%  { transform: scale(1, .006); filter: brightness(3); }
@@ -1603,12 +1594,6 @@ html.rm .quiz__beam { animation: none; }
   padding-top: 12px; border-top: 2px solid var(--shop-line);
 }
 .shop__keys { font: 400 13px/1.2 var(--font); color: var(--shop-dim); }
-.shop__quit {
-  font: 400 16px/1 var(--font); color: var(--shop-dim); background: none; border-radius: 0;
-  border: 2px solid var(--edge); padding: 8px 14px; min-width: 44px; min-height: 44px; cursor: pointer;
-}
-.shop__quit:hover, .shop__quit:focus-visible { color: var(--shop-text); border-color: var(--shop-gold); }
-.shop__quit:focus-visible { outline: 2px solid var(--shop-gold); outline-offset: 2px; }
 @media (max-width: 479px) {
   .shop { place-items: start center; overflow-x: hidden; }
   .shop__win { width: 100%; max-height: calc(100dvh - 32px); padding: 12px; box-shadow: 4px 4px 0 #000; }
@@ -1710,7 +1695,6 @@ html.rm body.is-trip .eng canvas, html.rm body.is-trip .craft { filter: saturate
 }
 .deck.is-in { opacity: 1; }
 /* the shared quit sits at top:20px, on top of the status bar's battery */
-.deck .bh__quit { top: 64px; }
 
 .deck__bar {
   display: flex; align-items: center; justify-content: space-between;

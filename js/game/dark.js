@@ -1021,9 +1021,6 @@
     if (NEU.quest) NEU.quest.lock(false);
   }
 
-  var q = document.getElementById('dkQuit');
-  if (q) q.addEventListener('click', close);
-
   /* Replay resets the errand: a kept `through`/`fixed` makes the second
      blackout unescapable. */
   function reset() {

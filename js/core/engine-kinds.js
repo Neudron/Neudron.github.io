@@ -94,14 +94,17 @@
     var m = e._m || (e._m = { since: -1, hurt: -1, now: now });
     m.now = now;
     var near = !!pl && Math.hypot(pl.x - (e.x + 0.5) * TILE, pl.y - (e.y + 1) * TILE) < MUSH.range;
-    if (!near) m.since = -1; else if (m.since < 0) m.since = now;
+    /* the mushrooms only find their feet once you are tripping (the vending
+       machines). The chop is still the same act either way. */
+    var high = !!(NEU.save && NEU.save.flagged('tripping'));
+    if (!near || !high) m.since = -1; else if (m.since < 0) m.since = now;
     if (m.hurt >= 0 && now - m.hurt >= MUSH.hurt) m.hurt = -1;
     if (m.hurt >= 0) {
       if (reduced) return { col: 2, row: 0, sx: 1, sy: 1 };
       var p = (now - m.hurt) / MUSH.hurt, amp = 0.18 * (1 - p);
       return { col: 2, row: Math.floor((now - m.hurt) / MUSH.react) % 3, sx: 1 + amp, sy: 1 - amp };
     }
-    if (!near) return { col: 0, row: 0, sx: 1, sy: 1 };
+    if (!near || !high) return { col: 0, row: 0, sx: 1, sy: 1 };
     if (reduced) return { col: 1, row: 0, sx: 1, sy: 1 };
     var t = now - m.since, windUp = MUSH.prep * 5;
     if (t < windUp) return { col: 0, row: Math.floor(t / MUSH.prep), sx: 1, sy: 1 };
@@ -435,6 +438,28 @@
     },
     width: function () { return 10; },
     light: function (e) { return e.lit ? { r: 66, col: '#FFB347', glow: 0.26, flicker: true } : null; }
+  });
+
+  /* ── the console ─────────────────────────────────────────────────────
+     The desk in your room. Z asks "power it off?"; yes runs e.run, which is
+     the ONLY way out of the console (ESC never leaves). */
+  kind('consolepc', {
+    interactive: function () { return true; },
+    fire: function (e, sys) {
+      if (tboxOpen()) return;
+      sfx('tick');
+      var go = function () { if (hasRun(e)) e.run(sys.api); };
+      if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('the console', go, 'power it off? your save is kept.');
+      else go();
+    },
+    draw: function (g, e, d) {
+      var S = d.S, x = d.sx - 5 * S, y = d.sy - 22 * S;
+      g.fillStyle = '#0E0A08'; g.fillRect(x, y, 10 * S, 8 * S);
+      g.fillStyle = '#7BE3FF'; g.fillRect(x + S, y + S, 8 * S, 6 * S);
+      g.fillStyle = '#C9F4FF'; g.fillRect(x + 2 * S, y + 2 * S, 3 * S, S);
+    },
+    width: function () { return 10; },
+    light: function () { return { r: 40, col: '#7BE3FF', glow: 0.2 }; }
   });
 
   /* ── trigger ──────────────────────────────────────────────────────── */

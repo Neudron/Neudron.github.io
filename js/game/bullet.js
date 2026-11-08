@@ -170,7 +170,7 @@
   var dying = 0;
   var outroF = 0;                          // frames left in the win's shatter
 
-  var running = false, won = false;
+  var running = false, won = false, chargeWon = false;
   /* Act III variant: a seeded plan of blocks, and the graze meter. */
   var variant = false, plan = null, planRng = null, qi = 0, attempt = 0;
   var meter = 0, lastGz = -9;
@@ -527,6 +527,8 @@
           }
           if (NEU.quest) NEU.quest.bump('charge', charge / 50);
           if (NEU.tvState) NEU.tvState();
+          /* console/charge run: full battery completes it (no timer) */
+          if (endless && charge >= 100) { chargeWon = true; finish(true); return; }
         }
         if (gn < 0 && NEU.juice) NEU.juice.hit('tick');
       } else if (held) {
@@ -911,7 +913,7 @@
   function begin() {
     dying = 0;                           /* a pending death animation is cancelled by restarting */
     outroF = 0;
-    t = 0; hp = 3; inv = 0; won = false; cheat = '';
+    t = 0; hp = 3; inv = 0; won = false; chargeWon = false; cheat = '';
     beatAt = -Infinity;
     F = dm.fight(0, 0);
     layout();
@@ -957,21 +959,22 @@
 
   function finish(good, quiet) {
     running = false; won = good;
-    if (good && !endless && NEU.juice) {
-      var every = Math.ceil(bullets.length / 40), i, b;
+    var charged = good && chargeWon;
+    if (good && (!endless || charged) && NEU.juice) {
+      var every = Math.ceil(bullets.length / 40) || 1, i, b;
       for (i = 0; i < bullets.length; i += every) {
         b = bullets[i];
         NEU.juice.burst(b.x, b.y, 2, b.c, 60);
       }
     }
-    if (good && !endless && NEU.juice) {
+    if (good && (!endless || charged) && NEU.juice) {
       bullets = []; blasters = []; bones = []; aims = [];
       NEU.juice.hit('large', { colour: PAL.full }); NEU.juice.burst(F.x, F.y, 22, PAL.soul, 150);
       outroF = 54; requestAnimationFrame(outro);
     }
     if (!quiet) draw();
 
-    if (endless) {
+    if (endless && !charged) {
       /* No win out here: the number is how long you lasted. */
       var secs = Math.round(t * 10) / 10;
       var prev = NEU.save ? NEU.save.best('twenty') : 0;
@@ -990,11 +993,17 @@
 
     if (msg) {
       msg.hidden = false;
-      msg.innerHTML = good
-        ? '<b>you made it.</b><br>' + durationText() + '. take the dog food?<br><small>esc to leave</small>'
-        : '<b>ouch.</b><br>enter to try again &middot; esc to leave';
+      if (charged) {
+        msg.innerHTML = '<b>console charged.</b><br>the battery is full.<br><small>esc to leave</small>';
+      } else {
+        msg.innerHTML = good
+          ? '<b>you made it.</b><br>' + durationText() + '. take the dog food?<br><small>esc to leave</small>'
+          : '<b>ouch.</b><br>enter to try again &middot; esc to leave';
+      }
     }
-    if (good) {
+    if (charged) {
+      announce('console charged. the battery is full.');
+    } else if (good) {
       announce('you made it. ' + durationText() + '. take the dog food?');
       if (NEU.quest) NEU.quest.mark('survive');
       if (NEU.grantDogFood) NEU.grantDogFood();
@@ -1094,16 +1103,6 @@
     }
     open({});
   });
-  /* The SC fight shares this button and this wrapper (#bh), so the
-     handler must route by whichever game is actually up — and it must
-     confirm like ESC does instead of vanishing without a word. */
-  var quitBtn = document.getElementById('bhQuit');
-  if (quitBtn) quitBtn.addEventListener('click', function () {
-    if (NEU.activeMinigame !== 'bullet') return;
-    if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Bullet Hell', close);
-    else close();
-  });
-
   if (NEU.kernel) NEU.kernel.register('bullet', {
     tick: function (dt) { if (running) step(performance.now()); },
     open: open, close: close,

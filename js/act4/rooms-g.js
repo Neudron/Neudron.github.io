@@ -498,13 +498,13 @@
      which is the cheapest way to make a world feel like it noticed. */
   NEU.chop = function (c, id) {
     if (!NEU.save) return;
-    if (NEU.save.has(id)) { c.say(['already cut.'], 'narr'); return; }
+    if (NEU.save.has(id)) { c.say(['already cut.'], 'mush'); return; }
     if (!NEU.save.flagged('tripping')) {
-      c.say(['a mushroom. you have no reason to want it and nothing to cut it with.'], 'narr');
+      c.say(['a mushroom. you have no reason to want it and nothing to cut it with.'], 'mush');
       return;
     }
     if (!NEU.save.has('axe')) {
-      c.say(['a mushroom. you want it very badly. you have nothing sharp.'], 'narr');
+      c.say(['a mushroom. you want it very badly. you have nothing sharp.'], 'mush');
       return;
     }
     var ents = (typeof c.ents === 'function') ? c.ents() : (c.ents || []);
@@ -513,8 +513,8 @@
     var lines = n < 5 ? ['you take the mushroom. ' + n + ' of five.']
       : ['you take the mushroom. five of five.',
          'bring them to the pot. the street has a door that opens only while you are tripping; it goes to the pot.'];
-    if (e) { NEU.take(e, id, lines); }
-    else { if (NEU.save) NEU.save.give(id); if (NEU.say) NEU.say(lines || ['* You got the ' + id.toUpperCase() + '.'], 'narr'); }
+    if (e) { NEU.take(e, id, lines, 'mush'); }
+    else { if (NEU.save) NEU.save.give(id); if (NEU.say) NEU.say(lines || ['* You got the ' + id.toUpperCase() + '.'], 'mush'); }
     if (NEU.quest) NEU.quest.bump('a4_mush', mushrooms());
   };
 

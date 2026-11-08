@@ -15,8 +15,8 @@
 
    1. WRONG ARRANGEMENTS ARE FREE. Nothing is consumed until you press
       CRAFT, and you can pick items back out with a click.
-   2. NOTHING CRAFTS ITSELF. Enter and Z only place or pick up a
-      mushroom. The CRAFT button validates the grid, shows the result
+   2. NOTHING CRAFTS ITSELF. Enter and Z only press the button under
+      the free soul. The CRAFT button validates the grid, shows the result
       and consumes the ingredients. A right shape yields the soup; a
       wrong one gives a line from the pot and every mushroom comes back
       to the tray. Trial and error is the discovery, so the grid itself
@@ -62,19 +62,50 @@
     } catch (e) { return false; }
   }
 
-  /* The soul is the cursor in this form: one heart that sits on the
-     focused slot. Re-placed after every render, which rebuilds the cells. */
-  var soul = null;
-  function placeSoul() {
-    if (!gridEl) return;
-    if (!soul) {
-      soul = document.createElement('img');
-      soul.src = SOUL; soul.alt = ''; soul.className = 'craft__soul';
-      soul.setAttribute('aria-hidden', 'true');
-      soul.style.cssText = 'position:absolute;left:-12px;top:-12px;width:32px;height:32px;image-rendering:pixelated;pointer-events:none;z-index:2';
+  /* The soul is the cursor, and it is FREE: arrows / touch stick move it
+     over the whole panel (Shift slows it), Z / Enter / Space presses the
+     button under it. Held keys, not keydown counts, same as quiz.js. */
+  var soul = null, sx = 0, sy = 0, held_ = {};
+  var SOUL_SPEED = 240;
+  function axis(neg, pos) { return (held_[pos] ? 1 : 0) - (held_[neg] ? 1 : 0); }
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+  function ensureSoul() {
+    if (soul) return;
+    soul = document.createElement('img');
+    soul.src = SOUL; soul.alt = ''; soul.className = 'craft__soul';
+    soul.setAttribute('aria-hidden', 'true');
+    soul.style.cssText = 'position:absolute;left:0;top:0;width:32px;height:32px;image-rendering:pixelated;pointer-events:none;z-index:3';
+    wrap.appendChild(soul);
+  }
+  function putSoul() {
+    ensureSoul();
+    soul.style.transform = 'translate(' + Math.round(sx - 16) + 'px,' + Math.round(sy - 16) + 'px)';
+  }
+  /* the soul starts on the middle cell */
+  function homeSoul() {
+    if (wrap.hidden) return;
+    var w = wrap.getBoundingClientRect(), c = gridEl && gridEl.querySelectorAll('.craft__cell')[4];
+    var r = c ? c.getBoundingClientRect() : null;
+    sx = r ? r.left - w.left + r.width / 2 : (w.width || 320) / 2;
+    sy = r ? r.top - w.top + r.height / 2 : (w.height || 240) / 2;
+    putSoul();
+  }
+  function tick(dtMs) {
+    var dt = (dtMs > 0 ? Math.min(dtMs, 50) : 0) / 1000;
+    var k = held_.Shift ? 0.4 : 1, w = wrap.getBoundingClientRect();
+    sx = clamp(sx + axis('ArrowLeft', 'ArrowRight') * SOUL_SPEED * k * dt, 0, w.width || 320);
+    sy = clamp(sy + axis('ArrowUp', 'ArrowDown') * SOUL_SPEED * k * dt, 0, w.height || 240);
+    putSoul();
+  }
+  /* Z: click the button whose box holds the soul's centre */
+  function press() {
+    var w = wrap.getBoundingClientRect(), bs = wrap.querySelectorAll('button'), i, r;
+    for (i = 0; i < bs.length; i++) {
+      r = bs[i].getBoundingClientRect();
+      if (!bs[i].disabled && sx + w.left >= r.left && sx + w.left <= r.right &&
+          sy + w.top >= r.top && sy + w.top <= r.bottom) { bs[i].click(); return bs[i]; }
     }
-    var btns = gridEl.querySelectorAll('.craft__cell');
-    if (btns[focusIdx]) btns[focusIdx].appendChild(soul);
+    return null;
   }
 
   /* The slot art: slot.png is a flat blue square, so each cell is painted
@@ -128,7 +159,6 @@
           gridEl.appendChild(b);
         })(i);
       }
-      placeSoul();
     }
     if (trayEl) {
       trayEl.innerHTML = '';
@@ -213,7 +243,7 @@
     if (NEU.save) {
       for (var i = 1; i <= 5; i++) NEU.save.take('mush' + i);
       NEU.save.give('soup');
-      NEU.save.flag('soulmade', 1);
+      NEU.save.flag('soup_made', 1);
     }
     if (NEU.quest) NEU.quest.mark('a4_soup');
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
@@ -236,13 +266,6 @@
       if (NEU.engine) NEU.engine.resume();
       if (NEU.talk) NEU.talk(['* you ladle the soup into a bowl.', '* press [' + label + '] to open your things.'], 'narr');
     }, reduced() ? 500 : 1300);
-  }
-
-  var focusIdx = 0;
-  function focusCell() {
-    if (!gridEl) return;
-    var btns = gridEl.querySelectorAll('.craft__cell');
-    if (btns[focusIdx]) { btns[focusIdx].focus(); placeSoul(); }
   }
 
   /* The panel's focusables, live — the grid is rebuilt on every click,
@@ -271,7 +294,7 @@
     NEU.activeMinigame = 'craft';       /* the room underneath must not move or take Escape */
     grid = [null,null,null, null,null,null, null,null,null];
     held = NEU.mushrooms ? NEU.mushrooms() : 5;
-    focusIdx = 0;
+    held_ = {};
     if (sayEl) sayEl.textContent = 'the pot is a shape. put them in that shape.';
     render();
   }
@@ -279,10 +302,7 @@
     if (NEU.kernel) NEU.kernel.push('craft');
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
-    if (soul && soul.animate && !reduced()) {
-      soul.animate([{ transform: 'translateY(72px)', opacity: 0 }, { transform: 'translateY(-8px)', opacity: 1, offset: 0.7 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 520, easing: 'steps(6)' });
-    }
-    setTimeout(focusCell, 50);
+    setTimeout(homeSoul, 50);
   }
   function open() { present(); claim(); }
 
@@ -410,18 +430,12 @@
   }
 
   layout();
+  ensureSoul();
   paintBackground();
   clearDecor();
   buildGo();
   /* Clicking the blind slot is a deliberate commit too, never an automatic one. */
   if (outEl) outEl.addEventListener('click', commit);
-
-  var q = document.getElementById('craftQuit');
-  if (q) q.addEventListener('click', function () {
-    if (taken) return;
-    close();
-    if (NEU.engine) NEU.engine.enter('h3_trip', 'in');
-  });
 
   addEventListener('keydown', function (e) {
     if (wrap.hidden) return;
@@ -442,41 +456,17 @@
       }
       return;
     }
-    /* On the CRAFT button Enter and Space are its own click, not a placement. */
-    if (goEl && document.activeElement === goEl) return;
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      focusIdx = (focusIdx % 3 === 0) ? focusIdx + 2 : focusIdx - 1;
-      focusCell();
-      return;
-    }
-    if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      focusIdx = (focusIdx % 3 === 2) ? focusIdx - 2 : focusIdx + 1;
-      focusCell();
-      return;
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      focusIdx = (focusIdx < 3) ? focusIdx + 6 : focusIdx - 3;
-      focusCell();
-      return;
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      focusIdx = (focusIdx >= 6) ? focusIdx - 6 : focusIdx + 3;
-      focusCell();
-      return;
-    }
-    /* Enter and Z place or pick up. Only the CRAFT button crafts. */
+    if (e.key.indexOf('Arrow') === 0 || e.key === 'Shift') { held_[e.key] = true; e.preventDefault(); return; }
     if (e.key === ' ' || e.key === 'Enter' || e.key === 'z' || e.key === 'Z') {
       e.preventDefault();
-      click(focusIdx);
+      if (!e.repeat) press();
     }
   });
+  addEventListener('keyup', function (e) { if (held_[e.key]) held_[e.key] = false; });
+  addEventListener('blur', function () { held_ = {}; });
 
   if (NEU.kernel) NEU.kernel.register('craft', {
-    tick: function (dt) {},
+    tick: tick,
     open: open, close: close,
     running: function () { return !wrap.hidden; }
   });
@@ -488,6 +478,7 @@
                 get running() { return !wrap.hidden; },
                 get grid() { return grid.slice(); },
                 get held() { return held; },
+                tick: tick, press: press, soul: function () { return { x: sx, y: sy }; },
                 recipe: RECIPE,
                 matches: matches,
                 put: function (n) { click(n); },

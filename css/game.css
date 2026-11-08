@@ -74,6 +74,14 @@
 .tbox__face { flex: none; line-height: 0; }
 /* 36x33 crop at 3x; 2x on a phone */
 .tbox__face img { width: 108px; height: auto; image-rendering: pixelated; }
+/* the mushroom talks with its cap: the dance frame (col 1, row 0, 28x35)
+   of the sheet (84x175, 3 cols) shows the eyes; scale 3x and clip to it. */
+.tbox__face.is-mush { width: 84px; height: 105px; overflow: hidden; }
+.tbox__face img.is-mush {
+  width: 252px; height: 525px; max-width: none;
+  margin-left: -84px;          /* col 1 */
+  image-rendering: pixelated;
+}
 .tbox__txt {
   position: relative; flex: 1; margin: 0;
   padding-left: 32px; min-height: 4.5em;
@@ -137,8 +145,9 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   pointer-events: none; image-rendering: pixelated;
 }
 
-/* bug tracker #7: the bottom-left "inside" chip is gone; the cube door (NEU.tryDoor) is the way in */
-#insideChip { display: none !important; }
+/* The "inside" chip is BACK by request (2026-11-08): the door face has to
+   be rotated to be found, and the chip is the way back in. The click handler
+   lives in js/game/sans.js 1760-1768 and works once the door is open. */
 
 /* ── the pot: witch's cauldron, torn recipe, stepping brew (WO W1.1) ──
    All of this lives inside #craft (z 76, under .tbox at 96); no new
@@ -690,11 +699,10 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .shop__bar { grid-area: bar; padding-top: 0; border-top: 0; }
 .shop__h { font-size: 32px; }
 .shop__gold { font-size: 16px; padding: 8px 16px; }
-.shop__say, .shop__row, .shop__keys, .shop__quit { font-size: 16px; line-height: 1.5; }
+.shop__say, .shop__row, .shop__keys { font-size: 16px; line-height: 1.5; }
 .shop__row { min-height: 32px; padding: 0 8px; align-items: center; }
 .shop__row::before { font-size: 16px; }
 .shop__keys { color: #bbb; }
-.shop__quit { min-height: 48px; }
 @media (max-width: 640px) {
   .shop { padding: 8px; place-items: start center; }
   .shop__win { width: 100%; padding: 8px; gap: 8px; grid-template-columns: minmax(0, 1fr);
@@ -742,10 +750,6 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .exo__hud {
   position: absolute; left: 16px; bottom: 16px; margin: 0;
   font: 400 16px/1.25 var(--font, monospace);
-}
-.exo__quit {
-  position: absolute; top: 16px; right: 16px;
-  font: 400 16px/1 var(--font, monospace); color: #fff; background: transparent; border: 0;
 }
 .exo__keys {
   position: absolute; right: 16px; bottom: 16px; margin: 0;
@@ -849,10 +853,6 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .draedon__hud {
   position: absolute; left: 16px; bottom: 16px; margin: 0;
   font: 400 16px/1.25 var(--font, monospace);
-}
-.draedon__quit {
-  position: absolute; top: 16px; right: 16px;
-  font: 400 16px/1 var(--font, monospace); color: #fff; background: transparent; border: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .draedon, .draedon * { animation: none !important; transition: none !important; }

@@ -1003,7 +1003,7 @@
      that walks along each wall. No telegraphs: the gap is read from the flames
      themselves. Dodge: stay off the edge the walls are coming from. */
   ATK.ArenaShrinkFlameWalls = function (st) {
-    var f = st.f, D_ = 1200, s = Math.min(1, f / D_) * 0.15, i, e, t, gp, cad, x, y, vx, vy, b, n = 10, fs = 95;
+    var f = st.f, D_ = 1500, s = Math.min(1, f / D_) * 0.15, i, e, t, gp, cad, x, y, vx, vy, b, n = 10, fs = 95;
     var wx = A.AW * s, wy = A.AH * s;
     G.box = { x: A.AX + wx, y: A.AY + wy, w: A.AW - 2 * wx, h: A.AH - 2 * wy };
     b = G.box;

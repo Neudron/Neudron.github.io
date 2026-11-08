@@ -522,7 +522,7 @@
     if (wrap.hidden) return;
     k = routed(e);
     if (!k) return;
-    if (k === 'Escape') { close(); return; }
+    if (k === 'Escape') { if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Draedon', close); else close(); return; }
     if (mode !== 'fight' && mode !== 'nuke') return;
     if (kit && kit.stripOpen) { kit.keydown(k); publish(); return; }
     if (k === 'x' || k === 'X') {
@@ -567,8 +567,6 @@
     if (document.getElementById('exo') && document.getElementById('exo').hidden)
       document.body.classList.remove('is-playing');
   }
-  var quit = document.getElementById('draedonQuit');
-  if (quit) quit.addEventListener('click', close);
   addEventListener('keydown', onDown);
   addEventListener('keyup', onUp);
   addEventListener('resize', function () { if (!wrap.hidden) layout(); });

@@ -108,6 +108,7 @@
 
   if (NEU.lookCity && NEU.lookCity.rooms) {
     NEU.lookCity.rooms.e5_dad = { w: 16, h: 8, paint: paintRoom };
+    NEU.lookCity.rooms.e6_room = { w: 16, h: 8, paint: paintRoom };
   }
   if (NEU.lookCity && NEU.lookCity.props) {
     var props = NEU.lookCity.props;
@@ -241,5 +242,75 @@
     onExit: function () { ticking = false; }
   });
 
-  if (NEU.act4RoomsD && NEU.act4RoomsD.indexOf('e5_dad') < 0) NEU.act4RoomsD.push('e5_dad');
+  /* Your bedroom: where the act starts, where the soup drops you, and the
+     only place the console powers off. sans stands at your left. The door
+     is shut (bed_free unset) while must_leave is up: after the soup it
+     waits until you have powered the console off and looked at the crack. */
+  var WAKE_YAP = [
+    "you're awake.",
+    "you've been out about four hours. toby sat with you.",
+    "you fought a witch. you took her ashes. you went through a door made of fire.",
+    "you bought a potion off a man who doesn't own a shop.",
+    "you went home. you broke a television. you did a quiz.",
+    "then you punched a vending machine and ate something you found in it.",
+    "the soup was your idea. i want that on the record.",
+    "you tripped on the way in. twice.",
+    "go power the console off at the desk. then look at that crack."
+  ];
+  E.register('e6_room', {
+    tileset: 'dad',
+    dark: 64,
+    tiles: [
+      '################',
+      '#o.o.......o...#',
+      '#..............#',
+      '#..............#',
+      '#..o...........#',
+      '#..............#',
+      '#######.########',
+      '################'
+    ].join('\n'),
+    spawns: { bed: { x: 11, y: 2, face: 'down' }, door: { x: 7, y: 5, face: 'up' }, default: { x: 11, y: 2, face: 'down' } },
+    entities: [
+      { t: 'cityfloor', v: 'e6_room', x: 0, y: 0 },
+      { t: 'cityprop', v: 'dadbounce', x: 7, y: 3 },
+      { t: 'cityprop', v: 'dadrobe', x: 1, y: 1 },
+      { t: 'cityprop', v: 'daddesk', x: 3, y: 1 },
+      { t: 'cityprop', v: 'dadlamp', x: 3, y: 1, dx: 6 },
+      { t: 'cityprop', v: 'dadclock', x: 3, y: 1, dx: -6 },
+      { t: 'consolepc', x: 3, y: 1, dx: -1, run: function (c) {
+        var wasMust = c.flagged('must_leave');
+        c.flag('must_leave', 0); c.flag('bed_free', 1);
+        c.leave();
+        if (wasMust && NEU.act4 && NEU.act4.settle) NEU.act4.settle();
+      } },
+      { t: 'cityprop', v: 'dadbed', x: 11, y: 1 },
+      { t: 'npc', x: 9, y: 2, colour: '#EDE7DE', look: 'sans', run: function (c) {
+        c.say([c.flagged('must_leave') ? 'go power the console off. then look at that crack.'
+                                       : 'the console powers off at your desk. z on it when you are done.'], 'sans');
+      } },
+      { t: 'exit', x: 7, y: 6, to: 'a1_clearing', spawn: 'default', style: 'door', locked: 'bed_free',
+        label: 'door', lines: ['* sans: go look at that crack first.'] }
+    ],
+    onEnter: function (c) {
+      var must = c.flagged('must_leave'), i, door = null, ents = c.ents();
+      for (i = 0; i < ents.length; i++) if (ents[i].t === 'exit') door = ents[i];
+      if (door) {
+        var home = NEU.quest && NEU.quest.has && NEU.quest.has('a4_home');
+        door.to = home ? 'e3_hall' : 'a1_clearing';
+        door.spawn = home ? 'dad' : 'default';
+      }
+      c.flag('bed_free', must ? 0 : 1);
+      if (must) {
+        if (!c.flagged('wake_yap')) { c.flag('wake_yap', 1); c.say(WAKE_YAP, 'sans'); }
+      } else if (!c.flagged('e6_intro')) {
+        c.flag('e6_intro', 1);
+        c.say(["morning. you're on the console again.",
+               "the way out of it is the desk. z on the console, and it powers off.",
+               "the door leads to the woods. i'd go. the woods have been waiting."], 'sans');
+      }
+    }
+  });
+
+  if (NEU.act4RoomsD && NEU.act4RoomsD.indexOf('e5_dad') < 0) NEU.act4RoomsD.push('e5_dad', 'e6_room');
 })();

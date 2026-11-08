@@ -26,7 +26,6 @@
   var sayEl = document.getElementById('shopSay');
   var goldEl = document.getElementById('shopGold');
   var keysEl = wrap.querySelector('.shop__keys');
-  var quitBtn = document.getElementById('shopQuit');
 
   var KINDS = { melee: 1, ranged: 1, spell: 1, heal: 1 };
   var MENU = [
@@ -264,7 +263,7 @@
 
   function draw() {
     var have = NEU.save ? NEU.save.has('axe') : false;
-    var p = anim ? pose(anim.t) : { mx: HOME.x, my: HOME.y, ax: AXE_ON.x, ay: AXE_ON.y, show: !have, hold: false };
+    var p = anim ? pose(reduced() ? DONE_AT - 0.01 : anim.t) : { mx: HOME.x, my: HOME.y, ax: AXE_ON.x, ay: AXE_ON.y, show: !have, hold: false };
     drawScene(p);
   }
 
@@ -423,7 +422,6 @@
   function handover(id, cb) {
     if (anim) return;
     if (!NEU.save || NEU.save.has(id)) { if (cb) cb(); return; }
-    if (reduced()) { finish(id, cb); return; }
     if (!active) open(1);
     anim = { t: 0, id: id, cb: cb };
     last = 0;
@@ -448,7 +446,7 @@
     if (!(dt >= 0)) dt = 0;
     if (dt > 0.05) dt = 0.05;
     anim.t += dt;
-    if (anim.t >= DONE_AT) { a = anim; finish(a.id, a.cb); return; }
+    if (anim.t >= (reduced() ? 1.5 : DONE_AT)) { a = anim; finish(a.id, a.cb); return; }
     draw();
   }
 
@@ -500,7 +498,7 @@
        Bring it back now, so closing the stall resumes the room. */
     if (NEU.engine && !NEU.engine.running) {
       var w = NEU.engine.where ? NEU.engine.where() : null;
-      if (w && w.room) NEU.engine.enter(w.room, w.spawn);
+      if (w && w.room) NEU.engine.enter(w.room, w.room === 'd1_street' ? 'stall' : w.spawn);
     }
   }
 
@@ -524,15 +522,14 @@
     if (wrap.hidden || !active || e === openedBy) return;
     /* the stall is modal: no key reaches the fight or the room under it */
     e.stopImmediatePropagation();
-    if (e.key === 'Escape') { close(); e.preventDefault(); return; }
     if (anim) { e.preventDefault(); return; }
+    if (e.key === 'Escape') { close(); e.preventDefault(); return; }
     if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { move(-1); e.preventDefault(); return; }
     if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { move(1); e.preventDefault(); return; }
     if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z') { confirm(); e.preventDefault(); return; }
     if (e.key === 'x' || e.key === 'X') { back(); e.preventDefault(); return; }
   });
 
-  if (quitBtn) quitBtn.addEventListener('click', function (e) { if (e) { e.preventDefault(); e.stopPropagation(); } close(); });
 
   NEU.shop = {
     open: open, close: close, buy: buy, sell: sell, handover: handover, tick: tick, pose: pose,

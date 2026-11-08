@@ -80,7 +80,7 @@
       a: 'Enter', aLabel: 'start',  b: 'Escape', stick: true },
 
     { id: 'craft',  on: function () { return NEU.craft && NEU.craft.running; },
-      a: 'Enter', aLabel: 'place',  b: 'Escape', stick: true, repeat: true },
+      a: 'Enter', aLabel: 'press',  b: 'Escape', stick: true },
 
     { id: 'quiz',   on: function () { return NEU.quiz && NEU.quiz.running; },
       a: 'Enter', aLabel: 'pick',   b: 'Escape', stick: true },
@@ -113,6 +113,18 @@
     if (sawTouch) return;
     sawTouch = true;
     sync();
+  }, { passive: true, capture: true });
+
+  /* Two-finger tap = Escape: the way out of an overlay now that the esc
+     buttons are gone. Only while a game or room owns the screen. */
+  var twoAt = 0;
+  addEventListener('touchstart', function (e) {
+    twoAt = e.touches && e.touches.length === 2 ? Date.now() : 0;
+  }, { passive: true, capture: true });
+  addEventListener('touchend', function () {
+    if (!twoAt || Date.now() - twoAt > 350 || !document.body.classList.contains('is-playing')) { twoAt = 0; return; }
+    twoAt = 0;
+    send('Escape', true); send('Escape', false);
   }, { passive: true, capture: true });
 
   /* ── key synthesis ─────────────────────────────────────────────── */
@@ -368,7 +380,8 @@
        player (wanted()): a tall desktop window has no phone to turn. */
     var fight = !!p && (p.id === 'bullet' || p.id === 'scal' || p.id === 'polt');
     document.body.classList.toggle('is-portrait-fight', fight && innerHeight > innerWidth && wanted());
-    var show = !!p && wanted() && !talking();
+    /* bottom thumb pad: shops only, by request; craft keeps it (the soul needs the stick) */
+    var show = !!p && (p.id === 'shop' || p.id === 'craft') && wanted() && !talking();
 
     if (!show) {
       if (built && pad && !pad.hidden) { pad.hidden = true; }

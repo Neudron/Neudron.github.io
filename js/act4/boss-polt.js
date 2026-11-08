@@ -1092,13 +1092,6 @@
     }
   }
 
-  var q = document.getElementById('poltQuit');
-  if (q) q.addEventListener('click', function () {
-    /* same path as ESC: a confirmed exit, since the fight is on the line */
-    if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Polterghast', close);
-    else close();
-  });
-
   if (NEU.kernel) NEU.kernel.register('polt', {
     tick: function (dt) { stepFn(performance.now()); },
     open: open, close: close,
