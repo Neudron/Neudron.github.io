@@ -1239,7 +1239,7 @@ body.is-blackout::before {
    percentages of the 640x320 picture (x / 6.4, y / 3.2). */
 .quiz__stage {
   position: relative; z-index: 1;
-  width: min(100vw, calc((100vh - 260px) * 1.7778));
+  width: 100%;
   background: #000;
 }
 .quiz__main { display: contents; }

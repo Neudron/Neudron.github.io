@@ -6,15 +6,16 @@
   if (!P || !P.level) return;
   var W = 48, H = 18, currentId = '';
 
+  /* recordings re-cut for the Celeste core (B1): edge-triggered jump/dash, so a held key is one press */
   var REC = {
-    m0: [[29, 'right'], [49, 'jump right'], [1, 'right'], [17, 'jump right'], [1, 'right'], [13, 'jump right'], [28, 'right'], [49, 'jump right'], [1, 'right'], [11, 'jump right'], [38, 'right']],
-    m1: [[172, 'right']],
-    m2: [[71, 'right'], [101, ''], [46, 'right'], [49, 'jump right'], [1, 'right'], [17, 'jump right'], [1, 'right'], [3, 'jump right'], [38, 'right']],
-    m3: [[124, 'right']],
-    m4: [[64, 'right'], [1, 'dash right'], [117, 'right']],
-    m5: [[16, 'right'], [1, 'jump right'], [7, 'right'], [17, 'right down melee'], [1, 'right'], [3, 'right down melee'], [56, 'right']],
-    m6: [[1, ''], [1, 'dash up'], [21, ''], [1, 'right'], [1, ''], [1, 'right'], [1, ''], [26, 'right']],
-    m7: [[119, 'right'], [49, 'jump right'], [1, 'right'], [17, 'jump right'], [1, 'right'], [3, 'jump right'], [27, 'right']]
+    m0: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, 'dash right']],
+    m1: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
+    m2: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right']],
+    m3: [[4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
+    m4: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [4, 'right']],
+    m5: [[4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right']],
+    m6: [[4, 'dash up right'], [12, 'right']],
+    m7: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'right down melee'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right']]
   };
 
   function blank() {
@@ -67,8 +68,6 @@
       tileset: 'mountain',
       onExit: makeExit(n)
     });
-    var i;
-    for (i = 0; i < def.entities.length; i++) if (def.entities[i].t === 'crumble') def.entities[i].solid = true;
     def.recording = REC[id];
     NEU.mountain.recordings[id] = REC[id];
     return def;

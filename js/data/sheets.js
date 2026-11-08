@@ -422,6 +422,64 @@
     sleepRug:   { src: 'img/act123/sleep-rug.png',   w: 7,  h: 10,  frames: 1, fw: 7,  fh: 10, fps: 0 }
   };
 
+  /* THE DUNGEON (B5): its own map because none of these files ship yet, and fixes7 wants
+     every NEU.sheets file on disk. Terraria's own sheets under their own names, drawn 1:1
+     (Terraria art is already 2x2 per art pixel, so a 16 px tile is 8x8 art). Blocks frame
+     on an 18 px stride (16 + 2 gutter), walls on 36 (32 + 4, drawn at -8,-8). Until the
+     user drops a file in, that thing draws as a magenta box. The full list,
+       with what each frame is for, is .opencode/plans/dungeon-sprites.md. `hit` is the
+       NPC's own width/height (NPC.SetDefaults), in world px. */
+  NEU.dgSheets = {
+    dgBlue:    { src: IMG + 'terraria/Tiles_41.png',  w: 288, h: 270,  frames: 15, cols: 16, fw: 18, fh: 18, fps: 0 },
+    dgGreen:   { src: IMG + 'terraria/Tiles_43.png',  w: 288, h: 270,  frames: 15, cols: 16, fw: 18, fh: 18, fps: 0 },
+    dgPink:    { src: IMG + 'terraria/Tiles_44.png',  w: 288, h: 270,  frames: 15, cols: 16, fw: 18, fh: 18, fps: 0 },
+    dgCrackB:  { src: IMG + 'terraria/Tiles_481.png', w: 288, h: 270,  frames: 15, cols: 16, fw: 18, fh: 18, fps: 0 },
+    dgCrackG:  { src: IMG + 'terraria/Tiles_482.png', w: 288, h: 270,  frames: 15, cols: 16, fw: 18, fh: 18, fps: 0 },
+    dgCrackP:  { src: IMG + 'terraria/Tiles_483.png', w: 288, h: 270,  frames: 15, cols: 16, fw: 18, fh: 18, fps: 0 },
+    dgGrass:   { src: IMG + 'terraria/Tiles_2.png',   w: 288, h: 1980, frames: 110, cols: 16, fw: 18, fh: 18, fps: 0 },
+    dgSpike:   { src: IMG + 'terraria/Tiles_48.png',  w: 234, h: 90,   frames: 5, cols: 13, fw: 18, fh: 18, fps: 0 },
+    dgChain:   { src: IMG + 'terraria/Tiles_214.png', w: 234, h: 90,   frames: 5, cols: 13, fw: 18, fh: 18, fps: 0 },
+    dgShelf:   { src: IMG + 'terraria/Tiles_19.png',  w: 486, h: 1260, frames: 70, cols: 27, fw: 18, fh: 18, fps: 0 },
+    dgLantern: { src: IMG + 'terraria/Tiles_42.png',  w: 70,  h: 2016, frames: 56, fw: 70, fh: 36, fps: 0 },
+    dgCandle:  { src: IMG + 'terraria/Tiles_49.png',  w: 36,  h: 22,   frames: 1, cols: 2, fw: 18, fh: 22, fps: 0 },
+    dgBanner:  { src: IMG + 'terraria/Tiles_91.png',  w: 1998, h: 162, frames: 3, cols: 111, fw: 18, fh: 54, fps: 0 },
+    dgBooks:   { src: IMG + 'terraria/Tiles_101.png', w: 1996, h: 142, frames: 2, fw: 1996, fh: 71, fps: 0 },
+    dgPot:     { src: IMG + 'terraria/Tiles_28.png',  w: 108, h: 1332, frames: 37, cols: 3, fw: 36, fh: 36, fps: 0 },
+    dgWallB:   { src: IMG + 'terraria/Wall_7.png',    w: 468, h: 180,  frames: 5, cols: 13, fw: 36, fh: 36, fps: 0 },
+    dgWallG:   { src: IMG + 'terraria/Wall_98.png',   w: 468, h: 180,  frames: 5, cols: 13, fw: 36, fh: 36, fps: 0 },
+    dgWallP:   { src: IMG + 'terraria/Wall_97.png',   w: 468, h: 180,  frames: 5, cols: 13, fw: 36, fh: 36, fps: 0 },
+    dgKeeper:  { src: IMG + 'terraria/NPC_37.png',    w: 40,  h: 1176, frames: 21, fw: 40, fh: 56, fps: 0, hit: { w: 18, h: 40 } },
+    dgSkull:   { src: IMG + 'terraria/NPC_34.png',    w: 28,  h: 90,   frames: 3, fw: 28, fh: 30, fps: 0, hit: { w: 26, h: 28 } },
+    dgSkullG:  { src: IMG + 'terraria/NPC_289.png',   w: 52,  h: 384,  frames: 6, fw: 52, fh: 64, fps: 0, hit: { w: 40, h: 40 } },
+    dgBonesR:  { src: IMG + 'terraria/NPC_269.png',   w: 46,  h: 842,  frames: 20, fw: 46, fh: 42, fps: 0, hit: { w: 18, h: 40 } },
+    dgBonesB:  { src: IMG + 'terraria/NPC_273.png',   w: 40,  h: 840,  frames: 20, fw: 40, fh: 42, fps: 0, hit: { w: 18, h: 40 } },
+    dgBonesH:  { src: IMG + 'terraria/NPC_277.png',   w: 50,  h: 842,  frames: 20, fw: 50, fh: 42, fps: 0, hit: { w: 18, h: 40 } },
+    dgRagged:  { src: IMG + 'terraria/NPC_281.png',   w: 40,  h: 168,  frames: 3, fw: 40, fh: 56, fps: 0, hit: { w: 18, h: 40 } },
+    dgNecro:   { src: IMG + 'terraria/NPC_283.png',   w: 40,  h: 168,  frames: 3, fw: 40, fh: 56, fps: 0, hit: { w: 18, h: 40 } },
+    dgDiabol:  { src: IMG + 'terraria/NPC_285.png',   w: 42,  h: 168,  frames: 3, fw: 42, fh: 56, fps: 0, hit: { w: 18, h: 40 } },
+    dgBoneLee: { src: IMG + 'terraria/NPC_287.png',   w: 44,  h: 896,  frames: 16, fw: 44, fh: 56, fps: 0, hit: { w: 18, h: 40 } },
+    dgSpirit:  { src: IMG + 'terraria/NPC_288.png',   w: 28,  h: 102,  frames: 3, fw: 28, fh: 34, fps: 0, hit: { w: 20, h: 20 } },
+    dgPaladin: { src: IMG + 'terraria/NPC_290.png',   w: 66,  h: 816,  frames: 17, fw: 66, fh: 48, fps: 0, hit: { w: 32, h: 44 } },
+    dgSniper:  { src: IMG + 'terraria/NPC_291.png',   w: 68,  h: 1260, frames: 21, fw: 68, fh: 60, fps: 0, hit: { w: 18, h: 40 } },
+    dgTactic:  { src: IMG + 'terraria/NPC_292.png',   w: 60,  h: 1260, frames: 21, fw: 60, fh: 60, fps: 0, hit: { w: 18, h: 40 } },
+    dgCommando:{ src: IMG + 'terraria/NPC_293.png',   w: 60,  h: 1200, frames: 20, fw: 60, fh: 60, fps: 0, hit: { w: 18, h: 40 } },
+    dgHammer:  { src: IMG + 'terraria/Projectile_300.png', w: 38, h: 38, frames: 1, fw: 38, fh: 38, fps: 0 },
+    dgBall:    { src: IMG + 'terraria/NPC_70.png',    w: 34,  h: 34,   frames: 1, fw: 34, fh: 34, fps: 0, hit: { w: 28, h: 28 } },
+    dgLink:    { src: IMG + 'terraria/Chain.png',     w: 12,  h: 12,   frames: 1, fw: 12, fh: 12, fps: 0 },
+    dgWheel:   { src: IMG + 'terraria/NPC_72.png',    w: 34,  h: 144,  frames: 4, fw: 34, fh: 36, fps: 0, hit: { w: 30, h: 30 } },
+    dgSign:    { src: IMG + 'terraria/Tiles_55.png',  w: 180, h: 36,   frames: 1, cols: 5, fw: 36, fh: 36, fps: 0 },
+    dgWarlock: { src: IMG + 'calamity/RenegadeWarlock.png', from: 'NPCs/Crags/RenegadeWarlock.png (npcFrameCount 4, 18x40)',
+                 w: 30, h: 200, frames: 4, fw: 30, fh: 50, fps: 0, hit: { w: 18, h: 40 } },
+    dgPhantom: { src: IMG + 'calamity/PhantomSpirit.png', from: 'NPCs/NormalNPCs/PhantomSpirit.png (npcFrameCount 3, 16x16)',
+                 w: 16, h: 84, frames: 3, fw: 16, fh: 28, fps: 0, hit: { w: 16, h: 16 } },
+    dgPhantomS:{ src: IMG + 'calamity/PhantomSpiritS.png', from: 'NPCs/NormalNPCs/PhantomSpiritS.png (sad, npcFrameCount 5, 32x80)',
+                 w: 32, h: 400, frames: 5, fw: 32, fh: 80, fps: 0, hit: { w: 32, h: 80 } },
+    dgPhantomM:{ src: IMG + 'calamity/PhantomSpiritM.png', from: 'NPCs/NormalNPCs/PhantomSpiritM.png (angry, npcFrameCount 5, 32x80)',
+                 w: 32, h: 400, frames: 5, fw: 32, fh: 80, fps: 0, hit: { w: 32, h: 80 } },
+    dgPhantomL:{ src: IMG + 'calamity/PhantomSpiritL.png', from: 'NPCs/NormalNPCs/PhantomSpiritL.png (happy, shoots, npcFrameCount 5, 32x80)',
+                 w: 32, h: 400, frames: 5, fw: 32, fh: 80, fps: 0, hit: { w: 32, h: 80 } }
+  };
+
   /* ── ONE blitter, and one image cache ──────────────────────────────
      This lives here rather than in engine.js because the manifest is
      what defines the contract, and because three modules need it

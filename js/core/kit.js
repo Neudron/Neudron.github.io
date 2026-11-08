@@ -40,7 +40,7 @@
     function addTp(n) { tp = Math.max(0, Math.min(1, tp + n)); return tp; }
     function heal(n) { hp = Math.min(6, hp + n); }
     function melee() {
-      if (meleeCd > 0) return;
+      if (meleeCd > 0 || opts.noMelee) return;
       var it = item(equipped('melee'));
       if (!it) return;
       var st = it.stats || {}, tg = nearest(), a = tg ? Math.atan2(tg.y - F.y, tg.x - F.x) : facing();
@@ -266,7 +266,9 @@
       get slow() { return stripOpen ? 0.2 : 1; },
       shots: shots,
       get beam() { return beam; },
-      get hp() { return hp; }
+      get hp() { return hp; },
+      /* a host that owns the HP (the dungeon) writes it in so HEAL and the strip read true */
+      set hp(v) { hp = Math.max(0, Math.min(6, Number(v) || 0)); }
     };
   }
 

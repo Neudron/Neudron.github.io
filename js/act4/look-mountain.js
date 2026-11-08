@@ -336,6 +336,9 @@
     }
   }
 
+  /* m0 bakes right after boot, not on the first climb */
+  setTimeout(function () { P.prebake('m0'); }, 0);
+
   NEU.mountainLook = {
     tileset: 'mountain',
     paint: function (level, g) {
