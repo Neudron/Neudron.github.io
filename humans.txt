@@ -4,5 +4,7 @@ neu ............ design, code, art direction, music synthesis
 toby fox ....... undertale + deltarune sprites, fonts of the soul
 calamity team .. terraria boss behaviour reference
 carter sande ... undertale webfont kit
+un tied games .. super pixel effects gigapack (vfx bursts, quiz icons)
+opengameart .... cc0 projectile + explosion sprites (dungeon shots)
 
 built by hand in a text editor, no build step, on purpose.

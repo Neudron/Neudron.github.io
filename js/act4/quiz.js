@@ -361,7 +361,7 @@
      pool is capped, so a perfect run cannot bury the screen. */
   var fcv = $('quizFx');
   var fg = fcv && fcv.getContext ? fcv.getContext('2d') : null;
-  var bits = [], fxW = 0, fxH = 0, DPR = 1, fxDirty = false;
+  var bits = [], fxW = 0, fxH = 0, DPR = 1, fxDirty = false, flashes = [];
   var CONF = ['#FFD34E', '#FF8ACF', '#7BE38A', '#4FC3F7', '#FF4D6A', '#F4F0FF'];
   function noBits() { return reduced || !!(NEU.settings && NEU.settings.particles); }
   function sizeFx() {
@@ -381,15 +381,30 @@
                   life: 2.2 + Math.random() * 1.2 });
     }
   }
+  /* gigapack verdict + rank icons; noBits() gates them with the confetti */
+  var RANK_ICON = { T: 'fxGigThumb', S: 'fxGigRankS', Z: 'fxGigNO' };
+  function flashIcon(k, x, y, sc) {
+    if (!fg || noBits()) return;
+    flashes.push({ k: k, x: x, y: y, t: .9, d: .9, sc: sc || 3 });
+  }
   function stepFx(dt) {
+    var q;
     if (!fg) return;
-    if (!bits.length) {
+    for (q = flashes.length - 1; q >= 0; q--) {
+      flashes[q].t -= dt;
+      if (flashes[q].t <= 0) flashes.splice(q, 1);
+    }
+    if (!bits.length && !flashes.length) {
       if (fxDirty) { fg.setTransform(1, 0, 0, 1, 0, 0); fg.clearRect(0, 0, fcv.width, fcv.height); fxDirty = false; }
       return;
     }
     fxDirty = true;
     fg.setTransform(DPR, 0, 0, DPR, 0, 0);
     fg.clearRect(0, 0, fxW, fxH);
+    for (q = 0; q < flashes.length; q++) {
+      var fl = flashes[q];
+      if (NEU.fxBurst) NEU.fxBurst(fg, fl.k, fl.x, fl.y, 1 - fl.t / fl.d, fl.sc);
+    }
     for (var k = bits.length - 1; k >= 0; k--) {
       var b = bits[k];
       b.vy += 760 * dt; b.vx *= 1 - 0.9 * dt;
@@ -404,6 +419,7 @@
   }
   function clearFx() {
     bits = [];
+    flashes = [];
     if (fg && fcv) { fg.setTransform(1, 0, 0, 1, 0, 0); fg.clearRect(0, 0, fcv.width, fcv.height); }
     fxDirty = false;
   }
@@ -604,13 +620,15 @@
       host(TENNA.right[(Math.random() * TENNA.right.length) | 0]);
       pose('cheer', 'happy');
       var b = btns[right] && btns[right].getBoundingClientRect ? btns[right].getBoundingClientRect() : null;
-      if (b) burst(16, b.left + b.width / 2, b.top + b.height / 2, 0, -260, 520);
+      if (b) { burst(16, b.left + b.width / 2, b.top + b.height / 2, 0, -260, 520); flashIcon('fxGigOK', b.left + b.width / 2, b.top + b.height / 2, 3); }
       if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
     } else {
       host(n < 0
         ? TENNA.slow + 'ABCD'[right] + "."
         : TENNA.wrong[(Math.random() * TENNA.wrong.length) | 0] + 'ABCD'[right] + ".");
       pose('shrug', n < 0 ? 'sad' : 'shock');
+      var wb = n >= 0 && btns[n] && btns[n].getBoundingClientRect ? btns[n].getBoundingClientRect() : null;
+      flashIcon('fxGigNO', wb ? wb.left + wb.width / 2 : fxW / 2, wb ? wb.top + wb.height / 2 : fxH * 0.4, 3);
       if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     }
     if (elNum) elNum.textContent = (i + 1) + ' / ' + deal.length + '   ·   ' + score + ' right';
@@ -704,6 +722,7 @@
     pose(take[0], take[1]);
     host(score + ' OUT OF ' + deal.length + '! ' + (TENNA.rank[runRank] || ''));
     if (score >= 12) burst(50, fxW / 2, fxH * 0.45, 0, -420, 760);
+    flashIcon(RANK_ICON[runRank] || 'fxGigRank' + runRank.charAt(0), fxW / 2, fxH * 0.45, 5);
     later(doors, 1300);
   }
   function showRank(animate) {

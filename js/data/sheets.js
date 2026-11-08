@@ -429,7 +429,19 @@
     fxGigBoomO:{ src: IMG + 'vfx/GigBoomO.png', w: 64, h: 512, frames: 8,  fw: 64, fh: 64, fps: 0 },
     fxGigBoomV:{ src: IMG + 'vfx/GigBoomV.png', w: 96, h: 960, frames: 10, fw: 96, fh: 96, fps: 0 },
     fxGigHitY: { src: IMG + 'vfx/GigHitY.png',  w: 96, h: 672, frames: 7,  fw: 96, fh: 96, fps: 0 },
-    fxGigHitV: { src: IMG + 'vfx/GigHitV.png',  w: 80, h: 480, frames: 6,  fw: 80, fh: 80, fps: 0 }
+    fxGigHitV: { src: IMG + 'vfx/GigHitV.png',  w: 80, h: 480, frames: 6,  fw: 80, fh: 80, fps: 0 },
+    fxGigCast: { src: IMG + 'vfx/GigCast.png',  w: 32, h: 448, frames: 14, fw: 32, fh: 32, fps: 0 },
+    fxGigNova: { src: IMG + 'vfx/GigNova.png',  w: 32, h: 576, frames: 18, fw: 32, fh: 32, fps: 0 },
+    fxGigMend: { src: IMG + 'vfx/GigMend.png',  w: 64, h: 1024, frames: 16, fw: 64, fh: 64, fps: 0 },
+    fxGigWard: { src: IMG + 'vfx/GigWard.png',  w: 64, h: 1152, frames: 18, fw: 64, fh: 64, fps: 0 },
+    fxGigBrim: { src: IMG + 'vfx/GigBrim.png',  w: 64, h: 1152, frames: 18, fw: 64, fh: 64, fps: 0 },
+    fxGigOK:   { src: IMG + 'vfx/GigOK.png',    w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigNO:   { src: IMG + 'vfx/GigNO.png',    w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigRankA:{ src: IMG + 'vfx/GigRankA.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigRankB:{ src: IMG + 'vfx/GigRankB.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigRankC:{ src: IMG + 'vfx/GigRankC.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigRankS:{ src: IMG + 'vfx/GigRankS.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigThumb:{ src: IMG + 'vfx/GigThumb.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 }
   };
 
   /* THE DUNGEON (B5): its own map because none of these files ship yet, and fixes7 wants
