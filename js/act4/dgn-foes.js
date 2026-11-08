@@ -53,13 +53,16 @@
     for (i = 1; i < n; i++) if (solidAt(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)) return false;
     return true;
   }
+  /* a ground foe's feet belong on the first standable tile under its spawn char — a char that floats
+     (d3's 'a' sits two tiles over the floor) must not materialize with its head inside the ceiling */
+  function floorBelow(x, y) { var fy = y + 1; while (fy < y + 200 && !P.solid(x, fy) && P.cell(x, fy) !== '=') fy++; return fy; }
   function spawn(k, x, y, sp) {
     var d = KIND[k], sh, m, f;
     if (!d) return null;
     f = { k: k, d: d, s: d.s, v: d.v, x: (x + 0.5) * T, y: 0, vx: 0, vy: 0, hp: d.hp, face: -1, t: 0, a: 0, n: 0, st: 0, sp: sp || null, walked: 0, flash: 0, cd: 0, shoots: 0 };
     if (d.phantom) { m = MOODS[(rnd() * 4) | 0]; f.s = m[0]; f.v = m[1]; f.shoots = m[2]; }
     sh = sheet(f.s); f.w = sh && sh.hit ? sh.hit.w : 16; f.h = sh && sh.hit ? sh.hit.h : 16; f.r = Math.min(f.w, f.h) / 2;
-    f.y = d.ai === 'fighter' || d.ai === 'ranged' || d.ai === 'caster' || d.ai === 'warlock' ? (y + 1) * T - f.h / 2 : (y + 0.5) * T;
+    f.y = d.ai === 'fighter' || d.ai === 'ranged' || d.ai === 'caster' || d.ai === 'warlock' ? floorBelow(x, y) * T - f.h / 2 : (y + 0.5) * T;
     if (d.ai === 'ball') { f.px = f.x; f.py = (y + 0.5) * T; f.len = 9 * T; }
     if (d.ai === 'wheel') { f.dx = 1; f.dy = 0; f.cx = x; f.cy = y; f.pr = 0; }
     if (d.ai === 'ranged') f.t = -1;
@@ -307,7 +310,7 @@
     }
     for (i = foes.length - 1; i >= 0; i--) if (foes[i].dead) foes.splice(i, 1);
   }
-  function explode(s) { s.k = 'boom'; s.age = 0; s.life = 0.3; s.r = s.boom; s.vx = s.vy = 0; shots.push(s); if (Math.abs(hx() - s.x) < s.boom + P.hw && Math.abs(hy() - s.y) < s.boom + P.hh / 2) hurtHero(1, sgn(hx() - s.x)); }
+  function explode(s) { if (s.k === 'boom') return; s.k = 'boom'; s.age = 0; s.life = 0.3; s.r = s.boom; s.vx = s.vy = 0; shots.push(s); if (Math.abs(hx() - s.x) < s.boom + P.hw && Math.abs(hy() - s.y) < s.boom + P.hh / 2) hurtHero(1, sgn(hx() - s.x)); }
   function onBeam(p) {
     var i, ax, ay, bx, by, t, qx, qy, L;
     for (i = 0; i + 3 < p.length; i += 2) {
