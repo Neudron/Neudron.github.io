@@ -210,35 +210,56 @@
     } catch (e) { return false; }
   }
   if (NEU.engineKinds && NEU.engineKinds.kind) {
+    var crackSp = null;
+    var crackBr = [
+      [[-9, -6], [-10, -7], [-11, -7], [-12, -8], [-13, -9], [-13, -10], [-14, -10]],
+      [[3, 5], [3, 6], [4, 7], [4, 8], [5, 8], [6, 9], [6, 10]],
+      [[11, -5], [12, -6], [12, -7], [13, -8], [14, -8], [15, -9], [16, -10]]
+    ];
+    /* a ground fissure: black inside, a stepped chrome lip, three hairlines */
+    var crackSprite = function () {
+      if (crackSp || !NEU.roomArt) return crackSp;
+      crackSp = NEU.roomArt.sprite('vzs:crack', 36, 28, 18, 14, function (R) {
+        var x, t, yc, y1, y2, hi, i, j;
+        for (x = -16; x < 16; x++) {
+          t = Math.round(0.5 + 3.2 * Math.sin(Math.PI * (x + 16.5) / 33));
+          yc = Math.round(1.2 * Math.sin(x * 0.35));
+          y1 = yc - t; y2 = yc + t;
+          hi = ((x >> 2) & 1) === 1;
+          if (t >= 2) R(x, y1 - 4, 1, 1, '#5A0C14');
+          if (t >= 1) R(x, y1 - 3, 1, 1, '#B01018');
+          R(x, y1 - 2, 1, 1, hi ? '#E04A4A' : '#B01018');
+          R(x, y1 - 1, 1, 1, hi ? '#FFD0D4' : '#E04A4A');
+          R(x, y1, 1, y2 - y1 + 1, '#000000');
+          R(x, y2 + 1, 1, 1, '#B01018');
+          if (t >= 1) R(x, y2 + 2, 1, 1, '#5A0C14');
+        }
+        for (i = 0; i < crackBr.length; i++) for (j = 0; j < crackBr[i].length; j++) R(crackBr[i][j][0], crackBr[i][j][1], 1, 1, j % 3 === 2 ? '#5A0C14' : '#B01018');
+      });
+      return crackSp;
+    };
     NEU.engineKinds.kind('crack', {
       interactive: function () { return false; },
       draw: function (g, e, d) {
-        var S = d.S || 1, x = (d.sx - 6 * S) | 0, y = (d.sy - 14 * S) | 0;
-        var cols = ['#2A0A12', '#8C2F4A', '#C2405F', '#FF6B6B', '#FFE3E3'];
-        var rows = [
-          '..3.........',
-          '.3442.......',
-          '344421......',
-          '.3444211....',
-          '..3442211...',
-          '...3422111..',
-          '....322111..',
-          '.....22111..',
-          '......111...'
-        ];
-        var band = crackReduced() ? 3 : (((d.now || 0) / 400) | 0) % 8;
-        var r, c, ch;
-        for (r = 0; r < rows.length; r++) {
-          for (c = 0; c < rows[r].length; c++) {
-            ch = rows[r].charAt(c);
-            if (ch === '.') continue;
-            g.fillStyle = (c === band) ? cols[4] : cols[(ch - 1) | 0];
-            g.fillRect(x + c * S, y + r * S, S, S);
-          }
+        var S = d.S || 1, x = d.sx, y = d.sy - 8 * S, now = d.now || 0, hold = crackReduced();
+        var sp = crackSprite(), lk = NEU.engineLook, a, k, ph, sx;
+        if (lk && lk.glow) {
+          a = hold ? 0.2 : 0.15 + 0.05 * [0, 1, 2, 1][((now / 300) | 0) & 3];
+          lk.glow(g, x, y, 20 * S, '#B01018', a);
+        }
+        if (sp) NEU.roomArt.blit(g, sp, { S: S, sx: x, sy: y });
+        else { g.fillStyle = '#000000'; g.fillRect(x - 12 * S, y - 2 * S, 24 * S, 4 * S); g.fillStyle = '#E04A4A'; g.fillRect(x - 12 * S, y - 3 * S, 24 * S, S); }
+        /* reduced motion: the glint stays where it is (phase 0), it does not flicker */
+        for (k = 0; k < 2; k++) {
+          ph = (((hold ? 0 : now) + k * 1000) % 2000) / 2000;
+          if (ph > 0.3) continue;
+          sx = (k ? 5 : -7) + ((ph * 20) | 0) * (k ? 1 : -1);
+          g.fillStyle = ph < 0.15 ? '#FFD0D4' : '#E04A4A';
+          g.fillRect(x + sx * S, y - (2 + ((ph * 60) | 0)) * S, 2 * S, S);
         }
       },
       width: function () { return 12; },
-      light: function () { return { r: 28, col: '#FF6B6B', glow: 0.28 }; }
+      light: function () { return { r: 28, col: '#E04A4A', glow: 0.28 }; }
     });
   }
 
@@ -295,20 +316,55 @@
     }
     return list;
   }
-  /* Cloak and cowl are one black. The face is empty except the eyes. */
+  /* The hooded figure: a bell of cloak in four tones, a warm rim on the
+     fire side, a cool one from the moon, a black face with two eyes. */
+  var HOOD_HW = [1, 2, 3, 4, 5, 5, 6, 6, 6, 6, 6, 6, 7, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9];
+  var HOOD_SH = [4, 3, 3, 2, 2, 1, 1, 0, 0, 0, 0, 0];
+  var hoodSp = [null, null];
+  function hoodSprite(pose) {
+    if (hoodSp[pose] || !NEU.roomArt) return hoodSp[pose];
+    hoodSp[pose] = NEU.roomArt.sprite('vzs:hood' + pose, 28, 40, 14, 38, function (R) {
+      var i, y, hw, cx, l, w, u, x, c, up;
+      for (i = 0; i < 34; i++) {
+        up = i < 14 ? pose : 0;
+        hw = HOOD_HW[i];
+        cx = i < HOOD_SH.length ? -HOOD_SH[i] : 0;
+        l = cx - hw; w = hw * 2;
+        if (i >= 31) {
+          /* ragged hem */
+          for (x = 0; x < w; x += 4) {
+            if (i === 31 || (i === 32 && ((x >> 2) & 1) === 0) || (i === 33 && ((x >> 2) & 1) === 1)) R(l + x, -34 + i, Math.min(3, w - x), 1, '#08060C');
+          }
+          if (i === 31) R(l, -34 + i, w, 1, '#08060C');
+          continue;
+        }
+        for (x = 0; x < w; x++) {
+          u = x / w;
+          c = u < 0.28 ? '#2A2436' : u < 0.5 ? '#1C1826' : u < 0.72 ? '#100E16' : '#08060C';
+          if (i >= 16 && i < 31 && (x === ((w * 0.45) | 0) || x === ((w * 0.7) | 0))) c = x === ((w * 0.45) | 0) ? '#1C1826' : '#08060C';
+          if (i >= 5 && x === 0) c = '#6A2A1A';
+          if (i >= 5 && x === w - 1) c = '#3A4A6A';
+          R(l + x, -34 + i - up, 1, 1, c);
+          if (i === 13 && pose) R(l + x, -34 + i, 1, 1, c);
+        }
+      }
+      R(-5, -34 + 6 - pose, 10, 1, '#2A2436');
+      R(-4, -34 + 7 - pose, 8, 8, '#000000');
+      R(-5, -34 + 8 - pose, 1, 6, '#1C1826'); R(4, -34 + 8 - pose, 1, 6, '#08060C');
+    });
+    return hoodSp[pose];
+  }
   function hoodDraw(g, e, d) {
-    var S = (d && d.S) || 1, x = d.sx, y = d.sy;
+    var S = (d && d.S) || 1, x = d.sx, y = d.sy, now = d.now || 0, calmNow = crackReduced();
+    var pose = calmNow ? 0 : (((now / 800) | 0) & 1), sp = hoodSprite(pose), lk = NEU.engineLook;
     try { g.imageSmoothingEnabled = false; } catch (err) {}
-    function R(px, py, w, h, col) {
-      g.fillStyle = col;
-      g.fillRect((x + px * S) | 0, (y + py * S) | 0, (w * S) | 0, (h * S) | 0);
-    }
-    R(-6, -3, 12, 3, '#1A1420');
-    R(-5, -20, 10, 18, '#100E16');
-    R(-4, -26, 8, 8, '#100E16');
-    R(-1, -24, 2, 8, '#100E16');
-    R(-2, -18, 2, 2, '#E4E0D4');
-    R(1, -18, 2, 2, '#E4E0D4');
+    if (lk && lk.shadow) lk.shadow(g, x, y, 20, S, 0.4);
+    if (sp) NEU.roomArt.blit(g, sp, d);
+    else { g.fillStyle = '#100E16'; g.fillRect(x - 9 * S, y - 34 * S, 18 * S, 34 * S); }
+    if (!calmNow && (now % 4000) >= 3880) return;
+    g.fillStyle = '#E4E0D4';
+    g.fillRect(x - 3 * S, y + (-24 - pose) * S, 2 * S, 2 * S);
+    g.fillRect(x + 1 * S, y + (-24 - pose) * S, 2 * S, 2 * S);
   }
   if (NEU.roomArt && NEU.roomArt.skins) {
     NEU.roomArt.skins.hood = { width: 0, draw: hoodDraw };

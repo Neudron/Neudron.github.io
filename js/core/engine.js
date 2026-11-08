@@ -947,6 +947,14 @@
       if (dr.k && dr.k.draw) { dr.k.draw(ctx, dr.e, d); d.room = room; }
       else { ctx.fillStyle = dr.e.colour || '#B892FF'; ctx.fillRect(d.sx - 3 * S, d.sy - 6 * S, 6 * S, 6 * S); }
     }
+    /* speech bubbles (e.hint) go over everything: a counter drawn after
+       its shopkeeper must not hide the sign that he has something to say */
+    for (i = 0; K && i < ents.length; i++) {
+      e = ents[i];
+      if (!e.hint || e.dead) continue;
+      var ph = entAt(e); d.sx = sx(ph.x); d.sy = sy(ph.y);
+      K.hint(ctx, e, d);
+    }
 
     if (L) {
       L.weatherDraw(ctx, camSX, camSY, S, w, h);
@@ -1093,7 +1101,7 @@
   }
 
   /* ESC confirmation dialog — every minigame's "leave?" */
-  function confirmExit(minigameName, onConfirm) {
+  function confirmExit(minigameName, onConfirm, note) {
     if (document.getElementById('confirmExit')) return;
     var before = document.activeElement;
     if (NEU.juice) NEU.juice.pause(true);
@@ -1110,7 +1118,7 @@
       '<div style="display:flex;gap:16px;justify-content:center;margin:0 0 20px;">' +
         confirmOpt('yes') + confirmOpt('no') +
       '</div>' +
-      '<div style="font:16px monospace;color:#8A8598;">This run won\'t count. Your save is kept.</div></div>';
+      '<div style="font:16px monospace;color:#8A8598;">' + (note || 'This run won\'t count. Your save is kept.') + '</div></div>';
     document.body.appendChild(overlay);
     /* Focus moves INTO the prompt (C11) — onto the dialog itself, not a
        button. The highlight is the only selection: `sel` drives both the
@@ -1189,6 +1197,21 @@
     if (NEU.save) { NEU.save.capture(); NEU.save.flush(); }
   }
 
+  /* Back into the room leave() stopped (craft hands the player back here).
+     enter() would re-run the room's onEnter, which wakes you; this does not.
+     false when there is no room or it already runs. */
+  function resume() {
+    if (running || !room) return false;
+    if (NEU.kernel) NEU.kernel.push('engine');
+    wrap.hidden = false;
+    document.body.classList.add('is-playing');
+    if (NEU.quest) NEU.quest.lock(true);
+    keys = {}; busy = false; acc = 0;
+    running = true; last = performance.now();
+    requestAnimationFrame(step);
+    return true;
+  }
+
   var API = {
     say: say, flag: flag,
     flagged: function (k) { return NEU.save ? NEU.save.flagged(k) : false; },
@@ -1223,7 +1246,7 @@
   });
 
   NEU.engine = {
-    register: register, tileset: tileset, decor: decor, enter: enter, leave: leave, go: go,
+    register: register, tileset: tileset, decor: decor, enter: enter, leave: leave, resume: resume, go: go,
     confirmExit: confirmExit,
     where: function () { return room ? { room: room.id, spawn: room.__spawn } : null; },
     get running() { return running; },

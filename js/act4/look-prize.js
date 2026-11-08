@@ -231,10 +231,12 @@
   }
 
   KK.kind('prizeprop', {
-    interactive: function (e) { return !!e.lines; },
+    interactive: function (e) { return !!(e.lines || e.run); },
     fire: function (e, sys) {
-      if (!e.lines) return;
+      if (!e.lines && !e.run) return;
       if (NEU.tboxOpen && NEU.tboxOpen()) return;
+      /* a run hook wins, as it does for npcs: the Z room's pen is a cheat */
+      if (e.run) { e.run(sys.api); return; }
       sys.say(e.lines, e.who || 'narr');
       if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
     },
@@ -1457,9 +1459,14 @@
      A concrete floor that runs out of light before it runs out of
      floor. The only light is the machine's: a cold pool, and then the
      dark stepping in, ring by ring, to black at the walls. When you
-     have punched it six times it turns its light off and the pool goes
+     have made its one decision it turns its light off and the pool goes
      with it. */
-  function machineOff() { var s = save(); return !!(s && (s.flag('punches') || 0) >= 6); }
+  /* the machine is spent once it has made its one decision (vend_pick), or
+     once six punches have put its light out (the older way, still honoured) */
+  function machineOff() {
+    var s = save();
+    return !!(s && (s.flagged('vend_pick') || (s.flag('punches') || 0) >= 6));
+  }
   STATE.h2 = function () { return machineOff() ? 'off' : 'on'; };
   PAINT.h2 = function (P, room, st) {
     var Wd = room.w * T, Hd = room.h * T, x, y, i;
@@ -1518,10 +1525,10 @@
   };
   NPCART.vending = {
     w: 32, h: 50, ax: 16, ay: 48, shadow: 22,
-    key: function () { var s = save(); return String(Math.min(6, (s && s.flag('punches')) || 0)); },
+    key: function () { return machineOff() ? 'spent' : 'live'; },
     light: function () { return machineOff() ? { r: 16, col: '#3A4A3A', glow: 0.05 } : { r: 66, col: '#E0A04A', glow: 0.22 }; },
     paint: function (P) {
-      var n = Math.min(6, ((save() && save().flag('punches')) || 0)), off = n >= 6;
+      var off = machineOff();
       /* olive cabinet, teal stile, damp for years */
       P.r(1, 2, 30, 46, '#141A10');
       P.r(2, 3, 28, 44, '#3A4636'); P.r(2, 3, 28, 2, '#5C6A4E');
@@ -1540,11 +1547,9 @@
           P.r(x, y, 2, 1, '#C8C0A8');
         }
       }
-      /* Deez Nutz: hanging on, then not */
-      if (n < 6) {
-        var lean = n >= 3 ? 1 : 0, drop = n >= 5 ? 1 : 0;
-        P.r(18 + lean, 27 + drop, 3, 4, '#6A4A28'); P.r(18 + lean, 27 + drop, 3, 1, '#C4A06A');
-      } else { P.r(7, 42, 14, 3, '#6A4A28'); P.r(7, 42, 14, 1, '#C4A06A'); }
+      /* the slot's item hangs until the one pick is made; then vendPick
+         drops it and eats it, and the tray is empty */
+      if (!off) { P.r(18, 27, 3, 4, '#6A4A28'); P.r(18, 27, 3, 1, '#C4A06A'); }
       P.line(9, 13, 9, 17, '#D8E8C0'); P.line(9, 17, 13, 22, '#9AA890');
       /* mould bloom on the left stile, rust down the right */
       P.r(2, 28, 2, 12, '#141A10'); P.dith(2, 28, 2, 12, '#4A6B35', 0); P.dith4(2, 30, 2, 8, '#7BA05B', 0);
@@ -1554,15 +1559,15 @@
       for (var k = 0; k < 6; k++) P.r(24 + (k & 1) * 2, 13 + (k >> 1) * 3, 1, 2, '#6B7A6E');
       P.r(24, 22, 3, 1, '#0A0C0A');
       P.r(4, 37, 24, 8, '#141A10'); P.r(5, 38, 22, 6, '#101410'); P.r(5, 38, 22, 1, '#2A403C');
-      /* dents: one per punch */
-      var dents = [[8, 46], [24, 30], [14, 46], [3, 20], [27, 40], [10, 4]];
-      for (k = 0; k < n; k++) { P.r(dents[k][0], dents[k][1] - 1, 3, 1, '#1A2018'); P.px(dents[k][0] + 1, dents[k][1], '#5C6A4E'); }
       P.r(3, 47, 26, 1, '#0A0C0A');
       P.dith4(4, 44, 22, 3, '#2A2418', 0);
     },
-    anim: function (g, x, y, S, now) {
+    anim: function (g, x, y, S, now, e) {
+      /* the pick falls and is eaten, in the machine that was used */
+      if (still()) return;
+      if (DROP.n >= 0 && e && MACH[e.v] === DROP.n && vendPick(g, x, y, S, now)) return;
       /* sodium tube, 400ms cycle (2.5 Hz). reduced motion holds the paint. */
-      if (still() || machineOff()) return;
+      if (machineOff()) return;
       var dim = ((now / 200) | 0) & 1;
       g.globalAlpha = dim ? 0.45 : 0.15;
       g.fillStyle = dim ? '#1A140C' : '#E0A04A';
@@ -1570,6 +1575,76 @@
       g.globalAlpha = 1;
     }
   };
+  /* The pick. Vending food used to be punched out of the machine and then
+     eaten; the choice now does the same visibly: the item drops from the
+     slot into the tray (600ms, falling), then three bites take it (900ms).
+     rooms-g calls NEU.vendDrop(n) at the decision; the trip starts after. */
+  var DROP = { n: -1, t0: -1 }, DROP_MS = 600, EAT_MS = 900;
+  var MACH = { vend_a: 0, vend_b: 1, vend_c: 2 };   /* the slot index rooms-g passes on */
+  /* The three items as 9-wide pixel maps (one char = 1 sprite px = 2 screen
+     px at S=2, so a can reads at 18x24): '.' is clear, k the outline. Each
+     has a lit left edge, a shaded right side and a banded middle. */
+  var PAL = {
+    k: '#0A0C0A', R: '#EEF2F8', H: '#DDE4EE', m: '#A8B0BC', s: '#5E6676', b: '#3E8F86', B: '#8FD0C4',
+    T: '#E4C48A', t: '#C4A06A', d: '#7A5A30', w: '#8A3A2A', L: '#EDE7DE', N: '#6A4A28',
+    P: '#E8708C', p: '#C2405F', q: '#8A2A40', I: '#F4EEE4'
+  };
+  var PICK = [
+    [   /* DEEZ NUTZ: a paper bag, folded and tied */
+      '.kkkkkkk.', 'kTtTtTtTk', 'kttttttdk', 'kwwwwwwwk', 'kTttttddk', 'kTtLLLtdk',
+      'kTtLNLtdk', 'kTtLLLtdk', 'kttttttdk', 'kttttttdk', 'kddddddkk', '.kkkkkkk.'
+    ],
+    [   /* the can, no label: rim, neck, a teal band */
+      '.kkkkkkk.', 'kRRRRRRmk', 'kmmmmmmsk', '.kkkkkkk.', 'kHHmmmmsk', 'kHbbbbbsk',
+      'kHbBBBbsk', 'kHbbbbbsk', 'kHmmmmmsk', 'kHmmmmmsk', 'kmmmmmssk', '.kkkkkkk.'
+    ],
+    [   /* HOLD ME: a crimped packet */
+      'kkkkkkkkk', 'kPpPpPpPk', 'kppppppqk', 'kPPppppqk', 'kPIIIIpqk', 'kPIpIpIqk',
+      'kPIIIIpqk', 'kPppppqqk', 'kppppppqk', 'kpPpPpPqk', 'kkkkkkkkk'
+    ]
+  ];
+  NEU.vendDrop = function (n) { DROP.n = n; DROP.t0 = -1; };
+  NEU.vendDrop.state = function () { return { n: DROP.n, t0: DROP.t0 }; };
+  /* sprite px → screen, for the NPCART sprite (anchored at ax, ay) */
+  function VP(g, x, y, S, px, py, w, h, c) {
+    g.fillStyle = c; g.fillRect(x - 16 * S + px * S, y - 48 * S + py * S, w * S, h * S);
+  }
+  /* one item from its map, cut off right of column `cut` with a toothed
+     edge (every other row sits one column further in). Runs of one colour
+     are one rect, so a frame is ~40 fills, not 100. */
+  function vendItem(g, x, y, S, px, py, map, cut) {
+    var r, c, c0, ch, line, lim;
+    for (r = 0; r < map.length; r++) {
+      line = map[r]; lim = Math.min(line.length, cut - (r & 1));
+      for (c = 0; c < lim; c = c0) {
+        ch = line.charAt(c); c0 = c + 1;
+        while (c0 < lim && line.charAt(c0) === ch) c0++;
+        if (ch !== '.') VP(g, x, y, S, px + c, py + r, c0 - c, 1, PAL[ch]);
+      }
+    }
+  }
+  function vendPick(g, x, y, S, now) {
+    if (DROP.t0 < 0) DROP.t0 = now;
+    var t = now - DROP.t0, map = PICK[DROP.n], H = map.length, k, px, py, bite, i, a;
+    if (t >= DROP_MS + EAT_MS) { DROP.n = -1; return false; }
+    if (t < DROP_MS) {
+      k = t / DROP_MS;                                    /* falls: slot to tray, gaining speed */
+      px = 18 - 7 * k; py = 12 + (45 - H - 12) * k * k;
+      vendItem(g, x, y, S, px | 0, py | 0, map, 9);
+      return true;
+    }
+    /* in the tray: three bites, each takes three columns off the right; each
+       lands with a squash and sheds crumbs that fly and fall */
+    bite = Math.floor((t - DROP_MS) / (EAT_MS / 3));
+    px = 11; py = 44 - H;
+    vendItem(g, x, y, S, px, py, map, 9 - 3 * bite);
+    k = ((t - DROP_MS) % (EAT_MS / 3)) / (EAT_MS / 3);
+    a = PAL[map[4].charAt(3)];
+    for (i = 0; i < 5; i++) {
+      VP(g, x, y, S, px + 9 - 3 * bite + (i * 2 + 1) * k * 2, py + 3 + i * 2 + 14 * k * k, 1, 1, i & 1 ? PAL[map[1].charAt(1)] : a);
+    }
+    return true;
+  }
   NPCART.vend_a = NPCART.vend_b = NPCART.vend_c = NPCART.vending;
   PROP.aframe = {
     w: 18, h: 22, ax: 9, ay: 21, shadow: 10,
@@ -1794,6 +1869,46 @@
     }
   };
 
+
+  /* C-menu icons for the quest items. NEU.questIcon(canvas, item) paints a
+     16x16 sprite for the ids below and returns true; any other item returns
+     false and the caller keeps its own icon. inventory.js drawIcon calls it
+     first (see NEEDS). Same ink and 1px outline as the equipment icons.
+     16x16, one palette letter per pixel, same ink as the equipment icons. */
+  var QP = { S: '#8FA9B8', o: '#1A1024', R: '#E8DCB8', r: '#B8A87E', c: '#C79A6B', k: '#A8743C', K: '#7A4E26', d: '#3A2418',
+             B: '#7A7F9A', e: '#5A6478', W: '#DCE6F2', w: '#FFFFFF', Y: '#FFD866', O: '#FF9E30', F: '#E8501A',
+             u: '#3A8FD8', U: '#7FE6FF', n: '#1F4F8F', M: '#D8332B', g: '#9A98A8', G: '#6A6878', C: '#F4D9B0' };
+  var QI = {
+    axe: ['................', '....ooooo.......', '..ooWWWWBoo.....', '.oWWwWWBBBBo....', '.oWwWBBBBbKo....',
+          '.oWWBBBBbKko....', '.oBBBbbbKkKo....', '..oooBbKkKo.....', '.....oKkKo......', '....oKkKo.......',
+          '...oKkKo........', '..oKkKo.........', '..oKkKo.........', '..ooKo..........', '...oo...........', '................'],
+    photo: ['................', '..oooooooooooo..', '.oRRRRRRRRRRRRo.', '.oRddddddddddRo.', '.oRdSSSSSSSSdRo.', '.oRdSSCSSCSSdRo.', '.oRdSMMMYYYSdRo.', '.oRdSMMMYYYSdRo.', '.oRdKKMKKYKKdRo.', '.oRdKKKKKKKKdRo.', '.oRddddddddddRo.', '.oRRRRRRRRRRRRo.', '.oRRrrrRRrrRRRo.', '.oRRRRRRRRRRRRo.', '..oooooooooooo..', '................'],
+    ashes: ['................', '.......g........', '......g..W......', '.......W.g......', '......g.........',
+            '.......oo.......', '.....oogGoo.....', '....ogggWggo....', '...ogGggFgggGo..', '..ogggggggOgggo.',
+            '.ogGgggWgggggGgo', '.ogggGgggggGgggo', '.oGGgggggggggGGo', '..ooGGGGGGGGGoo.', '....oooooooooo..', '................'],
+    pkg_misleading: ['................', '................', '..oooooooooooo..', '.okccccYYccccko.', '.okccccYYccccko.',
+          '.okkkkkYYkkkkko.', '.okccccYYccccko.', '.okccooooooccko.', '.okccowwwwoccko.', '.okccowMMwoccko.',
+          '.okccowwwwoccko.', '.okccooooooccko.', '.oKKKKKYYKKKKKo.', '..oooooooooooo..', '................', '................'],
+    dad_card: ['................', '................', '................', '.oooooooooooooo.', '.onnnnnnnnnnnno.',
+          '.onuuuuuuuuuuno.', '.onuYYouuuuuuno.', '.onuYYYouwwwuno.', '.onuYYoouuuuuno.', '.onuuuuuuwwwuno.',
+          '.onuuuuuuuuuuno.', '.onnnnnnnnnnnno.', '.oooooooooooooo.', '................', '................', '................'],
+    flying_chair: ['................', '................', '.oo.......ooo...', '.oWo.....oKkKo..', '.oWWoo...oKkKo..', '.oWWWWoo.oKkKo..', '..oWwWWWooKkKo..', '...oWWWWooKkKo..', '.....oooo.oKkKoo', '.........oKkkkKo', '.........oKkkkKo', '.........ooKkKoo', '.........oKo.oKo', '.........oKo.oKo', '.........ooo.ooo', '................'],
+    boss_key: ['................', '....oooooo......', '...oWWWWWWo.....', '..oWwooooWWo....', '..oWoo..ooWo....',
+          '..oWoo..ooWo....', '..oWWoooWWWo....', '...oWWWWWWo.....', '....oWWWWo......', '.....oWWo.......',
+          '.....oWWooo.....', '.....oWWWWWo....', '.....oWWo.......', '.....oWWooo.....', '.....oWWWWo.....', '......oooo......']
+  };
+  function questIcon(canvas, item) {
+    var ctx, rows = item && QI[item.id], x, y, ch;
+    if (!rows) return false;
+    try { canvas.width = 16; ctx = canvas.getContext('2d'); } catch (e) { return false; }
+    if (!ctx) return false;
+    for (y = 0; y < rows.length; y++) for (x = 0; x < 16; x++) {
+      ch = rows[y].charAt(x);
+      if (ch !== '.' && QP[ch]) { ctx.fillStyle = QP[ch]; ctx.fillRect(x, y, 1, 1); }
+    }
+    return true;
+  }
+  NEU.questIcon = questIcon;
 
   /* public: rooms-g registers its looks through this */
   NEU.lookPrize = {

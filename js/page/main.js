@@ -419,15 +419,14 @@
 
   function frame() {
     ticking = false;
-    var vh = innerHeight;
+    var vh = innerHeight, gOp = null;
 
     /* hero coverage, 1 → 0 across one viewport of scrolling */
     if (hero) {
       var r = hero.getBoundingClientRect();
       var t = 1 - Math.min(1, Math.max(0, -r.top / (vh * 0.85)));
       NEU.heroT = t;
-      if (glass) glass.style.opacity = document.body.classList.contains('is-ready')
-        ? (t * t).toFixed(3) : '0';
+      gOp = document.body.classList.contains('is-ready') ? (t * t).toFixed(3) : '0';
 
       /* The scroll cue has made its point once you have moved — but
          only hide it once the page has actually settled. Hiding it
@@ -443,6 +442,7 @@
       }
     }
 
+    if (reduce && glass && gOp !== null) glass.style.opacity = gOp;
     if (reduce) return;
 
     /* Read every box first, then write: interleaving forced a style
@@ -455,6 +455,7 @@
       ps[i] = (box.bottom < -vh || box.top > vh * 2) ? null   // far off-screen
             : (box.top + box.height / 2 - vh / 2) / vh;       // -1 … 1
     }
+    if (glass && gOp !== null) glass.style.opacity = gOp;
     for (i = 0; i < movers.length; i++) {
       if (ps[i] !== null) movers[i].style.setProperty('--ty', (ps[i] * movers[i].__d * vh).toFixed(1) + 'px');
     }

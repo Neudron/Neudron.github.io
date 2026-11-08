@@ -3,9 +3,9 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
-  var W = 320, H = 180, SCALE = 2, OX = 24, OY = 28, VIEW = 64;
+  var W = 320, H = 180, SCALE = 2, OX = 48, OY = 36, VIEW = 64;
   var CELLW = SCALE * 5 + 2, CELLH = SCALE * 7 + 6, SIG = 5, SPEED = 64;
-  var INK = '#24180F', RED = '#C41018', DUST = '#6A5848', FAR = '#3A2E26';
+  var INK = '#2A1A14', RED = '#8A0C14', RED_HI = '#C8202C', BLEED = '#5A4A3A';
   var LINES = [
     'the door remembers a',
     'hand that is not here',
@@ -30,6 +30,7 @@
   };
   var overlay, canvas, ctx, hint, live = false, reduced = false;
   var scroll = 0, sigMs = 0, sig = [0, 0, 0, 0, 0], held = { up: false, down: false };
+  var art = null;
 
   function rnd() {
     if (NEU.rand && NEU.rand.rng) return NEU.rand.rng();
@@ -71,9 +72,117 @@
       open: live, scroll: scroll, drift: driftOf(), max: maxScroll(),
       period: reduced ? 1 : 0.34, sig: sig.slice(), lines: LINES.slice(),
       ox: OX, oy: OY, scale: SCALE, cellW: CELLW, cellH: CELLH,
-      ink: INK, red: RED, dust: DUST
+      ink: INK, red: RED, dust: '#6A5848'
     };
   }
+  function rr(g, x, y, w, h, c) { g.fillStyle = c; g.fillRect(x, y, w, h); }
+  function hs(x, y, s) {
+    var h = (x * 374761393 + y * 668265263 + (s || 0) * 2147483647) | 0;
+    h = (h ^ (h >>> 13)) * 1274126177 | 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function blob(g, cx, cy, rx, ry, c) {
+    var y, k, hw;
+    for (y = -ry; y <= ry; y++) {
+      k = 1 - (y * y) / ((ry + 0.5) * (ry + 0.5));
+      if (k <= 0) continue;
+      hw = Math.round(rx * Math.sqrt(k));
+      rr(g, cx - hw, cy + y, hw * 2 + 1, 1, c);
+    }
+  }
+  function bake(w, h, fn) {
+    var cv, g;
+    try {
+      cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      g = cv.getContext('2d');
+      if (!g) return null;
+      g.imageSmoothingEnabled = false;
+      fn(g);
+      return cv;
+    } catch (e) { return null; }
+  }
+  function fitScale() {
+    if (!canvas) return;
+    var vw = (window.innerWidth || 320) - 32;
+    var vh = (window.innerHeight || 180) - 96;
+    var k = Math.floor(Math.min(vw / W, vh / H));
+    if (k < 1) k = 1;
+    canvas.style.width = (W * k) + 'px';
+    canvas.style.height = (H * k) + 'px';
+  }
+  function deskLayer(g) {
+    var i;
+    rr(g, 0, 0, W, H, '#08080B');
+    /* 8px wood border */
+    rr(g, 0, 0, W, 8, '#1A120C'); rr(g, 0, H - 8, W, 8, '#1A120C');
+    rr(g, 0, 0, 8, H, '#1A120C'); rr(g, W - 8, 0, 8, H, '#1A120C');
+    for (i = 0; i < W; i += 4) {
+      rr(g, i, 1, 2, 1, '#2A1C12'); rr(g, i + 1, H - 2, 2, 1, '#2A1C12');
+    }
+    for (i = 0; i < H; i += 4) {
+      rr(g, 1, i, 1, 2, '#2A1C12'); rr(g, W - 2, i + 1, 1, 2, '#2A1C12');
+    }
+    /* bottom-left glow: 3 stepped rings */
+    g.globalAlpha = 0.12;
+    blob(g, 24, H - 24, 90, 70, '#FFB347');
+    g.globalAlpha = 0.08;
+    blob(g, 24, H - 24, 60, 46, '#FFB347');
+    g.globalAlpha = 0.04;
+    blob(g, 24, H - 24, 34, 26, '#FFB347');
+    g.globalAlpha = 1;
+  }
+  function paperLayer(g) {
+    var px = 20, py = 12, pw = 280, ph = 156, i, x, y, dark;
+    /* torn top edge (2-3px zig-zag) */
+    for (x = px; x < px + pw; x += 2) {
+      var zh = 2 + ((hs(x, 1, 7) * 2) | 0);
+      rr(g, x, py - zh, 2, zh, '#CDBE9E');
+      rr(g, x, py - zh, 2, 1, '#B8A888');
+    }
+    rr(g, px, py, pw, ph, '#E8DCC0');
+    /* fibres 1px #DCCDAE over ~3% */
+    for (i = 0; i < 1300; i++) {
+      if (hs(i, 3, 9) < 0.03) {
+        x = px + ((hs(i, 1, 1) * pw) | 0);
+        y = py + ((hs(i, 2, 1) * ph) | 0);
+        rr(g, x, y, 1, 1, '#DCCDAE');
+      }
+    }
+    /* extra paper tones for >=6 colours */
+    for (i = 0; i < 600; i++) {
+      if (hs(i, 5, 2) < 0.04) {
+        x = px + ((hs(i, 6, 3) * pw) | 0);
+        y = py + ((hs(i, 7, 3) * ph) | 0);
+        rr(g, x, y, 1, 1, '#F4ECD8');
+      }
+    }
+    /* rule lines every 20px */
+    for (y = py + 20; y < py + ph - 4; y += 20) rr(g, px + 4, y, pw - 8, 1, '#C8B898');
+    /* margin line 1px #C88080 at x=40 */
+    rr(g, 40, py + 2, 1, ph - 4, '#C88080');
+    /* centre fold: 2px #D4C4A4 with 1px #F4ECD8 beside it */
+    rr(g, 160, py, 2, ph, '#D4C4A4');
+    rr(g, 162, py, 1, ph, '#F4ECD8');
+    /* four corners one step darker */
+    dark = '#D4C4A4';
+    rr(g, px, py, 8, 8, dark); rr(g, px + pw - 8, py, 8, 8, dark);
+    rr(g, px, py + ph - 8, 8, 8, dark); rr(g, px + pw - 8, py + ph - 8, 8, 8, dark);
+    rr(g, px, py, 3, 3, '#C8B898'); rr(g, px + pw - 3, py, 3, 3, '#C8B898');
+    rr(g, px, py + ph - 3, 3, 3, '#C8B898'); rr(g, px + pw - 3, py + ph - 3, 3, 3, '#C8B898');
+    /* edge shadow */
+    rr(g, px, py + ph, pw, 1, '#C8B898');
+    rr(g, px + pw, py + 2, 1, ph, '#C8B898');
+  }
+  function build() {
+    if (art) return art;
+    art = {
+      desk: bake(W, H, deskLayer),
+      paper: bake(W, H, paperLayer)
+    };
+    return art;
+  }
+  function blit(cv, x, y) { if (cv && ctx && ctx.drawImage) ctx.drawImage(cv, x, y); }
   function ensure() {
     var scrollK, closeK;
     overlay = document.getElementById('note');
@@ -82,11 +191,6 @@
       overlay.id = 'note';
       overlay.className = 'note';
       overlay.hidden = true;
-      overlay.style.position = 'fixed';
-      overlay.style.left = '50%';
-      overlay.style.top = '50%';
-      overlay.style.transform = 'translate(-50%, -50%)';
-      overlay.style.zIndex = '78';
       canvas = document.createElement('canvas');
       canvas.id = 'noteCanvas';
       canvas.width = W;
@@ -110,8 +214,8 @@
     if (ctx) ctx.imageSmoothingEnabled = false;
     if (NEU.keys && NEU.keys.refresh) NEU.keys.refresh();
   }
-  function drawGlyph(g, x, y, col) {
-    var r, c, bit;
+  function drawGlyph(g, x, y, col, wet) {
+    var r, c, bit, bx, by;
     x = x | 0;
     y = y | 0;
     if (!g) {
@@ -119,20 +223,30 @@
       ctx.fillRect(x, y, SCALE * 5, SCALE * 7);
       return;
     }
-    ctx.fillStyle = col;
     for (r = 0; r < 7; r++) {
       bit = g[r];
       for (c = 0; c < 5; c++) {
-        if (bit & (1 << (4 - c))) ctx.fillRect(x + c * SCALE, y + r * SCALE, SCALE, SCALE);
+        if (bit & (1 << (4 - c))) {
+          bx = x + c * SCALE; by = y + r * SCALE;
+          ctx.fillStyle = col;
+          ctx.fillRect(bx, by, SCALE, SCALE);
+          if (wet) {
+            ctx.fillStyle = RED_HI;
+            ctx.fillRect(bx, by, 1, 1);
+          } else if (hs(x + c, y + r, 3) < 0.3) {
+            ctx.fillStyle = BLEED;
+            ctx.fillRect(bx + SCALE, by, 1, SCALE);
+          }
+        }
       }
     }
   }
-  function drawLine(text, y, col) {
+  function drawLine(text, y, col, wet) {
     var i, x = OX, ch;
     for (i = 0; i < text.length; i++) {
       ch = text.charAt(i);
       if (ch === ' ') { x += CELLW; continue; }
-      drawGlyph(bits(ch), x, y, col);
+      drawGlyph(bits(ch), x, y, col, wet);
       x += CELLW;
     }
   }
@@ -142,30 +256,25 @@
     return s;
   }
   function draw(dt) {
-    var y, i, far, drift, page, b;
+    var a, y, i, page, b;
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
+    a = build();
     b = (NEU.juice && NEU.juice.bias) ? NEU.juice.bias : { x: 0, y: 0 };
     ctx.setTransform(1, 0, 0, 1, Math.round(b.x), Math.round(b.y));
-    ctx.fillStyle = '#120E0C';
-    ctx.fillRect(0, 0, W, H);
-    far = Math.floor(scroll * 0.15);
-    drift = driftOf();
-    ctx.fillStyle = FAR;
-    for (i = 0; i < 6; i++) ctx.fillRect(16 + i * 40, 18 + (i % 2) * 20 - far, 2, 2);
-    ctx.fillStyle = DUST;
-    for (i = 0; i < 8; i++) ctx.fillRect(30 + i * 28, 40 + (i % 3) * 12 - drift, 2, 2);
+    blit(a.desk, 0, 0);
+    if (!a.desk) { rr(ctx, 0, 0, W, H, '#08080B'); }
+    blit(a.paper, 0, 0);
+    if (!a.paper) { rr(ctx, 20, 12, 280, 156, '#E8DCC0'); rr(ctx, 40, 12, 1, 156, '#C88080'); }
+    /* dust motes ride the page at a third of its scroll speed (parallax) */
+    for (i = 0; i < 8; i++) rr(ctx, 30 + i * 28, 40 + (i % 3) * 12 - driftOf(), 2, 2, '#6A5848');
     page = OY - Math.floor(scroll);
-    ctx.fillStyle = '#E8D8BC';
-    ctx.fillRect(16, page - 8, 288, (LINES.length + 1) * CELLH + 16);
-    ctx.fillStyle = '#DCC8A4';
-    for (i = 0; i < LINES.length + 1; i += 2) ctx.fillRect(16, page - 8 + i * CELLH, 288, 8);
     y = page;
     for (i = 0; i < LINES.length; i++) {
-      drawLine(LINES[i], y, INK);
+      drawLine(LINES[i], y, INK, false);
       y += CELLH;
     }
-    drawLine(sigLine(), y, RED);
+    drawLine(sigLine(), y, RED, true);
     if (NEU.juice && NEU.juice.drawParts) NEU.juice.drawParts(ctx, dt || 0);
   }
   function step(dt, key) {
@@ -192,6 +301,7 @@
     ensure();
     if (live) return true;
     motion();
+    fitScale();
     live = true;
     scroll = 0;
     sigMs = 0;
@@ -238,10 +348,11 @@
   function stamp(ch) {
     ensure();
     if (!ctx) return;
-    drawGlyph(bits(ch), 0, 0, INK);
+    drawGlyph(bits(ch), 0, 0, INK, false);
   }
   window.addEventListener('keydown', onKey);
   window.addEventListener('keyup', onKey);
+  window.addEventListener('resize', function () { if (live) fitScale(); });
 
   NEU.note = {
     open: open, close: close, step: step, stamp: stamp, glyph: glyph,

@@ -2125,6 +2125,11 @@ html.rm .sword.is-burst::after { animation: none; display: none; }
   background: var(--accent); border: 0; border-radius: 0;
 }
 .sett__rng:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+@media (pointer: coarse) {
+  .sett__rng { min-height: 44px; }
+  .sett__rng::-webkit-slider-thumb { width: 32px; height: 32px; margin-top: -15px; }
+  .sett__rng::-moz-range-thumb { width: 32px; height: 32px; }
+}
 
 /* ── the frame-time meter ────────────────────────────────────────────
    z-index 84: above the dev panel (80) and every scene, below the
@@ -2262,8 +2267,6 @@ html.text-lg .eng { zoom: 0.8; }
   width: 136px; height: 136px; border-radius: 50%;
   background: rgba(12, 10, 18, 0.58);
   border: 2px solid rgba(184, 146, 255, 0.30);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   transition: border-color .18s ease, background .18s ease;
 }
 .tpad__stick[hidden] { display: none !important; }
@@ -2299,8 +2302,6 @@ html.text-lg .eng { zoom: 0.8; }
   border-radius: 50%;
   background: rgba(12, 10, 18, 0.58);
   border: 2px solid rgba(184, 146, 255, 0.30);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   cursor: pointer;
   transition: transform .12s cubic-bezier(.34, 1.56, .64, 1),
               background .12s ease, border-color .12s ease;

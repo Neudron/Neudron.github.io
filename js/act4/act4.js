@@ -94,6 +94,7 @@
     if (NEU.quest) { NEU.quest.mark('a4_wake'); NEU.quest.mark('a4_chair'); }
     if (already) return;
     document.body.classList.remove('is-trip');
+    document.body.classList.add('is-awake');
     var lines = [
       ["you're awake.", 'sans'],
       ["you've been out about four hours. toby sat with you.", 'sans'],
@@ -106,6 +107,30 @@
     ];
     if (NEU.talk) NEU.talk(lines.map(function (l) { return l[0]; }), 'sans');
     setTimeout(settle, lines.length * 3200);
+  }
+
+  /* After the soup the page used to say nothing about what came next. A
+     small card names the next open objective at the top of the screen; it
+     stays until clicked or for twelve seconds. Reduced motion: no fade. */
+  function cue() {
+    var text = NEU.quest && NEU.quest.nextText ? NEU.quest.nextText() : null;
+    if (!text || !document.body) return;
+    var old = document.getElementById('w3Cue');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var el = document.createElement('div');
+    el.id = 'w3Cue';
+    el.setAttribute('role', 'status');
+    el.style.cssText = 'position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:80;' +
+      'font:400 16px/1.3 var(--font, monospace);color:#FFFFFF;background:#170D1F;' +
+      'border:3px solid #FFD84A;padding:16px 24px;max-width:90vw;text-align:center;cursor:pointer';
+    el.textContent = 'next: ' + text;
+    var gone = function () { if (el.parentNode) el.parentNode.removeChild(el); };
+    el.addEventListener('click', gone);
+    document.body.appendChild(el);
+    if (el.animate && !document.documentElement.classList.contains('rm')) {
+      el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, easing: 'steps(4)' });
+    }
+    setTimeout(gone, 12000);
   }
 
   /* The dog leaves, he takes the chair, and the console becomes
@@ -129,6 +154,7 @@
                 'there is a crack in the corner of the panel inside the cube.',
                 'there was probably always a crack.'], 'narr');
     }
+    cue();
   }
 
   /* ── the last thing ─────────────────────────────────────────────*/

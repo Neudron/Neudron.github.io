@@ -184,9 +184,9 @@
       tiles: ['###########', '###########', '#.........#', '#...ooo...#', '#.........#',
               '#.........#', '#.........#', '###########'],
       at: [5, 3],
-      props: [P('ftable', 5, 3), P('cooler', 8, 2, { solid: true }), P('chairs', 1, 2, { solid: true }),
+      props: [P('ftable', 5, 3), P('cooler', 8, 2, { solid: true }), P('chairs', 3, 2, { solid: true }),
               P('bin', 9, 6, { solid: true, lines: ['a bin full of certificates.', 'all of them start with the same letter.'] }),
-              P('pen', 3, 5)] },
+              P('pen', 3, 5, { lines: ['a pen on a string. the string goes into the wall.'], run: rankCheat })] },
     { /* C– — a gallery, one exhibit, which is the wall */
       tiles: ['#############', '#############', '#...........#', '#...........#', '#...........#',
               '#...........#', '#...........#', '#############'],
@@ -248,8 +248,11 @@
           /* the prize: an npc in every way but its drawing */
           { t: 'prizenpc', v: 'prize' + n, x: set.at[0], y: set.at[1], solid: true, colour: '#B892FF', lines: [p[1], p[2]] },
           { t: 'exit', x: mid, y: h - 1, to: 'g0_hall', spawn: 'back' + n, style: 'curtain' }
-        ]).concat(n === 0 ? [{ t: 'exit', x: 1, y: 1, to: 'a1_clearing', spawn: 'default', style: 'door',
-                                lines: ['a door back to the forest. it was always here.'] }] : [])
+        ]).concat(n === 0 ? [{ t: 'exit', x: 1, y: 1, to: 'a1_clearing', spawn: 'default', style: 'hatch',
+                                locked: 'vend_pick', confirm: 'the prize corridor',
+                                confirmNote: 'the trapdoor drops shut behind you. your save is kept.',
+                                lines: ['a trapdoor in the floor. chained, with a padlock the size of a fist.',
+                                        'the chain stays on until the machines upstairs have been used. they have not.'] }] : [])
         .concat(last ? [{ t: 'exit', x: 0, y: 5, to: 'h1_storm', spawn: 'top', style: 'stairs' }] : []),
       onEnter: function (c) {
         if (NEU.quest) NEU.quest.bump('a4_prizes', n + 1);
@@ -384,11 +387,25 @@
     }
     if (NEU.save) { NEU.save.flag('vend_pick', n + 1); NEU.save.flag('tripping', 1); }
     if (NEU.quest) { NEU.quest.mark('a4_nutz'); NEU.quest.mark('a4_trip'); }
+    if (NEU.vendDrop) NEU.vendDrop(n);   /* the item drops and is eaten on the machine (look-prize) */
     c.say(VEND[n], 'narr');
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     /* SMALL: a hit landed, on a machine */
     if (NEU.juice && NEU.juice.hit) NEU.juice.hit('small');
     setTimeout(function () { trip(c); }, 2600);
+  }
+
+  /* The Z room's cheat. It writes the same rank state the quiz writes when
+     you finish (quiz_rank, the rank:* door flags, the saved quiz record), so
+     the stairs, the doors and the quiz all agree that you are rank T. */
+  function rankCheat(c) {
+    if (!NEU.save || NEU.save.flagged('rank:T')) { c.say(['the pen is still attached to nothing.'], 'narr'); return; }
+    NEU.save.flag('quiz_rank', 'T');
+    NEU.save.flag('rank:T', 1); NEU.save.flag('rank:S', 1); NEU.save.flag('rank:A', 1);
+    NEU.save.data.quiz = { rank: 'T', score: 20 };
+    NEU.save.capture();
+    if (NEU.quest) NEU.quest.mark('a4_rank');
+    c.say(['you click the pen. the wall takes the string back, with a sigh.', 'you cheated. you are now rank T.'], 'narr');
   }
 
   function trip(c) {
@@ -426,7 +443,7 @@
         lines: ['a pot. an enormous pot. it is the only thing in focus.',
                 'it wants mushroom soup. you are certain of this in a way you cannot defend.'],
         run: function (c) { pot(c); } },
-      { t: 'exit', x: 20, y: 5, to: 'd1_street', spawn: 'east', style: 'portal' },
+      { t: 'exit', x: 20, y: 5, to: 'd1_street', spawn: 'portal', style: 'portal' },
       P('bigshroom', 3, 2, { k: 0 }), P('bigshroom', 17, 2, { k: 1 }), P('bigshroom', 3, 8, { k: 2 }), P('bigshroom', 17, 8, { k: 3 }),
       P('tinyshroom', 6, 3), P('tinyshroom', 14, 7, { k: 1 }), P('tinyshroom', 7, 7, { k: 2 }), P('tinyshroom', 13, 3, { k: 3 }),
       P('spoon', 6, 5), P('spoon', 14, 5, { k: 1 })
@@ -464,7 +481,7 @@
       return;
     }
     if (NEU.quest) NEU.quest.mark('a4_pot');
-    if (NEU.craft) { c.leave(); setTimeout(function () { NEU.craft.open(); }, 320); }
+    if (NEU.craft) NEU.craft.fromRoom(c);
   }
 
   function mushrooms() {

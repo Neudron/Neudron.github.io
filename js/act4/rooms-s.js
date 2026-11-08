@@ -113,19 +113,22 @@
     boxEl.style.flexDirection = 'column';
     boxEl.style.alignItems = 'center';
     boxEl.style.justifyContent = 'center';
-    boxEl.style.background = bg || '#C4A15A';
+    boxEl.style.background = bg || '#12081E';
     var cv = document.createElement('canvas');
-    cv.width = 160;
-    cv.height = 96;
+    cv.width = 320;
+    cv.height = 192;
+    var k = Math.max(1, Math.floor(Math.min((window.innerWidth || 1280) / 320, (window.innerHeight || 720) * 0.9 / 192)));
     cv.style.display = 'block';
-    cv.style.width = 'min(100vw, 166.67vh)';
+    cv.style.width = (320 * k) + 'px';
     cv.style.aspectRatio = '5 / 3';
     cv.style.imageRendering = 'pixelated';
     var cap = document.createElement('p');
-    cap.style.margin = '0';
+    cap.style.margin = '8px 0 0';
+    cap.style.padding = '8px';
     cap.style.fontSize = '16px';
-    cap.style.fontFamily = 'monospace';
-    cap.style.color = bg ? '#D0D4D8' : '#3A2410';
+    cap.style.fontFamily = '"Determination Mono", monospace';
+    cap.style.color = '#EDE7DE';
+    cap.style.background = '#08080B';
     cap.textContent = hint;
     boxEl.appendChild(cv);
     boxEl.appendChild(cap);
@@ -140,6 +143,165 @@
     close();
   }
 
+
+  /* ── minigame art: one woven-mat backdrop, baked once per game ───── */
+  var INKC = '#12081E';
+  var gR = null;
+  function Rf(x, y, w, h, c) { gR.fillStyle = c; gR.fillRect(x, y, w, h); }
+  function blobG(g, cx, cy, rx, ry, c) {
+    gR = g;
+    if (NEU.roomArt && NEU.roomArt.blob) NEU.roomArt.blob(Rf, cx, cy, rx, ry, c);
+    else Rf(cx - rx, cy - ry, rx * 2 + 1, ry * 2 + 1, c);
+  }
+  function calm() {
+    if (NEU.motion && NEU.motion.reduced) return !!NEU.motion.reduced();
+    try { return !!matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  }
+  function nowMs() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0; }
+  function mkCv(w, h) {
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+  var mats = {};
+  function mat(kind) {
+    if (mats[kind]) return mats[kind];
+    var cv = mkCv(320, 192), g = cv.getContext && cv.getContext('2d'), x, y, i, r, k, pal;
+    mats[kind] = cv;
+    if (!g) return cv;
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = '#2A1A0C';
+    g.fillRect(0, 0, 320, 192);
+    g.fillStyle = INKC; g.fillRect(19, 20, 282, 152);
+    /* weave: 3x3 threads on a 1px grid, two tones */
+    g.fillStyle = '#5C3A18'; g.fillRect(26, 27, 268, 138);
+    for (y = 0; y < 34; y++) for (x = 0; x < 67; x++) {
+      g.fillStyle = ((x + y) & 1) ? '#A87038' : '#8A5A28';
+      g.fillRect(26 + x * 4 + 1, 27 + y * 4 + 1, 3, 3);
+      if (!((x + y) & 1)) { g.fillStyle = '#A87038'; g.fillRect(26 + x * 4 + 1, 27 + y * 4 + 1, 3, 1); }
+    }
+    /* geometric border, 6px, zigzag */
+    pal = ['#C4323A', '#E8DCC0', '#2A1A0C', '#E8DCC0'];
+    for (r = 0; r < 6; r++) {
+      k = r < 3 ? r : 5 - r;
+      for (x = 0; x < 280; x++) {
+        g.fillStyle = pal[((x + k * 2) >> 2) & 3];
+        g.fillRect(20 + x, 21 + r, 1, 1);
+        g.fillRect(20 + x, 21 + 144 + r, 1, 1);
+      }
+      for (y = 6; y < 144; y++) {
+        g.fillStyle = pal[((y + k * 2) >> 2) & 3];
+        g.fillRect(20 + r, 21 + y, 1, 1);
+        g.fillRect(20 + 274 + r, 21 + y, 1, 1);
+      }
+    }
+    g.fillStyle = INKC;
+    g.fillRect(20, 26, 280, 1); g.fillRect(20, 21 + 143, 280, 1);
+    /* the room around it falls away in three steps */
+    g.fillStyle = '#000000';
+    for (i = 0; i < 3; i++) {
+      g.globalAlpha = 0.3 - i * 0.1;
+      g.fillRect(i * 8, i * 8, 320 - i * 16, 8);
+      g.fillRect(i * 8, 184 - i * 8, 320 - i * 16, 8);
+      g.fillRect(i * 8, i * 8 + 8, 8, 176 - i * 16);
+      g.fillRect(312 - i * 8, i * 8 + 8, 8, 176 - i * 16);
+    }
+    g.globalAlpha = 1;
+    if (kind === 'beads') {
+      g.fillStyle = '#12081E';
+      for (x = 46; x <= 274; x++) g.fillRect(x, cordY(x) + 1, 1, 1);
+      g.fillStyle = '#3A2410';
+      for (x = 46; x <= 274; x++) g.fillRect(x, cordY(x), 1, 1);
+      g.fillStyle = '#A87038';
+      for (x = 48; x <= 272; x += 3) g.fillRect(x, cordY(x) - 1, 1, 1);
+      for (i = 0; i < 2; i++) {
+        x = i ? 272 : 40;
+        g.fillStyle = INKC; g.fillRect(x - 1, 65, 6, 8);
+        g.fillStyle = '#5C3A18'; g.fillRect(x, 66, 4, 6);
+        g.fillStyle = '#8A5A28'; g.fillRect(x, 66, 1, 6);
+      }
+    }
+    if (kind === 'wind') {
+      g.fillStyle = INKC; g.fillRect(38, 55, 7, 78);
+      g.fillStyle = '#5C3A18'; g.fillRect(39, 56, 5, 76);
+      g.fillStyle = '#8A5A28'; g.fillRect(39, 56, 2, 76);
+      g.fillStyle = '#E8DCC0'; g.fillRect(38, 52, 7, 3);
+      g.fillStyle = '#E8DCC0';
+      for (y = 62; y < 126; y += 6) g.fillRect(270, y, 1, 3);
+    }
+    return cv;
+  }
+  function cordY(x) {
+    var u = (x - 160) / 114;
+    return 76 + Math.round(14 * (1 - u * u));
+  }
+  var RAMPS = [['#5A1018', '#B02838', '#E85A5A'], ['#14284A', '#2E5A8F', '#8AB0FF'], ['#6A4A08', '#C89A1A', '#FFE35A']];
+  function bead(g, cx, cy, rx, ry, ramp) {
+    blobG(g, cx, cy, rx + 1, ry + 1, INKC);
+    blobG(g, cx, cy, rx, ry, ramp[0]);
+    blobG(g, cx - 1, cy - 1, rx - 1, ry - 1, ramp[1]);
+    blobG(g, cx - 2, cy - 2, Math.max(1, rx - 3), Math.max(1, ry - 3), ramp[2]);
+    g.fillStyle = '#FFFFFF';
+    g.fillRect(cx - rx + 3, cy - ry + 2, 2, 2);
+  }
+  /* a dashed pixel ring where a bead is still missing */
+  function ring(g, cx, cy, r) {
+    var a, x, y;
+    g.fillStyle = '#5C3A18';
+    for (a = 0; a < 32; a += 2) {
+      x = cx + Math.round(Math.cos(a / 32 * 6.2832) * r);
+      y = cy + Math.round(Math.sin(a / 32 * 6.2832) * r);
+      g.fillRect(x, y, 1, 1);
+    }
+  }
+  function cowrie(g, cx, cy, up) {
+    var i;
+    g.fillStyle = '#000000';
+    g.globalAlpha = 0.3; g.fillRect(cx - 12, cy + 9, 24, 2);
+    g.globalAlpha = 0.18; g.fillRect(cx - 9, cy + 11, 18, 1);
+    g.globalAlpha = 1;
+    cy -= up;
+    blobG(g, cx, cy, 14, 9, INKC);
+    blobG(g, cx, cy, 13, 8, '#A89878');
+    blobG(g, cx - 1, cy - 1, 12, 7, '#C8B898');
+    blobG(g, cx - 2, cy - 2, 9, 4, '#E8DCC0');
+    g.fillStyle = '#3A2410'; g.fillRect(cx - 9, cy, 18, 2);
+    g.fillStyle = '#E8DCC0';
+    for (i = -8; i < 9; i += 2) { g.fillRect(cx + i, cy - 1, 1, 1); g.fillRect(cx + i, cy + 2, 1, 1); }
+    g.fillStyle = '#FFFFFF'; g.fillRect(cx - 8, cy - 6, 4, 1);
+  }
+  function pea(g, cx, cy) {
+    blobG(g, cx, cy, 4, 4, INKC);
+    blobG(g, cx, cy, 3, 3, '#5A5A1E');
+    blobG(g, cx - 1, cy - 1, 2, 2, '#A89A3A');
+    g.fillStyle = '#E6D27A'; g.fillRect(cx - 2, cy - 2, 1, 1);
+  }
+  /* grass in three layers, four sway poses, baked */
+  var grassV = null;
+  function grass() {
+    if (grassV) return grassV;
+    var cols = ['#5A5A1E', '#7A7A2A', '#A89A3A'], step = [6, 5, 4], hh = [14, 18, 22];
+    var sway = [-1, 0, 1, 0], out = [], l, v, cv, g, x, h, sh, base = 40;
+    for (l = 0; l < 3; l++) {
+      out.push([]);
+      for (v = 0; v < 4; v++) {
+        cv = mkCv(268, 40); out[l].push(cv);
+        g = cv.getContext && cv.getContext('2d');
+        if (!g) continue;
+        for (x = 0; x < 268; x += step[l]) {
+          h = hh[l] - 4 + ((((x * 7 + l * 13) % 9)) | 0);
+          sh = sway[(v + (x >> 3)) & 3] * (l + 1 > 2 ? 2 : 1);
+          g.fillStyle = cols[l];
+          g.fillRect(x, base - (h >> 1), 2, h >> 1);
+          g.fillRect(x + sh, base - h, 2, h - (h >> 1));
+          if (l === 2) { g.fillStyle = '#E6D27A'; g.fillRect(x + sh, base - h, 1, 1); }
+        }
+      }
+    }
+    grassV = out;
+    return out;
+  }
+
   var beadsOn = false, beadN = 0, beadUi = null, beadOff = null;
   function beadClose() {
     beadsOn = false;
@@ -150,14 +312,20 @@
     beadUi = null;
     if (NEU.kernel && NEU.kernel.current() === 's_beads') NEU.kernel.pop();
   }
+  var beadAnim = null;
   function beadPaint() {
     if (!beadUi || !beadUi.g) return;
-    var g = beadUi.g, i;
-    g.fillStyle = '#E2B84A';
-    g.fillRect(0, 0, 160, 96);
+    var g = beadUi.g, i, cx, cy, f, rx = 6, ry = 6, el;
+    g.drawImage(mat('beads'), 0, 0);
     for (i = 0; i < 3; i++) {
-      g.fillStyle = i < beadN ? '#C47A32' : '#8A5A28';
-      g.fillRect(20 + i * 40, 36, 16, 16);
+      cx = 100 + i * 60; cy = cordY(cx) + 6;
+      if (i >= beadN) { ring(g, cx, cy, 7); continue; }
+      rx = 6; ry = 6;
+      if (beadAnim && beadAnim.i === i && !calm()) {
+        el = nowMs() - beadAnim.t;
+        if (el < 70) { rx = 7; ry = 5; } else if (el < 140) { rx = 6; ry = 6; cy -= 1; } else beadAnim = null;
+      }
+      bead(g, cx, cy, rx, ry, RAMPS[i]);
     }
   }
   function beadKey(e) {
@@ -165,6 +333,11 @@
     if (NEU.tboxOpen && NEU.tboxOpen()) return;
     if (routed(e) !== 'z' || e.repeat) return;
     beadN += 1;
+    beadAnim = { i: beadN - 1, t: nowMs() };
+    if (NEU.juice && NEU.juice.burst && beadUi) {
+      var rr = beadUi.box.querySelector('canvas').getBoundingClientRect();
+      NEU.juice.burst(rr.left + (100 + (beadN - 1) * 60) / 320 * rr.width, rr.top + (cordY(100 + (beadN - 1) * 60) + 6) / 192 * rr.height, 6, RAMPS[beadN - 1][2], 110);
+    }
     beadPaint();
     if (beadN >= 3) win('s_beads', beadClose);
   }
@@ -199,13 +372,18 @@
   }
   function shellPaint() {
     if (!shellUi || !shellUi.g) return;
-    var g = shellUi.g, i;
-    g.fillStyle = '#E2B84A';
-    g.fillRect(0, 0, 160, 96);
+    var g = shellUi.g, i, cx, up, t;
+    g.drawImage(mat('shells'), 0, 0);
+    t = calm() ? 0 : ((nowMs() / 300) | 0) & 1;
+    pea(g, 160, 118);
     for (i = 0; i < 3; i++) {
-      g.fillStyle = i === shellSel ? '#F0D48A' : '#A86828';
-      g.fillRect(16 + i * 48, 28, 32, 24);
-      if (i === 1) { g.fillStyle = '#3A2410'; g.fillRect(28, 58, 8, 8); }
+      cx = 80 + i * 80;
+      up = i === shellSel ? 6 + t : 0;
+      cowrie(g, cx, 96, up);
+      if (i === shellSel) {
+        g.fillStyle = INKC; g.fillRect(cx - 5, 62 - t, 11, 1); g.fillRect(cx - 4, 63 - t, 9, 1); g.fillRect(cx - 3, 64 - t, 7, 1); g.fillRect(cx - 1, 65 - t, 3, 1);
+        g.fillStyle = '#FFE35A'; g.fillRect(cx - 4, 62 - t, 9, 1); g.fillRect(cx - 3, 63 - t, 7, 1); g.fillRect(cx - 2, 64 - t, 5, 1); g.fillRect(cx, 65 - t, 1, 1);
+      }
     }
   }
   function shellKey(e) {
@@ -250,14 +428,20 @@
   }
   function windPaint() {
     if (!windUi || !windUi.g) return;
-    var g = windUi.g;
-    var w = Math.max(0, Math.min(120, (windCharge / 1.5) * 120)) | 0;
-    g.fillStyle = '#E2B84A';
-    g.fillRect(0, 0, 160, 96);
-    g.fillStyle = '#8A5A28';
-    g.fillRect(20, 40, 120, 16);
-    g.fillStyle = '#F0D48A';
-    g.fillRect(20, 40, w, 16);
+    var g = windUi.g, G = grass(), v, l, len, x, y, pose;
+    len = Math.max(0, Math.min(220, (windCharge / 1.5) * 220)) | 0;
+    pose = calm() ? 0 : ((nowMs() / 300) | 0);
+    g.drawImage(mat('wind'), 0, 0);
+    g.drawImage(G[0][pose & 3], 26, 121);
+    for (x = 0; x < len; x += 4) {
+      y = 66 + (calm() ? 0 : [0, 1, 2, 1][((x >> 2) + pose) & 3]) * (x > 8 ? 1 : 0);
+      g.fillStyle = INKC; g.fillRect(45 + x, y - 1, 4, 6);
+      g.fillStyle = '#E85A5A'; g.fillRect(45 + x, y, 4, 2);
+      g.fillStyle = '#C4323A'; g.fillRect(45 + x, y + 2, 4, 2);
+    }
+    if (len > 6) { g.fillStyle = INKC; g.fillRect(45 + len, y + 1, 1, 2); }
+    g.drawImage(G[1][(pose + 1) & 3], 26, 124);
+    g.drawImage(G[2][(pose + 2) & 3], 26, 126);
   }
   function windKey(e) {
     if (!windOn) return;
@@ -369,6 +553,8 @@
     gate('east', 's6_kraal', 'west'),
     gate('north', 's9_beads', 'south'),
     prop('hut', 3, 2),
+    prop('stall', 8, 6),
+    prop('stall', 2, 6),
     { t: 'sign', x: 7, y: 2, lines: ['mats, beads, and nothing with a price.'] }
   ], function () { if (NEU.snail) NEU.snail.arrive('s3'); });
 
@@ -383,7 +569,7 @@
   addBox('s5_baobab', sp('west', 'east'), [
     gate('west', 's2_well', 'east'),
     gate('east', 's8_hearth', 'west'),
-    prop('acacia', 5, 2),
+    prop('baobab', 5, 2),
     { t: 'sign', x: 5, y: 6, lines: ['a tree older than the argument about who planted it.'] }
   ]);
 
@@ -398,6 +584,7 @@
       { t: 'plate', x: 3, y: 4 },
       { t: 'exit', x: 0, y: 3, to: 's3_market', spawn: 'east', style: 'arch' },
       { t: 'exit', x: 3, y: 6, to: 's11_elder', spawn: 'north', style: 'arch' },
+      prop('kraal', 3, 1),
       { t: 'sign', x: 5, y: 3, lines: ['two stones. two plates. one push each, to the right.'] }
     ]),
     onEnter: function (c) {
@@ -482,6 +669,7 @@
     gate('north', 's6_kraal', 'south'),
     gate('south', 's14_station', 'north'),
     prop('hut', 5, 4),
+    prop('stool', 6, 5),
     { t: 'npc', x: 4, y: 5, colour: '#5C3A18',
       lines: ['the elder is asleep in the shade.', 'the shade is doing all the work.'] }
   ], function () { if (NEU.snail) NEU.snail.arrive('s11'); });
@@ -491,6 +679,9 @@
     tiles: box(11, 9),
     spawns: sp('north'),
     entities: [
+      { t: 'savannafloor', x: 0, y: 0 },
+      { t: 'stationlamp', x: 4, y: 1 },
+      { t: 'stationlamp', x: 6, y: 1 },
       { t: 'exit', x: 5, y: 0, to: 's11_elder', spawn: 'south', style: 'arch' },
       { t: 'npc', x: 5, y: 4, colour: '#C47A32',
         run: function () { if (NEU.snail) NEU.snail.open(); } },
@@ -507,7 +698,7 @@
   addBox('s12_termite', sp('west', 'east'), [
     gate('west', 's7_pool', 'east'),
     gate('east', 'x0_foyer', 'west'),
-    prop('hut', 6, 4),
+    prop('mound', 6, 4),
     { t: 'sign', x: 3, y: 3, lines: ['a mound. the termites are not taking visitors.'] }
   ]);
   addBox('s13_wind', sp('south'), [

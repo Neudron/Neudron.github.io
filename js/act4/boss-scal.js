@@ -631,6 +631,7 @@
     else if (n < 900) bullets.push({ x: x, y: y, vx: vx, vy: vy, r: r, c: c, k: k, age: 0 });
     if (bullets.length === n) return null;
     var b = bullets[n];
+    NEU.scalAtk.rim(b);
     for (var key in o) if (o.hasOwnProperty(key)) b[key] = o[key];
     shotsFired++;
     return b;
@@ -1096,6 +1097,7 @@
         if (b.y < AY || b.y > AY + AH) { b.vy = -b.vy; b.y = Math.min(AY + AH, Math.max(AY, b.y)); }
         b.bounce--;
       }
+      if (NEU.scalAtk.rim(b)) { if (b.onEnd) fire.push(b); continue; }
       if (b.x < AX - 60 || b.x > AX + AW + 60 || b.y < AY - 60 || b.y > AY + AH + 60) continue;
       keep.push(b);
       if (inv <= 0 && mode !== 'won') {
@@ -2215,6 +2217,8 @@
     }
     /* built once: every open() used to make 24 new Audio elements */
     if (!SFX) preloadSfx();
+    /* start her sheets in the intro: cold, her body drew as a magenta box */
+    if (NEU.sheetReady) for (var wk in NEU.sheets) if (/^(scal|cat|sepul|soulS|dart|hellb|fireb|gigab)/.test(wk)) NEU.sheetReady(NEU.sheets[wk]);
     mode = 'intro';
     px = AX + AW / 2; py = AY + AH - 60;
     F = dm.fight(px, py, { dashCd: 0.8 });
@@ -2325,7 +2329,7 @@
                get seekerDarts() { return NEU.scalSeekers ? NEU.scalSeekers.darts() : []; },
                get broPos() { return bros.map(function (b) { return { x: b.x, y: b.y }; }); },
                get broHp() { return bros.map(function (b) { return b.hp; }); },
-                get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, vx: b.vx, vy: b.vy, look: b.look }; }); },
+                get bullets() { return bullets.map(function (b) { return { x: b.x, y: b.y, r: b.r, vx: b.vx, vy: b.vy, look: b.look }; }); },
                 get myShots() { return myShots.map(function (s) { return { x: s.x, y: s.y, vx: s.vx, vy: s.vy, r: s.r, owner: s.owner, kind: s.kind, dmg: s.dmg, pierce: !!s.pierce }; }); },
                /* A2 hooks: the strip, heal, the blue soul and the
                   melee arcs, for the tests and the view. */

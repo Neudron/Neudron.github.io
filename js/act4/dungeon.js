@@ -46,8 +46,9 @@
     }
     return rows.join('\n');
   }
+  /* d10's exit has no room below: it leaves the dungeon instead of freezing the player on the exit tile */
   function makeExit(n) {
-    return function () { if (n < 10) openLevel('d' + (n + 1)); };
+    return function () { if (n < 10) openLevel('d' + (n + 1)); else P.close(); };
   }
   function ents(n) {
     var e = [], xs = [10, 12, 14, 16, 20, 22, 24, 30], i;
@@ -67,7 +68,12 @@
     return e;
   }
 
-  kinds.skull = {
+  function kd(name, def) {
+    var k = kinds[name] || (kinds[name] = {}), q;
+    for (q in def) k[q] = def[q];
+    return k;
+  }
+  kd('skull', {
     touch: function (e, input, melee) {
       if (NEU.dungeon._replay) return;
       if (melee) {
@@ -88,15 +94,15 @@
       e.y = e.y0 + Math.sin(e.t0 * 1.3) * 0.28;
       NEU.dungeon.skullAt = { x: e.x, y: e.y };
     }
-  };
-  kinds.sign = {
+  });
+  kd('sign', {
     touch: function (e, input, melee) {
       if (!melee || NEU.dungeon._replay) return;
       NEU.dungeon.sign = e.text || '';
       if (NEU.talk) NEU.talk([NEU.dungeon.sign], 'narr');
     }
-  };
-  kinds.magegate = {
+  });
+  kd('magegate', {
     touch: function (e, input, melee) {
       if (!melee || NEU.dungeon._replay) return;
       if (NEU.mage && typeof NEU.mage.open === 'function') {
@@ -107,7 +113,7 @@
         if (NEU.talk) NEU.talk(['* closed'], 'narr');
       }
     }
-  };
+  });
   /* Gilt frame, mountain inside. One interact opens the cart. */
   function drawPainting(c, x, y) {
     if (!c || !c.fillRect) return;
@@ -130,36 +136,6 @@
     R(1, 13, 2, 2, '#FFF4C8');
     R(13, 13, 2, 2, '#FFF4C8');
   }
-  function stampPaintings() {
-    var id = currentId, L, cv, c, dpr, w, h, scale, ox, oy, camX, camY, i, e;
-    if (dungeonN(id) < 0 || !P.state) return;
-    L = P.levels[id];
-    if (!L || !L.entities) return;
-    cv = document.getElementById('platCanvas');
-    if (!cv || !cv.getContext) return;
-    c = cv.getContext('2d');
-    if (!c) return;
-    dpr = window.devicePixelRatio || 1;
-    w = (window.innerWidth || 640) * dpr;
-    h = (window.innerHeight || 360) * dpr;
-    scale = Math.min(w / 640, h / 360) || 1;
-    ox = (w - 640 * scale) / 2;
-    oy = (h - 360 * scale) / 2;
-    if (P.cam) { camX = P.cam().x; camY = P.cam().y; }
-    else {
-      camX = Math.max(0, Math.min(P.state.x - 320, Math.max(0, L.w * 16 - 640)));
-      camY = Math.max(0, Math.min(P.state.y - 180, Math.max(0, L.h * 16 - 360)));
-    }
-    if (c.save) c.save();
-    if (c.setTransform) c.setTransform(scale, 0, 0, scale, ox, oy);
-    try { c.imageSmoothingEnabled = false; } catch (e1) {}
-    for (i = 0; i < L.entities.length; i++) {
-      e = L.entities[i];
-      if (e.t !== 'painting') continue;
-      drawPainting(c, (e.x * 16 - camX) | 0, (e.y * 16 - camY) | 0);
-    }
-    if (c.restore) c.restore();
-  }
   kinds.painting = {
     draw: function (c, px, py) { drawPainting(c, px, py); },
     touch: function (e, input, melee) {
@@ -174,7 +150,7 @@
       if (cv && NEU.juice && NEU.juice.shakeEl) NEU.juice.shakeEl(cv);
     }
   };
-  kinds.bossdoor = {
+  kd('bossdoor', {
     touch: function (e, input, melee) {
       if (!melee || e.dead || NEU.dungeon._replay) return;
       var has = NEU.save && NEU.save.has && NEU.save.has('boss_key');
@@ -189,7 +165,7 @@
         if (NEU.talk) NEU.talk([NEU.dungeon.bossLine], 'narr');
       }
     }
-  };
+  });
 
   var origOpen = P.open, origStep = P.step, origReplay = P.replay;
 
@@ -205,7 +181,6 @@
     }
     ok = origOpen(id, opts);
     if (!ok) { currentId = prev; return false; }
-    if (n >= 0 && NEU.dungeonLook && NEU.dungeonLook.paint) NEU.dungeonLook.paint(P.levels[id]);
     return true;
   }
   function settle(s) {
@@ -271,8 +246,6 @@
       NEU.dungeon.pendingDeath = null;
       origTick(dt);
       settle(P.state);
-      if (dungeonN(currentId) >= 0) stampPaintings();
-      if (NEU.dungeonLook && NEU.dungeonLook.flick && dungeonN(currentId) >= 0) NEU.dungeonLook.flick(dt);
     };
   }
 })();

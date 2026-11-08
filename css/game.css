@@ -219,11 +219,6 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
    The stepped metallic ramp + specular sweep is the "liquid chrome"
    look; prefers-reduced-motion kills all animation. */
 
-/* specular band sweeping across the chrome ramp */
-@keyframes crackSweep {
-  0%   { background-position: -80px 0; }
-  100% { background-position: 80px 0; }
-}
 
 /* bobbing arrow hint */
 @keyframes crackBob {
@@ -249,15 +244,10 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   clip-path: polygon(10% 0, 35% 15%, 55% 0, 70% 20%, 100% 35%, 85% 55%, 100% 75%, 75% 80%, 60% 100%, 40% 85%, 20% 100%, 5% 70%, 0 45%, 15% 30%);
   background: linear-gradient(135deg, #F4F6FA 0%, #F4F6FA 20%, #C9CED8 20%, #C9CED8 40%, #8C93A3 40%, #8C93A3 60%, #4A5060 60%, #4A5060 80%, #1B1E26 80%, #1B1E26 100%);
   background-size: 160px 160px;
-  animation: crackSweep 2.4s steps(6) infinite;
   outline: 2px solid #1B1E26;
-  filter: drop-shadow(0 0 6px rgba(200,206,216,.6));
 }
 #panel #crack[data-n="1"] { transform: scale(1.5); }
 #panel #crack[data-n="2"] { transform: scale(2.4); }
-#panel #crack[data-n="2"]::after {
-  filter: drop-shadow(0 0 14px rgba(200,206,216,.9));
-}
 
 /* up-arrow hint: bobbing pixel arrow + text */
 .crack-hint {
@@ -280,9 +270,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   clip-path: circle(50%);
   background: linear-gradient(135deg, #FFE3E3 0%, #FFE3E3 20%, #FF6B6B 20%, #FF6B6B 40%, #C2405F 40%, #C2405F 60%, #8C2F4A 60%, #8C2F4A 80%, #2A0A12 80%, #2A0A12 100%);
   background-size: 200px 200px;
-  animation: crackSweep 2.4s steps(6) infinite;
   outline: 2px solid #2A0A12;
-  filter: drop-shadow(0 0 20px rgba(255,107,107,.85));
 }
 #panel #crack.is-portal {
   animation: crackPulse 1.2s steps(4) infinite;
@@ -290,9 +278,8 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 
 /* calm motion: static chrome, no sweep/bob/pulse */
 @media (prefers-reduced-motion: reduce) {
-  #panel #crack::after { animation: none; }
+  html.rm #crack .crack__glow, html.rm #crack .crack__portal { animation: none; }
   #panel #crack.is-portal { animation: none; }
-  #panel #crack.is-portal::after { animation: none; }
   .crack-hint { animation: none; }
 }
 
@@ -571,36 +558,62 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .inv__tab canvas { width: 16px; height: 16px; image-rendering: pixelated; }
 .inv__tab.is-sel { color: #ff0; outline: 2px solid #ff0; outline-offset: -2px; }
 .inv__coins { white-space: nowrap; color: #fff; }
-.inv__body { display: grid; grid-template-columns: 160px 256px 224px minmax(256px, 1fr); gap: 16px; min-height: 288px; padding: 16px 0; }
+.inv__body { display: grid; grid-template-columns: 1fr; gap: 16px; padding: 16px 0; }
+/* EQUIP: categories top-left, the item list in the middle, CHAR and STATS
+   down the right edge. Stats are never in the centre column. */
+.inv.is-equip .inv__body { grid-template-columns: 232px minmax(0, 1fr) 216px; align-items: stretch; }
+.inv.is-equip .inv__equipped { grid-column: 1; grid-row: 1; }
+.inv.is-equip .inv__inventory { grid-column: 2; grid-row: 1; }
+.inv.is-equip .inv__stats { grid-column: 3; grid-row: 1; }
+.inv.is-equip .inv__list { max-height: 200px; }
 .inv__body section { min-width: 0; border: 2px solid #fff; padding: 8px; }
 .inv__body h2 { margin: 0 0 8px; color: #fff; font: inherit; }
 .inv__char { text-align: center; }
-.inv__portrait { display: block; width: 80px; height: 120px; margin: 16px auto; image-rendering: pixelated; }
 .inv__slots { display: grid; gap: 8px; }
-.inv__slot { display: grid; grid-template-columns: 32px 1fr; align-items: center; min-height: 48px; }
-.inv__slot > span:first-child { grid-row: span 2; font-size: 16px; }
+.inv__slot { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 4px 8px; min-height: 48px; }
+/* Category icons: the 48x16 Deltarune strip (sword, arrow, star) shown at 2x. */
+.inv__sym { flex: none; width: 32px; height: 32px; background: url(../img/act4/deltarune/equip-icons.png) 0 0 / 96px 32px no-repeat; image-rendering: pixelated; }
+.inv__sym.sym-ranged { background-position: -32px 0; }
+.inv__sym.sym-spell { background-position: -64px 0; }
 .inv__slot b { font-weight: normal; color: #bbb; }
-.inv__slot.is-focus { color: #ff0; outline: 2px solid #ff0; }
-.inv__slot.is-focus b { color: #ff0; }
+.inv__spell { flex: 0 0 100%; padding-left: 40px; color: #ddd; }
+.inv__spell.is-focus { color: #ff0; }
+.inv__slot.is-focus { outline: 2px solid #ff0; }
+.inv__slot.is-focus > b { color: #ff0; }
+.inv__hint { margin: 8px 0 0; color: #aaa; }
 .inv__statlines { display: grid; gap: 16px; }
 .inv__statlines b { font-weight: normal; }
 .inv__statlines .is-up { color: #5f6; }
 .inv__statlines .is-down { color: #f55; }
 .inv__statlines .is-fx { color: #fa4; }
 .inv__inventory { grid-column: 1 / -1; }
-.inv__inventory.is-equip { grid-column: auto; }
 .inv__list { max-height: 240px; overflow: auto; }
 .inv__list li { min-height: 40px; padding: 4px 4px 4px 40px; gap: 8px; }
-.inv__list li::before { width: 16px; height: 16px; margin-top: -8px; background: none; content: '♥'; color: #f55; font-size: 16px; }
-.inv__list li.is-sel { outline: 2px solid #ff0; }
-.inv__list li.is-unusable { color: #666; }
+.inv__list li.is-sel { box-shadow: inset 0 0 0 2px #ff0; }
 .inv__list li.is-equipped span::after { content: '  EQUIPPED'; color: #aaa; }
-.inv__icon { width: 16px; height: 16px; image-rendering: pixelated; }
-.inv__desc { min-height: 48px; border: 2px solid #fff; padding: 8px; }
+.inv__icon { flex: none; width: 32px; height: 32px; image-rendering: pixelated; }
+.inv__desc { min-height: 48px; margin-top: 16px; border: 2px solid #fff; padding: 8px; }
+/* The bottom fight preview: the combat HUD look, one target, the soul. */
+.inv__preview { margin-top: 16px; border: 2px solid #fff; padding: 8px; }
+.inv__preview[hidden] { display: none; }
+.inv__preview h2 { margin: 0 0 8px; color: #fff; font: inherit; }
+.inv__stage { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.inv__fight { display: block; flex: 0 1 480px; min-width: 0; width: 480px; max-width: 100%; height: auto; aspect-ratio: 4 / 1; border: 2px solid #3a2a55; background: #000; image-rendering: pixelated; }
+.inv__fight-text { flex: 1 1 240px; color: #fff; white-space: pre-line; line-height: 2; }
+.inv__fight-text::first-line { color: #ff0; }
 .inv__body[hidden], .inv__body section[hidden] { display: none; }
+/* Phone: one column, the stats as a row, a shorter list, so the whole menu
+   including the description fits the phone screen without a scroll. */
 @media (max-width: 800px) {
-  .inv__body { grid-template-columns: 1fr 1fr; }
-  .inv__inventory { grid-column: 1 / -1; }
+  .inv { top: 0; transform: translateX(-50%); max-height: 100vh; max-height: 100dvh; padding: 8px 8px 24px; }
+  .inv.is-equip .inv__body { grid-template-columns: 1fr; gap: 8px; padding: 8px 0; }
+  .inv.is-equip .inv__body > section { grid-column: 1; grid-row: auto; }
+  .inv.is-equip .inv__list { max-height: 120px; }
+  .inv.is-equip .inv__slot { min-height: 0; padding: 2px 8px; }
+  .inv.is-equip .inv__statlines { grid-auto-flow: column; justify-content: start; gap: 16px; }
+  .inv.is-equip .inv__preview { margin-top: 0; padding: 6px 8px; }
+  .inv.is-equip .inv__preview h2 { margin-bottom: 4px; }
+  .inv.is-equip .inv__desc { margin-top: 0; min-height: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
@@ -643,8 +656,58 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   color: #f00; font-size: 16px;
 }
 .mage__p { float: right; color: #fff; }
+.mage__gold { margin-top: 16px; padding-top: 8px; border-top: 4px solid #fff; color: #E4C46A; }
+@media (max-width: 640px) {
+  .mage__art { flex: 0 0 auto; aspect-ratio: 320 / 192; margin: 8px 8px 0; }
+  .mage__dock { flex: 1 1 auto; flex-direction: column; gap: 8px; padding: 8px; }
+  .mage__box { order: -1; flex: 0 0 auto; min-height: 96px; padding: 8px; }
+  .mage__menu { flex: 1 1 auto; padding: 8px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .mage, .mage * { animation: none !important; transition: none !important; }
+}
+
+/* The stall (js/act4/shop.js). The base .shop rules live in style.css; this block
+   lays the window out as an Undertale shop: title bar, the scene with the merchant
+   behind his counter, then the menu (left) and what he says (right). Every size is
+   a multiple of 16px. */
+.shop__win {
+  width: min(1000px, 100%, calc((100dvh - 380px) * 16 / 9 + 48px));
+  min-width: min(100%, 360px);
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;
+  grid-template-areas: "top top" "scene scene" "board say" "bar bar";
+  align-content: start; padding: 16px; max-height: none;
+}
+.shop__top { grid-area: top; }
+.shop__scene {
+  grid-area: scene; justify-self: center; display: block;
+  width: min(100%, calc((100dvh - 380px) * 16 / 9)); height: auto; aspect-ratio: 16 / 9;
+  background: #0A0810; border: 4px solid var(--shop-line); box-sizing: border-box;
+  image-rendering: pixelated;
+}
+.shop__say { grid-area: say; align-self: stretch; min-height: 128px; padding: 16px; border: 4px solid var(--shop-line); box-sizing: border-box; }
+.shop__board { grid-area: board; max-height: 184px; padding: 8px; border: 4px solid var(--shop-line); box-sizing: border-box; gap: 0; }
+.shop__bar { grid-area: bar; padding-top: 0; border-top: 0; }
+.shop__h { font-size: 32px; }
+.shop__gold { font-size: 16px; padding: 8px 16px; }
+.shop__say, .shop__row, .shop__keys, .shop__quit { font-size: 16px; line-height: 1.5; }
+.shop__row { min-height: 32px; padding: 0 8px; align-items: center; }
+.shop__row::before { font-size: 16px; }
+.shop__keys { color: #bbb; }
+.shop__quit { min-height: 48px; }
+@media (max-width: 640px) {
+  .shop { padding: 8px; place-items: start center; }
+  .shop__win { width: 100%; padding: 8px; gap: 8px; grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "top" "scene" "say" "board" "bar"; }
+  .shop__scene { width: 100%; }
+  .shop__say { min-height: 96px; padding: 8px; }
+  .shop__board { max-height: 184px; }
+  .shop__h { font-size: 16px; }
+  .shop__keys { display: block; }
+}
+@media (pointer: coarse) { .shop__win { max-height: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .shop *, .shop *::before, .shop *::after { animation: none !important; transition: none !important; }
 }
 
 /* Card duel (js/act4/cards.js). The picture is the canvas; this only
@@ -694,19 +757,20 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 
 /* Merchant stall after the rap (rhythm.js). Sits inside #fnf, under .tbox. */
 .fnf__stall {
-  position: absolute; left: 16px; right: 16px; bottom: 128px; z-index: 4;
-  max-width: 640px; margin: 0 auto; box-sizing: border-box;
+  position: absolute; left: 16px; right: 16px; top: 96px; bottom: auto; z-index: 4;   /* above the fighters, never over them */
+  max-width: 480px; margin: 0 auto; box-sizing: border-box;
   padding: 16px; background: #000; color: #fff;
   border: 4px solid #fff;
   font: 400 16px/1.5 "Determination Mono", "Pixelify Sans", monospace;
 }
 .fnf__stall[hidden] { display: none !important; }
 .fnf__stall button {
-  display: block; width: 100%; min-height: 32px; margin: 0 0 8px; padding: 0 16px;
+  position: relative; display: block; width: 100%; min-height: 32px; margin: 0 0 8px; padding: 0 16px 0 40px;
   text-align: left; color: #fff; background: #000; border: 0; cursor: pointer;
   font: 400 16px/2 "Determination Mono", "Pixelify Sans", monospace;
 }
 .fnf__stall button.is-sel { color: #ff0; }
+.fnf__stall button.is-sel::before { content: '\2665'; position: absolute; left: 8px; top: 0; color: #f00; }
 @media (prefers-reduced-motion: reduce) {
   .fnf, .fnf * { animation: none !important; transition: none !important; }
 }
@@ -815,8 +879,8 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 
 /* Desk note (js/act4/note.js). Centred, under .tbox (96). */
 .note {
-  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  z-index: 78; background: #120e0c; border: 4px solid #5a4634;
+  position: fixed; inset: 0; z-index: 78; background: #08080B;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
 }
 .note[hidden] { display: none !important; }
 .note canvas { display: block; width: min(960px, 100vw - 32px); height: auto; aspect-ratio: 16 / 9; image-rendering: pixelated; }
@@ -875,8 +939,8 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 
 /* Photograph (js/act4/photo.js). Centred, under .tbox (96). */
 .photo {
-  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  z-index: 78; background: #12161e; border: 4px solid #5a4634;
+  position: fixed; inset: 0; z-index: 78; background: #08080B;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
 }
 .photo[hidden] { display: none !important; }
 .photo canvas { display: block; width: min(960px, 100vw - 32px); height: auto; aspect-ratio: 16 / 9; image-rendering: pixelated; }

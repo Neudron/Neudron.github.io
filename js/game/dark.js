@@ -1039,6 +1039,13 @@
     if (wrap) wrap.classList.remove('is-walk');
   }
 
+  if (NEU.tune) {
+    NEU.tune.table('dark.ramp', RAMP);
+    NEU.tune.table('dark.hzZone', HZ_ZONE);
+    NEU.tune.table('dark.hazards', HAZARDS);
+    NEU.tune.table('dark.sweeps', SWEEPS);
+  }
+
   NEU.dark = {
     open: open, close: close, reset: reset,
     get mode() { return mode; },

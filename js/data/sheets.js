@@ -369,8 +369,14 @@
        would just trade a wrong-provenance sprite for a missing one. */
     recall:    { src: IMG + 'terraria/recall-potion.png', w: 16, h: 16, frames: 1, fw: 16, fh: 16, fps: 0 },
     axe:       { src: IMG + 'terraria/axe.png',           w: 34, h: 30, frames: 1, fw: 34, fh: 30, fps: 0 },
-    mushroom:  { src: IMG + 'terraria/mushroom.png',      w: 22, h: 24, frames: 1, fw: 22, fh: 24, fps: 0 },
     slot:      { src: IMG + 'terraria/slot.png',          w: 52, h: 52, frames: 1, fw: 52, fh: 52, fps: 0 },
+
+    /* The mushroom NPCs of the act (rooms-a/d). Undertale's own Mushroom
+       Dance sprites, 28x35 cells, three columns x five rows: col 0 rest and
+       wind-up (prep, rows 0-4), col 1 dance (mid, rows 0-3, row 4 holds),
+       col 2 react (end, rows 0-2, rows 3-4 hold). The inventory icon stays
+       terraria/mushroom.png; see img/act4/CREDITS.md for provenance. */
+    mushroom:  { src: IMG + 'undertale/mushroom-dance.png', w: 84, h: 175, frames: 5, cols: 3, fw: 28, fh: 35, fps: 0 },
 
     /* ── characters and set dressing — same caveat as above ──────*/
     /* TV TIME, extracted Deltarune Ch3 art. These are HORIZONTAL strips, one row of

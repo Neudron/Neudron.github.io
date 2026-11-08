@@ -42,6 +42,8 @@
   var mode = 'fight', phase = 1, hp = MAX, playerHp = 6, iframe = 0;
   var index = 0, cur = null, tele = null, haz = null, sig = false;
   var acc = 0, frame = 0, musicPhase = -1, kit = null, held = {};
+  var shatterBusy = 0, impactT = 0, shieldOn = false;
+  var lastVuln = null, lastBang = null, lastPrompt = null, lastCount = null, lastHud = null;
   var haze = 0, fog = 0, count = 0, countT = 0, flash = 0, flashes = 0;
   var shattered = 0, soulY = 0, bodyY = 0, didBoom = false;
   var state = {
@@ -76,7 +78,6 @@
   }
   function cycle() { return phase >= 2 ? P2 : P1; }
   function paintPhase() {
-    if (LOOK[phase]) wrap.style.background = LOOK[phase];
     if (NEU.music && NEU.music.bossPhase && musicPhase !== phase) {
       NEU.music.bossPhase('draedon', phase);
       musicPhase = phase;
@@ -137,7 +138,10 @@
     paintPhase();
     if (!shattered && NEU.juice && NEU.juice.shatter) {
       shattered = 1;
+      /* the canvas still holds the lit arena: the shards carry its colours. */
+      shatterBusy = 30;
       NEU.juice.shatter({
+        onDone: function () { shatterBusy = 0; },
         canvas: cv,
         x: ((box.AX + box.AW / 2) * (window.devicePixelRatio || 1)) | 0,
         y: ((box.AY + box.AH / 2) * (window.devicePixelRatio || 1)) | 0
@@ -149,6 +153,8 @@
     var blocked;
     if (didBoom) return;
     didBoom = true;
+    impactT = 1;
+    shieldOn = false;
     flashes = 1;
     flash = 1;
     blocked = kit && kit.hit(1);
@@ -195,6 +201,9 @@
     countT = 0;
     flash = 0;
     didBoom = false;
+    shatterBusy = 0;
+    impactT = 0;
+    shieldOn = false;
     shattered = 0;
     soulY = 0;
     held = {};
@@ -274,27 +283,40 @@
     return (NEU.keys && NEU.keys.label) ? NEU.keys.label('c') : 'c';
   }
   function publish() {
-    var word = '';
+    var word = '', txt;
     if (mode === 'fight') word = vulnerableNow() ? 'VULNERABLE' : 'INVULNERABLE';
-    if (vulnEl) vulnEl.textContent = word;
-    if (bangEl) {
-      bangEl.hidden = mode !== 'nuke';
+    /* DOM writes only on change: publish runs every frame. */
+    if (vulnEl && word !== lastVuln) { vulnEl.textContent = word; lastVuln = word; }
+    if (bangEl && (mode === 'nuke') !== lastBang) {
+      lastBang = mode === 'nuke';
+      bangEl.hidden = !lastBang;
       bangEl.style.color = '#ff0';
       bangEl.style.fontSize = '64px';
       bangEl.style.fontWeight = '700';
     }
     if (promptEl) {
-      promptEl.hidden = mode !== 'nuke';
-      promptEl.style.color = '#ff0';
-      promptEl.style.fontSize = '32px';
-      promptEl.style.fontWeight = '700';
-      promptEl.textContent = 'press [' + keyName() + ']: SOUL SHIELD';
+      txt = 'press [' + keyName() + ']: SOUL SHIELD';
+      if (lastPrompt !== (mode === 'nuke' ? txt : '')) {
+        lastPrompt = mode === 'nuke' ? txt : '';
+        promptEl.hidden = mode !== 'nuke';
+        promptEl.style.color = '#ff0';
+        promptEl.style.fontSize = '32px';
+        promptEl.style.fontWeight = '700';
+        promptEl.textContent = txt;
+      }
     }
     if (countEl) {
-      countEl.hidden = mode !== 'nuke';
-      countEl.textContent = mode === 'nuke' ? String(count) : '';
+      txt = mode === 'nuke' ? String(count) : '';
+      if (txt !== lastCount) {
+        lastCount = txt;
+        countEl.hidden = mode !== 'nuke';
+        countEl.textContent = txt;
+      }
     }
-    if (hudEl) hudEl.textContent = 'HP ' + hp;
+    if (hudEl) {
+      txt = 'HP ' + hp;
+      if (txt !== lastHud) { hudEl.textContent = txt; lastHud = txt; }
+    }
     state.mode = mode;
     state.phase = phase;
     state.hp = hp;
@@ -306,7 +328,7 @@
     state.hazard = haz;
     state.frame = frame;
     state.parallax = REDUCE ? 0 : (frame % 32);
-    state.bg = wrap.style.background;
+    state.bg = LOOK[phase];
     state.playerHp = playerHp;
     state.tp = kit ? kit.tp : 0;
     state.strip = !!(kit && kit.stripOpen);
@@ -324,18 +346,45 @@
     ctx.fillStyle = col;
     ctx.fillRect(x | 0, y | 0, w | 0, h | 0);
   }
-  function drawShape(s, col) {
-    var k, px, py;
-    if (!s || !ctx) return;
+  function art() { return NEU.exoArt; }
+  function tsec() { return REDUCE ? 0 : frame / 60; }
+  /* a lane of 3px squares along an angle, w wide */
+  function lane(x, y, a, len, w, col, al) {
+    var c = Math.cos(a), s = Math.sin(a), k, o, p = ctx.globalAlpha;
+    ctx.globalAlpha = al;
     ctx.fillStyle = col;
-    if (s.kind === 'hover') band(s.x, s.y, s.len, 4, col);
-    else {
-      for (k = 0; k < 8; k++) {
-        px = s.x + Math.cos(s.a) * (s.len * k / 8);
-        py = s.y + Math.sin(s.a) * (s.len * k / 8);
-        ctx.fillRect(px | 0, py | 0, 8, 8);
-      }
+    for (k = 0; k < len; k += 3) {
+      for (o = -w / 2; o < w / 2; o += 3) ctx.fillRect((x + c * k - s * o) | 0, (y + s * k + c * o) | 0, 3, 3);
     }
+    ctx.globalAlpha = p;
+  }
+  /* the 2px core, as 2x2 steps along the angle */
+  function core(x, y, a, len, col) {
+    var c = Math.cos(a), s = Math.sin(a), k;
+    ctx.fillStyle = col;
+    for (k = 0; k < len; k += 2) ctx.fillRect((x + c * k) | 0, (y + s * k) | 0, 2, 2);
+  }
+  function drawTele(sh) {
+    var m, w;
+    if (!sh || !cur) return;
+    if (sh.kind === 'hover') {
+      ctx.fillStyle = '#FFD2A0';
+      ctx.fillRect(sh.x | 0, sh.y | 0, sh.len, 2);
+      return;
+    }
+    m = Math.max(0, Math.min(1, (cur.f - 27) / 27));
+    w = Math.round(10 - 8 * m);
+    lane(sh.x, sh.y, sh.a, sh.len, w, '#FF5A3C', 0.2);
+    core(sh.x, sh.y, sh.a, sh.len, '#FF5A3C');
+  }
+  function drawHaz(sh) {
+    var white;
+    if (!sh || !cur) return;
+    if (sh.kind === 'hover') return;
+    white = cur.f - 54 < 5;
+    lane(sh.x, sh.y, sh.a, sh.len, 14, '#FF5A3C', 0.35);
+    lane(sh.x, sh.y, sh.a, sh.len, 6, '#FF5A3C', 1);
+    if (white) core(sh.x, sh.y, sh.a, sh.len, '#FFFFFF');
   }
   function drawDigit(n, x, y) {
     var rows = DIG[n], r, c, ch;
@@ -344,45 +393,60 @@
       for (c = 0; c < 3; c++) {
         ch = rows[r].charAt(c);
         if (ch !== '1') continue;
-        ctx.fillStyle = '#E8FFE8';
+        ctx.fillStyle = '#FFE070';
         ctx.fillRect(x + c * 16, y + r * 16, 16, 16);
+        ctx.fillStyle = '#A07A10';
+        ctx.fillRect(x + c * 16, y + r * 16 + 12, 16, 4);
+        ctx.fillStyle = '#FFF8C8';
+        ctx.fillRect(x + c * 16, y + r * 16, 16, 2);
       }
     }
   }
-  function drawDraedon() {
-    var x = boss.x | 0, y = boss.y | 0;
-    ctx.fillStyle = '#0E2A32';
-    ctx.fillRect(x - 40, y + 20, 80, 14);
-    ctx.fillStyle = '#1A6A78';
-    ctx.fillRect(x - 28, y + 16, 56, 8);
-    ctx.fillStyle = '#7FE3C4';
-    ctx.fillRect(x - 16, y + 14, 32, 4);
-    ctx.fillStyle = '#2A3038';
-    ctx.fillRect(x - 36, y + 8, 56, 12);
-    ctx.fillStyle = '#8A939C';
-    ctx.fillRect(x + 16, y - 4, 28, 10);
-    ctx.fillStyle = '#E04A3A';
-    ctx.fillRect(x + 40, y - 8, 8, 14);
-    ctx.fillStyle = '#4A6670';
-    ctx.fillRect(x - 20, y - 36, 40, 48);
-    ctx.fillStyle = '#1A1C20';
-    ctx.fillRect(x - 16, y - 48, 32, 16);
-    ctx.fillStyle = '#E23B3B';
-    ctx.fillRect(x - 12, y - 40, 24, 4);
+  /* the soul's rings after the blast: three expanding 1px rings and dust */
+  function drawImpact(x, y) {
+    var k, a, r, cols = ['#FFFFFF', '#FFD34E', '#E04A3A'], j, d;
+    if (impactT <= 0) return;
+    for (j = 0; j < 3; j++) {
+      r = impactT * 5 - j * 14;
+      if (r < 4) continue;
+      ctx.fillStyle = cols[j];
+      for (k = 0; k < 48; k++) {
+        a = k * Math.PI / 24;
+        ctx.fillRect((x + Math.cos(a) * r) | 0, (y + Math.sin(a) * r) | 0, 1, 1);
+      }
+    }
+    for (k = 0; k < 14; k++) {
+      a = k * 0.9 + 0.3;
+      d = impactT * (1.2 + (k % 4) * 0.5);
+      ctx.fillStyle = k % 2 ? '#5A6878' : '#3A4450';
+      ctx.fillRect((x + Math.cos(a) * d * 3) | 0, (y + Math.sin(a) * d * 2 - impactT * 0.6) | 0, 4, 4);
+    }
+  }
+  /* red danger frame: three stepped bands, alpha rises with each count */
+  function drawDanger(w, h) {
+    var a = 0.25 + (3 - Math.max(0, Math.min(3, count))) * 0.05, k, ins, p = ctx.globalAlpha, ww = box.AW | 0, hh = box.AH | 0;
+    ctx.fillStyle = '#A01818';
+    for (k = 0; k < 3; k++) {
+      ctx.globalAlpha = a * (1 - k * 0.3);
+      ins = k * 8;
+      ctx.fillRect((box.AX | 0) + ins, (box.AY | 0) + ins, ww - ins * 2, 8);
+      ctx.fillRect((box.AX | 0) + ins, (box.AY | 0) + hh - ins - 8, ww - ins * 2, 8);
+      ctx.fillRect((box.AX | 0) + ins, (box.AY | 0) + ins + 8, 8, hh - ins * 2 - 16);
+      ctx.fillRect((box.AX | 0) + ww - ins - 8, (box.AY | 0) + ins + 8, 8, hh - ins * 2 - 16);
+    }
+    ctx.globalAlpha = p;
   }
   function draw() {
-    var w, h, k, shift, i, y, can;
+    var w, h, can, nuke, wy, fx, fy;
     if (!ctx) return;
+    if (shatterBusy > 0) { shatterBusy--; }
     ctx.imageSmoothingEnabled = false;
     w = window.innerWidth || 800;
     h = window.innerHeight || 600;
-    ctx.fillStyle = LOOK[phase] || '#FF00FF';
+    ctx.fillStyle = '#06080C';
     ctx.fillRect(0, 0, w, h);
-    for (k = 0; k < 4; k++) {
-      shift = REDUCE ? 0 : ((frame * (k + 1)) % 32);
-      band((box.AX - shift) | 0, (box.AY + 48 + k * 48) | 0, box.AW + 32, 8, k % 2 ? '#1C2830' : '#243240');
-    }
-    band(box.AX, box.AY, box.AW, box.AH, '#07080C');
+    if (art()) art().arena(ctx, box, phase, frame, REDUCE);
+    nuke = mode === 'nuke' || mode === 'fall' || mode === 'wake';
     can = ctx.save && ctx.beginPath && ctx.rect && ctx.clip && ctx.restore;
     if (can) {
       ctx.save();
@@ -390,32 +454,41 @@
       ctx.rect(box.AX | 0, box.AY | 0, box.AW | 0, box.AH | 0);
       ctx.clip();
     }
-    drawShape(tele, '#FFD2A0');
-    drawShape(haz, '#FF5A3C');
-    if (can) ctx.restore();
-    if (mode === 'nuke' || mode === 'fall' || mode === 'wake') {
-      for (i = 0; i < fog; i++) {
-        y = (h - (i + 1) * 32) | 0;
-        band(0, y, w, 32, i % 2 ? '#145C28' : '#39A84A');
-      }
+    drawTele(tele);
+    drawHaz(haz);
+    if (art()) art().draedon(ctx, boss.x | 0, (boss.y + 8) | 0, tsec());
+    if (mode === 'nuke' && art()) {
+      /* the warhead falls from the top centre across the countdown */
+      wy = (box.AY - 90 + Math.min(1, countT / 180) * (box.AH * 0.62)) | 0;
+      art().warhead(ctx, (box.AX + box.AW / 2) | 0, wy, tsec());
     }
-    /* robes, visor, chair, mech arm, hover glow. Drawn, so a missing sheet is not a gap. */
-    drawDraedon();
+    if (can) ctx.restore();
+    if (nuke) drawDanger(w, h);
     if (mode === 'fall' || mode === 'wake' || mode === 'nuke') {
       band((box.AX + box.AW / 2 - 24) | 0, bodyY | 0, 48, 16, '#C4A574');
       band((box.AX + box.AW / 2 - 28) | 0, (bodyY + 12) | 0, 56, 8, '#3A2A22');
     }
-    if (mode === 'nuke' && count > 0) drawDigit(count, ((w - 48) / 2) | 0, 160);
+    if (mode === 'nuke' && count > 0) {
+      fx = (box.AX + 24) | 0;
+      fy = (box.AY + 24) | 0;
+      band(fx, fy, 72, 104, '#0A0C10');
+      if (art()) art().hazardFrame(ctx, fx, fy, 72, 104);
+      drawDigit(count, fx + 12, fy + 12);
+    }
     if (mode === 'fall' || mode === 'wake') {
       if (NEU.danmaku && NEU.danmaku.soul) NEU.danmaku.soul.draw(ctx, F.x, soulY, false);
       else band(F.x - 8, soulY - 8, 16, 16, '#FF00FF');
+      if (impactT > 0) drawImpact(F.x | 0, soulY | 0);
     } else if (NEU.danmaku && NEU.danmaku.soul) NEU.danmaku.soul.draw(ctx, F.x, F.y, false);
     else band(F.x - 8, F.y - 8, 16, 16, '#FF00FF');
+    if (shieldOn && mode === 'nuke' && art()) art().shield(ctx, F.x, F.y, tsec());
     if (kit) kit.draw(ctx);
     if (flash && !REDUCE) band(0, 0, w, h, '#FFFFFF');
   }
   function frameOnce() {
     flash = 0;
+    if (impactT > 0) impactT++;
+    if (impactT > 40) impactT = 0;
     if (mode === 'fight') fightStep();
     else if (mode === 'nuke') nukeStep();
     else if (mode === 'fall') fallStep();
@@ -445,7 +518,7 @@
     return k;
   }
   function onDown(e) {
-    var k, dir;
+    var k, dir, tp0;
     if (wrap.hidden) return;
     k = routed(e);
     if (!k) return;
@@ -456,7 +529,14 @@
       if (NEU.danmaku && NEU.danmaku.key) NEU.danmaku.key(F, { key: 'x' });
       return;
     }
-    if (kit && (k === 'z' || k === 'c' || k === 'C')) { kit.keydown(k); publish(); return; }
+    if (kit && (k === 'z' || k === 'c' || k === 'C')) {
+      tp0 = kit.tp;
+      kit.keydown(k);
+      /* spending TP in the nuke is the soul shield going up */
+      if (mode === 'nuke' && kit.tp < tp0) shieldOn = true;
+      publish();
+      return;
+    }
     dir = k === 'ArrowLeft' || k === 'a' ? 'left' : k === 'ArrowRight' || k === 'd' ? 'right' :
       k === 'ArrowUp' || k === 'w' ? 'up' : k === 'ArrowDown' || k === 's' ? 'down' : k === 'Shift' ? 'focus' : '';
     if (dir) held[dir] = true;

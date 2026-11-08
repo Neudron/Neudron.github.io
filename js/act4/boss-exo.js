@@ -20,7 +20,6 @@
   /* ExoMechManagement.cs:55-57 */
   var P2 = 0.85, P3 = 0.625, P4 = 0.5;
   var MAX = 1000;
-  var LOOK = [null, '#101820', '#1a1408', '#201018', '#0c1830', '#281008', '#300818'];
   var REDUCE = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   var F = NEU.danmaku && NEU.danmaku.fight ? NEU.danmaku.fight(400, 300) : { x: 400, y: 300, fx: 0, fy: -1 };
   var box = { AX: 20, AY: 20, AW: 760, AH: 500 };
@@ -35,6 +34,7 @@
   var compSummoned = false, finSummoned = false, overdriveOpen = false;
   var playerHp = 6, musicPhase = -1, kit = null, held = {}, god = false;
   var gates = [], gateSeen = { a: 0, b: 0, c: 0 };
+  var lastVuln = null, lastHud = null, hudTxt = '', capText = '', capT = 0;
   var state = {
     mode: 'select', primary: null, complement: null, final: null,
     phase: 1, hp: MAX, max: MAX, ratio: 1, attack: null, vents: false,
@@ -60,6 +60,7 @@
     ar = NEU.danmaku && NEU.danmaku.arena ? NEU.danmaku.arena(w, h, 760, 500, 20) : null;
     if (ar) { box.AX = ar.AX; box.AY = ar.AY; box.AW = ar.AW; box.AH = ar.AH; }
     else { box.AX = 20; box.AY = 40; box.AW = 760; box.AH = 480; }
+    if (mode === 'select' && ctx) drawBackdrop();
   }
   function centerPlayer() {
     F.x = box.AX + box.AW / 2;
@@ -103,7 +104,6 @@
       NEU.music.bossPhase('exo', phase);
       musicPhase = phase;
     }
-    if (LOOK[phase]) wrap.style.background = LOOK[phase];
   }
   function noteGates() {
     var ini = initialId && mechs[initialId], r;
@@ -122,7 +122,7 @@
     if (!comboLive()) { NEU.exoCombos.clear(); return; }
     NEU.exoCombos.pair(initialId, compId);
     NEU.exoCombos.step({
-      x: bodies[initialId].x, y: bodies[initialId].y, tx: F.x, ty: F.y,
+      x: bodies[initialId].x, y: bodies[initialId].y, px: bodies[compId].x, py: bodies[compId].y, tx: F.x, ty: F.y,
       ax: box.AX, ay: box.AY, aw: box.AW, ah: box.AH
     });
   }
@@ -135,7 +135,7 @@
       mechs[compId].alive = true;
       mechs[compId].hp = MAX;
       named = '* ' + LABEL[compId] + ' joins.';
-      if (NEU.talk) NEU.talk([named], 'draedon');
+      caption(named);
     }
     comp = mechs[compId];
     /* ThanatosHeadBehaviorOverride.cs:210-215 */
@@ -149,11 +149,15 @@
     var word = '', ini = initialId ? mechs[initialId] : null;
     var comp = compSummoned && compId && mechs[compId].alive ? compId : null;
     if (mode === 'fight' || mode === 'won') word = ventsOpen() ? 'VULNERABLE' : 'INVULNERABLE';
-    if (vulnEl) vulnEl.textContent = word;
+    if (vulnEl && word !== lastVuln) { vulnEl.textContent = word; lastVuln = word; }
     state.combo = NEU.exoCombos ? NEU.exoCombos.current() : null;
     state.comboTelegraph = NEU.exoCombos ? NEU.exoCombos.telegraph() : null;
     state.comboHazard = NEU.exoCombos ? NEU.exoCombos.hazard() : null;
-    if (hudEl && ini) hudEl.textContent = 'HP ' + ini.hp + '  P' + phase + (state.combo ? '  ' + state.combo : '');
+    if (hudEl && ini) {
+      /* the canvas boss bar replaces the corner text; this line stays for screen readers */
+      hudTxt = 'HP ' + ini.hp + '  P' + phase + (state.combo ? '  ' + state.combo : '');
+      if (hudTxt !== lastHud) { hudEl.textContent = hudTxt; lastHud = hudTxt; }
+    }
     state.mode = mode;
     state.primary = initialId;
     state.complement = comp;
@@ -326,61 +330,19 @@
     fn();
     if (can) ctx.restore();
   }
+  function caption(text) { capText = text; capT = 90; }
+  function art() { return NEU.exoArt; }
+  NEU.exoCaption = caption;
+  function tsec() { return REDUCE ? 0 : fightFrame / 60; }
   function drawAres(c, x, y) {
-    x = x | 0; y = y | 0;
-    c.fillStyle = '#102028';
-    c.fillRect(x - 48, y + 28, 96, 12);
-    c.fillStyle = '#7FE3C4';
-    c.fillRect(x - 28, y + 26, 56, 4);
-    c.fillStyle = '#E04A3A';
-    c.fillRect(x - 64, y - 28, 36, 14);
-    c.fillStyle = '#3BE2C8';
-    c.fillRect(x + 28, y - 28, 36, 14);
-    c.fillStyle = '#7C5CFF';
-    c.fillRect(x - 64, y + 8, 36, 14);
-    c.fillStyle = '#E6C15A';
-    c.fillRect(x + 28, y + 8, 36, 14);
-    c.fillStyle = '#8A939C';
-    c.fillRect(x - 24, y - 48, 48, 72);
-    c.fillStyle = '#C5D0D8';
-    c.fillRect(x - 14, y - 32, 28, 18);
-    c.fillStyle = '#E04A3A';
-    c.fillRect(x - 12, y - 24, 24, 4);
-  }
-  function drawTwin(c, x, y, body, lens) {
-    x = x | 0; y = y | 0;
-    c.fillStyle = body;
-    c.fillRect(x, y - 48, 40, 96);
-    c.fillStyle = '#F4F4F4';
-    c.fillRect(x + 4, y - 40, 32, 18);
-    c.fillStyle = lens;
-    c.fillRect(x + 8, y - 14, 24, 16);
-    c.fillStyle = '#101418';
-    c.fillRect(x + 14, y - 8, 12, 6);
-    c.fillStyle = '#2A3038';
-    c.fillRect(x - 4, y + 40, 48, 8);
+    if (art()) art().ares(c, x, y, { t: tsec(), tx: F.x, ty: F.y, fire: !!(NEU.aresAtk && (NEU.aresAtk.telegraph() || NEU.aresAtk.hazard())) });
   }
   function drawTwins(c, x, y) {
-    drawTwin(c, (x - 72) | 0, y, '#E23B3B', '#F4F4F4');
-    drawTwin(c, (x + 16) | 0, y, '#3BE26A', '#7CFFB2');
+    var tw = NEU.twinsAtk, hot = !!(tw && tw.telegraph());
+    if (art()) art().twins(c, x, y, { t: tsec(), tx: F.x, ty: F.y, hotA: hot, hotB: hot });
   }
   function drawThanatos(x, y, open) {
-    var s, sx, sy;
-    x = x | 0; y = y | 0;
-    /* ThanatosHeadBehaviorOverride.cs:54 SegmentCount 100.
-       ThanatosSegmentBehaviorOverride.cs:104 open every 12th while the head is open. */
-    for (s = 0; s < 100; s++) {
-      sx = x - 24 - s * 6;
-      sy = y - 8 + (s % 2) * 4;
-      ctx.fillStyle = (open && s % 12 === 11) ? '#FFC46A' : '#7A8794';
-      ctx.fillRect(sx | 0, sy | 0, 16, 16);
-    }
-    ctx.fillStyle = '#5C656E';
-    ctx.fillRect(x - 112, y - 4, 96, 16);
-    ctx.fillStyle = open ? '#FFC46A' : '#C5D0D8';
-    ctx.fillRect(x - 28, y - 28, 48, 36);
-    ctx.fillStyle = '#E04A3A';
-    ctx.fillRect(x - 10, y - 14, 22, 6);
+    if (art()) art().thanatos(ctx, x, y, open, tsec(), box);
   }
   NEU.exoPaint = {
     ares: function (c, x, y) { drawAres(c, x, y); },
@@ -392,48 +354,41 @@
       ctx = prev;
     }
   };
-  function drawShape(s, col) {
-    var k, px, py;
-    if (!s) return;
-    ctx.fillStyle = col;
-    if (s.kind === 'ring') {
-      for (k = 0; k < 8; k++) {
-        px = s.x + Math.cos(k * Math.PI / 4) * s.r;
-        py = s.y + Math.sin(k * Math.PI / 4) * s.r;
-        ctx.fillRect(px | 0, py | 0, 8, 8);
-      }
-    } else if (s.kind === 'fan') {
-      for (k = 0; k < 5; k++) ctx.fillRect((s.x + k * 24) | 0, (s.y + k * 10) | 0, 16, 4);
-    } else {
-      ctx.fillRect(s.x | 0, s.y | 0, s.len || 8, 4);
+  function drawAtk() {
+    var A = NEU.thanatosAtk, t, h, src = bodies.thanatos, aim, f;
+    if (!A || !art()) return;
+    t = A.telegraph(); h = A.hazard();
+    if (!t && !h) return;
+    aim = Math.atan2(F.y - src.y, F.x - src.x);
+    f = A.frame();
+    if (t) art().tele(ctx, t, f - 27, { warn: 27 }, box, src, aim);
+    if (h) art().hazard(ctx, h, f - 54, box, src, aim);
+  }
+  function drawBackdrop() {
+    var w = window.innerWidth || 800, h = window.innerHeight || 600;
+    ctx.fillStyle = '#06080C';
+    ctx.fillRect(0, 0, w, h);
+    if (art()) art().arena(ctx, box, phase || 1, fightFrame, REDUCE);
+    if (mode === 'select' && art()) art().caption(ctx, 'CHOOSE YOUR FIRST OPPONENT', (w / 2) | 0, 40);
+  }
+  function drawBar() {
+    var barY = Math.max(8, (box.AY | 0) - 76), w = Math.min(480, box.AW | 0), ini = initialId && mechs[initialId];
+    var bx = ((box.AX + box.AW / 2 - w / 2) | 0);
+    if (!ini || !art()) return;
+    if (barY > 50) barY = 50;
+    art().bar(ctx, bx, barY, w, ini.hp / ini.max, [P4, P3, P2], initialId);
+    if (capT > 0) {
+      capT--;
+      art().caption(ctx, capText, (box.AX + box.AW / 2) | 0, (box.AY + 16) | 0);
     }
   }
   function draw() {
-    var open, shift, k, y, x, span, w, h;
+    var open;
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
-    w = window.innerWidth || 800;
-    h = window.innerHeight || 600;
-    ctx.fillStyle = LOOK[phase] || '#FF00FF';
-    ctx.fillRect(0, 0, w, h);
-    band(box.AX, box.AY, box.AW, box.AH, '#07080C');
+    drawBackdrop();
     clipArena(function () {
-      for (k = 0; k < 4; k++) {
-        y = (box.AY + 24 + k * 48) | 0;
-        if (y < box.AY || y + 8 > box.AY + box.AH) continue;
-        band(box.AX, y, box.AW, 8, k % 2 ? '#1C2830' : '#243240');
-        if (!REDUCE) {
-          shift = (fightFrame * (k + 1)) % box.AW;
-          span = 32;
-          x = box.AX + shift;
-          if (x + span > box.AX + box.AW) x = box.AX + box.AW - span;
-          band(x, y, span, 8, k % 2 ? '#243240' : '#1C2830');
-        }
-      }
-      if (NEU.thanatosAtk) {
-        drawShape(NEU.thanatosAtk.telegraph(), '#FFD2A0');
-        drawShape(NEU.thanatosAtk.hazard(), '#FF5A3C');
-      }
+      drawAtk();
       if (NEU.exoCombos) NEU.exoCombos.draw(ctx);
       if (mechs.thanatos.alive) {
         open = ventsOpen();
@@ -443,6 +398,7 @@
       if (mechs.twins.alive) drawTwins(ctx, bodies.twins.x, bodies.twins.y);
     });
     if (NEU.danmaku && NEU.danmaku.soul) NEU.danmaku.soul.draw(ctx, F.x, F.y, false);
+    drawBar();
     if (kit) kit.draw(ctx);
   }
   function keysEl() {
@@ -459,56 +415,48 @@
     if (i < 0) return;
     el.textContent = t.slice(0, i).replace(/[\s\u00a0·.\u00b7]+$/, '');
   }
-  function paintIcon(cv, id) {
+  function paintIcon(cv, id, lit) {
     var g = cv.getContext ? cv.getContext('2d') : null;
-    if (!g || !g.fillRect) return;
-    g.imageSmoothingEnabled = false;
-    g.fillStyle = '#000000';
-    g.fillRect(0, 0, 32, 32);
-    if (id === 'ares') {
-      g.fillStyle = '#8A939C'; g.fillRect(8, 4, 16, 24);
-      g.fillStyle = '#E04A3A'; g.fillRect(0, 8, 8, 6);
-      g.fillStyle = '#3BE2C8'; g.fillRect(24, 8, 8, 6);
-      g.fillStyle = '#7C5CFF'; g.fillRect(0, 18, 8, 6);
-      g.fillStyle = '#E6C15A'; g.fillRect(24, 18, 8, 6);
-    } else if (id === 'twins') {
-      g.fillStyle = '#E23B3B'; g.fillRect(2, 4, 12, 24);
-      g.fillStyle = '#F4F4F4'; g.fillRect(4, 8, 8, 6);
-      g.fillStyle = '#3BE26A'; g.fillRect(18, 4, 12, 24);
-      g.fillStyle = '#F4F4F4'; g.fillRect(20, 8, 8, 6);
-    } else {
-      g.fillStyle = '#7A8794'; g.fillRect(2, 14, 22, 8);
-      g.fillStyle = '#C5D0D8'; g.fillRect(18, 8, 12, 10);
-      g.fillStyle = '#FFC46A'; g.fillRect(6, 16, 4, 4);
-    }
+    if (!g || !g.fillRect || !art()) return;
+    art().portrait(g, id, lit);
   }
   function mountIcons() {
     var buttons, n, cv, id;
     if (!pickEl) return;
+    pickEl.style.minWidth = '400px';
     buttons = pickEl.getElementsByTagName('button');
     for (n = 0; n < buttons.length; n++) {
       if (buttons[n].getElementsByTagName('canvas').length) continue;
+      buttons[n].style.padding = '8px 16px';
       id = buttons[n].getAttribute('data-mech');
       cv = document.createElement('canvas');
-      cv.width = 32;
-      cv.height = 32;
+      cv.width = 96;
+      cv.height = 64;
       cv.setAttribute('aria-hidden', 'true');
-      cv.style.width = '32px';
-      cv.style.height = '32px';
-      cv.style.verticalAlign = 'middle';
+      cv.style.width = '192px';
+      cv.style.height = '128px';
+      cv.style.flex = 'none';
       cv.style.marginRight = '16px';
       cv.style.imageRendering = 'pixelated';
-      paintIcon(cv, id);
+      paintIcon(cv, id, n === sel);
       buttons[n].insertBefore(cv, buttons[n].firstChild);
     }
   }
   function paintSel() {
-    var buttons, n;
+    var buttons, n, cv;
     if (!pickEl) return;
     buttons = pickEl.getElementsByTagName('button');
     for (n = 0; n < buttons.length; n++) {
+      cv = buttons[n].getElementsByTagName('canvas')[0];
       if (n === sel) buttons[n].className = 'is-sel';
       else buttons[n].className = '';
+      buttons[n].style.display = 'flex';
+      buttons[n].style.alignItems = 'center';
+      buttons[n].style.borderWidth = '4px';
+      buttons[n].style.borderColor = n === sel ? '#FFD34E' : '#3A4450';
+      buttons[n].style.background = '#05070A';
+      buttons[n].style.color = n === sel ? '#FFD34E' : '#8A98A8';
+      if (cv) paintIcon(cv, buttons[n].getAttribute('data-mech'), n === sel);
     }
   }
   function pick(id) {
@@ -525,7 +473,8 @@
     layout();
     ensureKit();
     resetFight();
-    if (NEU.talk) NEU.talk(['* ' + LABEL[id] + '.'], 'draedon');
+    /* the arena caption names the pick; no dialogue box over a live fight */
+    caption('* ' + LABEL[id] + '.');
   }
   function routed(e) {
     var k = e.key, r;
@@ -571,6 +520,9 @@
     wrap.hidden = false;
     mode = 'select';
     held = {};
+    lastVuln = null;
+    lastHud = null;
+    if (hudEl) hudEl.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);';
     if (pickEl) pickEl.hidden = false;
     chooseHint(true);
     if (vulnEl) vulnEl.textContent = '';

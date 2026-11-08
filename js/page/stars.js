@@ -88,11 +88,22 @@
   document.documentElement.addEventListener('mouseleave', function () { px = py = -999; });
   var w = 0, h = 0;
 
+  /* the hidden star: one warm-inked star, picked per build, never regenerated */
+  var secretIdx = -1;
+
   NEU.stars = {
     canvas: canvas,
     version: 0,       // bumped on every repaint; scene.js watches this
-    setLit: function (on) { lit = !!on; recolor(); paint(); }
+    setLit: function (on) { lit = !!on; recolor(); paint(); },
+    onSecret: null    // sans.js sets this: the reward for clicking the hidden star
   };
+
+  /* canvas is pointer-events none, so a click on the star's cell reaches the page */
+  addEventListener('click', function (e) {
+    var s = stars[secretIdx];
+    if (!s || !NEU.stars.onSecret || e.target.closest('a,button,input,textarea,select,label,[role="button"],#boot')) return;
+    if (e.clientX >= s.x - 3 && e.clientX < s.x + PIXEL + 3 && e.clientY >= s.y - 3 && e.clientY < s.y + PIXEL + 3) NEU.stars.onSecret();
+  });
 
   function palette() { return lit ? COLORS_LIT : COLORS; }
 
@@ -127,13 +138,16 @@
     stars = [];
     var n = Math.floor(w * h * DENSITY);
     for (var i = 0; i < n; i++) stars.push(makeStar());
+    secretIdx = stars.length ? Math.floor(Math.random() * stars.length) : -1;
   }
 
   function regenerate() {
     if (!stars.length) return;
     var n = Math.max(1, Math.floor(stars.length * REGEN_FRACTION));
     for (var i = 0; i < n; i++) {
-      stars[Math.floor(Math.random() * stars.length)] = makeStar();
+      var j = Math.floor(Math.random() * stars.length);
+      if (j === secretIdx) continue;      // never replace the hidden one
+      stars[j] = makeStar();
     }
   }
 
@@ -150,7 +164,9 @@
       var s = stars[i];
       var near = !reduce && (s.x - px) * (s.x - px) + (s.y - py) * (s.y - py) < GLOW_R2;
       ctx.globalAlpha = near ? Math.min(1, s.base + 0.35) : s.alpha;
-      ctx.fillStyle = s.color;
+      /* the hidden star: same size, same grid, one warmer ink so it sits in
+         the field. Dark sky gets pale gold, the lit page a dark amber. */
+      ctx.fillStyle = i === secretIdx ? (lit ? '#9A7424' : '#FFF2CF') : s.color;
       ctx.fillRect(s.x, s.y, PIXEL, PIXEL);
       if (near) {
         ctx.globalAlpha = 0.45 * Math.min(1, s.base + 0.35);

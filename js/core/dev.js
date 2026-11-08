@@ -422,6 +422,15 @@
       if (isNaN(v)) { log('volume ' + NEU.music.volume + '. usage: vol <0-100>'); return; }
       log('volume ' + NEU.music.setVolume(v) + '.');
     },
+    tune: function (arg) {
+      if (!NEU.tune) { log('tune.js not loaded'); return; }
+      var parts = String(arg || '').trim().split(/\s+/);
+      if (parts.length === 0 || parts[0] === '' || parts[0] === 'list') { log('tables: ' + NEU.tune.paths().join(', ')); return; }
+      if (parts[0] === 'dump') { log(NEU.tune.dump()); return; }
+      if (parts.length < 2) { log('usage: tune <path> <value>  (e.g. tune dark.ramp.0.hz 1.2)'); return; }
+      var ok = NEU.tune.set(parts[0], parts[1]);
+      log(ok ? parts[0] + ' = ' + parts[1] : 'no such table/leaf: ' + parts[0]);
+    },
     clear: function () { out.innerHTML = ''; }
   };
 

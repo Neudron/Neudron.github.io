@@ -5,8 +5,12 @@
   var levels = {}, kinds = {}, current = null, live = false, paused = false, replaying = false;
   var canvas = document.getElementById('platCanvas'), overlay = document.getElementById('plat');
   var ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
-  var keys = {}, accumulator = 0, camera = { x: 0, y: 0 }, baked = null, afterimages = [];
-  var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var keys = {}, accumulator = 0, camera = { x: 0, y: 0 }, baked = null, afterimages = [], bakeCache = {};
+  var reduced = redNow(), view = { w: 640, h: 360, scale: 1 }, area = { x0: 0, y0: 0, x1: 640, y1: 360 };
+  var painters = [], padB = {}, sprCache = {}, lastDraw = 0;
+  function redNow() {
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
+  }
   var player = fresh();
 
   function fresh() {
@@ -181,7 +185,7 @@
         var by1 = Math.floor((player.y + player.vy * dt - 1) / TILE), tx, ty;
         for (ty = by0; ty <= by1; ty++) for (tx = bx0; tx <= bx1; tx++)
           if (cell(tx, ty) === 'x') { if (!current.broken) current.broken = {}; current.broken[tx + ',' + ty] = true; broke = true; }
-        if (broke) bake();
+        if (broke) { delete bakeCache[current.id]; bake(); }
         hit = sweep(player.vx * dt, player.vy * dt);
         if (hit.x || hit.y) player.dashTime = 0;
         if (player.dashTime === 0) { player.vx = player.dashX * 320; player.vy = player.dashY * 320 * (player.dashY < 0 ? 0.75 : 1); }
@@ -227,18 +231,20 @@
   }
   function bake() {
     if (!current || !document.createElement) return;
+    var tall = (padB[current.tileset] | 0), c, x, y, ch, px, py, i, done = false;
     api._baking = true;
     baked = document.createElement('canvas');
     api._baking = false;
-    baked.width = current.w * TILE; baked.height = current.h * TILE;
-    var c = baked.getContext('2d'); if (!c) return;
+    baked.width = current.w * TILE; baked.height = current.h * TILE + tall;
+    c = baked.getContext('2d'); if (!c) return;
     c.imageSmoothingEnabled = false;
-    var mountain = current.tileset === 'mountain';
-    var colors = mountain ? ['#516d74', '#516d74', '#99b6aa'] : ['#181725', '#51455c', '#b892ff'];
-    if (mountain) { if (c.clearRect) c.clearRect(0, 0, baked.width, baked.height); }
-    else { c.fillStyle = colors[0]; c.fillRect(0, 0, baked.width, baked.height); }
-    for (var y = 0; y < current.h; y++) for (var x = 0; x < current.w; x++) {
-      var ch = cell(x, y), px = x * TILE, py = y * TILE;
+    if (c.clearRect) c.clearRect(0, 0, baked.width, baked.height);
+    for (i = 0; i < painters.length && !done; i++) done = !!painters[i](c, current);
+    if (done) return;
+    var colors = ['#181725', '#51455c', '#b892ff'];
+    c.fillStyle = colors[0]; c.fillRect(0, 0, baked.width, baked.height);
+    for (y = 0; y < current.h; y++) for (x = 0; x < current.w; x++) {
+      ch = cell(x, y); px = x * TILE; py = y * TILE;
       if (ch === '#' || ch === 'x') { c.fillStyle = ch === 'x' ? '#9a4263' : colors[1]; c.fillRect(px, py, TILE, TILE); c.fillStyle = colors[2]; c.fillRect(px, py, TILE, 2); }
       else if (ch === '=') { c.fillStyle = colors[2]; c.fillRect(px, py, TILE, 3); }
       else if (ch === '^' || ch === 'v' || ch === '<' || ch === '>') spikeTile(c, px, py, ch);
@@ -260,25 +266,85 @@
       c.fillStyle = tip; c.fillRect(px + 10, py + 7, 4, 2);
     }
   }
+  /* a stepped steel spike pair in any of four directions; pal = { ink, dark, mid, light, tip, base } */
+  var STEEL = { ink: '#12081E', dark: '#5A6470', mid: '#9AA0A8', light: '#E4E4EC', tip: '#FFFFFF', base: '#3A4048' };
+  function spikeShape(c, px, py, ch, pal) {
+    var q = pal || STEEL, W = [2, 2, 2, 4, 4, 4, 6, 6, 6, 8, 8, 8], k, n, cx, wd, v, u;
+    function R(uu, vv, ww, hh, col) {
+      c.fillStyle = col;
+      if (ch === '^') c.fillRect(px + uu, py + vv, ww, hh);
+      else if (ch === 'v') c.fillRect(px + uu, py + 16 - vv - hh, ww, hh);
+      else if (ch === '<') c.fillRect(px + vv, py + uu, hh, ww);
+      else c.fillRect(px + 16 - vv - hh, py + uu, hh, ww);
+    }
+    R(0, 13, 16, 3, q.ink); R(1, 13, 14, 2, q.dark); R(1, 13, 14, 1, q.mid);
+    for (n = 0; n < 2; n++) {
+      cx = 4 + n * 8;
+      for (k = 0; k < 12; k++) {
+        wd = W[k]; u = cx - (wd >> 1); v = 2 + k;
+        R(u - 1, v, wd + 2, 1, q.ink);
+      }
+      for (k = 0; k < 12; k++) {
+        wd = W[k]; u = cx - (wd >> 1); v = 2 + k;
+        R(u, v, wd, 1, q.mid);
+        R(u, v, Math.max(1, wd >> 1), 1, q.light);
+        R(u + wd - 1, v, 1, 1, q.dark);
+      }
+      R(cx - 1, 2, 1, 1, q.tip);
+    }
+  }
   function placeCamera() {
     var worldH = current.h * TILE, worldW = current.w * TILE;
-    camera.x = clamp(player.x - 320, 0, Math.max(0, worldW - 640));
-    if (worldH < 360) camera.y = (worldH - 360) / 2;
-    else camera.y = clamp(player.y - 180, 0, Math.max(0, worldH - 360));
+    camera.x = clamp(player.x - view.w / 2, 0, Math.max(0, worldW - view.w));
+    if (worldH < view.h) camera.y = (worldH - view.h) / 2;
+    else camera.y = clamp(player.y - view.h / 2, 0, Math.max(0, worldH - view.h));
+  }
+  function mod(a, n) { return ((a % n) + n) % n; }
+  /* one cached 1x sprite; fn(R, g) paints it, R(x, y, w, h, colour) is an integer fillRect */
+  function spr(key, w, h, fn) {
+    var s = sprCache[key], cv, g;
+    if (s) return s;
+    cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    g = cv.getContext && cv.getContext('2d');
+    s = sprCache[key] = { cv: cv, w: w, h: h };
+    if (g) { g.imageSmoothingEnabled = false; fn(function (x, y, ww, hh, col) { g.fillStyle = col; g.fillRect(x, y, ww, hh); }, g); }
+    return s;
+  }
+  function rowsOf(R, rows, pal, x, y) {
+    var r, i, ch;
+    for (r = 0; r < rows.length; r++) for (i = 0; i < rows[r].length; i++) {
+      ch = rows[r].charAt(i);
+      if (ch !== '.' && pal[ch]) R(x + i, y + r, 1, 1, pal[ch]);
+    }
+  }
+  function put(c, s, x, y) { if (s && s.cv) c.drawImage(s.cv, x | 0, y | 0); }
+  function glow(c, x, y, r, col, a) {
+    var L = NEU.engineLook;
+    if (L && L.glow && c.createRadialGradient) L.glow(c, x, y, r, col, a);
   }
   function draw() {
     if (!ctx || !current || !live) return;
-    var w = canvas.width = window.innerWidth * (window.devicePixelRatio || 1);
-    var h = canvas.height = window.innerHeight * (window.devicePixelRatio || 1);
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#0b0a12'; ctx.fillRect(0, 0, w, h);
-    var scale = Math.min(w / 640, h / 360), ox = (w - 640 * scale) / 2, oy = (h - 360 * scale) / 2;
+    var dpr = window.devicePixelRatio || 1, w = Math.round(window.innerWidth * dpr), h = Math.round(window.innerHeight * dpr);
+    var now, dtf, ox, oy, shook = false, ai, i, e, J = NEU.juice, L = current;
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    reduced = redNow();
+    now = reduced ? 0 : (window.performance && performance.now ? performance.now() : Date.now());
+    dtf = clamp((now - lastDraw) / 1000, 0, 0.05); lastDraw = now;
+    view.h = 360; view.w = clamp(Math.round(360 * w / h), 240, 640);
+    view.scale = Math.min(w / view.w, h / view.h);
+    ox = Math.round((w - view.w * view.scale) / 2); oy = Math.round((h - view.h * view.scale) / 2);
+    area.x0 = Math.floor(-ox / view.scale) - 1; area.y0 = Math.floor(-oy / view.scale) - 1;
+    area.x1 = Math.ceil((w - ox) / view.scale) + 1; area.y1 = Math.ceil((h - oy) / view.scale) + 1;
     placeCamera();
-    ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale); ctx.imageSmoothingEnabled = false;
-    if (current.h * TILE < 360 && current.tileset === 'dungeon' && NEU.dungeonLook && NEU.dungeonLook.fillGap) {
-      NEU.dungeonLook.fillGap(ctx, camera.x, camera.y, current);
-    }
-    if (baked) ctx.drawImage(baked, -camera.x, -camera.y);
-    var ai;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (!api.backdrop) { ctx.fillStyle = '#0b0a12'; ctx.fillRect(0, 0, w, h); }
+    ctx.setTransform(view.scale, 0, 0, view.scale, ox, oy); ctx.imageSmoothingEnabled = false;
+    /* begin() wraps save/rotate; only a live shake needs it, so a still frame paints with no transform */
+    if (J && J.begin && !reduced && J.trauma > 0) shook = !!J.begin(ctx, view.w, view.h);
+    if (api.backdrop) api.backdrop(ctx, camera.x, camera.y, L, now, area);
+    if (baked) ctx.drawImage(baked, -camera.x | 0, -camera.y | 0);
+    if (api.live) api.live(ctx, camera.x, camera.y, L, now, area);
     if (!reduced) for (ai = 0; ai < afterimages.length; ai++) {
       ctx.save();
       ctx.globalAlpha = (afterimages[ai].t / 0.12) * 0.28;
@@ -286,48 +352,198 @@
       ctx.restore();
     }
     ctx.globalAlpha = 1;
-    var i, e;
-    for (i = 0; i < current.entities.length; i++) {
-      e = current.entities[i]; if (!e.dead) drawEntity(e, ctx, camera.x, camera.y);
+    for (i = 0; i < L.entities.length; i++) {
+      e = L.entities[i];
+      if (e.dead) continue;
+      if (e.x * TILE - camera.x < area.x0 - 48 || e.x * TILE - camera.x > area.x1 + 16) continue;
+      drawEntity(e, ctx, camera.x, camera.y, now);
     }
-    if (player.dead <= 0) drawHero(ctx, player.x - camera.x, player.y - camera.y, player.face, player.onGround);
+    if (player.dead <= 0) {
+      if (player.onGround) {
+        ctx.globalAlpha = 0.4; ctx.fillStyle = '#000000';
+        ctx.fillRect((player.x - camera.x - 10) | 0, (player.y - camera.y) | 0, 20, 1);
+        ctx.fillRect((player.x - camera.x - 7) | 0, (player.y - camera.y + 1) | 0, 14, 1);
+        ctx.globalAlpha = 1;
+      }
+      drawHero(ctx, player.x - camera.x, player.y - camera.y, player.face, player.onGround);
+    }
     if (player.dead <= 0 && player.swing > 0) {
       ctx.fillStyle = '#fff0a6'; ctx.globalAlpha = Math.min(1, player.swing / 0.12);
       ctx.fillRect(player.x - camera.x + player.face * 12, player.y - camera.y - 24, player.face * 12, 3);
       ctx.fillRect(player.x - camera.x + player.face * 17, player.y - camera.y - 18, player.face * 3, 8);
       ctx.globalAlpha = 1;
     }
-    ctx.restore();
+    if (J && J.drawParts) { ctx.save(); ctx.translate(-camera.x, -camera.y); J.drawParts(ctx, dtf || 0.016); ctx.restore(); }
+    if (api.foreground) api.foreground(ctx, camera.x, camera.y, L, now, area);
+    if (J && J.end) J.end(ctx, shook);
   }
-  var ART = {
-    spike: { p: { a: '#FF5577', b: '#FFD0DC' }, r: ['...b....', '...b....', '..aaa...', '.aaaaa..', 'aaaaaaa.'] },
-    refill: { p: { a: '#146878', b: '#64E8FF', c: '#E8FFFF' }, r: ['...cc...', '..cbbc..', '.cbaabc.', '..cbbc..', '...aa...'] },
-    spring: { p: { a: '#8A6410', b: '#FFCF4A' }, r: ['bbbbbbbb', 'a......a', 'bbbbbbbb', 'a......a', 'bbbbbbbb'] },
-    zip: { p: { a: '#1A3058', b: '#7AA2FF' }, r: ['aaaaaaaa', 'abbbbbba', 'ab.bb.ba', 'abbbbbba', 'aaaaaaaa'] },
-    crumble: { p: { a: '#6A4030', b: '#C4846A' }, r: ['bbbbbbbb', 'bb.bb.bb', 'b.bbbb.b', 'bbbb.bbb', 'aaaaaaaa'] },
-    barrier: { p: { a: '#E23B4A', b: '#FFD0D4' }, r: ['a......a', '.a....a.', '..aaaa..', '.a....a.', 'a......a'] },
-    pogo: { p: { a: '#146848', b: '#3DDC97' }, r: ['..bbbb..', '.baaabb.', '.baabb..', '.babb...', '..aa....'] },
-    checkpoint: { p: { a: '#802048', b: '#FF8AC8', c: '#FFF0F6' }, r: ['c.......', 'bbbb....', 'bbbb....', 'a.......', 'a.......'] },
-    door: { p: { a: '#3A2418', b: '#8A5A32', c: '#E8C878' }, r: ['aaaaaaaa', 'abbbbbba', 'abbcbbba', 'abbbbbba', 'abbbbbba', 'aaaaaaaa'] },
-    skull: { p: { a: '#C4A882', b: '#F4E4CC', c: '#1A120C' }, r: ['..bbbb..', '.bcccb.', '.b.bb.b.', '..bbbb..', '..a..a..'] },
-    exit: { p: { a: '#1A4020', b: '#A9FF8A' }, r: ['..bbbb..', '.b....b.', '.b....b.', 'bbbbbbbb'] },
-    coin: { p: { a: '#A07810', b: '#FFE35A' }, r: ['..bbbb..', '.baaab..', '.baaab..', '..bbbb..'] },
-    bossdoor: { p: { a: '#E8D2B0', b: '#1A120C', c: '#C4A882' }, r: ['..aaaa..', '.abbba.', '.a.aa.a.', '..cccc..', '.cc..cc.'] }
-  };
-  function blit(c, art, x, y) {
-    var rows = art.r, pal = art.p, r, i, ch;
-    x = x | 0; y = y | 0;
-    for (r = 0; r < rows.length; r++) for (i = 0; i < rows[r].length; i++) {
-      ch = rows[r].charAt(i);
-      if (ch === '.' || !pal[ch]) continue;
-      c.fillStyle = pal[ch];
-      c.fillRect(x + i * 2, y + r * 2, 2, 2);
+  var INK = '#12081E', DEF = { key: 'def', ink: INK, deep: '#3A2418', base: '#6A4030', light: '#C4846A', rim: '#E8B090' };
+  function skin() { return (api.skin && api.skin(current)) || DEF; }
+  function fr(c, x, y, w, h, col) { c.fillStyle = col; c.fillRect(x, y, w, h); }
+  function ell(g, ox, oy, cx, cy, rx, ry, col) {
+    var y, k, hw;
+    g.fillStyle = col;
+    for (y = -ry; y <= ry; y++) {
+      k = 1 - (y * y) / ((ry + 0.5) * (ry + 0.5));
+      if (k <= 0) continue;
+      hw = Math.round(rx * Math.sqrt(k));
+      g.fillRect(ox + cx - hw, oy + cy + y, hw * 2 + 1, 1);
     }
   }
-  function drawEntity(e, c, x, y) {
+  /* an arched opening: two stepped shoulders, then the straight sides */
+  function archFill(c, x, y, w, h, col) {
+    c.fillStyle = col;
+    c.fillRect(x + 2, y, w - 4, 1); c.fillRect(x + 1, y + 1, w - 2, 1); c.fillRect(x, y + 2, w, h - 2);
+  }
+  var COIN_W = [10, 8, 4, 8];
+  function coinSpr(f) {
+    var wd = COIN_W[f];
+    return spr('coin' + f, 10, 10, function (R) {
+      var x0 = (10 - wd) >> 1, y, ins;
+      for (y = 0; y < 10; y++) {
+        ins = Math.min((y === 0 || y === 9) ? 2 : (y === 1 || y === 8) ? 1 : 0, Math.max(0, (wd >> 1) - 1));
+        R(x0 + ins, y, wd - ins * 2, 1, '#6A4A08');
+        if (y > 0 && y < 9) R(x0 + 1 + (ins ? 1 : 0), y, Math.max(1, wd - 2 - (ins ? 2 : 0)), 1, '#C89A1A');
+      }
+      if (wd >= 8) { R(x0 + 2, 2, wd - 5, 1, '#FFE35A'); R(x0 + 2, 3, 1, 3, '#FFE35A'); R(x0 + 3, 3, 2, 2, '#FFF6C0'); R(x0 + 2, 8, wd - 4, 1, '#A07810'); }
+      else R(x0 + 1, 2, 1, 6, '#FFE35A');
+    });
+  }
+  function refillSpr() {
+    return spr('refill', 10, 14, function (R) {
+      var W = [2, 4, 6, 8, 10, 10, 10, 10, 10, 10, 8, 6, 4, 2], y, wd, x0;
+      for (y = 0; y < 14; y++) {
+        wd = W[y]; x0 = (10 - wd) >> 1;
+        R(x0, y, wd, 1, INK);
+        if (wd > 2) {
+          R(x0 + 1, y, wd - 2, 1, '#2AA8C0');
+          R(x0 + 1, y, Math.max(1, (wd - 2) >> 1), 1, '#64E8FF');
+          R(x0 + wd - 2, y, 1, 1, '#146878');
+        }
+      }
+      R(4, 2, 2, 2, '#E8FFFF'); R(3, 5, 1, 2, '#E8FFFF'); R(5, 12, 4, 1, '#146878');
+    });
+  }
+  function crumbleSpr(s) {
+    return spr('crumble' + s.key, 16, 16, function (R, g) {
+      var y, i;
+      R(0, 0, 16, 16, INK); R(1, 1, 14, 14, s.base);
+      R(1, 1, 14, 1, s.light); R(1, 1, 1, 14, s.light); R(1, 14, 14, 1, s.deep); R(14, 1, 1, 14, s.deep);
+      R(1, 7, 14, 1, s.deep); R(8, 1, 1, 6, s.deep); R(4, 8, 1, 6, s.deep); R(11, 8, 1, 6, s.deep);
+      R(3, 3, 3, 1, s.rim); R(10, 9, 3, 1, s.rim);
+      R(6, 5, 2, 1, INK); R(7, 6, 2, 1, INK); R(8, 7, 1, 2, INK); R(9, 9, 2, 1, INK);
+    });
+  }
+  function checkpointSpr() {
+    return spr('checkpoint', 12, 24, function (R) {
+      R(1, 21, 10, 3, INK); R(2, 21, 8, 2, '#5C4030'); R(2, 21, 8, 1, '#8A6040');
+      R(4, 4, 4, 17, INK); R(5, 4, 2, 17, '#3A2A20'); R(5, 4, 1, 17, '#5C4030');
+      R(4, 1, 4, 4, INK); R(5, 2, 2, 2, '#FFD36A');
+    });
+  }
+  function skullSpr() {
+    return spr('skull', 16, 14, function (R, g) {
+      ell(g, 0, 0, 8, 6, 7, 6, INK); ell(g, 0, 0, 8, 6, 6, 5, '#C4A882'); ell(g, 0, 0, 7, 5, 5, 4, '#E8D2B0');
+      R(4, 5, 3, 3, '#1A120C'); R(9, 5, 3, 3, '#1A120C'); R(7, 8, 2, 2, '#1A120C');
+      R(3, 11, 10, 3, INK); R(4, 11, 8, 2, '#C4A882'); R(5, 11, 1, 2, '#F4E4CC'); R(7, 11, 1, 2, '#F4E4CC'); R(9, 11, 1, 2, '#F4E4CC');
+      R(4, 13, 8, 1, '#8A7456');
+    });
+  }
+  function exitSpr(s) {
+    return spr('exit' + s.key, 24, 32, function (R) {
+      var y;
+      archFill2(R, 0, 0, 24, 32, INK);
+      archFill2(R, 1, 1, 22, 31, s.base);
+      R(1, 6, 3, 26, s.light); R(20, 6, 3, 26, s.deep); R(2, 3, 2, 3, s.light); R(8, 1, 8, 2, s.light);
+      R(10, 0, 4, 3, s.rim); R(11, 3, 2, 1, INK);
+      for (y = 8; y < 32; y += 8) { R(1, y, 3, 1, s.deep); R(20, y + 4, 3, 1, s.base); }
+      R(0, 31, 24, 1, INK); R(0, 30, 24, 1, s.deep);
+    });
+  }
+  function archFill2(R, x, y, w, h, col) { R(x + 2, y, w - 4, 1, col); R(x + 1, y + 1, w - 2, 1, col); R(x, y + 2, w, h - 2, col); }
+
+  var ENT = {
+    coin: function (c, px, py, e, now) {
+      put(c, coinSpr(reduced ? 0 : ((now / 120) | 0) & 3), px + 3, py + 3);
+    },
+    refill: function (c, px, py, e, now) {
+      var on = !(e.t0 > 0), dy = (on && !reduced) ? (((now / 400) | 0) & 1) : 0, k;
+      if (!on) c.globalAlpha = 0.3;
+      else glow(c, px + 8, py + 8, 20, '#64E8FF', 0.15);
+      put(c, refillSpr(), px + 3, py + 1 + dy);
+      c.globalAlpha = 1;
+      if (on) { k = reduced ? 0 : ((now / 400) | 0) & 3; fr(c, px + [1, 13, 12, 2][k], py + [3, 5, 12, 11][k], 1, 1, '#64E8FF'); }
+    },
+    crumble: function (c, px, py, e, now) {
+      var s = skin(), j = (e.breakAt > 0 && !reduced) ? ((((now / 40) | 0) & 1) ? 1 : -1) : 0;
+      put(c, crumbleSpr(s), px + j, py);
+      fr(c, px + 3 + j, py + 2, 4, 1, s.light);
+    },
+    checkpoint: function (c, px, py, e, now) {
+      var f = reduced ? 0 : ((now / 160) | 0) % 3, i, top = py - 22 + 3, off, up = e.active ? 0 : 6;
+      put(c, checkpointSpr(), px + 2, py - 22);
+      for (i = 0; i < 8; i++) {
+        off = (((i + f) % 3) === 0) ? 1 : 0;
+        fr(c, px + 8 + i, top + up + off, 1, 6 - (i >> 2), '#802048');
+        fr(c, px + 8 + i, top + up + off + 1, 1, 3 - (i >> 2), '#C83A7A');
+        fr(c, px + 8 + i, top + up + off, 1, 1, '#FF8AC8');
+      }
+      if (e.active) glow(c, px + 8, py - 12, 18, '#FF8AC8', 0.14);
+    },
+    skull: function (c, px, py, e, now) {
+      put(c, skullSpr(), px, py + 1);
+      fr(c, px + 5, py + 2, 3, 1, '#F4E4CC');
+      fr(c, px + 5, py + 6, 1, 1, '#FF5577'); fr(c, px + 10, py + 6, 1, 1, '#FF5577');
+    },
+    exit: function (c, px, py, e, now) {
+      var s = skin(), ix = px - 4 + 4, iy = py - 16 + 4, p = reduced ? 0 : ((now / 400) | 0) & 1;
+      glow(c, px + 8, py - 2, 26, '#5AC85A', 0.12);
+      put(c, exitSpr(s), px - 4, py - 16);
+      archFill(c, ix, iy, 16, 28, '#1A4020');
+      archFill(c, ix + 2, iy + 3, 12, 25, '#5AC85A');
+      archFill(c, ix + 4 + p, iy + 6 + p, 8 - p * 2, 22 - p, '#A9FF8A');
+    },
+    spring: function (c, px, py, e) {
+      var cmp = (e.flash > 0 && !reduced) ? 4 : 0, t = py + 4 + cmp, k, yy, gap = ((9 - cmp) / 3) | 0;
+      fr(c, px + 1, py + 13, 14, 3, INK); fr(c, px + 2, py + 14, 12, 2, '#8A6410'); fr(c, px + 2, py + 13, 12, 1, '#B8861A');
+      for (k = 0; k < 3; k++) {
+        yy = t + 4 + k * gap;
+        fr(c, px + 4, yy, 8, 2, INK); fr(c, px + 5, yy, 6, 1, '#FFCF4A'); fr(c, px + 5, yy + 1, 6, 1, '#8A6410');
+      }
+      fr(c, px + 1, t, 14, 4, INK); fr(c, px + 2, t + 1, 12, 2, '#FFCF4A'); fr(c, px + 2, t + 1, 12, 1, '#FFF0A0');
+    },
+    zip: function (c, px, py, e, now) {
+      var a = reduced ? 0 : ((now / 400) | 0) & 1;
+      fr(c, px, py, 16, 16, INK); fr(c, px + 1, py + 1, 14, 14, '#1A3058');
+      fr(c, px + 1, py + 1, 14, 1, '#7AA2FF'); fr(c, px + 1, py + 1, 1, 14, '#7AA2FF');
+      fr(c, px + 14, py + 2, 1, 13, '#0E1C38'); fr(c, px + 2, py + 14, 13, 1, '#0E1C38');
+      fr(c, px + 4, py + 4, 8, 8, '#7AA2FF'); fr(c, px + 5, py + 5, 6, 6, '#26407A');
+      fr(c, px + 7, py + 6 + a, 2, 4 - a, '#E8F0FF'); fr(c, px + 6, py + 7 + a, 4, 1, '#E8F0FF');
+      fr(c, px + 2, py + 2, 1, 1, '#E8F0FF'); fr(c, px + 13, py + 2, 1, 1, '#E8F0FF');
+    },
+    barrier: function (c, px, py) {
+      var i;
+      for (i = 0; i < 6; i++) { fr(c, px + 2 + i * 2, py + 2 + i * 2, 4, 3, INK); fr(c, px + 12 - i * 2, py + 2 + i * 2, 4, 3, INK); }
+      for (i = 0; i < 6; i++) { fr(c, px + 3 + i * 2, py + 3 + i * 2, 2, 2, '#E23B4A'); fr(c, px + 13 - i * 2, py + 3 + i * 2, 2, 2, '#E23B4A'); }
+      fr(c, px + 3, py + 3, 1, 1, '#FFD0D4'); fr(c, px + 13, py + 3, 1, 1, '#FFD0D4');
+    },
+    pogo: function (c, px, py, e, now) {
+      var b = reduced ? 0 : ((now / 400) | 0) & 1;
+      glow(c, px + 8, py + 8, 16, '#3DDC97', 0.12);
+      ell(c, px, py + b, 8, 8, 6, 6, INK); ell(c, px, py + b, 8, 8, 5, 5, '#146848'); ell(c, px, py + b, 7, 7, 3, 3, '#3DDC97');
+      fr(c, px + 5, py + 5 + b, 2, 2, '#C8FFE4'); fr(c, px + 4, py + 14, 8, 2, INK); fr(c, px + 5, py + 14, 6, 1, '#146848');
+    },
+    door: function (c, px, py) {
+      fr(c, px + 1, py, 14, 16, INK); fr(c, px + 2, py + 1, 12, 15, '#8A5A32');
+      fr(c, px + 2, py + 1, 12, 1, '#B07A4A'); fr(c, px + 5, py + 1, 1, 15, '#3A2418'); fr(c, px + 10, py + 1, 1, 15, '#3A2418');
+      fr(c, px + 11, py + 8, 2, 2, '#E8C878'); fr(c, px + 2, py + 4, 12, 1, '#3A2418'); fr(c, px + 2, py + 12, 12, 1, '#3A2418');
+    },
+    spike: function (c, px, py) { api.spike(c, px, py, '^', null); }
+  };
+  function drawEntity(e, c, x, y, now) {
     var px = (e.x * TILE - x) | 0, py = (e.y * TILE - y) | 0, kind = kinds[e.t];
-    if (kind && kind.draw) { kind.draw(c, px, py, e); return; }
-    if (ART[e.t]) { blit(c, ART[e.t], px, py); return; }
+    if (kind && kind.draw) { kind.draw(c, px, py, e, now); return; }
+    if (ENT[e.t]) { ENT[e.t](c, px, py, e, now || 0); return; }
     c.fillStyle = '#FF00FF';
     c.fillRect(px, py, 16, 16);
   }
@@ -346,7 +562,10 @@
     current = cloneLevel(levels[id]); player = fresh(); opts = opts || {};
     if (opts.spawn) current.spawn = opts.spawn;
     player.x = (current.spawn.x + 0.5) * TILE; player.y = (current.spawn.y + 1) * TILE;
-    accumulator = 0; afterimages = []; live = true; paused = false; if (overlay) overlay.hidden = false; bake(); draw();
+    accumulator = 0; afterimages = []; live = true; paused = false; reduced = redNow(); if (overlay) overlay.hidden = false;
+    /* ponytail: per-room bake cache, dropped when a crumble breaks; a room bakes on its first open only (prebake warms d0 and m0 at boot) */
+    if (bakeCache[id]) baked = bakeCache[id]; else { bake(); bakeCache[id] = baked; }
+    draw();
     NEU.activeMinigame = 'plat';
     if (NEU.kernel) NEU.kernel.push('plat'); return true;
   }
@@ -365,7 +584,8 @@
   }
   function tick(dt) {
     if (!live || paused) return;
-    accumulator += Math.min(0.25, Math.max(0, dt)) / 1000;
+    /* dt arrives in ms (kernel rAF delta); convert to seconds before the 0.25 s clamp, or every frame adds 0.00025 s and the hero never moves */
+    accumulator += Math.min(0.25, Math.max(0, dt) / 1000);
     var n = 0;
     while (accumulator >= STEP && n++ < MAX_STEPS) { step(STEP, keys); accumulator -= STEP; }
     draw();
@@ -430,7 +650,30 @@
   kinds.barrier = { touch: function () {} };
 
   var api = { level: level, open: open, close: close, running: function () { return live; },
-    get state() { return getStateSafe(); }, step: step, replay: replay,
+    painters: painters, pad: padB, spr: spr, rows: rowsOf, ell: ell, mod: mod, spike: spikeShape, glow: glow, fr: fr, steel: STEEL,
+    mk: function (w, h) { var c = document.createElement('canvas'); c.width = Math.max(1, w | 0); c.height = Math.max(1, h | 0); return c; },
+    hash: function (x, y, z) {
+      var h = (x * 374761393 + y * 668265263 + (z || 0) * 2147483647) | 0;
+      h = (h ^ (h >>> 13)) * 1274126177 | 0;
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+    },
+    mix: function (a, b, t) {
+      var x = [parseInt(a.substr(1, 2), 16), parseInt(a.substr(3, 2), 16), parseInt(a.substr(5, 2), 16)];
+      var y = [parseInt(b.substr(1, 2), 16), parseInt(b.substr(3, 2), 16), parseInt(b.substr(5, 2), 16)], i, v, o = '#';
+      for (i = 0; i < 3; i++) { v = Math.round(x[i] + (y[i] - x[i]) * t); o += (v < 16 ? '0' : '') + v.toString(16); }
+      return o.toUpperCase();
+    },
+    reduced: redNow, bakedCanvas: function () { return baked; }, rebake: function () { bake(); },
+    /* bake a room into the cache without opening it; restores the live level */
+    prebake: function (id) {
+      var keepLevel = current, keepBaked = baked;
+      if (levels[id] && !bakeCache[id]) { current = cloneLevel(levels[id]); bake(); bakeCache[id] = baked; }
+      current = keepLevel; baked = keepBaked;
+    },
+    view: function () { return { w: view.w, h: view.h, scale: view.scale }; },
+    backdrop: null, live: null, foreground: null, skin: null,
+    get state() { return getStateSafe(); }, step: step, replay: replay, tick: tick,
+    levelId: function () { return current ? current.id : ''; },
     get levels() { return levels; }, _kinds: kinds,
     cam: function () { return { x: camera.x, y: camera.y }; } };
   NEU.plat = api;

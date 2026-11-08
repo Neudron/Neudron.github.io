@@ -171,37 +171,142 @@
     g.fillStyle = col;
     g.fillRect(x | 0, y | 0, w | 0, h | 0);
   }
+  function A() { return NEU.roomArt; }
+  var droneSp = null, lampSp = null;
+  function droneSprite() {
+    if (droneSp || !A()) return droneSp;
+    droneSp = A().sprite('vzs:drone', 32, 42, 16, 40, function (R, g) {
+      var i, d, o = [], x, y;
+      R(-11, -21, 4, 9, '#3A4048'); R(-11, -21, 1, 9, '#8E98A2'); R(-10, -21, 3, 1, '#5A6470');
+      R(8, -21, 4, 9, '#3A4048'); R(8, -21, 1, 9, '#5A6470'); R(8, -21, 4, 1, '#5A6470');
+      R(-8, -23, 16, 15, '#5A6470');
+      R(-8, -23, 3, 15, '#8E98A2'); R(-8, -23, 16, 1, '#C5D0D8'); R(-8, -22, 1, 14, '#C5D0D8');
+      R(5, -22, 3, 14, '#3A4048'); R(-8, -10, 16, 2, '#3A4048');
+      R(-5, -17, 10, 1, '#3A4048'); R(-5, -15, 10, 1, '#8E98A2');
+      for (i = 0; i < 3; i++) R(-4 + i * 3, -13, 2, 2, '#3A4048');
+      R(-1, -20, 2, 2, '#20C8D0');
+      R(-5, -9, 10, 2, '#3A4048'); R(-5, -9, 10, 1, '#5A6470');
+      R(-3, -25, 6, 2, '#3A4048');
+      R(-7, -34, 14, 10, '#5A6470');
+      R(-7, -34, 14, 1, '#C5D0D8'); R(-7, -33, 2, 9, '#8E98A2'); R(5, -33, 2, 9, '#3A4048'); R(-7, -25, 14, 1, '#3A4048');
+      R(-5, -31, 10, 4, '#0A0C10');
+      R(3, -38, 1, 4, '#3A4048'); R(3, -38, 1, 1, '#C5D0D8');
+      /* ink outline so it reads as one shape */
+      try { d = g.getImageData(0, 0, 32, 42).data; } catch (err) { return; }
+      for (y = 0; y < 42; y++) for (x = 0; x < 32; x++) {
+        if (d[(y * 32 + x) * 4 + 3] > 40) continue;
+        if ((x > 0 && d[(y * 32 + x - 1) * 4 + 3] > 40) || (x < 31 && d[(y * 32 + x + 1) * 4 + 3] > 40) ||
+            (y > 0 && d[((y - 1) * 32 + x) * 4 + 3] > 40) || (y < 41 && d[((y + 1) * 32 + x) * 4 + 3] > 40)) o.push(x, y);
+      }
+      g.fillStyle = '#0A0C10';
+      for (i = 0; i < o.length; i += 2) g.fillRect(o[i], o[i + 1], 1, 1);
+    });
+    return droneSp;
+  }
+  function chaserDir(e, d) {
+    var room, goal, fn, key, n;
+    room = (d && d.room) || (NEU.engine && NEU.engine.api && NEU.engine.api.room);
+    if (!room) return null;
+    goal = playerCell();
+    fn = NEU.chase && NEU.chase.nextCell;
+    key = e.x + ',' + e.y + ',' + goal.x + ',' + goal.y;
+    if (e._nk !== key || e._nf !== fn) {
+      e._nk = key;
+      e._nf = fn;
+      n = fn ? fn(room, e.x, e.y, goal.x, goal.y) : null;
+      e._nd = n ? { x: n.x - e.x, y: n.y - e.y } : null;
+    }
+    return e._nd;
+  }
+  /* The telegraph: a searchlight on the floor toward the next cell. */
+  function cone(g, x, y, dir, S) {
+    var lens = [44, 30, 16], alphas = [0.03, 0.06, 0.10], l, i, n, hw, o;
+    g.fillStyle = '#FFE8A0';
+    for (l = 0; l < 3; l++) {
+      g.globalAlpha = alphas[l];
+      n = lens[l] >> 2;
+      for (i = 0; i < n; i++) {
+        hw = 4 + ((i * 10 / n) | 0);
+        o = 8 + i * 4;
+        if (dir.x) g.fillRect(x + (dir.x > 0 ? o : -o - 4) * S, y - hw * S, 4 * S, hw * 2 * S);
+        else g.fillRect(x - hw * S, y + (dir.y > 0 ? o : -o - 4) * S, hw * 2 * S, 4 * S);
+      }
+    }
+    g.globalAlpha = 1;
+  }
   function drawChaser(g, e, d) {
-    var S, x, y;
+    var S, x, y, now, hold, bob, f, sp, dir, lk;
     S = (d && d.S) || 1;
     x = d.sx;
     y = d.sy;
+    lk = NEU.engineLook;
+    now = d.now || 0;
+    hold = calm();
     try { g.imageSmoothingEnabled = false; } catch (err) {}
-    rect(g, x - 6 * S, y - 4 * S, 12 * S, 4 * S, '#C8A04A');
-    rect(g, x - 4 * S, y - 3 * S, 3 * S, 2 * S, '#F0D48A');
-    rect(g, x - 4 * S, y - 16 * S, 8 * S, 12 * S, '#1A4A48');
-    rect(g, x - 3 * S, y - 20 * S, 6 * S, 5 * S, '#D8DEE6');
-    rect(g, x - 2 * S, y - 18 * S, 2 * S, 2 * S, '#E23B55');
-    rect(g, x + 1 * S, y - 18 * S, 2 * S, 2 * S, '#E23B55');
-    rect(g, x - 7 * S, y - 12 * S, 3 * S, 6 * S, '#8A7040');
-    rect(g, x + 4 * S, y - 12 * S, 3 * S, 6 * S, '#8A7040');
+    dir = chaserDir(e, d);
+    if (dir && (dir.x || dir.y)) cone(g, x, y - 6 * S, dir, S);
+    if (lk && lk.shadow) lk.shadow(g, x, y, 22, S, 0.35);
+    f = hold ? 0 : ((now / 330) | 0) & 1;
+    g.fillStyle = '#20C8D0';
+    g.globalAlpha = 0.06; g.fillRect(x - 12 * S, y - 3 * S, 24 * S, 3 * S);
+    g.globalAlpha = 0.12; g.fillRect(x - 9 * S, y - 3 * S, 18 * S, 2 * S);
+    g.globalAlpha = 0.2; g.fillRect(x - 6 * S, y - 2 * S, 12 * S, S);
+    g.globalAlpha = 1;
+    bob = hold ? 0 : [0, 0, -1, -1][((now / 250) | 0) & 3];
+    sp = droneSprite();
+    if (sp) A().blit(g, sp, { S: S, sx: x, sy: y + bob * S });
+    else rect(g, x - 8 * S, y - 30 * S, 16 * S, 24 * S, '#5A6470');
+    rect(g, x - 4 * S, y + (bob - 30) * S, 8 * S, 2 * S, '#E04A3A');
+    rect(g, x - 4 * S, y + (bob - 30) * S, 3 * S, S, '#FF8A70');
+    if (lk && lk.glow) lk.glow(g, x, y + (bob - 29) * S, 10 * S, '#E04A3A', 0.25);
+    rect(g, x - 4 * S, y + (bob - 7) * S, 2 * S, (1 + f) * S, '#20C8D0');
+    rect(g, x + 2 * S, y + (bob - 7) * S, 2 * S, (2 - f) * S, '#20C8D0');
+  }
+  function lampSprite() {
+    if (lampSp || !A()) return lampSp;
+    lampSp = A().sprite('vzs:alarm', 16, 30, 8, 28, function (R, g) {
+      R(-1, -20, 3, 20, '#3A2410'); R(-1, -20, 1, 20, '#8A5A28');
+      R(-4, -2, 9, 2, '#2A1A0C'); R(-3, -3, 7, 1, '#5C3A18');
+      R(-4, -26, 9, 7, '#2A1218'); R(-4, -26, 9, 1, '#5A2A30'); R(-4, -26, 1, 7, '#5A2A30');
+      R(-3, -19, 7, 1, '#12081E');
+      R(-1, -27, 3, 1, '#5C3A18');
+      var d, o = [], x, y, i;
+      try { d = g.getImageData(0, 0, 16, 30).data; } catch (err) { return; }
+      for (y = 0; y < 30; y++) for (x = 0; x < 16; x++) {
+        if (d[(y * 16 + x) * 4 + 3] > 40) continue;
+        if ((x > 0 && d[(y * 16 + x - 1) * 4 + 3] > 40) || (x < 15 && d[(y * 16 + x + 1) * 4 + 3] > 40) ||
+            (y > 0 && d[((y - 1) * 16 + x) * 4 + 3] > 40) || (y < 29 && d[((y + 1) * 16 + x) * 4 + 3] > 40)) o.push(x, y);
+      }
+      g.fillStyle = '#12081E';
+      for (i = 0; i < o.length; i += 2) g.fillRect(o[i], o[i + 1], 1, 1);
+    });
+    return lampSp;
+  }
+  function alarmOn(d) {
+    return calm() || (Math.floor(((d && d.now) || 0) / PERIOD) % 2) === 0;
   }
   function drawAlarm(g, e, d) {
-    var S, x, y, on;
+    var S, x, y, on, sp, lk;
     S = (d && d.S) || 1;
     x = d.sx;
     y = d.sy;
+    lk = NEU.engineLook;
     try { g.imageSmoothingEnabled = false; } catch (err) {}
-    on = calm() || (Math.floor((d.now || 0) / PERIOD) % 2) === 0;
-    rect(g, x - 3 * S, y - 14 * S, 6 * S, 4 * S, '#2A1218');
-    rect(g, x - 2 * S, y - 16 * S, 4 * S, 3 * S, on ? '#E23B55' : '#4A1820');
-    rect(g, x - S, y - 10 * S, 2 * S, 8 * S, '#3A2410');
+    on = alarmOn(d);
+    sp = lampSprite();
+    if (sp) A().blit(g, sp, d);
+    else rect(g, x - 3 * S, y - 14 * S, 6 * S, 4 * S, '#2A1218');
+    rect(g, x - 3 * S, y - 25 * S, 7 * S, 5 * S, on ? '#E04A3A' : '#5A1810');
+    rect(g, x - 3 * S, y - 25 * S, 3 * S, 2 * S, on ? '#FFB0A0' : '#7A2A20');
+    if (on && lk && lk.glow) lk.glow(g, x, y - 22 * S, 18 * S, '#E04A3A', 0.3);
   }
   function drawFigure(g, e, d) {
-    var S, x, y;
+    var S, x, y, sk;
     S = (d && d.S) || 1;
     x = d.sx;
     y = d.sy;
+    sk = A() && A().skins && A().skins.hood;
+    if (sk && sk.draw) { sk.draw(g, e, d); return; }
     try { g.imageSmoothingEnabled = false; } catch (err) {}
     rect(g, x - 5 * S, y - 18 * S, 10 * S, 16 * S, '#100E16');
     rect(g, x - 4 * S, y - 24 * S, 8 * S, 8 * S, '#100E16');
@@ -209,12 +314,9 @@
     rect(g, x + 1 * S, y - 18 * S, 2 * S, 2 * S, '#E4E0D4');
   }
   function lampLight(e, d) {
-    var t, on;
-    if (calm()) return { r: 28, col: '#E23B55', glow: 0.2, a: 0.7 };
-    t = d && d.now ? d.now : 0;
-    on = (Math.floor(t / PERIOD) % 2) === 0;
-    if (!on) return null;
-    return { r: 36, col: '#E23B55', glow: 0.35, a: 1 };
+    if (calm()) return { r: 28, col: '#E04A3A', glow: 0.2, a: 0.7 };
+    if (alarmOn(d)) return { r: 36, col: '#E04A3A', glow: 0.35, a: 1 };
+    return null;                       /* off half of the 400 ms flash: dark, the engine skips a null light */
   }
 
   if (NEU.engineKinds && NEU.engineKinds.kind) {
@@ -242,6 +344,7 @@
     catches: 0,
     over: figureMet(),
     step: step,
+    nextCell: nextCell,
     arrive: arrive,
     bind: function (room) {
       var base, prev, far;

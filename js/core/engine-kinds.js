@@ -34,6 +34,25 @@
   function sfx(name) { if (NEU.sfx && NEU.sfx[name]) NEU.sfx[name](); }
   function L() { return NEU.engineLook; }
 
+  /* A speech bubble over an npc that has something to say (e.hint): the
+     one thing a shopkeeper's counter cannot show by itself. It bobs; the
+     reduced-motion setting holds it still. */
+  function hintBubble(g, d) {
+    var S = d.S, reduced = !!(L() && L().reduced);
+    var bob = reduced ? 0 : Math.round(Math.sin((d.now || 0) / 260)) * S;
+    /* 14x9 so it fits the gap between a stall's awning and the head under it */
+    var x = d.sx - 7 * S, y = d.sy - 32 * S + bob;
+    g.fillStyle = '#120F18'; g.fillRect(x, y, 14 * S, 9 * S);
+    g.fillStyle = '#EDE7DE'; g.fillRect(x + S, y + S, 12 * S, 7 * S);
+    /* the tail: a dark wedge with an ivory core, pointing down at the head */
+    g.fillStyle = '#120F18'; g.fillRect(x + 5 * S, y + 9 * S, 4 * S, 3 * S);
+    g.fillStyle = '#EDE7DE'; g.fillRect(x + 6 * S, y + 9 * S, 2 * S, 2 * S);
+    g.fillStyle = '#120F18';
+    g.fillRect(x + 3 * S, y + 4 * S, 2 * S, S);
+    g.fillRect(x + 6 * S, y + 4 * S, 2 * S, S);
+    g.fillRect(x + 9 * S, y + 4 * S, 2 * S, S);
+  }
+
   /* integer sprite scale for sheet art, so pixels stay square: item-
      sized art is drawn at half the world scale, larger art at a third —
      the proportions v1 tuned at its fixed scale of 3. */
@@ -56,6 +75,54 @@
   function sheetWidth(e, S) {
     var sh = e.sheet && NEU.sheets && NEU.sheets[e.sheet];
     return sh ? sh.fw * sheetScale(sh, S, e) / S : 10;
+  }
+
+  /* ── mushrooms ───────────────────────────────────────────────────────
+     The five the act sends you to cut. Cutting is still their whole
+     purpose (the npc's run hook, rooms-g NEU.chop); what they add is a
+     life of their own while you are near. Within four cells one winds up
+     (strip col 0, rows 0-4, 90 ms each) and then dances (col 1, rows 0-3,
+     120 ms each). Pressing Z on one squashes it for half a second while
+     it reacts (col 2) and sheds a few spores. Reduced motion holds each
+     pose still and drops the squash. Pure of the room: the state lives on
+     the entity (e._m) and is read from the frame's clock.
+     ponytail: four-cell range is one constant; upgrade to per-room
+     range when a room needs a mushroom that notices from further off. */
+  var MUSH = { range: 64, prep: 90, dance: 120, react: 160, hurt: 480, scale: 2 };
+  var TILE = 16;   /* engine.js TILE: world units per cell */
+  function mushPose(e, now, pl, reduced) {
+    var m = e._m || (e._m = { since: -1, hurt: -1, now: now });
+    m.now = now;
+    var near = !!pl && Math.hypot(pl.x - (e.x + 0.5) * TILE, pl.y - (e.y + 1) * TILE) < MUSH.range;
+    if (!near) m.since = -1; else if (m.since < 0) m.since = now;
+    if (m.hurt >= 0 && now - m.hurt >= MUSH.hurt) m.hurt = -1;
+    if (m.hurt >= 0) {
+      if (reduced) return { col: 2, row: 0, sx: 1, sy: 1 };
+      var p = (now - m.hurt) / MUSH.hurt, amp = 0.18 * (1 - p);
+      return { col: 2, row: Math.floor((now - m.hurt) / MUSH.react) % 3, sx: 1 + amp, sy: 1 - amp };
+    }
+    if (!near) return { col: 0, row: 0, sx: 1, sy: 1 };
+    if (reduced) return { col: 1, row: 0, sx: 1, sy: 1 };
+    var t = now - m.since, windUp = MUSH.prep * 5;
+    if (t < windUp) return { col: 0, row: Math.floor(t / MUSH.prep), sx: 1, sy: 1 };
+    return { col: 1, row: Math.floor((t - windUp) / MUSH.dance) % 4, sx: 1, sy: 1 };
+  }
+  function mushHurt(e, sys) {
+    var m = e._m || (e._m = { since: -1, hurt: -1, now: 0 });
+    m.hurt = m.now;
+    sys.burst(e, 6, '#F7A0B0');
+  }
+  function drawMushroom(g, e, d) {
+    var sh = NEU.sheets && NEU.sheets.mushroom;
+    var pl = d.api && d.api.player;
+    var p = mushPose(e, d.now, pl, !!(L() && L().reduced));
+    g.save();
+    g.translate(d.sx, d.sy);
+    if (p.sx !== 1 || p.sy !== 1) g.scale(p.sx, p.sy);
+    var drawn = !!sh && NEU.sheetDraw && NEU.sheetDraw(g, 'mushroom', 0, 0, {
+      frame: p.row, col: p.col, scale: MUSH.scale * sheetScale(sh, d.S, e), anchor: 'feet', now: d.now });
+    g.restore();
+    if (!drawn) drawSheet(g, e, d);
   }
 
   /* A door's name plate: a few letters in a 3x5 pixel font, on the wall
@@ -112,6 +179,13 @@
       if (e.locked && !(NEU.save && NEU.save.flagged(e.locked))) {
         sys.say(e.lines || ['it will not move yet.'], 'narr');
         sfx('locked');
+        return;
+      }
+      /* An exit that asks first (the prize corridor's trapdoor): the same
+         dialog ESC gives every minigame. Walking into it and pressing Z both
+         land here, so the question cannot be skipped by either. */
+      if (e.confirm && NEU.engine && NEU.engine.confirmExit) {
+        NEU.engine.confirmExit(e.confirm, function () { sys.go(e.to, e.spawn); }, e.confirmNote);
         return;
       }
       sys.go(e.to, e.spawn);
@@ -231,6 +305,7 @@
       /* A run hook wins over lines: the mushrooms, the witch, the
          merchant answer differently depending on the state of the world
          and a fixed `lines` array cannot do that. */
+      if (e.mush) mushHurt(e, sys);
       if (hasRun(e)) { e.run(sys.api); return; }
       /* E while THIS dialogue is showing is a no-op. */
       if (tboxOpen()) return;
@@ -261,6 +336,7 @@
       }
     },
     draw: function (g, e, d) {
+      if (e.mush) { drawMushroom(g, e, d); return; }
       if (e.sheet) { drawSheet(g, e, d); return; }
       var look = L().lookFor(e);
       /* the socket holds a flame once the room is solved */
@@ -407,6 +483,9 @@
   NEU.engineKinds = {
     kind: kind, get: get, all: K,
     interactive: interactive, promptable: promptable, fire: fire,
+    /* the speech bubble of an e.hint entity, drawn by the engine after the
+       whole room (see engine.js draw) */
+    hint: function (g, e, d) { hintBubble(g, d); },
     known: function () { return Object.keys(K).filter(function (k) { return k !== 'default'; }); }
   };
 })();

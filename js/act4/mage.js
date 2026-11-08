@@ -70,54 +70,394 @@
     ctx.fillRect(x | 0, y | 0, w | 0, h | 0);
   }
 
-  function flameH(i) {
+  /* ── art: every static layer is baked once, the frame is a few blits ── */
+  var INK = '#12081E';
+  var LX = [230, 254, 278];
+  var OFF = 120;
+  var art = null;
+
+  function rr(g, x, y, w, h, c) { g.fillStyle = c; g.fillRect(x, y, w, h); }
+  function bake(w, h, fn) {
+    var cv, g;
+    try {
+      cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      g = cv.getContext('2d');
+      if (!g) return null;
+      g.imageSmoothingEnabled = false;
+      fn(g);
+      return cv;
+    } catch (e) { return null; }
+  }
+  function hs(x, y, s) {
+    var h = (x * 374761393 + y * 668265263 + (s || 0) * 2147483647) | 0;
+    h = (h ^ (h >>> 13)) * 1274126177 | 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function blob(g, cx, cy, rx, ry, c) {
+    var y, k, hw;
+    for (y = -ry; y <= ry; y++) {
+      k = 1 - (y * y) / ((ry + 0.5) * (ry + 0.5));
+      if (k <= 0) continue;
+      hw = Math.round(rx * Math.sqrt(k));
+      rr(g, cx - hw, cy + y, hw * 2 + 1, 1, c);
+    }
+  }
+  function blit(cv, x, y) {
+    if (cv && ctx.drawImage) ctx.drawImage(cv, x, y);
+  }
+
+  function wallLayer(g) {
+    var bx, by, x, y, k, d, i, dx, dy, tone, hi, warm, dmin;
+    var cool = ['#1C1814', '#2A2622', '#3A342C', '#1A120C'];
+    rr(g, 0, 0, 320, 192, '#120E14');
+    for (by = 0; by < 128; by += 8) {
+      for (bx = ((by / 8) % 2) ? -8 : 0; bx < 320; bx += 16) {
+        k = Math.floor(hs(bx, by, 3) * cool.length);
+        dmin = 999;
+        for (i = 0; i < 3; i++) {
+          dx = bx + 7 - (LX[i] + 7); dy = by + 3 - 118;
+          d = Math.sqrt(dx * dx + dy * dy);
+          if (d < dmin) dmin = d;
+        }
+        warm = dmin < 60;
+        if (warm) {
+          tone = dmin < 30 ? (k ? '#5A4030' : '#3A2C22') : (k === 2 ? '#5A4030' : '#3A2C22');
+          hi = tone === '#5A4030' ? '#7A5A44' : '#5A4030';
+        } else {
+          tone = cool[k];
+          hi = (k === 2 || k === 3) ? '#4E463C' : '#3A342C';
+        }
+        rr(g, bx, by, 15, 7, tone);
+        rr(g, bx, by, 15, 1, hi);
+        rr(g, bx, by, 1, 7, hi);
+        rr(g, bx, by + 6, 15, 1, '#120E14');
+        rr(g, bx + 14, by, 1, 7, '#120E14');
+        if (hs(bx, by, 9) > 0.7) rr(g, bx + 3 + ((hs(bx, by, 5) * 8) | 0), by + 2 + ((hs(bx, by, 6) * 3) | 0), 2, 1, warm ? '#6A5040' : '#4E463C');
+        if (hs(bx, by, 11) > 0.88) rr(g, bx + 5, by + 3, 1, 2, '#0A0810');
+      }
+    }
+    rr(g, 0, 120, 320, 8, '#120E14');
+    rr(g, 0, 118, 320, 2, '#1C1814');
+  }
+  function windowLayer(g) {
+    var i, y, hw, r = 28, dy, band;
+    for (i = 0; i < 57; i++) {
+      y = 24 + i;
+      if (i < r) { dy = r - i - 0.5; hw = Math.round(Math.sqrt(r * r - dy * dy)); } else hw = r;
+      rr(g, 264 - hw - 3, y, hw * 2 + 6, 1, INK);
+      rr(g, 264 - hw - 2, y, hw * 2 + 4, 1, '#3A2A20');
+      band = y < 40 ? '#0E1630' : (y < 60 ? '#142038' : '#1A2848');
+      rr(g, 264 - hw, y, hw * 2, 1, band);
+    }
+    rr(g, 261 - 24, 25, 48, 1, INK);
+    for (i = 0; i < 7; i++) rr(g, 238 + ((hs(i, 1, 2) * 50) | 0), 30 + ((hs(i, 2, 2) * 36) | 0), 1, 1, '#8AA0D0');
+    rr(g, 276, 36, 2, 2, '#B8CCD6');
+    blob(g, 250, 38, 4, 4, '#B8CCD6');
+    blob(g, 249, 37, 3, 3, '#E6EEF2');
+    rr(g, 236, 72, 56, 8, '#0A1020');
+    rr(g, 270, 62, 8, 10, '#0A1020');
+    rr(g, 272, 58, 4, 4, '#0A1020');
+    rr(g, 246, 66, 6, 6, '#0A1020');
+    rr(g, 273, 64, 2, 2, '#E8C878');
+    rr(g, 263, 24, 2, 56, '#3A2A20');
+    rr(g, 236, 52, 56, 2, '#3A2A20');
+    rr(g, 263, 24, 1, 56, '#4A3A2E');
+    rr(g, 232, 80, 64, 3, '#6B4423');
+    rr(g, 232, 80, 64, 1, '#8A5A32');
+    rr(g, 234, 83, 60, 2, '#3A2414');
+    rr(g, 234, 85, 60, 2, '#0A0810');
+  }
+  function potion(g, x, yb, t) {
+    var y = yb - 10;
+    rr(g, x + 2, y, 2, 2, '#8A6040');
+    rr(g, x + 1, y + 2, 4, 1, INK);
+    rr(g, x, y + 3, 6, 7, INK);
+    rr(g, x + 1, y + 3, 4, 6, t[1]);
+    rr(g, x + 1, y + 3, 1, 6, t[0]);
+    rr(g, x + 4, y + 3, 1, 6, t[2]);
+    rr(g, x + 2, y + 4, 1, 1, '#FFFFFF');
+    rr(g, x + 1, y + 8, 4, 1, t[0]);
+  }
+  function book(g, x, yb, h, c, lean) {
+    var r, s;
+    for (r = 0; r < h; r++) {
+      s = lean ? ((h - 1 - r) >> 2) : 0;
+      rr(g, x + s - 1, yb - 1 - r, 1, 1, INK);
+      rr(g, x + s + 4, yb - 1 - r, 1, 1, INK);
+      rr(g, x + s, yb - 1 - r, 3, 1, c[0]);
+      rr(g, x + s + 3, yb - 1 - r, 1, 1, c[1]);
+      if (r === 2 || r === 3 || r === h - 3) rr(g, x + s, yb - 1 - r, 4, 1, '#C8A040');
+    }
+    rr(g, x + (lean ? 1 : 0), yb - h - 1, 4, 1, INK);
+  }
+  var SKULL = ['..XXXX..', '.XwwwwX.', 'XwwwwwsX', 'XwkwwkwX', 'XwwwwwsX', '.XwXXwX.', '..XwwX..'];
+  function shelfLayer(g) {
+    var i, r, c;
+    var BK = [['#2E8B57', '#1A5A38'], ['#8B2E2E', '#5A1A1A'], ['#2E4A8B', '#1A2A5A']];
+    var RED = ['#5A1018', '#B02838', '#FF6A6A'], GRN = ['#0C3A1A', '#1A7A3A', '#8AFFB0'], BLU = ['#14284A', '#2E4A8B', '#8AB0FF'];
+    for (i = 0; i < 2; i++) {
+      rr(g, 8, 40 + i * 28, 72, 3, '#0A0810');
+      rr(g, 8, 36 + i * 28, 72, 1, '#8A6040');
+      rr(g, 8, 37 + i * 28, 72, 2, '#5C4030');
+      rr(g, 8, 39 + i * 28, 72, 1, '#3A2414');
+      rr(g, 14, 40 + i * 28, 3, 8, '#2A1C12');
+      rr(g, 14, 40 + i * 28, 1, 8, '#3A2414');
+      rr(g, 70, 40 + i * 28, 3, 8, '#2A1C12');
+      rr(g, 70, 40 + i * 28, 1, 8, '#3A2414');
+    }
+    book(g, 12, 36, 12, BK[0], false);
+    book(g, 18, 36, 10, BK[1], false);
+    book(g, 24, 36, 13, BK[2], true);
+    book(g, 31, 36, 11, BK[0], true);
+    potion(g, 42, 36, RED);
+    potion(g, 51, 36, GRN);
+    potion(g, 60, 36, BLU);
+    potion(g, 69, 36, RED);
+    for (r = 0; r < SKULL.length; r++) for (c = 0; c < 8; c++) {
+      i = SKULL[r].charAt(c);
+      if (i === '.') continue;
+      rr(g, 14 + c, 57 + r, 1, 1, i === 'X' || i === 'k' ? INK : (i === 's' ? '#B8B0A8' : '#E4DCD0'));
+    }
+    rr(g, 26, 61, 10, 3, '#3A2414');
+    rr(g, 26, 61, 10, 1, '#8A6040');
+    blob(g, 31, 54, 7, 7, INK);
+    blob(g, 31, 54, 6, 6, '#3B1F5C');
+    blob(g, 32, 55, 4, 4, '#7A52B8');
+    blob(g, 30, 52, 2, 2, '#B892FF');
+    rr(g, 28, 50, 2, 1, '#E8DCFF');
+    potion(g, 46, 64, GRN);
+    potion(g, 56, 64, BLU);
+    potion(g, 66, 64, RED);
+  }
+  function bgLayer(g) {
+    wallLayer(g);
+    windowLayer(g);
+    shelfLayer(g);
+    g.globalAlpha = 0.34;
+    rr(g, 0, 0, 12, 128, '#000000'); rr(g, 308, 0, 12, 128, '#000000'); rr(g, 0, 0, 320, 6, '#000000');
+    g.globalAlpha = 0.2;
+    rr(g, 12, 0, 12, 128, '#000000'); rr(g, 296, 0, 12, 128, '#000000'); rr(g, 0, 6, 320, 6, '#000000');
+    g.globalAlpha = 0.09;
+    rr(g, 24, 0, 12, 128, '#000000'); rr(g, 284, 0, 12, 128, '#000000'); rr(g, 0, 12, 320, 6, '#000000');
+    g.globalAlpha = 1;
+  }
+  function mageSprite(g) {
+    var y, h, i, k, w, x0, cx, L, R3, ws, wd;
+    function Rm(x, yy, ww, hh, c) { rr(g, 32 + x, 95 + yy, ww, hh, c); }
+    /* pin keep */ Rm(0, 0, 0, 0, '#2A1248');
+    for (y = -56; y < 0; y++) {
+      h = 14 + Math.floor((y + 56) * 6 / 56);
+      Rm(-h - 1, y, h * 2 + 2, 1, INK);
+      Rm(-h, y, h * 2, 1, '#3B1F5C');
+      Rm(-h, y, 4, 1, '#1E0F33');
+      Rm(h - 6, y, 3, 1, '#6A3FA0');
+      if (y > -50) Rm(h - 3, y, 2, 1, '#9A70D0');
+      Rm(h - 1, y, 1, 1, '#E8B060');
+      if (y > -46) { Rm(-6 + ((y + 56) >> 4), y, 1, 1, '#2A1640'); Rm(2 + ((y + 56) >> 5), y, 1, 1, '#4B2A78'); }
+    }
+    Rm(-15, -57, 30, 1, INK);
+    Rm(-6, -40, 2, 1, '#B892FF'); Rm(5, -40, 2, 1, '#B892FF');
+    Rm(20, -77, 5, 77, INK);
+    Rm(21, -76, 3, 76, '#4A3424');
+    Rm(23, -76, 1, 76, '#6B4A30');
+    Rm(21, -50, 3, 2, '#2A1C12'); Rm(21, -24, 3, 2, '#2A1C12');
+    ws = [2, 4, 6, 8, 8, 8, 8, 6, 4, 2];
+    for (i = 0; i < 10; i++) {
+      w = ws[i]; x0 = 23 - (w >> 1); y = -88 + i;
+      Rm(x0 - 1, y, w + 2, 1, INK);
+      Rm(x0, y, w, 1, '#7A52B8');
+      Rm(x0, y, 2, 1, '#4B2A78');
+      Rm(x0 + w - 2, y, 2, 1, '#B892FF');
+    }
+    Rm(-3, -90, 6, 1, INK); Rm(22, -89, 2, 1, INK);
+    Rm(23, -84, 1, 2, '#FFFFFF');
+    Rm(-23, -55, 10, 32, INK);
+    Rm(-22, -54, 8, 30, '#3B1F5C');
+    Rm(-22, -54, 3, 30, '#1E0F33');
+    Rm(-15, -54, 1, 30, '#6A3FA0');
+    Rm(-22, -28, 8, 3, '#C8A040'); Rm(-22, -28, 8, 1, '#FFE080'); Rm(-22, -26, 8, 1, '#8A6A20');
+    Rm(-21, -25, 6, 5, INK); Rm(-20, -25, 4, 4, '#C4A574'); Rm(-17, -25, 1, 4, '#E6C9A0');
+    Rm(11, -53, 11, 20, INK);
+    Rm(12, -52, 9, 18, '#3B1F5C');
+    Rm(12, -52, 3, 18, '#1E0F33');
+    Rm(18, -52, 2, 18, '#6A3FA0');
+    Rm(20, -52, 1, 18, '#E8B060');
+    Rm(12, -37, 9, 3, '#C8A040'); Rm(12, -37, 9, 1, '#FFE080'); Rm(12, -35, 9, 1, '#8A6A20');
+    Rm(19, -34, 7, 6, INK); Rm(20, -33, 5, 4, '#C4A574'); Rm(24, -33, 1, 4, '#E6C9A0');
+    Rm(-8, -71, 16, 13, INK);
+    Rm(-7, -70, 14, 12, '#C4A574');
+    Rm(4, -70, 3, 12, '#E6C9A0');
+    Rm(-7, -70, 14, 2, '#8A6A4A');
+    Rm(-5, -68, 4, 1, '#B8B0A8'); Rm(1, -68, 4, 1, '#B8B0A8');
+    Rm(-4, -67, 2, 2, '#F4F0A0'); Rm(1, -67, 2, 2, '#F4F0A0');
+    Rm(0, -66, 2, 5, '#C49B6A'); Rm(1, -66, 1, 5, '#E6C9A0');
+    for (i = 0; i < 16; i++) {
+      w = i < 6 ? 18 : (i < 10 ? 16 : (i < 13 ? 12 : (i < 15 ? 8 : 4)));
+      x0 = -(w >> 1); y = -62 + i;
+      Rm(x0 - 1, y, w + 2, 1, INK);
+      Rm(x0, y, w, 1, '#B8B0A8');
+      Rm(x0 + w - 5, y, 5, 1, '#E4DCD0');
+      Rm(x0, y, 2, 1, '#8A827A');
+      if ((i & 3) < 2) Rm(x0 + 3 + (i & 1), y, 1, 1, '#FFFFFF');
+      if ((i & 3) > 0) Rm(x0 + w - 4 + (i & 1), y, 1, 1, '#FFFFFF');
+    }
+    Rm(-21, -75, 42, 6, INK);
+    Rm(-20, -74, 40, 4, '#2A1640');
+    Rm(-20, -74, 40, 1, '#4B2A78');
+    Rm(14, -73, 6, 2, '#7A52B8');
+    Rm(-20, -71, 40, 1, INK);
+    for (k = 0; k < 18; k++) {
+      w = 22 - Math.round(16 * k / 17);
+      cx = k > 9 ? Math.floor((k - 9) * 6 / 8) : 0;
+      x0 = cx - (w >> 1); y = -75 - k;
+      Rm(x0 - 1, y, w + 2, 1, INK);
+      L = Math.max(1, Math.floor(w / 3)); R3 = w > 10 ? 3 : 2;
+      Rm(x0, y, L, 1, '#2A1640');
+      Rm(x0 + L, y, w - L - R3, 1, '#4B2A78');
+      Rm(x0 + w - R3, y, R3, 1, '#7A52B8');
+      if (k === 1 || k === 2) Rm(x0, y, w, 1, '#C8A040');
+    }
+    Rm(-4, -93, 8, 1, INK); Rm(2, -93, 5, 1, INK);
+    Rm(-2, -78, 4, 3, '#E8C860'); Rm(-1, -77, 2, 1, INK);
+  }
+  function counterLayer(g) {
+    var i, x, y, w, px, pw;
+    function C(xx, yy, ww, hh, c) { rr(g, xx, yy - OFF, ww, hh, c); }
+    C(0, 136, 320, 1, '#C49060');
+    C(0, 137, 320, 3, '#A07040');
+    C(0, 140, 320, 2, '#3A2414');
+    C(0, 142, 320, 34, '#6B4226');
+    C(0, 142, 320, 2, '#8A4A20');
+    for (i = 0; i < 3; i++) {
+      px = 4 + i * 106; pw = 100;
+      C(px, 146, pw, 26, '#5A3418');
+      C(px, 146, pw, 1, '#3A2414'); C(px, 146, 1, 26, '#3A2414');
+      C(px, 171, pw, 1, '#8A5A32'); C(px + pw - 1, 146, 1, 26, '#8A5A32');
+      for (x = 0; x < 5; x++) C(px + 6 + ((hs(i, x, 1) * 60) | 0), 150 + x * 5, 10 + ((hs(i, x, 2) * 14) | 0), 1, '#6B4226');
+      C(px + 1, 147, pw - 2, 1, '#7A4E2C');
+      if (i) C(px - 3, 142, 2, 34, '#1A120C');
+    }
+    C(0, 176, 320, 4, '#2A1C12');
+    C(0, 180, 320, 12, '#120E14');
+    C(0, 180, 320, 1, '#1C1814');
+    C(0, 142, 2, 34, '#2A1C12'); C(318, 142, 2, 34, '#2A1C12');
+    /* on the counter: open book, coins, bell */
+    C(43, 134, 26, 2, '#5A3418');
+    C(43, 134, 26, 1, '#8A5A32');
+    C(44, 126, 24, 1, INK);
+    C(44, 127, 12, 7, '#E8DCC0');
+    C(56, 127, 12, 7, '#C8B898');
+    C(55, 127, 2, 7, '#8A7A5A');
+    for (i = 0; i < 3; i++) { C(46, 129 + i * 2, 8, 1, '#8A7A5A'); C(58, 129 + i * 2, 7, 1, '#6A5A3A'); }
+    C(43, 127, 1, 7, INK); C(68, 127, 1, 7, INK);
+    for (i = 0; i < 3; i++) {
+      C(96, 134 - i * 2, 6, 2, INK);
+      C(97, 134 - i * 2, 4, 1, '#FFE080');
+      C(97, 135 - i * 2, 4, 1, '#8A6A20');
+    }
+    C(97, 134 - 6, 4, 1, '#C8A040');
+    C(106, 134, 4, 2, INK); C(107, 134, 2, 1, '#FFE080'); C(107, 135, 2, 1, '#8A6A20');
+    C(119, 126, 10, 10, INK);
+    C(121, 125, 4, 2, INK); C(122, 126, 2, 2, '#C8A040');
+    C(120, 128, 8, 6, '#C8A040');
+    C(120, 128, 2, 6, '#FFE080');
+    C(126, 128, 2, 6, '#8A6A20');
+    C(119, 133, 10, 2, '#8A6A20');
+    C(123, 135, 2, 1, '#FFE080');
+  }
+  function lanternSprite(g) {
+    rr(g, 0, 1, 14, 21, INK);
+    rr(g, 3, 0, 8, 1, INK);
+    rr(g, 2, 1, 10, 2, '#2A2420'); rr(g, 2, 1, 10, 1, '#4A3E34');
+    rr(g, 1, 3, 2, 16, '#2A2420'); rr(g, 1, 3, 1, 16, '#4A3E34');
+    rr(g, 11, 3, 2, 16, '#2A2420'); rr(g, 12, 3, 1, 16, '#1A1614');
+    rr(g, 3, 3, 8, 16, '#3A2410');
+    g.globalAlpha = 0.5;
+    rr(g, 3, 3, 8, 16, '#FFD060');
+    g.globalAlpha = 1;
+    rr(g, 3, 10, 8, 1, '#2A2420');
+    rr(g, 6, 15, 2, 4, '#E8D8B0'); rr(g, 7, 15, 1, 4, '#C8B898');
+    rr(g, 1, 19, 12, 3, '#2A2420'); rr(g, 1, 19, 12, 1, '#4A3E34');
+  }
+  function glowSprite(g, D, radii, alphas, col) {
+    var i, c = D >> 1;
+    for (i = radii.length - 1; i >= 0; i--) {
+      g.globalAlpha = alphas[i];
+      blob(g, c, c, radii[i], Math.round(radii[i] * 0.85), col);
+    }
+    g.globalAlpha = 1;
+  }
+  function build() {
+    if (art) return art;
+    art = {
+      bg: bakeOnce(320, 192, bgLayer),
+      mage: bakeOnce(64, 96, mageSprite),
+      counter: bakeOnce(320, 72, counterLayer),
+      lamp: bakeOnce(14, 22, lanternSprite),
+      lg: [
+        bakeOnce(96, 96, function (g) { glowSprite(g, 96, [18, 30, 44], [0.22, 0.12, 0.06], '#FFB347'); }),
+        bakeOnce(96, 96, function (g) { glowSprite(g, 96, [20, 32, 46], [0.22, 0.12, 0.06], '#FFB347'); })
+      ],
+      cg: [
+        bakeOnce(80, 80, function (g) { glowSprite(g, 80, [22, 30], [0.2, 0.1], '#B892FF'); }),
+        bakeOnce(80, 80, function (g) { glowSprite(g, 80, [26, 34], [0.2, 0.1], '#B892FF'); })
+      ]
+    };
+    return art;
+  }
+  function bakeOnce(w, h, fn) { return bake(w, h, fn); }
+
+  function candleH(i) {
     if (reduced()) return 8;
     if (Math.floor((clock + i * 160) / 400) % 2) return 10;
     return 6;
   }
 
   function draw() {
-    var y, x, i, h, m;
+    var a, i, m, bob, still, ph, lx, fl, dx, dy, near, cry;
     if (!context()) return;
     ctx.imageSmoothingEnabled = false;
-    box(0, 0, 320, 192, '#1C1814');
-    for (y = 0; y < 128; y += 8) {
-      for (x = ((y / 8) % 2) ? 0 : 8; x < 320; x += 16) box(x, y, 15, 7, '#2A2622');
+    a = build();
+    still = reduced();
+    bob = still ? 0 : (Math.floor(clock / 600) % 2);
+    ph = still ? 0 : (Math.floor(clock / 800) % 2);
+    blit(a.bg, 0, 0);
+    if (!a.bg) { box(0, 0, 320, 192, '#1C1814'); return; }
+    cry = 57 + bob;
+    blit(a.cg[ph], 187 - 40, cry - 40);
+    blit(a.mage, 164 - 32, 140 - 95 + bob);
+    if (!still && clock % 3600 < 120) {
+      box(160, 140 - 67 + bob, 2, 2, '#C4A574');
+      box(165, 140 - 67 + bob, 2, 2, '#C4A574');
+    } else {
+      ctx.globalAlpha = 0.22;
+      box(158, 140 - 69 + bob, 6, 6, '#F4F0A0');
+      box(163, 140 - 69 + bob, 6, 6, '#F4F0A0');
+      ctx.globalAlpha = 1;
     }
-    box(8, 36, 72, 4, '#5C4030');
-    box(8, 64, 72, 4, '#5C4030');
-    box(14, 22, 6, 14, '#2E8B57');
-    box(28, 26, 6, 10, '#8B2E2E');
-    box(42, 20, 6, 16, '#2E4A8B');
-    box(16, 48, 16, 12, '#E6D2A2');
-    box(40, 50, 14, 10, '#CDB88A');
-    box(236, 24, 70, 48, '#3A342C');
-    box(242, 30, 18, 14, '#E6D2A2');
-    box(266, 32, 16, 12, '#CDB88A');
-    box(0, 140, 320, 36, '#6B4226');
-    box(0, 136, 320, 4, '#8A5A32');
-    box(150, 78, 28, 58, '#3B1F5C');
-    box(148, 86, 32, 8, '#6A3FA0');
-    box(156, 36, 16, 30, '#3B1F5C');
-    box(148, 62, 32, 6, '#6A3FA0');
-    box(160, 22, 8, 16, '#3B1F5C');
-    box(156, 66, 12, 10, '#C4A574');
-    box(158, 69, 3, 3, '#F4F0A0');
-    box(164, 69, 3, 3, '#F4F0A0');
-    box(188, 48, 3, 88, '#4A3424');
-    box(184, 44, 11, 4, '#C8C060');
-    for (i = 0; i < 3; i++) {
-      x = 230 + i * 24;
-      box(x - 8, 96, 22, 40, '#3A2414');
-      box(x - 4, 104, 14, 28, '#5A3418');
-      box(x, 110, 6, 16, '#8A4A20');
-      box(x, 112, 6, 18, '#E8D8B0');
-      h = flameH(i);
-      box(x + 1, 112 - h, 4, h, '#FFD060');
+    for (i = 0; i < 3; i++) blit(a.lg[still ? 0 : (Math.floor(clock / 400 + i) % 2)], LX[i] + 7 - 48, 122 - 48);
+    blit(a.counter, 0, OFF);
+    for (i = 0; i < 3; i++) blit(a.lamp, LX[i], 114);
+    /* the flame sits inside each lamp glass, drawn after the lamp so it shows.
+       The shared room flame is used when the room kit is loaded; otherwise a plain flame. */
+    if (NEU.roomArt && NEU.roomArt.flame) {
+      for (i = 0; i < 3; i++) NEU.roomArt.flame(ctx, LX[i] + 7, 128, 1, 1, clock, i);
+    } else {
+      ctx.fillStyle = '#FFD060';
+      for (i = 0; i < 3; i++) ctx.fillRect(LX[i] + 5, 128 - candleH(i), 4, candleH(i));
     }
+    ctx.fillStyle = '#E8D8A0';
     for (i = 0; i < MOTES.length; i++) {
       m = MOTES[i];
-      box(m.x, m.y, 2, 2, '#D8D0C0');
+      near = 0;
+      for (lx = 0; lx < 3; lx++) {
+        dx = m.x - (LX[lx] + 7); dy = m.y - 122;
+        if (dx * dx + dy * dy < 44 * 44) near = 1;
+      }
+      dx = m.x - 187; dy = m.y - cry;
+      if (dx * dx + dy * dy < 30 * 30) near = 1;
+      if (near) ctx.fillRect(m.x | 0, m.y | 0, 2, 2);
     }
   }
 
@@ -226,6 +566,11 @@
       })(i);
       menuEl.appendChild(b);
     }
+    /* the purse, always on the menu: you cannot shop blind */
+    price = document.createElement('div');
+    price.className = 'mage__gold';
+    price.textContent = (NEU.save ? NEU.save.coins() : 0) + 'g';
+    menuEl.appendChild(price);
   }
 
   function buy(id) {
@@ -383,6 +728,20 @@
       e.preventDefault();
       if (Math.floor(shown) < full.length) { shown = full.length; paintSay(); return; }
       confirm();
+    }
+    /* X goes back one menu level; on the top menu it leaves, like Esc's exit */
+    if (k === 'x' || k === 'X') {
+      e.preventDefault();
+      if (mode !== 'main') { mode = 'main'; sel = 0; render(); return; }
+      exitAction();
+      return;
+    }
+    /* C or spell cast: cast a spell at the mage -> triggers card duel */
+    if (k === 'c' || k === 'C') {
+      e.preventDefault();
+      close();
+      provoke();
+      return;
     }
   });
 

@@ -72,7 +72,21 @@
   function laserSeg(l) {
     var x = l.x, u;
     if (l.sw) { u = clamp((G.fr - l.at) / (l.end - l.at), 0, 1); x = lerp(l.sw[0], l.sw[1], u); }
-    return { x0: x, y0: l.y, x1: x + Math.cos(l.a) * l.len, y1: l.y + Math.sin(l.a) * l.len };
+    return arenaSeg({ x0: x, y0: l.y, x1: x + Math.cos(l.a) * l.len, y1: l.y + Math.sin(l.a) * l.len });
+  }
+  /* the part of a segment inside the fight arena (Liang-Barsky), or null.
+     Beams stop at the walls: what a beam draws and hits stays in the box. */
+  function arenaSeg(s) {
+    var dx = s.x1 - s.x0, dy = s.y1 - s.y0, t0 = 0, t1 = 1, i, p, q, r;
+    var P = [-dx, dx, -dy, dy], Q = [s.x0 - A.AX, A.AX + A.AW - s.x0, s.y0 - A.AY, A.AY + A.AH - s.y0];
+    for (i = 0; i < 4; i++) {
+      p = P[i]; q = Q[i];
+      if (p === 0) { if (q < 0) return null; continue; }
+      r = q / p;
+      if (p < 0) { if (r > t1) return null; if (r > t0) t0 = r; }
+      else { if (r < t0) return null; if (r < t1) t1 = r; }
+    }
+    return { x0: s.x0 + dx * t0, y0: s.y0 + dy * t0, x1: s.x0 + dx * t1, y1: s.y0 + dy * t1 };
   }
   /* the soul state the Gravity section asks for; the soul module owns the physics */
   function soulMode(m) { if (NEU.scalSoul && NEU.scalSoul.setMode) NEU.scalSoul.setMode(m); }
@@ -629,6 +643,7 @@
       var tx = hx(A.px + rnd(-off, off)), ty = hy(A.py + rnd(-off, off));
       G.tele.push({ x: tx, y: ty, a: Math.atan2(ty - A.by, tx - A.bx), at: G.fr, life: 30, bw: 24,
         len: Math.hypot(tx - A.bx, ty - A.by) + 40 });
+      warn({ x: tx, y: ty, r: 30, w: 3, rFill: true, life: 30 });
       later(45, (function (bx, by) {
         return function () { bomb(bx, by, 0, 0, rnd(135, 185), 12, V(6)); };
       }(tx, ty)));
@@ -661,7 +676,7 @@
     if (f === 245 - T) {
       st.dir = RNG() < 0.5 ? -1 : 1; st.ang = aim() - st.dir * 0.9; st.om = 0;
       st.p.w = warn({ x: A.bx, y: A.by, a: st.ang, life: T, w: 6 }); cue('chime');
-      st.p.next = 235;
+      st.p.next = 240;   /* the mod's 235, five frames late so its aim line shows the full 24 f */
     }
     if (st.p.w && f < 245) { st.p.w.x = A.bx; st.p.w.y = A.by; }
     /* f 405 and f 490 tolls (ClockConstellation.cs, rubric 5): she stops, a
@@ -681,7 +696,7 @@
       if (f % 3 === 0) { var tp = rayTip(A.bx, A.by, st.ang); sparks(tp.x, tp.y, 2, st.ang + Math.PI, 1.6, 160); }
     }
     gc = Math.max(45, (L >= 3 ? 57 : 75) - 6 * st.n) * (G.thin ? 2 : 1);
-    tg = Math.round(teleT(gc) * 0.4);
+    tg = 24;
     if (st.p.next && f === st.p.next - tg) {
       st.p.ga = aim();
       warn({ x: A.bx, y: A.by, a: st.p.ga, life: tg, w: 3, len: 260 });
@@ -869,7 +884,7 @@
      idle, soul anywhere. exit: the dim lifts at the fan, f 224. */
   ATK.SummonShadowDemon = function (st) {
     if (st.f === 0) { A.anim('idle'); loud(true, 0.55); }
-    if (st.f === 140) { warn({ x: A.bx, y: A.by, r: 40, w: 3, life: 30 }); cue('chime'); }
+    if (st.f === 140) { warn({ x: A.bx, y: A.by, r: 96, w: 4, rFill: true, life: 30 }); cue('chime'); }
     if (st.f === 170) {
       ringRamp(A.bx, A.by, 8, V(8), 0);
       A.sfx('fireblast');
@@ -981,38 +996,21 @@
     return st.f >= 105;
   };
 
-  /* Arena Shrink (the final all-out). Over 1200 f the playable box closes 20% on
-     each side (G.box, which the walls and her position follow; the soul is
+  /* Arena Shrink (the final all-out). Over 1200 f the playable box closes 15%
+     on each side (G.box, which the walls and her position follow; the soul is
      not clamped to it). Every edge throws a row of ten flames inward at 95
      px/s, every 36 f falling to every 12 f by the end, with a two-flame gap
-     that walks along each wall. Dodge: stay off the edge the walls are coming from. */
+     that walks along each wall. No telegraphs: the gap is read from the flames
+     themselves. Dodge: stay off the edge the walls are coming from. */
   ATK.ArenaShrinkFlameWalls = function (st) {
-    var f = st.f, D_ = 1200, s = Math.min(1, f / D_) * 0.2, i, e, t, gp, cad, x, y, vx, vy, b, n = 10, fs = 95;
+    var f = st.f, D_ = 1200, s = Math.min(1, f / D_) * 0.15, i, e, t, gp, cad, x, y, vx, vy, b, n = 10, fs = 95;
     var wx = A.AW * s, wy = A.AH * s;
     G.box = { x: A.AX + wx, y: A.AY + wy, w: A.AW - 2 * wx, h: A.AH - 2 * wy };
     b = G.box;
     move(A.AX + A.AW / 2, A.AY + A.AH / 2, 0.04);
-    /* the four wall lanes show along the box's edges teleT(36) f ahead of
-       the first volley; the wall glow itself keeps them visible after */
-    if (f === 0) {
-      var Tw = teleT(36);
-      warn({ x: b.x, y: b.y, a: 0, life: Tw, w: 3, len: b.w });
-      warn({ x: b.x, y: b.y + b.h, a: 0, life: Tw, w: 3, len: b.w });
-      warn({ x: b.x, y: b.y, a: Math.PI / 2, life: Tw, w: 3, len: b.h });
-      warn({ x: b.x + b.w, y: b.y, a: Math.PI / 2, life: Tw, w: 3, len: b.h });
-      /* the final box (s = .2), previewed as a 3 px outline */
-      warn({ kind: 'rect', x: A.AX + A.AW * 0.2, y: A.AY + A.AH * 0.2, w: A.AW * 0.6, h: A.AH * 0.6, safe: false, lw: 3, life: Tw });
-      cue('chime');
-    }
     cad = Math.round(36 - 24 * Math.min(1, f / D_));
     if (f % cad === 0) {
       gp = (f / cad) | 0;
-      /* the walking two-slot gap, marked on each edge */
-      var gc = ((gp + 1) % n + 0.0) / n;
-      gapMark(b.x + gc * b.w, b.y, true, 2 * b.w / n, cad);
-      gapMark(b.x + gc * b.w, b.y + b.h, true, 2 * b.w / n, cad);
-      gapMark(b.x, b.y + gc * b.h, false, 2 * b.h / n, cad);
-      gapMark(b.x + b.w, b.y + gc * b.h, false, 2 * b.h / n, cad);
       for (e = 0; e < 4; e++) for (i = 0; i < n; i++) {
         if ((((i - gp) % n) + n) % n < 2) continue;
         t = (i + 0.5) / n;
@@ -1134,7 +1132,7 @@
       }
       px = nx; py = ny;
     }
-    return segs;
+    return segs.map(arenaSeg).filter(function (s) { return s; });
   }
   ATK.BrimstoneLightning = function (st) {
     var f = st.f, w, n, g, i, a, nw = G.lvl >= 1 ? 4 : 3, as;
@@ -1234,7 +1232,12 @@
     var f = st.f, cx = A.AX + A.AW / 2, cy = A.AY + A.AH / 2, cad = G.thin ? 12 : 6, k, r, q, x, y, ia;
     var arms = !G.thin && G.lvl >= 2 ? 3 : 2, dr = 110 + 10 * Math.min(G.lvl, 3);
     move(cx, cy, 0.06);
-    if (f === 0) warn({ x: cx, y: cy, r: 180, w: 2, life: 30 });
+    if (f === 0) {
+      warn({ x: cx, y: cy, r: 180, w: 3, life: 30 });
+      /* the arms' start headings, and the first gap between them (safe, cyan) */
+      for (k = 0; k < arms; k++) warn({ x: cx, y: cy, a: k * TAU / arms, w: 2, len: 330, life: 30 });
+      warn({ kind: 'fan', safe: true, x: cx, y: cy, r: 330, a0: TAU / (2 * arms) - 0.12, a1: TAU / (2 * arms) + 0.12, life: 30 });
+    }
     if (f >= 30 && f < 210 && (f - 30) % cad === 0) {
       r = Math.max(40, 330 - (f - 30) * 1.6);
       /* the open gap: midway between arm 0 and arm 1, safe-marked as a fan */
@@ -1313,7 +1316,7 @@
       if (f === 0) cue('chime');
     }
     if (f === 192) { warn({ x: A.bx, y: A.by, r: 40, w: 3, life: 24 }); cue('chime'); kick('small'); }
-    if (f % cad === 0 && f < 420) {
+    if (f >= cad && f % cad === 0 && f < 420) {
       for (k = 0; k < arms; k++) {
         a = crossAng(f) + k * TAU / arms;
         A.shot(A.bx, A.by, Math.cos(a) * 165, Math.sin(a) * 165, 2, { tag: 'gig', fuse: 2.5 });
@@ -1375,7 +1378,11 @@
     for (k = 0; k < 3; k++) {
       e = st.p.eyes[k];
       if (G.thin && k === 1) continue;
-      if (f === e.at - teleT(T)) warn({ x: e.x, y: e.y, r: 20, life: teleT(T), w: 2 });
+      if (f === e.at - teleT(T)) {
+        warn({ x: e.x, y: e.y, r: 34, life: teleT(T), w: 3, rFill: true });
+        /* the arc's opening heading and where its arms sit a quarter, half and three quarters round */
+        for (i = 0; i < 4; i++) warn({ x: e.x, y: e.y, a: (i * 7 * tap / N) + (k - 1) * 0.9, life: teleT(T), w: 2, len: D(420) });
+      }
       if (f === e.at) {
         A.sfx('fireblast'); kick('small');
         for (i = 0; i < N; i++) {
@@ -1409,7 +1416,8 @@
       for (k = 0; k < n; k++) {
         var y = y0 + k * 64;
         if (y < A.AY + 6 || y > A.AY + A.AH - 6) continue;
-        warn({ x: dir ? A.AX + A.AW : A.AX, y: y, a: dir ? Math.PI : 0, life: 30, w: 4, len: A.AW, bw: 65 });
+        /* bw 8: the band is the 14 px the light actually hurts in, not a 130 px lane that looks unsafe */
+        warn({ x: dir ? A.AX + A.AW : A.AX, y: y, a: dir ? Math.PI : 0, life: 30, w: 4, len: A.AW, bw: 8 });
         (function (d, ly) {
           later(30, function () {
             G.lasers.push({ x: d ? A.AX + A.AW : A.AX, y: ly, a: 0, len: 130, at: G.fr, end: G.fr + 70,
@@ -1889,7 +1897,7 @@
       for (i = 0; i < dirs.length; i++) (function (d, k) {
         var hole = (d === 'l' || d === 'r') ? hy0 : A.AX + 60 + RNG() * (A.AW - 120);
         later(k * 14, function () { wallWarn(d, hole); cue('chime'); });
-        later(k * 14 + 22, function () { wallLine(d, hole); });
+        later(k * 14 + 26, function () { wallLine(d, hole); });
       })(dirs[i], i);
       if (G.lvl >= 3) later(30, (function (left) { return function () { skullRow(st, left, 5); }; })(b % 2 === 0));
     }
@@ -1956,18 +1964,25 @@
     if (s < len - 60 && s % 18 === 0) {
       var sp = V(rnd(8, 17)), la = -Math.PI / 2 + rnd(-0.73, 0.73);
       warn({ x: A.bx, y: A.by, a: la, w: 2, life: 24 });
-      var b = A.shot(A.bx, A.by, Math.cos(la) * sp, Math.sin(la) * sp, 0, { tag: 'soul', fuse: 230 / 60 });
-      if (b) { tracked(b); (p.ls = p.ls || []).push({ b: b, t: 0 }); }
+      (function (ox, oy, ca, cs) {
+        later(24, function () {
+          var b = A.shot(ox, oy, ca * sp, cs * sp, 0, { tag: 'soul', fuse: 230 / 60 });
+          if (b) { tracked(b); (p.ls = p.ls || []).push({ b: b, t: 0 }); }
+        });
+      })(A.bx, A.by, Math.cos(la), Math.sin(la));
     }
     var l = p.ls || [];
     for (var i = 0; i < l.length; i++) {
       var m = l[i];
-      if (++m.t === 40) {
+      /* the turn comes at 40 f, or at once when the soul nears the top edge:
+         SCAL hovers near that edge here, so the rise must not leave the arena */
+      if (!m.r && (++m.t === 40 || m.b.y < A.AY + 16)) {
+        m.r = true;
         var a = Math.atan2(A.py - m.b.y, A.px - m.b.x), v = Math.hypot(m.b.vx, m.b.vy);
         m.b.vx = Math.cos(a) * v; m.b.vy = Math.sin(a) * v;
       }
     }
-    p.ls = l.filter(function (m) { return m.b.fuse > 0 && m.t < 41; });
+    p.ls = l.filter(function (m) { return m.b.fuse > 0 && !m.r; });
     return s >= len;
   };
 
@@ -1988,12 +2003,17 @@
       p.cd = Math.max(56, 120 - 6 * p.bc);
       kick('small');
     }
-    if (s >= 28 && s < len - 30 && (s - 28) % 56 === 0) {
-      var a = aim();
+    /* each volley's two fans (forward and reverse, aim locked) show 24 f ahead */
+    if (s >= 60 && s < len - 30 && (s - 28 + 24) % 56 === 0) {
+      p.da = aim();
+      warn({ kind: 'fan', x: A.bx, y: A.by, a0: p.da - 0.79, a1: p.da + 0.79, r: D(900), life: 24 });
+      warn({ kind: 'fan', x: A.bx, y: A.by, a0: p.da + Math.PI - 0.79, a1: p.da + Math.PI + 0.79, r: D(900), life: 24 });
+    }
+    if (s >= 84 && s < len - 30 && (s - 28) % 56 === 0) {
       for (var j = 0; j < 7; j++) {
         var d = lerp(-0.79, 0.79, j / 6);
-        shotRamp(A.bx, A.by, a + d, V(8.4), 0, { tag: 'brim', fuse: 6 });
-        shotRamp(A.bx, A.by, a + Math.PI + d, V(8.4), 0, { tag: 'brim', fuse: 6 });
+        shotRamp(A.bx, A.by, p.da + d, V(8.4), 0, { tag: 'brim', fuse: 6 });
+        shotRamp(A.bx, A.by, p.da + Math.PI + d, V(8.4), 0, { tag: 'brim', fuse: 6 });
       }
     }
     return s >= len;
@@ -2023,7 +2043,7 @@
       for (var x0 = base; x0 < A.AX + A.AW; x0 += D(840)) {
         for (var x = x0; x < x0 + D(420); x += 12) {
           if (x < A.AX || x > A.AX + A.AW || Math.abs(x - (x0 + D(210))) < D(21)) continue;
-          A.shot(x, A.AY - 10 - V(5) * 14 / 60, 0, V(5), 0, { tag: 'brim', fuse: 8 });
+          A.shot(x, A.AY + 2, 0, V(5), 0, { tag: 'brim', fuse: 8 });
         }
       }
     }
@@ -2144,7 +2164,7 @@
       i = k / every;
       px = p.x0 + (p.x1 - p.x0) * (i + 1) / (n + 1);
       py = p.y0 + (p.y1 - p.y0) * (i + 1) / (n + 1);
-      warn({ x: px, y: py, r: PR, w: 2, life: TL });
+      warn({ x: px, y: py, r: PR, w: 3, rFill: true, life: TL });
       a = p.ang + Math.PI / 2;
       dirs = P.bothWays[L] ? [a, a + Math.PI] : [i % 2 ? a + Math.PI : a];
       for (j = 0; j < dirs.length; j++) {
@@ -2344,7 +2364,7 @@
     for (i = 0; i < G.lasers.length; i++) {
       if (G.fr < G.lasers[i].at) continue;
       s = laserSeg(G.lasers[i]);
-      if (segDist(A.px, A.py, s.x0, s.y0, s.x1, s.y1) < 7 && !(A.dashI && A.dashI() > 0)) A.hit();
+      if (s && segDist(A.px, A.py, s.x0, s.y0, s.x1, s.y1) < 7 && !(A.dashI && A.dashI() > 0)) A.hit();
     }
     for (i = 0; i < G.rend.length; i++) {
       r = G.rend[i];
@@ -2470,6 +2490,8 @@
     rend: function () { return G ? G.rend : []; },
     bolts: function () { return G ? G.bolts : []; },
     lasers: function () { return G ? G.lasers : []; },
+    /* the beams' segments as they are drawn and hit, for the tests */
+    laserSegs: function () { return G ? G.lasers.map(laserSeg).filter(function (s) { return s; }) : []; },
     hexes: function () { return G ? G.hexes : []; },
     lanes: function () { return G ? G.lanes : null; },
     /* the blue section's hazards and the bag, for the tests */
@@ -2478,9 +2500,22 @@
     ceil: function () { return G ? G.ceil : null; },
     bag: function () { return G && G.bag ? G.bag.slice() : []; },
     box: function () { return G ? G.box : null; },
+    /* the full fight arena (test-only read): desperation bullets stay inside it */
+    arena: function () { return A ? { x: A.AX, y: A.AY, w: A.AW, h: A.AH } : null; },
     afterimages: function () { return G ? G.after : []; },
     pending: function () { return G ? G.ev.length : 0; },
     stage: function () { return G && G.desp ? G.desp.stage : ''; },
+    /* the desperation chain and the final all-out keep every bullet disc in
+       the fight box: clamp it in, and say whether it had to move (it ends then).
+       A bullet born in those attacks keeps the rule after they end. */
+    rim: function (b) {
+      if (!b.arena) {
+        if (!G || !(G.desp && G.desp.stage || cur && cur.name === 'ArenaShrinkFlameWalls')) return false;
+        b.arena = true;
+      }
+      var x = clamp(b.x, A.AX + b.r, A.AX + A.AW - b.r), y = clamp(b.y, A.AY + b.r, A.AY + A.AH - b.r), m = x !== b.x || y !== b.y;
+      b.x = x; b.y = y; return m;
+    },
     /* V: the newest open rift (for the view split), or null */
     rift: function () { return liveRift(); },
     frame: function () { return G ? G.fr : 0; },
@@ -2618,7 +2653,8 @@
         var tcol = 'rgba(255,40,40,' + (0.25 + 0.5 * k).toFixed(2) + ')';
         for (j = 0; j < bo.segs.length; j++) {
           sg = bo.segs[j];
-          line(ctx, sg.x0, sg.y0, sg.x1, sg.y1, tcol, 1);
+          line(ctx, sg.x0, sg.y0, sg.x1, sg.y1, 'rgba(0,0,0,0.45)', 5);
+          line(ctx, sg.x0, sg.y0, sg.x1, sg.y1, tcol, 3);
         }
         continue;
       }
@@ -2627,14 +2663,19 @@
       glowSegs(ctx, bo.segs, 0.4 + 0.6 * k, 3);
       ctx.globalCompositeOperation = op;
       sg = bo.segs[bo.segs.length - 1];
-      if (k > 0.5) glowAt(ctx, sg.x1, sg.y1, 26, '#FFD0A0', k);
+      if (sg && k > 0.5) glowAt(ctx, sg.x1, sg.y1, 26, '#FFD0A0', k);
       if (i === 0) glowAt(ctx, bo.x, bo.y, 64, desp ? '#FFFFFF' : '#FF6A3A', 0.6 * k);
     }
     for (i = 0; i < G.lasers.length; i++) {
       l = G.lasers[i];
       sg = laserSeg(l);
+      if (!sg) continue;
       if (G.fr < l.at) {
-        line(ctx, sg.x0, sg.y0, sg.x1, sg.y1, 'rgba(255,60,40,' + (0.55 + 0.35 * Math.sin(G.fr * 0.3)).toFixed(2) + ')', 2);
+        /* the shape it will hit: the 14 px hurt band, then a 3 px core on a dark edge */
+        k = clamp(1 - (l.at - G.fr) / 30, 0, 1);
+        line(ctx, sg.x0, sg.y0, sg.x1, sg.y1, 'rgba(255,60,40,' + (0.2 + 0.16 * k).toFixed(2) + ')', 14);
+        line(ctx, sg.x0, sg.y0, sg.x1, sg.y1, 'rgba(0,0,0,0.5)', 7);
+        line(ctx, sg.x0, sg.y0, sg.x1, sg.y1, 'rgba(255,' + (90 + (150 * k | 0)) + ',70,' + (0.8 + 0.2 * Math.sin(G.fr * 0.3)).toFixed(2) + ')', 3);
       } else {
         ctx.globalCompositeOperation = 'lighter';
         glowLine(ctx, sg.x0, sg.y0, sg.x1, sg.y1, 1, 4);
@@ -2662,10 +2703,15 @@
         var g = Math.min(1, r.t / 54);
         half = Math.hypot(A.AW, A.AH) * g;
         k = 0.55 + 0.35 * Math.sin(r.t * 0.21);
+        /* the cut's real hurt band (12 px each side), then a core that reads on the red wash */
         line(ctx, r.cx - ca * half, r.cy - sa * half, r.cx + ca * half, r.cy + sa * half,
-             'rgba(255,48,64,' + k.toFixed(2) + ')', 1 + Math.round(2 * g));
+             'rgba(255,48,64,' + (0.10 + 0.12 * g).toFixed(2) + ')', 24);
         line(ctx, r.cx - ca * half, r.cy - sa * half, r.cx + ca * half, r.cy + sa * half,
-             'rgba(255,230,230,' + (0.5 * g).toFixed(2) + ')', 1);
+             'rgba(0,0,0,0.5)', 7 + Math.round(3 * g));
+        line(ctx, r.cx - ca * half, r.cy - sa * half, r.cx + ca * half, r.cy + sa * half,
+             'rgba(255,48,64,' + k.toFixed(2) + ')', 3 + Math.round(3 * g));
+        line(ctx, r.cx - ca * half, r.cy - sa * half, r.cx + ca * half, r.cy + sa * half,
+             'rgba(255,230,230,' + (0.6 * g).toFixed(2) + ')', 2);
         continue;
       }
       if (!r.scar) {
@@ -2782,10 +2828,10 @@
         if (b.at - G.fr > (col ? 60 : 24)) continue;
         t = 1 - (b.at - G.fr) / (col ? 60 : 24);
         if (col) {
-          ctx.fillStyle = 'rgba(' + rampRGB(t * 0.8) + ',' + (0.10 + 0.25 * t).toFixed(2) + ')';
+          ctx.fillStyle = 'rgba(' + rampRGB(t * 0.8) + ',' + (0.22 + 0.4 * t).toFixed(2) + ')';
           ctx.fillRect((b.x - b.w) | 0, b.y0 | 0, (2 * b.w) | 0, (b.y1 - b.y0) | 0);
-          ctx.fillStyle = 'rgba(' + rampRGB(t) + ',' + (0.3 + 0.6 * t).toFixed(2) + ')';
-          ctx.fillRect((b.x - b.w) | 0, b.y0 | 0, 1, (b.y1 - b.y0) | 0); ctx.fillRect((b.x + b.w - 1) | 0, b.y0 | 0, 1, (b.y1 - b.y0) | 0);
+          ctx.fillStyle = 'rgba(' + rampRGB(t) + ',' + (0.55 + 0.4 * t).toFixed(2) + ')';
+          ctx.fillRect((b.x - b.w) | 0, b.y0 | 0, 2, (b.y1 - b.y0) | 0); ctx.fillRect((b.x + b.w - 2) | 0, b.y0 | 0, 2, (b.y1 - b.y0) | 0);
           continue;
         }
         rgb = hi ? iceRGB(t) : rampRGB(t);
@@ -2803,6 +2849,13 @@
         u = Math.min(1, (G.fr - b.at) / 6) * Math.min(1, (b.end - G.fr) / 8);
         var top = b.y1 - (b.y1 - b.y0) * Math.min(1, (G.fr - b.at) / 5);
         boneRect(ctx, b.x + ((G.fr % 4) < 2 ? 0 : 1), top, b.y1, b.w - 2 + ((G.fr >> 1) % 2), b.kind === 'pillar' ? '255,58,26' : '255,154,74', 0.85 * u, 0);
+        /* licks of flame rising inside the shaft: dark seams and bright tongues, so it is fire, not a flat bar */
+        var sc = rm() ? 0 : (G.fr * 3) % 16, ty;
+        for (ty = (b.y1 | 0) - 32 + sc; ty > top; ty -= 16) {
+          ctx.fillStyle = 'rgba(70,6,2,' + (0.45 * u).toFixed(2) + ')'; ctx.fillRect((b.x - b.w + 2) | 0, ty, 3, 8);
+          ctx.fillRect((b.x + b.w - 5) | 0, ty + 8, 3, 8);
+          ctx.fillStyle = 'rgba(255,214,120,' + (0.7 * u).toFixed(2) + ')'; ctx.fillRect((b.x - 5) | 0, ty + 3, 3, 9); ctx.fillRect((b.x + 3) | 0, ty + 11, 3, 7);
+        }
         continue;
       }
       boneRect(ctx, b.x, b.y0, b.y1, b.w, hi ? '143,216,255' : '255,154,74', 1, hi ? 2 : 1);

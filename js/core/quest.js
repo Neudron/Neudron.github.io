@@ -143,6 +143,16 @@
     },
     has: function (id) { return !!done[id]; },
 
+    /* The first open step after the last completed one: the "what next"
+       that the wake cue names. Falls back to the first open step at all. */
+    nextText: function () {
+      var last = -1, i;
+      for (i = 0; i < STEPS.length; i++) if (done[STEPS[i].id]) last = i;
+      for (i = last + 1; i < STEPS.length; i++) if (!done[STEPS[i].id]) return STEPS[i].text;
+      for (i = 0; i < STEPS.length; i++) if (!done[STEPS[i].id]) return STEPS[i].text;
+      return null;
+    },
+
     /* Later acts register their own steps rather than this file
        knowing about content it has never seen. Idempotent, because the
        console tile can be clicked twice. */

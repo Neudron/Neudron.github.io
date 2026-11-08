@@ -395,7 +395,7 @@
      announce it; a 200ms poll is cheaper than an event contract with
      nine modules, and the pad appearing a fifth of a second late is
      imperceptible next to a scene fade. */
-  setInterval(sync, 200);
+  setInterval(function () { if (!document.hidden) sync(); }, 200);
   addEventListener('resize', sync);
   addEventListener('blur', releaseAll);
   document.addEventListener('visibilitychange', function () {

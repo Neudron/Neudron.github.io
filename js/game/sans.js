@@ -126,21 +126,31 @@
     "i'd throw it, personally. hard."
   ];
   var swings = 0;
-  var HITS = 10;
+  var HITS = 3;
 
-  /* The sword's ten-hit meter: one pip per landed swing, built here so
+  /* The sword's three-hit meter: one pip per landed swing, built here so
      index.html stays as it is. Empty pips show only while the sword is armed. */
   var pips = null;
   if (sans) {
     pips = document.createElement('div');
     pips.className = 'sans__pips';
     pips.setAttribute('aria-hidden', 'true');
-    for (var pi = 0; pi < HITS; pi++) pips.appendChild(document.createElement('i'));
+    /* 12px chips, readable beside a 70px Sans; set here because style.css is
+       another lane's file (its 5px rule is overridden inline). */
+    pips.style.gap = '4px';
+    pips.style.bottom = '-18px';
+    for (var pi = 0; pi < HITS; pi++) {
+      var chip = document.createElement('i');
+      chip.style.width = chip.style.height = '12px';
+      pips.appendChild(chip);
+    }
     sans.appendChild(pips);
   }
   function paintPips() {
     if (!pips) return;
-    for (var i = 0; i < HITS; i++) pips.children[i].className = i < swings ? 'on t' + (i < 3 ? 1 : i < 6 ? 2 : i < 9 ? 3 : 4) : '';
+    /* pip i is hit i+1: the first two take the gold then ember tiers, the
+       last pip (the breaking hit) takes the red break colour */
+    for (var i = 0; i < HITS; i++) pips.children[i].className = i < swings ? 'on t' + (i === HITS - 1 ? 4 : Math.min(i + 1, 3)) : '';
   }
 
   /* ── the blip ───────────────────────────────────────────────────
@@ -737,6 +747,14 @@
     }
     next();
   };
+  /* Dark door: engine.js skips dialogue only with no minigame up, and dark.js
+     eats Z (interact) while the box is open. Capture phase takes the key first. */
+  addEventListener('keydown', function (e) {
+    if (NEU.activeMinigame !== 'dark' || !NEU.tboxOpen || !NEU.tboxOpen() || !/^(z|x|enter)$/i.test(e.key)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    NEU.talk.ff();
+  }, true);
   NEU.hush = function () { shutUp(); };
   /* Watchers get (index, total) as each line starts and (-1, -1) when
      the box closes, interrupted or finished — the engine uses it to
@@ -1059,8 +1077,10 @@
   }
 
   /* ── click sans ─────────────────────────────────────────────────*/
-  if (secret) secret.addEventListener('click', function (e) {
-    e.stopPropagation();
+  /* The star no longer sits beside him. It is one star of the sky: stars.js
+     picks it and calls this when a click lands on it. Same reward as before. */
+  if (secret) secret.hidden = true;
+  if (NEU.stars) NEU.stars.onSecret = function () {
     if (NEU.save && NEU.save.flagged && NEU.save.flagged('act1:star')) {
       say(['the tiny star is still there. it does not need anything.']);
       return;
@@ -1068,7 +1088,7 @@
     if (NEU.save && NEU.save.flag) NEU.save.flag('act1:star', 1);
     say(['the little star was tucked behind his sleeve.',
          'it is warm. somebody left it here for you.']);
-  });
+  };
 
   btn.addEventListener('click', function () {
     /* Feeding him beats everything else he might have to say. */
@@ -1665,7 +1685,7 @@
     if (!overSans(x, y)) { setLedge(); say(["swing and a miss. classic."]); missBeat(); flyHome(); return; }
 
     state = 'swing';
-    var willBreak = swings >= HITS - 1;        // the tenth landed swing breaks it
+    var willBreak = swings >= HITS - 1;        // the third landed swing breaks it
 
     NEU.sword.swing(
       function () {                            // on impact
@@ -1682,10 +1702,12 @@
           return;
         }
         popTotem();
-        say([LINES[Math.min(swings, LINES.length - 1)]]);
+        say([LINES[Math.min(swings + 1, LINES.length - 1)]]);   // 0 is the miss line
         swings++;
         paintPips();
-        if (pips) pips.children[swings - 1].classList.add('pop');
+        var lit = pips && pips.children[swings - 1];
+        /* Web Animations, not a class: '.pop' is the totem rule in style.css */
+        if (lit && lit.animate && !calm() && !(NEU.juice && NEU.juice.noShake)) lit.animate([{ transform: 'scale(2.2)' }, { transform: 'scale(1)' }], { duration: 280, easing: 'steps(3, end)' });
       },
       function () {                            // after the follow-through
         if (!willBreak) flyHome();

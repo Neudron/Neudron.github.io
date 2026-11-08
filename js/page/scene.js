@@ -114,7 +114,7 @@ function init() {
   let backdropTex = null;
   let backdrop = null;
   let starVersion = -1;
-  const STAR_UPLOAD_MS = 250;   // 4 Hz ceiling on canvas re-uploads
+  const STAR_UPLOAD_MS = 2000;  // 0.5 Hz ceiling: each upload re-renders the transmission pass
   let starUploadAt = -Infinity;
 
   if (STARS && STARS.canvas) {
@@ -421,6 +421,7 @@ function init() {
 
     const t = NEU.heroT;
     if (!visible || t < 0.02 || document.body.classList.contains('is-playing')) return;
+    if (NEU.kernel && NEU.kernel.current()) return;   /* any kernel scene: plat, snail, finale... never set is-playing */
 
     const dt = Math.min(clock.getDelta(), 1 / 30);
 

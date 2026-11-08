@@ -83,6 +83,11 @@
       AX = ((innerWidth - AW) / 2) | 0;
       AY = ((innerHeight - AH) / 2 + 20) | 0;
     }
+    /* the kit HUD (tab 18 + box 48, 24 under the arena) must clear the
+       controls hint row, which starts about 44px above the window floor */
+    var over = AY + AH + 72 - (innerHeight - 44);
+    if (over > 0) AH = Math.max(300, AH - over) | 0;
+    arenaCache = {};
   }
   addEventListener('resize', function () { if (running) layout(); });
 
@@ -188,7 +193,9 @@
   }
 
   function solveLeg(leg) {
-    var hx = bx + Math.cos(leg.a) * 23, hy = by + Math.sin(leg.a) * 20;
+    /* hip anchored to the ghost body: the sprite is 90x150 at s=1, so the
+       mechanical root sits ~40px below centre rather than in empty space */
+    var hx = bx + Math.cos(leg.a) * 30, hy = by + 40 + Math.sin(leg.a) * 34;
     var dx = leg.foot.x - hx, dy = leg.foot.y - hy, d = Math.sqrt(dx * dx + dy * dy);
     var l1 = Math.max(70, d * 0.52), l2 = Math.max(70, d * 0.52);
     var reach = Math.max(1, Math.min(l1 + l2 - 1, d));
@@ -213,15 +220,30 @@
   }
 
   function drawLegs() {
-    ctx.lineCap = 'square'; ctx.lineWidth = 7; ctx.strokeStyle = '#2B3440';
-    for (var i = 0; i < legs.length; i++) {
-      var p = solveLeg(legs[i]);
-      ctx.beginPath(); ctx.moveTo(p.hx | 0, p.hy | 0); ctx.lineTo(p.kx | 0, p.ky | 0);
-      ctx.lineTo(p.fx | 0, p.fy | 0); ctx.stroke();
-      ctx.fillStyle = 'rgba(127,227,255,0.24)'; ctx.fillRect((p.kx - 7) | 0, (p.ky - 7) | 0, 14, 14);
-      ctx.fillStyle = '#7FE3FF'; ctx.fillRect((p.kx - 3) | 0, (p.ky - 3) | 0, 6, 6);
-      ctx.fillStyle = legs[i].planted ? '#7FE3FF' : '#C4FFF0';
-      ctx.fillRect((p.fx - 4) | 0, (p.fy - 4) | 0, 8, 8);
+    ctx.lineCap = 'square'; ctx.lineJoin = 'miter';
+    var i, p, pts = [];
+    for (i = 0; i < legs.length; i++) pts.push(solveLeg(legs[i]));
+    /* three passes: ink, steel, rim light, so a limb reads as a lit bar */
+    var W = [11, 7, 2], C = ['#0A0E14', '#2B3440', '#6A7A8C'], k, o;
+    for (k = 0; k < 3; k++) {
+      ctx.lineWidth = W[k]; ctx.strokeStyle = C[k]; o = k === 2 ? -2 : 0;
+      for (i = 0; i < pts.length; i++) {
+        p = pts[i];
+        ctx.beginPath(); ctx.moveTo(p.hx | 0, (p.hy + o) | 0); ctx.lineTo(p.kx | 0, (p.ky + o) | 0);
+        ctx.lineTo(p.fx | 0, (p.fy + o) | 0); ctx.stroke();
+      }
+    }
+    for (i = 0; i < pts.length; i++) {
+      p = pts[i];
+      ctx.fillStyle = '#0A0E14'; ctx.fillRect((p.kx - 8) | 0, (p.ky - 8) | 0, 16, 16);
+      ctx.fillStyle = '#2B6A80'; ctx.fillRect((p.kx - 6) | 0, (p.ky - 6) | 0, 12, 12);
+      ctx.fillStyle = '#7FE3FF'; ctx.fillRect((p.kx - 4) | 0, (p.ky - 4) | 0, 8, 8);
+      ctx.fillStyle = '#E0FAFF'; ctx.fillRect((p.kx - 4) | 0, (p.ky - 4) | 0, 3, 3);
+      /* the foot: a shadow, then the claw */
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect((p.fx - 9) | 0, (p.fy + 3) | 0, 18, 5);
+      ctx.fillStyle = '#0A0E14'; ctx.fillRect((p.fx - 7) | 0, (p.fy - 7) | 0, 14, 14);
+      ctx.fillStyle = legs[i].planted ? '#7FE3FF' : '#C4FFF0'; ctx.fillRect((p.fx - 5) | 0, (p.fy - 5) | 0, 10, 10);
+      ctx.fillStyle = '#FFFFFF'; ctx.fillRect((p.fx - 5) | 0, (p.fy - 5) | 0, 4, 4);
     }
   }
 
@@ -592,10 +614,10 @@
      mistaken for a logic bug and costs an hour. */
   /* One blitter for the whole site, in data/sheets.js. The local copy
      this replaces was the third of three identical image caches. */
-  function drawSheet(key, x, y, scale, glowKeys, rot) {
+  function drawSheet(key, x, y, scale, glowKeys, rot, frame) {
     if (!NEU.sheetDraw) return false;
     return NEU.sheetDraw(ctx, key, x, y, {
-      scale: scale, glowKeys: glowKeys, rot: rot, now: performance.now()
+      scale: scale, glowKeys: glowKeys, rot: rot, frame: frame, now: performance.now()
     });
   }
 
@@ -609,37 +631,184 @@
     phaseFlashes += 1;
   }
 
-  /* look-dungeon.js BANDS: blue back wall, green fog, pink bottom chamber. */
-  var BRICK = {
-    1: { wall: '#24325C', mort: '#1A2340' },
-    2: { wall: '#24325C', mort: '#1A2340' },
-    3: { wall: '#4A1848', mort: '#602050' }
+  /* ── the bottom chamber ─────────────────────────────────────────
+     Baked once per phase and size into an offscreen canvas; a frame is
+     one drawImage plus the live fog, drips and torches. Ramps are 5 steps,
+     light from the upper left: a bright top-left bevel, a dark
+     bottom-right one, mortar in the darkest tone. */
+  var arenaCache = {}, tints = {};
+  var RAMPS = {
+    1: { w: ['#0B1024', '#141C3A', '#24325C', '#2B3A67', '#3E5490'], lip: '#6A82C4',
+         fl: ['#1A2A6A', '#3E6AD0', '#8AB4FF', '#E0F0FF'], lt: '#3E6AD0' },
+    2: { w: ['#0B1024', '#141C3A', '#24325C', '#2B3A67', '#3E5490'], lip: '#7FE3C4',
+         fl: ['#0A4020', '#2FA06A', '#7FE3C4', '#E0FFF4'], lt: '#7FE3C4' },
+    3: { w: ['#12061A', '#1E0A1E', '#4A1848', '#602050', '#8A2A6A'], lip: '#C0508C',
+         fl: ['#5A0A1E', '#C02A4A', '#FF7A8A', '#FFE0E0'], lt: '#E04A6B' }
   };
-  function drawBricks() {
-    var pal = BRICK[phase] || BRICK[1];
-    var y;
-    ctx.fillStyle = pal.wall;
-    ctx.fillRect(AX | 0, AY | 0, AW | 0, AH | 0);
-    ctx.fillStyle = pal.mort;
-    for (y = 15; y < AH; y += 16) ctx.fillRect(AX | 0, (AY + y) | 0, AW | 0, 1);
+  function hsh(x, y, s) {
+    var h = (x * 374761393 + y * 668265263 + (s || 0) * 2147483647) | 0;
+    h = (h ^ (h >>> 13)) * 1274126177 | 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function mkc(w, h) {
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, w | 0); c.height = Math.max(1, h | 0);
+    return c;
+  }
+  /* a stepped pixel ellipse, 2px rows */
+  function ell(g, cx, cy, rx, ry, col, a) {
+    g.globalAlpha = a; g.fillStyle = col;
+    for (var y = -ry; y < ry; y += 2) {
+      var k = 1 - ((y + 1) * (y + 1)) / (ry * ry), hw = k > 0 ? Math.round(rx * Math.sqrt(k)) : 0;
+      if (hw > 0) g.fillRect((cx - hw) | 0, (cy + y) | 0, hw * 2, 2);
+    }
+    g.globalAlpha = 1;
+  }
+  function bakeArena(ph) {
+    var W = AW | 0, H = AH | 0, c = mkc(W, H), g = c.getContext && c.getContext('2d');
+    if (!g) return null;
+    g.imageSmoothingEnabled = false;
+    var P = RAMPS[ph] || RAMPS[1], w = P.w, FLOOR = H - 44, x, y, row, k, h, tone;
+    function R(x0, y0, ww, hh, col) { g.fillStyle = col; g.fillRect(x0, y0, ww, hh); }
+    function A(x0, y0, ww, hh, col, a) { g.globalAlpha = a; g.fillStyle = col; g.fillRect(x0, y0, ww, hh); g.globalAlpha = 1; }
+    R(0, 0, W, H, w[2]);
+    /* running-bond bricks 32x16, mortar darkest, tone by hash */
+    for (row = 0, y = 0; y < FLOOR; y += 16, row++) {
+      for (x = (row & 1) ? -16 : 0; x < W; x += 32) {
+        h = hsh(x, row, ph); tone = h < 0.3 ? 1 : h < 0.62 ? 2 : 3;
+        R(x, y, 32, 16, w[0]);
+        R(x + 1, y + 1, 30, 14, w[tone]);
+        R(x + 1, y + 1, 30, 2, w[tone + 1]); R(x + 1, y + 1, 2, 14, w[tone + 1]);
+        R(x + 1, y + 13, 30, 2, w[tone - 1]); R(x + 29, y + 1, 2, 14, w[tone - 1]);
+        if (h > 0.95) { R(x + 9 + ((h * 997) & 7), y + 4, 2, 5, w[tone - 1]); R(x + 11 + ((h * 997) & 7), y + 9, 2, 3, w[tone - 1]); }
+      }
+    }
+    /* a soft light pool behind where the boss hangs: the focal point */
+    ell(g, W >> 1, (H * 0.38) | 0, 220, 130, P.lt, 0.035);
+    ell(g, W >> 1, (H * 0.38) | 0, 150, 90, P.lt, 0.04);
+    ell(g, W >> 1, (H * 0.38) | 0, 80, 50, P.lt, 0.05);
+    /* wall falls into shadow toward the edges: 6 stepped bands per side */
+    for (k = 0; k < 6; k++) {
+      var d = (6 - k) * 16;
+      A(0, 0, W, d, '#000000', 0.08); A(0, FLOOR - d, W, d, '#000000', 0.08);
+      A(0, 0, d, FLOOR, '#000000', 0.08); A(W - d, 0, d, FLOOR, '#000000', 0.08);
+    }
+    /* two pillars, a quarter in from each side */
+    for (k = 1; k <= 3; k += 2) {
+      var px = ((W * k / 4) | 0) - 12;
+      A(px + 24, 0, 12, FLOOR, '#000000', 0.22); A(px + 36, 0, 8, FLOOR, '#000000', 0.12);
+      R(px, 0, 24, FLOOR, w[1]); R(px, 0, 4, FLOOR, w[4]); R(px + 4, 0, 10, FLOOR, w[3]);
+      R(px + 14, 0, 6, FLOOR, w[2]); R(px + 20, 0, 4, FLOOR, w[0]);
+      for (y = 48; y < FLOOR - 24; y += 64) { R(px - 2, y, 28, 5, w[3]); R(px - 2, y, 28, 2, w[4]); R(px - 2, y + 5, 28, 2, w[0]); }
+      R(px - 4, 0, 32, 14, w[3]); R(px - 4, 0, 32, 3, w[4]); R(px - 4, 14, 32, 4, w[0]);
+      R(px - 4, FLOOR - 14, 32, 14, w[3]); R(px - 4, FLOOR - 14, 32, 3, w[4]); R(px + 24, FLOOR - 14, 4, 14, w[0]);
+      /* the iron sconce the flame sits on, and the light it throws */
+      var sy = (H * 0.30) | 0;
+      ell(g, px + 12, sy - 12, 76, 56, P.lt, 0.05); ell(g, px + 12, sy - 12, 46, 34, P.lt, 0.05);
+      R(px + 4, sy, 16, 6, '#0A0E14'); R(px + 6, sy - 8, 12, 8, '#2A2A34'); R(px + 6, sy - 8, 12, 2, '#5A5A6A');
+    }
+    /* the floor: flagstones, a lit lip, and the wall's contact shadow */
+    R(0, FLOOR, W, H - FLOOR, w[1]);
+    for (x = 0; x < W; x += 64) {
+      tone = hsh(x, 9, ph) < 0.5 ? 1 : 2;
+      R(x, FLOOR + 6, 64, 16, w[tone]); R(x, FLOOR + 22, 64, H - FLOOR - 22, w[tone === 1 ? 2 : 1]);
+      R(x, FLOOR + 6, 64, 2, w[3]); R(x, FLOOR + 22, 64, 2, w[3]);
+      R(x, FLOOR + 6, 2, H - FLOOR - 6, w[0]); R(x + 62, FLOOR + 6, 2, H - FLOOR - 6, w[0]);
+    }
+    R(0, FLOOR + 22, W, 2, w[0]);
+    R(0, FLOOR, W, 6, w[4]); R(0, FLOOR, W, 2, P.lip); R(0, FLOOR + 6, W, 2, w[0]);
+    A(0, FLOOR - 8, W, 8, '#000000', 0.18); A(0, FLOOR - 4, W, 4, '#000000', 0.18);
+    A(0, H - 10, W, 10, '#000000', 0.2);
+    /* inner shadow under the rim */
+    A(0, 0, W, 1, '#000000', 0.4); A(0, H - 1, W, 1, '#000000', 0.4);
+    A(0, 0, 1, H, '#000000', 0.4); A(W - 1, 0, 1, H, '#000000', 0.4);
+    return c;
+  }
+  function arenaImg() {
+    var key = phase + ':' + (AW | 0) + 'x' + (AH | 0);
+    if (!(key in arenaCache)) arenaCache[key] = bakeArena(phase);
+    return arenaCache[key];
+  }
+
+  /* the live layer: torch flames, P2 ecto fog and wisps, P3 blood drips.
+     Rects only; every motion is a pure function of the game clock `t`,
+     so a pause holds it, and reduced motion freezes it at t = 0. */
+  function liveArena() {
+    var tt = REDUCE_MOTION ? 0 : t, W = AW | 0, H = AH | 0, i, x, a, y;
+    var P = RAMPS[phase] || RAMPS[1], RA = NEU.roomArt;
+    if (RA && RA.flame) {
+      for (i = 1; i <= 3; i += 2) {
+        var fx = AX + ((W * i / 4) | 0), fy = AY + ((H * 0.30) | 0) - 8;
+        RA.flame(ctx, fx, fy, 1, 3, performance.now(), i, P.fl);
+      }
+    }
     if (phase === 2) {
-      for (y = 0; y < AH; y += 32) {
-        ctx.fillStyle = (y & 32) ? '#0A4020' : '#158039';
-        ctx.fillRect(AX | 0, (AY + y) | 0, AW | 0, Math.min(16, (AH - y) | 0));
-        ctx.fillStyle = '#7FE3C4';
-        ctx.fillRect(AX | 0, (AY + y) | 0, AW | 0, 2);
+      var fogBase = '#158039', fogTop = '#7FE3C4';
+      ctx.fillStyle = fogBase; ctx.globalAlpha = 0.22;
+      for (x = 0; x < W; x += 64) {
+        y = H - 18 - (((Math.sin((x + tt * 8) * 0.03) + 1) * 4) | 0);
+        ctx.fillRect(AX + x, AY + y, Math.min(64, W - x), H - y);
+      }
+      ctx.fillStyle = fogTop;
+      for (var band = 0; band < 2; band++) {
+        ctx.globalAlpha = band ? 0.06 : 0.10;
+        var base = H - (band ? 40 : 72), amp = band ? 5 : 8;
+        for (x = 0; x < W; x += 16) {
+          y = base + Math.round(Math.sin((x + tt * 8 * (band ? -1 : 1)) * 0.022 + band * 2) * amp);
+          ctx.fillRect(AX + x, AY + y, Math.min(16, W - x), H - y);
+        }
+      }
+      ctx.fillStyle = '#C4FFF0';
+      for (i = 0; i < 12; i++) {
+        var rise = (tt * 20 + hsh(i, 1, 7) * 96) % 96;
+        ctx.globalAlpha = 0.5 * (1 - rise / 96);
+        ctx.fillRect(AX + ((hsh(i, 2, 7) * (W - 8)) | 0), AY + H - 12 - rise, 2, 6);
+      }
+      ctx.globalAlpha = 1;
+    } else if (phase === 3) {
+      for (i = 0; i < 9; i++) {
+        var len = 6 + ((((tt / 0.4) | 0) + i * 5) % 9);
+        x = AX + 24 + ((hsh(i, 3, 9) * (W - 48)) | 0);
+        ctx.fillStyle = '#8C2F4A'; ctx.fillRect(x, AY, 2, len);
+        ctx.fillStyle = '#C0507A'; ctx.fillRect(x - 1, AY + len, 4, 2);
       }
     }
   }
   function frame() {
-    var look = PHASE_LOOK[phase] || PHASE_LOOK[1];
-    ctx.fillStyle = look.field;
-    ctx.fillRect(AX | 0, AY | 0, AW | 0, AH | 0);
-    drawBricks();
+    var look = PHASE_LOOK[phase] || PHASE_LOOK[1], a = arenaImg();
+    /* the phase field is always painted; the baked wall sits on top of it */
+    ctx.fillStyle = look.field; ctx.fillRect(AX | 0, AY | 0, AW | 0, AH | 0);
+    if (a) ctx.drawImage(a, AX | 0, AY | 0);
     ctx.fillStyle = look.rim;
     ctx.fillRect(AX - 3, AY - 3, AW + 6, 3); ctx.fillRect(AX - 3, AY + AH, AW + 6, 3);
     ctx.fillRect(AX - 3, AY, 3, AH); ctx.fillRect(AX + AW, AY, 3, AH);
   }
+
+  /* baked tint of one sheet frame: the silhouette flooded with a colour
+     (source-atop keeps the alpha), cached per frame and colour. The clone
+     is red, the punish window gold, the charge warning red. */
+  function tinted(key, fr, col, al) {
+    var sh = NEU.sheets && NEU.sheets[key], im = NEU.sheetReady && NEU.sheetReady(sh);
+    if (!im) return null;
+    var k = key + fr + col + al, c = tints[k];
+    if (c) return c;
+    c = mkc(sh.fw, sh.fh);
+    var g = c.getContext && c.getContext('2d');
+    if (!g) return null;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(im, 0, fr * sh.fh, sh.fw, sh.fh, 0, 0, sh.fw, sh.fh);
+    g.globalCompositeOperation = 'source-atop'; g.globalAlpha = al; g.fillStyle = col;
+    g.fillRect(0, 0, sh.fw, sh.fh);
+    tints[k] = c;
+    return c;
+  }
+  function putTint(c, x, y, s, dx, dy) {
+    if (!c) return;
+    var w = (c.width * s) | 0, h = (c.height * s) | 0;
+    ctx.drawImage(c, Math.round(x) - (w >> 1) + (dx || 0), Math.round(y) - (h >> 1) + (dy || 0), w, h);
+  }
+  var OFS = [[-2, 0], [2, 0], [0, -2], [0, 2]];
+  function outline(c, x, y, s) { for (var i = 0; i < 4; i++) putTint(c, x, y, s, OFS[i][0], OFS[i][1]); }
 
   /* a free hook about to fire: red corner brackets and a dotted aim at
      you. Static, so it reads the same under reduced motion. */
@@ -659,6 +828,7 @@
     ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, innerWidth, innerHeight);
     var shook = NEU.juice ? NEU.juice.begin(ctx, innerWidth, innerHeight) : false;
     frame();
+    liveArena();
 
     /* chains first, behind everything */
     drawLegs();
@@ -673,7 +843,7 @@
       var haveLink = !!(NEU.sheetReady && NEU.sheetReady(link));
       if (!haveLink) { ctx.strokeStyle = 'rgba(127,227,196,.28)'; ctx.lineWidth = 2; }
       for (var i = 0; i < hooks.length; i++) {
-        var p1 = proj(bx, by, bz), p2 = proj(hooks[i].x, hooks[i].y, 0);
+        var p1 = proj(bx, by + 40, bz), p2 = proj(hooks[i].x, hooks[i].y, 0);
         if (!haveLink) {
           ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
           continue;
@@ -731,7 +901,7 @@
       var p = proj(o.x, o.y, o.z);
       var s = Math.max(0.5, p.k);
       if (o.kind === 'hook') {
-        if (!drawSheet('hook', p.x, p.y, s * 0.5)) {
+        if (!drawSheet('hook', Math.round(p.x), Math.round(p.y), s * 0.8, null, 0, REDUCE_MOTION ? 0 : undefined)) {
           ctx.fillStyle = COL.ecto;
           ctx.fillRect((p.x - 9 * s) | 0, (p.y - 9 * s) | 0, (18 * s) | 0, (18 * s) | 0);
         }
@@ -743,38 +913,34 @@
          health bar is. The clone is the same body tinted red by an
          extra pass, because it IS the same body. */
       var glows = phase >= 3 ? ['polterG1', 'polterG2'] : phase >= 2 ? ['polterG1'] : null;
-      var w = 44 * s, h = 44 * s;
-      var drew = drawSheet('polter', p.x, p.y, s * 0.42, glows);
-      if (o.kind === 'clone' && drew) {
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.4;
-        ctx.fillStyle = COL.red;
-        ctx.fillRect((p.x - 22 * s) | 0, (p.y - 22 * s) | 0, (44 * s) | 0, (44 * s) | 0);
+      var w = 90 * s, h = 150 * s, bxp = Math.round(p.x), byp = Math.round(p.y);
+      var fr = REDUCE_MOTION ? 0 : ((nowMs / 100) | 0) % 12;
+      var isBody = o.kind === 'body';
+      /* a shadow on the floor under him, then a halo behind him */
+      if (isBody) {
+        var gy = AY + AH - 30, sh = 1 - Math.min(0.5, Math.abs(gy - byp) / 600);
+        ctx.fillStyle = '#000000'; ctx.globalAlpha = 0.16;
+        ctx.fillRect(bxp - ((34 * sh) | 0), gy - 2, (68 * sh) | 0, 8);
+        ctx.fillRect(bxp - ((22 * sh) | 0), gy, (44 * sh) | 0, 4);
         ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = 'source-over';
       }
-      /* glowing red = it is about to charge. announced, always. This
-         has to sit OUTSIDE the fallback branch: with the sheets
-         loaded, drew is true and a glow nested in the fallback would
-         never render — the charge would come without the telegraph. */
+      if (dm.glow) dm.glow(ctx, bxp, byp, o.kind === 'clone' ? 84 : 96, o.kind === 'clone' ? COL.red : COL.ecto, phase >= 2 ? 0.34 : 0.26);
+      /* the punish window: a 2px gold outline of the sprite itself */
+      if (isBody && vuln > 0 && mode !== 'won') outline(tinted('polter', fr, VULN_COL, 1), bxp, byp, s);
+      /* about to charge: the same silhouette in red, fading out */
       if (o.kind === 'body' && glow > 0) {
         ctx.globalAlpha = Math.min(1, glow);
-        ctx.fillStyle = COL.red;
-        ctx.fillRect((p.x - w / 2 - 4) | 0, (p.y - h / 2 - 4) | 0, (w + 8) | 0, (h + 8) | 0);
+        outline(tinted('polter', fr, COL.red, 1), bxp, byp, s);
         ctx.globalAlpha = 1;
       }
-      /* the punish window: a gold frame round him, static */
-      if (o.kind === 'body' && vuln > 0 && mode !== 'won') {
-        ctx.fillStyle = VULN_COL;
-        var vx0 = (p.x - w / 2 - 6) | 0, vy0 = (p.y - h / 2 - 6) | 0, vw = (w + 12) | 0, vh = (h + 12) | 0;
-        ctx.fillRect(vx0, vy0, vw, 2); ctx.fillRect(vx0, vy0 + vh - 2, vw, 2);
-        ctx.fillRect(vx0, vy0, 2, vh); ctx.fillRect(vx0 + vw - 2, vy0, 2, vh);
-      }
+      var drew = drawSheet('polter', bxp, byp, s * 1.0, glows, 0, fr);
+      /* the clone is the same body, flooded red by a baked copy */
+      if (o.kind === 'clone' && drew) putTint(tinted('polter', fr, COL.red, 0.5), bxp, byp, s);
       if (drew) return;
       ctx.fillStyle = o.kind === 'clone' ? '#5A2A3E' : '#1E3A44';
-      ctx.fillRect((p.x - w / 2) | 0, (p.y - h / 2) | 0, w | 0, h | 0);
+      ctx.fillRect((p.x - w / 4) | 0, (p.y - h / 4) | 0, (w / 2) | 0, (h / 2) | 0);
       ctx.fillStyle = o.kind === 'clone' ? COL.red : COL.ecto;
-      ctx.fillRect((p.x - w / 2 + 4) | 0, (p.y - h / 2 + 4) | 0, (w - 8) | 0, (h - 8) | 0);
+      ctx.fillRect((p.x - w / 4 + 4) | 0, (p.y - h / 4 + 4) | 0, (w / 2 - 8) | 0, (h / 2 - 8) | 0);
     });
 
     for (var b = 0; b < bullets.length; b++) {
@@ -803,19 +969,20 @@
                      hp: bossHP, max: bossMax, ticks: [0.5, 0.2],
                      php: hp, pmax: MAXHP, phase: phase });
 
-    /* the label sits outside the shake, on a dark plate (AA) */
-    if (vuln > 0 && mode !== 'won') {
+    /* the label sits outside the shake and outside the arena: on the
+       boss-bar row, right-aligned under the bar, on a dark plate (AA) */
+    if (mode !== 'won' && (running || vuln > 0)) {
+      var isV = vuln > 0, lt = isV ? 'VULNERABLE' : 'INVULNERABLE';
+      var lbw = dm.barW ? dm.barW(innerWidth) : 480, lbx = ((innerWidth - lbw) / 2) | 0;
+      /* 32px: the punish window is the one moment to read at a glance */
       ctx.font = '32px "Determination Mono","Pixelify Sans",monospace';
-      var lw = ctx.measureText('VULNERABLE').width || 200;
-      var lx = (AX + AW / 2 - lw / 2) | 0, ly = AY + 48;
+      ctx.textBaseline = 'top'; ctx.textAlign = 'right';
+      var lw = ctx.measureText(lt).width || 160;
       ctx.globalAlpha = 0.85; ctx.fillStyle = '#000000';
-      ctx.fillRect(lx - 8, ly - 32, (lw + 16) | 0, 44);
-      ctx.globalAlpha = 1; ctx.fillStyle = VULN_COL;
-      ctx.fillText('VULNERABLE', lx, ly, innerWidth);
-    } else if (mode !== 'won' && running) {
-      ctx.font = '32px "Determination Mono","Pixelify Sans",monospace';
-      ctx.fillStyle = COL.dim;
-      ctx.fillText('INVULNERABLE', AX + AW / 2 - 120, AY + 48, innerWidth);
+      ctx.fillRect((lbx + lbw - lw - 8) | 0, 50, (lw + 16) | 0, 40);
+      ctx.globalAlpha = 1; ctx.fillStyle = isV ? VULN_COL : COL.dim;
+      ctx.fillText(lt, lbx + lbw, 57, innerWidth);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     }
 
     if (phaseFlash > 0 && !REDUCE_MOTION) {

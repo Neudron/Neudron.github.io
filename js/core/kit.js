@@ -144,7 +144,7 @@
         dash.t -= dt;
         list = targets();
         for (i = 0; i < list.length; i++) if (dash.hit.indexOf(list[i]) < 0 && distance(list[i].x - F.x, list[i].y - F.y) <= 18 + (list[i].r || 0)) {
-          dash.hit.push(list[i]); damage(list[i], (item(equipped('melee')).stats || {}).dmg || 1, 'melee');
+          dash.hit.push(list[i]); damage(list[i], ((item(equipped('melee')) || {}).stats || {}).dmg || 1, 'melee');
         }
         if (dash.t <= 0) dash = null;
       }

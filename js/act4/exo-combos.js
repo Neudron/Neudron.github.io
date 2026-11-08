@@ -8,6 +8,8 @@
   var NEU = window.NEU = window.NEU || {};
   var A = null, pair = '', index = 0, current = null, tele = null, haz = null;
   var WARN = 27, HIT = 54, DUR = 80;
+  var src = { x: 0, y: 0 }, mate = { x: 0, y: 0 }, aim = 0, tf = 0, live = false;
+  var REDUCE = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   /* ExoMechComboAttackContent.cs:83-122 — each pair flips between two attacks. */
   var CYCLES = {
     'thanatos+ares': ['ThanatosAres_LaserCircle', 'ThanatosAres_EnergySlashesAndCharges'],
@@ -87,11 +89,16 @@
     index = 0;
     list = CYCLES[key];
     begin(list[0]);
-    if (NEU.talk) NEU.talk(['* They move together.'], 'narr');
+    if (NEU.exoCaption) NEU.exoCaption('* They move together.');
   }
   function tickFrame(st) {
     var list, fin;
     if (!pair) return false;
+    src.x = st.x; src.y = st.y;
+    mate.x = st.px === undefined ? st.x : st.px; mate.y = st.py === undefined ? st.y : st.py;
+    aim = Math.atan2(st.ty - st.y, st.tx - st.x);
+    live = true;
+    tf++;
     if (!current) begin(CYCLES[pair][0]);
     current.ax = st.ax; current.ay = st.ay; current.aw = st.aw; current.ah = st.ah;
     current.x = st.x; current.y = st.y; current.tx = st.tx; current.ty = st.ty;
@@ -104,42 +111,44 @@
     }
     return false;
   }
-  function paint(ctx, s, col) {
-    var k, n, px, py;
-    if (!s) return;
-    n = s.n || 1;
-    ctx.fillStyle = col;
-    if (s.kind === 'ring' || s.kind === 'circle') {
-      for (k = 0; k < n; k++) {
-        px = s.x + Math.cos(k * Math.PI * 2 / n) * s.r;
-        py = s.y + Math.sin(k * Math.PI * 2 / n) * s.r;
-        ctx.fillRect(px | 0, py | 0, 8, 8);
-      }
-    } else if (s.kind === 'burst') {
-      for (k = 0; k < n; k++) ctx.fillRect((s.x + k * 16) | 0, (s.y + k * 8) | 0, 12, 4);
-    } else if (s.kind === 'slash') {
-      ctx.fillRect(s.x | 0, s.y | 0, 8, 48);
-    } else if (s.kind === 'beam' || s.kind === 'dash') {
-      ctx.fillRect(s.x | 0, s.y | 0, s.len || 64, 4);
-    } else {
-      ctx.fillStyle = '#FF00FF';
-      ctx.fillRect((s.x | 0), (s.y | 0), 16, 16);
+  /* art: the shared telegraph and hazard painters in look-exo.js. */
+  function artKind(s) {
+    var k = s.kind === 'circle' ? 'ring' : s.kind === 'burst' ? 'fan' : s.kind;
+    return { kind: k, x: s.x, y: s.y, len: s.len, r: s.r, n: s.n };
+  }
+  /* a dashed teal tether between the two partners: 6 on, 4 off, 30 px/s */
+  function tether(ctx) {
+    var dx = mate.x - src.x, dy = mate.y - src.y, L = Math.sqrt(dx * dx + dy * dy), k, off, d;
+    if (L < 8) return;
+    off = REDUCE ? 0 : (tf * 0.5) % 10;
+    ctx.fillStyle = '#3BE2C8';
+    for (k = 0; k < L; k += 2) {
+      d = (k + off) % 10;
+      if (d < 6) ctx.fillRect((src.x + dx * k / L) | 0, (src.y + dy * k / L) | 0, 2, 2);
     }
+  }
+  function paintShape(ctx, s, f, haz) {
+    var A = NEU.exoArt, k;
+    if (!A || !s) return;
+    k = artKind(s);
+    if (haz) A.hazard(ctx, k, f - HIT, null, src, aim);
+    else A.tele(ctx, k, f - WARN, { warn: WARN }, null, src, aim);
   }
 
   NEU.exoCombos = {
     attach: function (adapter) { A = adapter; },
     pair: setPair,
     pairOf: function () { return pair; },
-    clear: function () { pair = ''; index = 0; current = null; tele = null; haz = null; },
+    clear: function () { pair = ''; index = 0; current = null; tele = null; haz = null; live = false; },
     step: tickFrame,
     current: function () { return current ? current.name : null; },
     telegraph: function () { return tele; },
     hazard: function () { return haz; },
     draw: function (ctx) {
       if (!ctx || !ctx.fillRect) return;
-      paint(ctx, tele, '#FFD2A0');
-      paint(ctx, haz, '#C83CFF');
+      if (pair && live) tether(ctx);
+      paintShape(ctx, tele, current ? current.f : 0, false);
+      paintShape(ctx, haz, current ? current.f : 0, true);
     }
   };
 })();

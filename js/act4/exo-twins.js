@@ -142,23 +142,17 @@
       { id: 'apollo', x: cx + 16, y: cy }
     ];
   }
+  /* DOM nodes are looked up once and written only when the text changes. */
+  var elV = null, elH = null, lastV = null, lastH = null;
   function label(word) {
-    var el = document.getElementById('exoVuln');
-    var hud = document.getElementById('exoHud');
-    var st = NEU.exo && NEU.exo.state;
-    if (el) el.textContent = word;
-    if (hud && st) hud.textContent = 'HP ' + twinsHp + '  P' + st.phase;
-  }
-  function draw(st) {
-    var cv = document.getElementById('exoCanvas');
-    var ctx = cv && cv.getContext ? cv.getContext('2d') : null;
-    var ar, cx, cy;
-    if (!ctx || !ctx.fillRect) return;
-    ctx.imageSmoothingEnabled = false;
-    ar = arena();
-    cx = (ar.AX + ar.AW - 96) | 0;
-    cy = (ar.AY + 88) | 0;
-    if (NEU.exoPaint && NEU.exoPaint.twins) NEU.exoPaint.twins(ctx, cx, cy);
+    var st = NEU.exo && NEU.exo.state, h;
+    if (!elV) elV = document.getElementById('exoVuln');
+    if (!elH) elH = document.getElementById('exoHud');
+    if (elV && word !== lastV) { elV.textContent = word; lastV = word; }
+    if (elH && st) {
+      h = 'HP ' + twinsHp + '  P' + st.phase;
+      if (h !== lastH) { elH.textContent = h; lastH = h; }
+    }
   }
   function publish() {
     var st = NEU.exo.state, word;
@@ -175,7 +169,6 @@
     if (finalOn) st.phase = 6;
     word = st.mode === 'fight' && open ? 'VULNERABLE' : (st.mode === 'fight' || st.mode === 'won' ? 'INVULNERABLE' : '');
     label(word);
-    draw(st);
   }
   function lockWin() {
     var st = NEU.exo.state;
@@ -207,13 +200,10 @@
     NEU.twinsAtk.phase(1);
   }
   function noteFinal() {
-    var wrap;
     if (NEU.twinsAtk.tier() < 6 || musicSent) return;
     finalOn = true;
     musicSent = true;
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('exo', 6);
-    wrap = document.getElementById('exo');
-    if (wrap) wrap.style.background = '#300818';
   }
   function onFightFrame() {
     var st = NEU.exo.state, ar;

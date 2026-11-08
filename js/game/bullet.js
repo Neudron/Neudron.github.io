@@ -112,6 +112,7 @@
     '.##..',
     '.#...'
   ];
+  var BOLT_PAL = { '#': '#FFF06A' };
 
   var blasters = [], bones = [], wallTelegraphs = [], grazeSparks = [];
   var BL_CHARGE = 0.85, BL_FIRE = 0.42;
@@ -670,6 +671,18 @@
     }
     var ec = bl.elec ? PAL.elec : PAL.blaster;
 
+    /* the look kit's halo on the muzzle: gathers while it charges, flares
+       as it fires. Skipped under reduced motion / no-flash. */
+    var EL = NEU.engineLook;
+    if (EL && EL.glow && !reducedFx()) {
+      var mx = bl.horiz ? (bl.from === 'l' ? AX : AX + AW) : bl.lane,
+          my = bl.horiz ? bl.lane : (bl.from === 't' ? AY : AY + AH),
+          gk = charging ? bl.t / BL_CHARGE * 0.5 : 1 - (bl.t - BL_CHARGE) / BL_FIRE;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      EL.glow(ctx, mx, my, BL_HALF * (charging ? 1.4 : 2.4), ec, Math.max(0.05, gk * 0.6));
+      ctx.restore();
+    }
+
     if (charging) {
       /* the telegraph line: an untelegraphed beam is unreadable */
       ctx.fillStyle = ec;
@@ -717,7 +730,11 @@
       ctx.drawImage(img, fr * GB_W, 0, GB_W, GB_H, (-GB_W * s / 2) | 0, -reach, GB_W * s, GB_H * s);
       ctx.restore();
     }
-    if (bl.elec) dm.soul.stamp(ctx, BOLT, x, y, 3, '#FFF06A');
+    if (bl.elec) {
+      /* the kit's cached sprite (feet-anchored: 5 rows * 3 = 15px) */
+      if (NEU.engineLook && NEU.engineLook.stamp) NEU.engineLook.stamp(ctx, BOLT, BOLT_PAL, x, y + 8, 3);
+      else dm.soul.stamp(ctx, BOLT, x, y, 3, '#FFF06A');
+    }
   }
 
   function drawWallTelegraphs() {
@@ -1062,8 +1079,21 @@
     NEU.activeMinigame = null;
   }
 
+  /* Step In: the door panel slides away (420ms, as sans.js closePanel), then
+     the room opens. open({}) keeps the default variant. */
+  var door = document.getElementById('panel');
+  var doorT = 0;
   var startBtn = document.getElementById('bhStart');
-  if (startBtn) startBtn.addEventListener('click', open);
+  if (startBtn) startBtn.addEventListener('click', function () {
+    /* Sans's box would sit over the bottom of the room: clear it first. */
+    if (NEU.talk && NEU.talk.close) NEU.talk.close();
+    if (door) {
+      door.classList.remove('is-open');
+      clearTimeout(doorT);
+      doorT = setTimeout(function () { door.hidden = true; }, 420);
+    }
+    open({});
+  });
   /* The SC fight shares this button and this wrapper (#bh), so the
      handler must route by whichever game is actually up — and it must
      confirm like ESC does instead of vanishing without a word. */

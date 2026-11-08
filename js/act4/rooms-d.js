@@ -101,12 +101,16 @@
       '#........................#',
       '##########################'
     ].join('\n'),
-    spawns: { fire: { x: 1, y: 7, face: 'right' }, east: { x: 24, y: 7, face: 'left' } },
+    /* portal: the painted door in the north wall, one tile inside it. The
+       pot's exit lands here; `east` is the alley side. */
+    spawns: { fire: { x: 1, y: 7, face: 'right' }, east: { x: 24, y: 7, face: 'left' },
+              portal: { x: 6, y: 3, face: 'down' } },
     entities: [
       { t: 'cityfloor', v: 'd1_street', x: 0, y: 0 },
       { t: 'save', x: 4, y: 10 },
       P('stallback', 10, 3),
-      { t: 'npc', x: 10, y: 4, colour: '#E4C46A', look: 'merchant', run: function (c) { shop(c); } },
+      /* hint: a speech bubble over him, so the shop reads as something to talk to */
+      { t: 'npc', x: 10, y: 4, colour: '#E4C46A', look: 'merchant', hint: true, run: function (c) { shop(c); } },
       /* the counter answers for him: you talk to a merchant across it,
          and from the road he is just out of arm's reach */
       P('stallfront', 10, 5, { run: function (c) { shop(c); } }),
@@ -158,18 +162,51 @@
     return (NEU.quest && NEU.quest.has && NEU.quest.has('a4_axe')) ||
       (NEU.save && NEU.save.has('axe'));
   }
+  /* Dialogue to combat. The fight waits for the dialogue to be shut (not a
+     timer), the screen goes black, the room is left, the fight opens on the
+     black, and the black lifts into it. Reduced motion skips the fades. */
+  var cutEl = null;
+  /* the black is made as soon as the dialogue can open, so it is in the page
+     from the first line of the talk, not only when the fight is armed */
+  function cutFx() {
+    if (!cutEl) {
+      cutEl = document.createElement('div');
+      cutEl.id = 'combatCut';
+      cutEl.setAttribute('aria-hidden', 'true');
+      cutEl.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#000;opacity:0;pointer-events:none;z-index:96;transition:opacity 500ms linear;';
+      document.body.appendChild(cutEl);
+    }
+    return cutEl;
+  }
+  function toCombat(c, start) {
+    cutFx();
+    var reduced = !!(NEU.motion && NEU.motion.reduced ? NEU.motion.reduced() : window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    var shut = reduced ? 0 : 500, hold = reduced ? 0 : 450, lift = reduced ? 0 : 600;
+    function waitShut() {
+      if (NEU.tboxOpen && NEU.tboxOpen()) { setTimeout(waitShut, 120); return; }
+      cutEl.style.transitionDuration = shut + 'ms';
+      cutEl.style.pointerEvents = 'auto';
+      cutEl.style.opacity = '1';
+      setTimeout(function () {
+        c.leave();
+        start();
+        cutEl.style.transitionDuration = lift + 'ms';
+        cutEl.style.opacity = '0';
+        setTimeout(function () { cutEl.style.pointerEvents = 'none'; }, lift);
+      }, shut + hold);
+    }
+    setTimeout(waitShut, 120);
+  }
   function shop(c) {
     /* Third state. The axe was refused hours ago and the refusal was a
        person, not a price — so the way past it is also a person.
        After the fight the board stays open, recall included. */
     if (NEU.save && NEU.save.flagged('tripping') && !fought()) {
+      cutFx();
       c.say(["you again. you look terrible.",
              "the axe? still not for sale.",
              "...but i'll go against you for it. you look like you'd lose."], 'narr');
-      setTimeout(function () {
-        c.leave();
-        if (NEU.rhythm) NEU.rhythm.open();
-      }, 6000);
+      toCombat(c, function () { if (NEU.rhythm) NEU.rhythm.open(); });
       return;
     }
     if (!fought() && NEU.save && NEU.save.has('recall')) {
