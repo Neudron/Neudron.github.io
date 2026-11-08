@@ -11,7 +11,7 @@
     var adapter = opts.adapter || {};
     var tp = 0, shield = false, stripOpen = false, stripSel = 0;
     var charge = false, chargeT = 0, meleeCd = 0, rangedCd = 0, healCd = 0;
-    var shots = [], swings = [], beam = null, dash = null, hp = 6;
+    var shots = [], swings = [], beam = null, dash = null, hp = 6, casts = [];
     var grazePts = 8 / 250, grazePad = 8, playerR = 4;
     var GRAZE_TEXT = 'GRAZE';
 
@@ -61,6 +61,7 @@
       var st = it.stats || {}, target = nearest(), base = target ? Math.atan2(target.y - F.y, target.x - F.x) : facing();
       var n = it.fx === 'shot' ? Math.max(1, st.n || 1) : 1, spread = st.spread || 0, i;
       rangedCd = st.cd || 1;
+      casts.push({ x: F.x, y: F.y - 8, t: 0.35, d: 0.35, k: 'fxGigCast' });
       for (i = 0; i < n; i++) {
         var ang = base + (n > 1 ? (i - (n - 1) / 2) * spread : 0);
         shots.push({ kind: it.fx === 'split' ? 'fireball' : it.fx, x: F.x, y: F.y,
@@ -111,6 +112,8 @@
           vx: Math.cos(a) * 220, vy: Math.sin(a) * 220, r: 6, dmg: st.dmg || 1, age: 0, life: 2, hit: [], pierce: false }); }
       } else if (fx === 'heal') heal(st.heal === 'full' ? 6 : Number(st.heal) || 0);
       else { tp += cost; return; }
+      var CF = { beam: 'fxGigBrim', shield: 'fxGigWard', nova: 'fxGigNova', heal: 'fxGigMend' };
+      if (CF[fx]) casts.push({ x: F.x, y: F.y - 8, t: 0.45, d: 0.45, k: CF[fx] });
       if (row.kind === 'consumable' && NEU.save) NEU.save.take(def.id);
       stripOpen = false;
     }
@@ -149,6 +152,7 @@
         if (dash.t <= 0) dash = null;
       }
       for (i = swings.length - 1; i >= 0; i--) { swings[i].t += dt; if (swings[i].t >= swings[i].dur) swings.splice(i, 1); }
+      for (i = casts.length - 1; i >= 0; i--) { casts[i].t -= dt; if (casts[i].t <= 0) casts.splice(i, 1); }
       if (beam) {
         beam.x = F.x; beam.y = F.y;
         list = targets();
@@ -231,6 +235,7 @@
         for (i = 0; i < 32; i++) { x = (beam.x + Math.cos(beam.ang) * i * 28) | 0; y = (beam.y + Math.sin(beam.ang) * i * 28) | 0; ctx.fillRect(x - 2, y - 2, 5, 5); }
         ctx.fillStyle = '#FFF4D0'; ctx.fillRect((beam.x - 1) | 0, (beam.y - 1) | 0, 3, 3);
       }
+      for (i = 0; i < casts.length; i++) if (NEU.fxBurst) NEU.fxBurst(ctx, casts[i].k, casts[i].x, casts[i].y, 1 - casts[i].t / casts[i].d, 1.6);
       if (!stripOpen) return;
       rows = stripItems(); panel = Math.min(box.AW - 24, 464); rw = 40;
       x = (box.AX + (box.AW - panel) / 2) | 0; y = (box.AY + Math.max(8, (box.AH - (rows.length * rw + 96)) / 2)) | 0;
@@ -264,7 +269,7 @@
       get tp() { return tp; },
       get stripOpen() { return stripOpen; },
       get slow() { return stripOpen ? 0.2 : 1; },
-      shots: shots,
+      shots: shots, casts: casts,
       get beam() { return beam; },
       get hp() { return hp; },
       /* a host that owns the HP (the dungeon) writes it in so HEAL and the strip read true */

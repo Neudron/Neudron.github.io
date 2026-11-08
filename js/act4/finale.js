@@ -10,7 +10,7 @@
   var GRANTS = ['phaseslayer', 'pulse_rifle', 'exoblade', 'magnomaly', 'flying_chair'];
 
   var live = false, age = 0, beam = 0, skin = 1, bodyY = START, fade = 1;
-  var still = false, granted = false, shook = false, hitOnce = false, burstOnce = false;
+  var still = false, granted = false, shook = false, hitOnce = false, burstOnce = false, fxT = -1;
   var parts = [], layers = [0, 0], shedT = 0, shedN = 0;
   var root = null, wordEl = null, g = null, off = null;
 
@@ -51,6 +51,7 @@
     parts.push({ x: 152, y: REST + 16, vx: 22, vy: -12, c: '#39FF6A' });
     if (!burstOnce && NEU.juice && NEU.juice.burst) {
       burstOnce = true;
+      fxT = 0;
       NEU.juice.burst(156, REST, 12, '#39FF6A', 90);
     }
   }
@@ -82,6 +83,7 @@
       }
       if (skin === 0) grant();
     }
+    if (fxT >= 0) { fxT += t; if (fxT > 0.9) fxT = -1; }
     tickShed(t, Math.round(beam * (W - BEAM_X)));
     layers[0] += t * 12;
     layers[1] += t * 28;
@@ -95,6 +97,7 @@
     skin = 0;
     fade = age / 0.45;
     if (fade >= 1) { fade = 1; still = true; grant(); }
+    if (fxT >= 0) { fxT += t; if (fxT > 0.9) fxT = -1; }
     if (!parts.length) {
       for (i = 0; i < 3; i++) parts.push({ x: 144 + i * 10, y: REST, vx: 0, vy: 0, c: '#39FF6A' });
     }
@@ -301,6 +304,7 @@
     for (i = 0; i < parts.length; i++) {
       F(g, Math.round(parts[i].x), Math.round(parts[i].y), 2, 2, parts[i].c);
     }
+    if (fxT >= 0 && fxT <= 0.9 && NEU.fxBurst) NEU.fxBurst(g, 'fxGigBoomV', 156, REST, fxT / 0.9, 2.4);
     if (shookNow && NEU.juice.end) NEU.juice.end(g, shookNow);
     if (NEU.juice && NEU.juice.overlay) NEU.juice.overlay(g, W, H);
   }
@@ -342,6 +346,7 @@
     shook = false;
     hitOnce = false;
     burstOnce = false;
+    fxT = -1;
     layers = [0, 0];
     shed = [];
     still = false;

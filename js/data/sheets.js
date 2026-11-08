@@ -419,7 +419,34 @@
        7x10 carpet repeat. */
     sleepLamp:  { src: 'img/act123/sleep-lamp.png',  w: 17, h: 43,  frames: 1, fw: 17, fh: 43, fps: 0 },
     sleepShelf: { src: 'img/act123/sleep-shelf.png', w: 52, h: 57,  frames: 1, fw: 52, fh: 57, fps: 0 },
-    sleepRug:   { src: 'img/act123/sleep-rug.png',   w: 7,  h: 10,  frames: 1, fw: 7,  fh: 10, fps: 0 }
+    sleepRug:   { src: 'img/act123/sleep-rug.png',   w: 7,  h: 10,  frames: 1, fw: 7,  fh: 10, fps: 0 },
+
+    /* Gigapack bursts (unTied, attribution) — one-shot strips for boss
+       impacts and the finale, re-sliced from the pack's horizontal rows
+       into the site's vertical-strip convention. Drawn through
+       NEU.fxBurst with p in [0,1]; falls back to nothing (callers keep
+       their own juice/glow under it). */
+    fxGigBoomO:{ src: IMG + 'vfx/GigBoomO.png', w: 64, h: 512, frames: 8,  fw: 64, fh: 64, fps: 0 },
+    fxGigBoomV:{ src: IMG + 'vfx/GigBoomV.png', w: 96, h: 960, frames: 10, fw: 96, fh: 96, fps: 0 },
+    fxGigHitY: { src: IMG + 'vfx/GigHitY.png',  w: 96, h: 672, frames: 7,  fw: 96, fh: 96, fps: 0 },
+    fxGigHitV: { src: IMG + 'vfx/GigHitV.png',  w: 80, h: 480, frames: 6,  fw: 80, fh: 80, fps: 0 },
+    fxGigCast: { src: IMG + 'vfx/GigCast.png',  w: 32, h: 448, frames: 14, fw: 32, fh: 32, fps: 0 },
+    fxGigNova: { src: IMG + 'vfx/GigNova.png',  w: 32, h: 576, frames: 18, fw: 32, fh: 32, fps: 0 },
+    fxGigMend: { src: IMG + 'vfx/GigMend.png',  w: 64, h: 1024, frames: 16, fw: 64, fh: 64, fps: 0 },
+    fxGigWard: { src: IMG + 'vfx/GigWard.png',  w: 64, h: 1152, frames: 18, fw: 64, fh: 64, fps: 0 },
+    fxGigBrim: { src: IMG + 'vfx/GigBrim.png',  w: 64, h: 1152, frames: 18, fw: 64, fh: 64, fps: 0 },
+    fxGigOK:   { src: IMG + 'vfx/GigOK.png',    w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigNO:   { src: IMG + 'vfx/GigNO.png',    w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigRankA:{ src: IMG + 'vfx/GigRankA.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigRankB:{ src: IMG + 'vfx/GigRankB.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigRankC:{ src: IMG + 'vfx/GigRankC.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigRankS:{ src: IMG + 'vfx/GigRankS.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    fxGigThumb:{ src: IMG + 'vfx/GigThumb.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    /* gigapack looping smoke (ambient wisps) + bdragon holy strip (paladin
+       smite). Holy is row 2 of sheet 00 re-sliced vertical; BDragon free
+       tier = non-commercial only, fine while neu.ac stays free. */
+    fxGigSmoke:{ src: IMG + 'vfx/GigSmoke.png', w: 64, h: 1024, frames: 16, fw: 64, fh: 64, fps: 5 },
+    fxHolySmite:{ src: IMG + 'vfx/FxHoly.png',  w: 64, h: 832,  frames: 13, fw: 64, fh: 64, fps: 0 }
   };
 
   /* THE DUNGEON (B5): its own map because none of these files ship yet, and fixes7 wants
@@ -464,6 +491,14 @@
     dgTactic:  { src: IMG + 'terraria/NPC_292.png',   w: 60,  h: 1260, frames: 21, fw: 60, fh: 60, fps: 0, hit: { w: 18, h: 40 } },
     dgCommando:{ src: IMG + 'terraria/NPC_293.png',   w: 60,  h: 1200, frames: 20, fw: 60, fh: 60, fps: 0, hit: { w: 18, h: 40 } },
     dgHammer:  { src: IMG + 'terraria/Projectile_300.png', w: 38, h: 38, frames: 1, fw: 38, fh: 38, fps: 0 },
+    dgFxBullet:{ src: IMG + 'vfx/FxBullet.png', w: 8,  h: 8,   frames: 1, fw: 8,  fh: 8,  fps: 0 },
+    dgFxPellet:{ src: IMG + 'vfx/FxPellet.png', w: 8,  h: 8,   frames: 1, fw: 8,  fh: 8,  fps: 0 },
+    dgFxSoul:  { src: IMG + 'vfx/FxSoul.png',   w: 12, h: 12,  frames: 1, fw: 12, fh: 12, fps: 0 },
+    dgFxFlame: { src: IMG + 'vfx/FxFlame.png',  w: 12, h: 12,  frames: 1, fw: 12, fh: 12, fps: 0 },
+    dgFxGhost: { src: IMG + 'vfx/FxGhost.png',  w: 12, h: 12,  frames: 1, fw: 12, fh: 12, fps: 0 },
+    dgFxBolt:  { src: IMG + 'vfx/FxBolt.png',   w: 16, h: 16,  frames: 1, fw: 16, fh: 16, fps: 0 },
+    dgFxFire:  { src: IMG + 'vfx/FxFire.png',   w: 128,h: 32,  frames: 4, fw: 32, fh: 32, fps: 0 },
+    dgFxBoom:  { src: IMG + 'vfx/FxBoom.png',   w: 48, h: 48,  frames: 1, fw: 48, fh: 48, fps: 0 },
     dgBall:    { src: IMG + 'terraria/NPC_70.png',    w: 34,  h: 34,   frames: 1, fw: 34, fh: 34, fps: 0, hit: { w: 28, h: 28 } },
     dgLink:    { src: IMG + 'terraria/Chain.png',     w: 12,  h: 12,   frames: 1, fw: 12, fh: 12, fps: 0 },
     dgWheel:   { src: IMG + 'terraria/NPC_72.png',    w: 34,  h: 144,  frames: 4, fw: 34, fh: 36, fps: 0, hit: { w: 30, h: 30 } },
@@ -562,6 +597,26 @@
                       dx, dy, dw | 0, dh | 0);
       }
     }
+    ctx.restore();
+    return true;
+  };
+
+  /* One-shot burst strips (Gigapack fxGig*): p in [0,1] walks the frames
+     once, alpha fades over the last third. Returns false until the image
+     is ready so callers keep their procedural burst underneath. */
+  NEU.fxBurst = function (ctx, key, x, y, p, scale) {
+    var sh = NEU.sheets[key], im;
+    if (!sh || p === undefined || p < 0 || p > 1) return false;
+    im = NEU.sheetReady(sh);
+    if (!im) return false;
+    var n = sh.frames || 1;
+    var fr = Math.min(n - 1, (p * n) | 0);
+    var sc = (scale || 1);
+    var dw = sh.fw * sc, dh = sh.fh * sc;
+    ctx.save();
+    ctx.globalAlpha = p > 0.66 ? Math.max(0, (1 - p) / 0.34) : 1;
+    ctx.drawImage(im, 0, fr * sh.fh, sh.fw, sh.fh,
+                  ((x - dw / 2) | 0), ((y - dh / 2) | 0), dw | 0, dh | 0);
     ctx.restore();
     return true;
   };

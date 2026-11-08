@@ -39,7 +39,7 @@
   var SPELL = { beam: { first: 1.67, next: 0.83, per: 5, cycle: 7.5, hitTp: 0.5 }, souls: { first: 1.67, next: 1, per: 3, cycle: 9, hitTp: 0 },
     inferno: { first: 1.67, next: 1.67, per: 3, cycle: 6.67, hitTp: 1 } };
   var PHANTOM = ['* Wails echo through the dilapidated dungeon halls...', '* Long-dead prisoners seek their zealous revenge...'];
-  var foes = [], shots = [], pops = [], kit = null, F = { x: 0, y: 0, fx: 1, fy: 0 }, box = { AX: 0, AY: 0, AW: 640, AH: 360 }, lastDir = 0;
+  var foes = [], shots = [], pops = [], fxs = [], kit = null, F = { x: 0, y: 0, fx: 1, fy: 0 }, box = { AX: 0, AY: 0, AW: 640, AH: 360 }, lastDir = 0;
 
   function sheet(k) { return NEU.dgSheets && NEU.dgSheets[k]; }
   function sgn(v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
@@ -53,13 +53,16 @@
     for (i = 1; i < n; i++) if (solidAt(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)) return false;
     return true;
   }
+  /* a ground foe's feet belong on the first standable tile under its spawn char — a char that floats
+     (d3's 'a' sits two tiles over the floor) must not materialize with its head inside the ceiling */
+  function floorBelow(x, y) { var fy = y + 1; while (fy < y + 200 && !P.solid(x, fy) && P.cell(x, fy) !== '=') fy++; return fy; }
   function spawn(k, x, y, sp) {
     var d = KIND[k], sh, m, f;
     if (!d) return null;
     f = { k: k, d: d, s: d.s, v: d.v, x: (x + 0.5) * T, y: 0, vx: 0, vy: 0, hp: d.hp, face: -1, t: 0, a: 0, n: 0, st: 0, sp: sp || null, walked: 0, flash: 0, cd: 0, shoots: 0 };
     if (d.phantom) { m = MOODS[(rnd() * 4) | 0]; f.s = m[0]; f.v = m[1]; f.shoots = m[2]; }
     sh = sheet(f.s); f.w = sh && sh.hit ? sh.hit.w : 16; f.h = sh && sh.hit ? sh.hit.h : 16; f.r = Math.min(f.w, f.h) / 2;
-    f.y = d.ai === 'fighter' || d.ai === 'ranged' || d.ai === 'caster' || d.ai === 'warlock' ? (y + 1) * T - f.h / 2 : (y + 0.5) * T;
+    f.y = d.ai === 'fighter' || d.ai === 'ranged' || d.ai === 'caster' || d.ai === 'warlock' ? floorBelow(x, y) * T - f.h / 2 : (y + 0.5) * T;
     if (d.ai === 'ball') { f.px = f.x; f.py = (y + 0.5) * T; f.len = 9 * T; }
     if (d.ai === 'wheel') { f.dx = 1; f.dy = 0; f.cx = x; f.cy = y; f.pr = 0; }
     if (d.ai === 'ranged') f.t = -1;
@@ -93,10 +96,23 @@
     var h = hero();
     if (h.dead > 0 || h.inv > 0 || P.replaying()) return;
     lastDir = dir || sgn(h.x - F.x) || 1;
-    if (kit && kit.hit(n)) h.inv = P.C.hurtInv;
+    if (kit && kit.hit(n)) { h.inv = P.C.hurtInv; fxs.push({ x: h.x, y: h.y - 6, t: 0.4, d: 0.4, k: 'fxGigHitV' }); }
   }
   function shoot(o) { o.age = 0; o.r = o.r || 4; shots.push(o); return o; }
   function aimAt(f, sp, spread) { var a = Math.atan2(hy() - f.y, hx() - f.x) + (spread || 0); return { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, a: a }; }
+
+  /* foe shot sprites (img/act4/vfx, CC0/AI sources — see .opencode/plans/vfx-assets.md).
+     A missing file just falls back to the old glow+rect, same as before. */
+  var FXS = { bullet: 'dgFxBullet', pellet: 'dgFxPellet', soul: 'dgFxSoul', flame: 'dgFxFlame', ghost: 'dgFxGhost', bolt: 'dgFxBolt' };
+  function fxIm(k) { var sh = k && NEU.dgSheets && NEU.dgSheets[k]; return sh ? NEU.sheetReady(sh) : null; }
+  function fxShot(c, s, k) {
+    var im = fxIm(k), sh = im && NEU.dgSheets[k], w, h;
+    if (!im) return false;
+    w = sh.fw || sh.w; h = sh.fh || sh.h;
+    c.save(); c.translate(s.x | 0, s.y | 0); c.rotate(Math.atan2(s.vy || 0, s.vx || 1));
+    c.drawImage(im, 0, 0, w, h, (-w / 2) | 0, (-h / 2) | 0, w, h); c.restore();
+    return true;
+  }
 
   /* ── AI families ───────────────────────────────────────────────────── */
   function fighter(f, dt) {
@@ -244,6 +260,7 @@
     var n;
     f.dead = true; if (f.sp) f.sp.cd = 20;
     if (NEU.juice && NEU.juice.burst) NEU.juice.burst(f.x, f.y, 10, '#E8DCC8', 120);
+    fxs.push({ x: f.x, y: f.y, t: 0.45, d: 0.45, k: f.d.hammer ? 'fxHolySmite' : 'fxGigHitY' });
     if (NEU.save && NEU.save.addCoins && !P.replaying()) NEU.save.addCoins(1 + ((rnd() * 2) | 0));
     if (f.d.big && rnd() < 1 / 6) spawn('s', f.x / T - 0.5, f.y / T - 0.5);
     if (f.d.phantom && NEU.save && NEU.save.flag) {
@@ -294,10 +311,12 @@
       if (kit) kit.graze(s);
       if (Math.abs(hx() - s.x) < P.hw + s.r && Math.abs(hy() - s.y) < P.hh / 2 + s.r) {
         if (s.boom) explode(s); else hurtHero(1, sgn(s.vx));
+        if (s.k === 'hammer' && !s.smit) { s.smit = 1; fxs.push({ x: s.x, y: s.y, t: 0.4, d: 0.4, k: 'fxHolySmite' }); }
         if (s.k !== 'fire' && s.k !== 'boom' && s.k !== 'hammer') shots.splice(i, 1);
       }
     }
     for (i = pops.length - 1; i >= 0; i--) if ((pops[i].t -= dt) <= 0) pops.splice(i, 1);
+    for (i = fxs.length - 1; i >= 0; i--) if ((fxs[i].t -= dt) <= 0) fxs.splice(i, 1);
     /* Terraria-style respawn: a spawner refills off screen and far away after 20 s; a fighter is Bone Lee 1 in 30 */
     for (i = 0; i < sps.length; i++) {
       sp = sps[i]; if (sp.foe && !sp.foe.dead) continue;
@@ -307,7 +326,7 @@
     }
     for (i = foes.length - 1; i >= 0; i--) if (foes[i].dead) foes.splice(i, 1);
   }
-  function explode(s) { s.k = 'boom'; s.age = 0; s.life = 0.3; s.r = s.boom; s.vx = s.vy = 0; shots.push(s); if (Math.abs(hx() - s.x) < s.boom + P.hw && Math.abs(hy() - s.y) < s.boom + P.hh / 2) hurtHero(1, sgn(hx() - s.x)); }
+  function explode(s) { if (s.k === 'boom') return; s.k = 'boom'; s.age = 0; s.life = 0.3; s.r = s.boom; s.vx = s.vy = 0; shots.push(s); if (Math.abs(hx() - s.x) < s.boom + P.hw && Math.abs(hy() - s.y) < s.boom + P.hh / 2) hurtHero(1, sgn(hx() - s.x)); }
   function onBeam(p) {
     var i, ax, ay, bx, by, t, qx, qy, L;
     for (i = 0; i + 3 < p.length; i += 2) {
@@ -319,7 +338,7 @@
   }
   function open() {
     var i, sps = def.spawners;
-    foes.length = 0; shots.length = 0; pops.length = 0;
+    foes.length = 0; shots.length = 0; pops.length = 0; fxs.length = 0;
     kit = NEU.kit ? NEU.kit.create({ F: F, box: box, noMelee: true, adapter: {
       targets: function () { var out = [], i; for (i = 0; i < foes.length; i++) if (!foes[i].dead && foes[i].d.hp && onScreen(foes[i].x, foes[i].y, 0)) out.push(foes[i]); return out; },
       damage: function (t, n, kind) { if (kind !== 'melee') hitFoe(t, 1, sgn(t.x - F.x)); },
@@ -373,11 +392,21 @@
     for (i = 0; i < shots.length; i++) {
       s = shots[i];
       if (s.k === 'beam') { for (p = 0; p + 3 < s.path.length; p += 2) line(c, s.path[p], s.path[p + 1], s.path[p + 2], s.path[p + 3], '#D8A0FF', 2); continue; }
-      if (s.k === 'fire' || s.k === 'boom') { P.glow(c, s.x, s.y, s.r * 1.5, '#FF6A3A', 0.3); ring(c, s.x, s.y, s.r, '#FFB050'); ring(c, s.x, s.y, s.r * 0.6, '#FFE0A0'); continue; }
+      if (s.k === 'fire' || s.k === 'boom') {
+        P.glow(c, s.x, s.y, s.r * 1.5, '#FF6A3A', 0.3); ring(c, s.x, s.y, s.r, '#FFB050'); ring(c, s.x, s.y, s.r * 0.6, '#FFE0A0');
+        var bim = fxIm(s.k === 'fire' ? 'dgFxFire' : 'dgFxBoom');
+        if (bim) {
+          if (s.k === 'fire') { var f = (s.age * 6) | 0, fs = 32; c.drawImage(bim, (f % 4) * fs, 0, fs, fs, (s.x - fs / 2) | 0, (s.y - fs / 2) | 0, fs, fs); }
+          else { var bs = Math.max(48, Math.min(160, (s.r * 1.4) | 0)); c.drawImage(bim, 0, 0, 48, 48, (s.x - bs / 2) | 0, (s.y - bs / 2) | 0, bs, bs); }
+        }
+        continue;
+      }
       if (s.k === 'hammer') { NEU.dungeonLook.cut(c, 'dgHammer', 0, 0, 38, 38, s.x - 19, s.y - 19); continue; }
       k = { bullet: '#FFE8A0', pellet: '#FFD070', rocket: '#FF8A3A', soul: '#9AF0FF', flame: '#E8E8FF', ghost: '#7FE3C4', bolt: '#FF6A3A' }[s.k] || '#FFFFFF';
-      P.glow(c, s.x, s.y, 12, k, 0.25); P.fr(c, (s.x - s.r / 2) | 0, (s.y - s.r / 2) | 0, Math.max(2, s.r), Math.max(2, s.r), k);
+      P.glow(c, s.x, s.y, 12, k, 0.25);
+      if (!fxShot(c, s, FXS[s.k])) P.fr(c, (s.x - s.r / 2) | 0, (s.y - s.r / 2) | 0, Math.max(2, s.r), Math.max(2, s.r), k);
     }
+    for (i = 0; i < fxs.length; i++) if (NEU.fxBurst) NEU.fxBurst(c, fxs[i].k, fxs[i].x, fxs[i].y, 1 - fxs[i].t / fxs[i].d, 1.4);
     c.font = '16px "Determination Mono","Pixelify Sans",monospace'; c.textAlign = 'center'; c.textBaseline = 'bottom';
     for (i = 0; i < pops.length; i++) { c.fillStyle = '#12081E'; c.fillText(pops[i].s, (pops[i].x + 1) | 0, (pops[i].y + 1) | 0); c.fillStyle = '#FFE8A0'; c.fillText(pops[i].s, pops[i].x | 0, pops[i].y | 0); }
     c.textAlign = 'left';

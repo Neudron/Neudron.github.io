@@ -406,6 +406,7 @@
   function drawImpact(x, y) {
     var k, a, r, cols = ['#FFFFFF', '#FFD34E', '#E04A3A'], j, d;
     if (impactT <= 0) return;
+    if (NEU.fxBurst) NEU.fxBurst(ctx, 'fxGigBoomO', x, y, Math.min(1, impactT / 40), 1.8);
     for (j = 0; j < 3; j++) {
       r = impactT * 5 - j * 14;
       if (r < 4) continue;

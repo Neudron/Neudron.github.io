@@ -597,6 +597,7 @@
     ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, innerWidth, innerHeight);
     frame();
     var playing = dm.death ? dm.death(ctx, px, py, ms, COL.soul) : (ms <= 1700);
+    if (playing && ms < 900 && NEU.fxBurst) NEU.fxBurst(ctx, 'fxGigBoomV', px, py, ms / 900, 2.2);
     if (!playing) {
       dying = 0;
       if (msg) { msg.hidden = false;
