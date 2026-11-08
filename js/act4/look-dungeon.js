@@ -146,6 +146,18 @@
       if (d.k === 'w') { P.glow(c, sx + 8, sy - 2, 22, '#7AA8FF', 0.16); P.fr(c, sx + 7, sy - 4 - ((f + d.x) & 1), 2, 3, '#BFD8FF'); P.fr(c, sx + 7, sy - 2, 2, 1, '#4A78E0'); }
       else P.glow(c, sx + 8, sy + 18, 34, '#F8A030', 0.14);
     }
+    /* deep-zone haze: gigapack smoke loops drifting up, only under d7 —
+       the upper dungeon stays clean. reducedNow() freezes them like the
+       flames; sheetDraw no-ops until the png lands. */
+    var s = P.state, z = s && L.zoneAt ? L.zoneAt(s.x, s.y - 11) : null;
+    if (z && z.n >= 7 && !reducedNow() && NEU.sheetReady && NEU.sheetReady(NEU.sheets.fxGigSmoke)) {
+      var i2, px, py;
+      for (i2 = 0; i2 < 3; i2++) {
+        px = a.x0 + P.mod(P.hash(i2, 7, z.n) * (a.x1 - a.x0) + now * 0.006 * (i2 + 1), a.x1 - a.x0);
+        py = a.y1 - P.mod(P.hash(i2, 3, z.n) * (a.y1 - a.y0) + now * 0.012, a.y1 - a.y0 + 64);
+        NEU.sheetDraw(c, 'fxGigSmoke', px, py, { scale: 1.6, alpha: 0.4, now: now + i2 * 373 });
+      }
+    }
   }
 
   /* ── the light map: Terraria's four sweeps over the view + a 4-tile margin ── */

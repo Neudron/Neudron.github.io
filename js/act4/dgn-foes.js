@@ -260,7 +260,7 @@
     var n;
     f.dead = true; if (f.sp) f.sp.cd = 20;
     if (NEU.juice && NEU.juice.burst) NEU.juice.burst(f.x, f.y, 10, '#E8DCC8', 120);
-    fxs.push({ x: f.x, y: f.y, t: 0.45, d: 0.45, k: 'fxGigHitY' });
+    fxs.push({ x: f.x, y: f.y, t: 0.45, d: 0.45, k: f.d.hammer ? 'fxHolySmite' : 'fxGigHitY' });
     if (NEU.save && NEU.save.addCoins && !P.replaying()) NEU.save.addCoins(1 + ((rnd() * 2) | 0));
     if (f.d.big && rnd() < 1 / 6) spawn('s', f.x / T - 0.5, f.y / T - 0.5);
     if (f.d.phantom && NEU.save && NEU.save.flag) {
@@ -311,6 +311,7 @@
       if (kit) kit.graze(s);
       if (Math.abs(hx() - s.x) < P.hw + s.r && Math.abs(hy() - s.y) < P.hh / 2 + s.r) {
         if (s.boom) explode(s); else hurtHero(1, sgn(s.vx));
+        if (s.k === 'hammer' && !s.smit) { s.smit = 1; fxs.push({ x: s.x, y: s.y, t: 0.4, d: 0.4, k: 'fxHolySmite' }); }
         if (s.k !== 'fire' && s.k !== 'boom' && s.k !== 'hammer') shots.splice(i, 1);
       }
     }

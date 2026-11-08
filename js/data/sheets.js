@@ -441,7 +441,12 @@
     fxGigRankB:{ src: IMG + 'vfx/GigRankB.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
     fxGigRankC:{ src: IMG + 'vfx/GigRankC.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
     fxGigRankS:{ src: IMG + 'vfx/GigRankS.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
-    fxGigThumb:{ src: IMG + 'vfx/GigThumb.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 }
+    fxGigThumb:{ src: IMG + 'vfx/GigThumb.png', w: 40, h: 2400, frames: 60, fw: 40, fh: 40, fps: 0 },
+    /* gigapack looping smoke (ambient wisps) + bdragon holy strip (paladin
+       smite). Holy is row 2 of sheet 00 re-sliced vertical; BDragon free
+       tier = non-commercial only, fine while neu.ac stays free. */
+    fxGigSmoke:{ src: IMG + 'vfx/GigSmoke.png', w: 64, h: 1024, frames: 16, fw: 64, fh: 64, fps: 5 },
+    fxHolySmite:{ src: IMG + 'vfx/FxHoly.png',  w: 64, h: 832,  frames: 13, fw: 64, fh: 64, fps: 0 }
   };
 
   /* THE DUNGEON (B5): its own map because none of these files ship yet, and fixes7 wants
