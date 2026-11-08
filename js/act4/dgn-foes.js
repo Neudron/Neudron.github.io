@@ -101,6 +101,19 @@
   function shoot(o) { o.age = 0; o.r = o.r || 4; shots.push(o); return o; }
   function aimAt(f, sp, spread) { var a = Math.atan2(hy() - f.y, hx() - f.x) + (spread || 0); return { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, a: a }; }
 
+  /* foe shot sprites (img/act4/vfx, CC0/AI sources — see .opencode/plans/vfx-assets.md).
+     A missing file just falls back to the old glow+rect, same as before. */
+  var FXS = { bullet: 'dgFxBullet', pellet: 'dgFxPellet', soul: 'dgFxSoul', flame: 'dgFxFlame', ghost: 'dgFxGhost', bolt: 'dgFxBolt' };
+  function fxIm(k) { var sh = k && NEU.dgSheets && NEU.dgSheets[k]; return sh ? NEU.sheetReady(sh) : null; }
+  function fxShot(c, s, k) {
+    var im = fxIm(k), sh = im && NEU.dgSheets[k], w, h;
+    if (!im) return false;
+    w = sh.fw || sh.w; h = sh.fh || sh.h;
+    c.save(); c.translate(s.x | 0, s.y | 0); c.rotate(Math.atan2(s.vy || 0, s.vx || 1));
+    c.drawImage(im, 0, 0, w, h, (-w / 2) | 0, (-h / 2) | 0, w, h); c.restore();
+    return true;
+  }
+
   /* ── AI families ───────────────────────────────────────────────────── */
   function fighter(f, dt) {
     var d = f.d, dx = hx() - f.x, stuck, v;
@@ -376,10 +389,19 @@
     for (i = 0; i < shots.length; i++) {
       s = shots[i];
       if (s.k === 'beam') { for (p = 0; p + 3 < s.path.length; p += 2) line(c, s.path[p], s.path[p + 1], s.path[p + 2], s.path[p + 3], '#D8A0FF', 2); continue; }
-      if (s.k === 'fire' || s.k === 'boom') { P.glow(c, s.x, s.y, s.r * 1.5, '#FF6A3A', 0.3); ring(c, s.x, s.y, s.r, '#FFB050'); ring(c, s.x, s.y, s.r * 0.6, '#FFE0A0'); continue; }
+      if (s.k === 'fire' || s.k === 'boom') {
+        P.glow(c, s.x, s.y, s.r * 1.5, '#FF6A3A', 0.3); ring(c, s.x, s.y, s.r, '#FFB050'); ring(c, s.x, s.y, s.r * 0.6, '#FFE0A0');
+        var bim = fxIm(s.k === 'fire' ? 'dgFxFire' : 'dgFxBoom');
+        if (bim) {
+          if (s.k === 'fire') { var f = (s.age * 6) | 0, fs = 32; c.drawImage(bim, (f % 4) * fs, 0, fs, fs, (s.x - fs / 2) | 0, (s.y - fs / 2) | 0, fs, fs); }
+          else { var bs = Math.max(48, Math.min(160, (s.r * 1.4) | 0)); c.drawImage(bim, 0, 0, 48, 48, (s.x - bs / 2) | 0, (s.y - bs / 2) | 0, bs, bs); }
+        }
+        continue;
+      }
       if (s.k === 'hammer') { NEU.dungeonLook.cut(c, 'dgHammer', 0, 0, 38, 38, s.x - 19, s.y - 19); continue; }
       k = { bullet: '#FFE8A0', pellet: '#FFD070', rocket: '#FF8A3A', soul: '#9AF0FF', flame: '#E8E8FF', ghost: '#7FE3C4', bolt: '#FF6A3A' }[s.k] || '#FFFFFF';
-      P.glow(c, s.x, s.y, 12, k, 0.25); P.fr(c, (s.x - s.r / 2) | 0, (s.y - s.r / 2) | 0, Math.max(2, s.r), Math.max(2, s.r), k);
+      P.glow(c, s.x, s.y, 12, k, 0.25);
+      if (!fxShot(c, s, FXS[s.k])) P.fr(c, (s.x - s.r / 2) | 0, (s.y - s.r / 2) | 0, Math.max(2, s.r), Math.max(2, s.r), k);
     }
     c.font = '16px "Determination Mono","Pixelify Sans",monospace'; c.textAlign = 'center'; c.textBaseline = 'bottom';
     for (i = 0; i < pops.length; i++) { c.fillStyle = '#12081E'; c.fillText(pops[i].s, (pops[i].x + 1) | 0, (pops[i].y + 1) | 0); c.fillStyle = '#FFE8A0'; c.fillText(pops[i].s, pops[i].x | 0, pops[i].y | 0); }
