@@ -120,19 +120,9 @@
     NEU.save.flag('mage_beaten', true);
   }
 
+  /* a lost duel is a dungeon death: you wake at the surface save */
   function dungeonDeath() {
-    var P = NEU.plat, i, s;
-    if (!P || !P.open || !P.step) return;
-    if (!(P.levels && P.levels.d1)) {
-      if (P.levels && P.levels.d0) P.open('d0');
-      return;
-    }
-    P.open('d1');
-    for (i = 0; i < 80; i++) {
-      s = P.step(1 / 60, 'left');
-      if (NEU.dungeon && NEU.dungeon.here && NEU.dungeon.here() === 'd0') return;
-      if (s && s.dead) return;
-    }
+    if (NEU.dungeon && NEU.dungeon.toSurface) NEU.dungeon.toSurface();
   }
 
   /* Both decks and both hands empty, both still up: the duel has nowhere
