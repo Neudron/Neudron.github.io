@@ -39,7 +39,7 @@
   var SPELL = { beam: { first: 1.67, next: 0.83, per: 5, cycle: 7.5, hitTp: 0.5 }, souls: { first: 1.67, next: 1, per: 3, cycle: 9, hitTp: 0 },
     inferno: { first: 1.67, next: 1.67, per: 3, cycle: 6.67, hitTp: 1 } };
   var PHANTOM = ['* Wails echo through the dilapidated dungeon halls...', '* Long-dead prisoners seek their zealous revenge...'];
-  var foes = [], shots = [], pops = [], kit = null, F = { x: 0, y: 0, fx: 1, fy: 0 }, box = { AX: 0, AY: 0, AW: 640, AH: 360 }, lastDir = 0;
+  var foes = [], shots = [], pops = [], fxs = [], kit = null, F = { x: 0, y: 0, fx: 1, fy: 0 }, box = { AX: 0, AY: 0, AW: 640, AH: 360 }, lastDir = 0;
 
   function sheet(k) { return NEU.dgSheets && NEU.dgSheets[k]; }
   function sgn(v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
@@ -96,7 +96,7 @@
     var h = hero();
     if (h.dead > 0 || h.inv > 0 || P.replaying()) return;
     lastDir = dir || sgn(h.x - F.x) || 1;
-    if (kit && kit.hit(n)) h.inv = P.C.hurtInv;
+    if (kit && kit.hit(n)) { h.inv = P.C.hurtInv; fxs.push({ x: h.x, y: h.y - 6, t: 0.4, d: 0.4, k: 'fxGigHitV' }); }
   }
   function shoot(o) { o.age = 0; o.r = o.r || 4; shots.push(o); return o; }
   function aimAt(f, sp, spread) { var a = Math.atan2(hy() - f.y, hx() - f.x) + (spread || 0); return { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, a: a }; }
@@ -260,6 +260,7 @@
     var n;
     f.dead = true; if (f.sp) f.sp.cd = 20;
     if (NEU.juice && NEU.juice.burst) NEU.juice.burst(f.x, f.y, 10, '#E8DCC8', 120);
+    fxs.push({ x: f.x, y: f.y, t: 0.45, d: 0.45, k: 'fxGigHitY' });
     if (NEU.save && NEU.save.addCoins && !P.replaying()) NEU.save.addCoins(1 + ((rnd() * 2) | 0));
     if (f.d.big && rnd() < 1 / 6) spawn('s', f.x / T - 0.5, f.y / T - 0.5);
     if (f.d.phantom && NEU.save && NEU.save.flag) {
@@ -314,6 +315,7 @@
       }
     }
     for (i = pops.length - 1; i >= 0; i--) if ((pops[i].t -= dt) <= 0) pops.splice(i, 1);
+    for (i = fxs.length - 1; i >= 0; i--) if ((fxs[i].t -= dt) <= 0) fxs.splice(i, 1);
     /* Terraria-style respawn: a spawner refills off screen and far away after 20 s; a fighter is Bone Lee 1 in 30 */
     for (i = 0; i < sps.length; i++) {
       sp = sps[i]; if (sp.foe && !sp.foe.dead) continue;
@@ -335,7 +337,7 @@
   }
   function open() {
     var i, sps = def.spawners;
-    foes.length = 0; shots.length = 0; pops.length = 0;
+    foes.length = 0; shots.length = 0; pops.length = 0; fxs.length = 0;
     kit = NEU.kit ? NEU.kit.create({ F: F, box: box, noMelee: true, adapter: {
       targets: function () { var out = [], i; for (i = 0; i < foes.length; i++) if (!foes[i].dead && foes[i].d.hp && onScreen(foes[i].x, foes[i].y, 0)) out.push(foes[i]); return out; },
       damage: function (t, n, kind) { if (kind !== 'melee') hitFoe(t, 1, sgn(t.x - F.x)); },
@@ -403,6 +405,7 @@
       P.glow(c, s.x, s.y, 12, k, 0.25);
       if (!fxShot(c, s, FXS[s.k])) P.fr(c, (s.x - s.r / 2) | 0, (s.y - s.r / 2) | 0, Math.max(2, s.r), Math.max(2, s.r), k);
     }
+    for (i = 0; i < fxs.length; i++) if (NEU.fxBurst) NEU.fxBurst(c, fxs[i].k, fxs[i].x, fxs[i].y, 1 - fxs[i].t / fxs[i].d, 1.4);
     c.font = '16px "Determination Mono","Pixelify Sans",monospace'; c.textAlign = 'center'; c.textBaseline = 'bottom';
     for (i = 0; i < pops.length; i++) { c.fillStyle = '#12081E'; c.fillText(pops[i].s, (pops[i].x + 1) | 0, (pops[i].y + 1) | 0); c.fillStyle = '#FFE8A0'; c.fillText(pops[i].s, pops[i].x | 0, pops[i].y | 0); }
     c.textAlign = 'left';

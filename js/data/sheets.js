@@ -419,7 +419,17 @@
        7x10 carpet repeat. */
     sleepLamp:  { src: 'img/act123/sleep-lamp.png',  w: 17, h: 43,  frames: 1, fw: 17, fh: 43, fps: 0 },
     sleepShelf: { src: 'img/act123/sleep-shelf.png', w: 52, h: 57,  frames: 1, fw: 52, fh: 57, fps: 0 },
-    sleepRug:   { src: 'img/act123/sleep-rug.png',   w: 7,  h: 10,  frames: 1, fw: 7,  fh: 10, fps: 0 }
+    sleepRug:   { src: 'img/act123/sleep-rug.png',   w: 7,  h: 10,  frames: 1, fw: 7,  fh: 10, fps: 0 },
+
+    /* Gigapack bursts (unTied, attribution) — one-shot strips for boss
+       impacts and the finale, re-sliced from the pack's horizontal rows
+       into the site's vertical-strip convention. Drawn through
+       NEU.fxBurst with p in [0,1]; falls back to nothing (callers keep
+       their own juice/glow under it). */
+    fxGigBoomO:{ src: IMG + 'vfx/GigBoomO.png', w: 64, h: 512, frames: 8,  fw: 64, fh: 64, fps: 0 },
+    fxGigBoomV:{ src: IMG + 'vfx/GigBoomV.png', w: 96, h: 960, frames: 10, fw: 96, fh: 96, fps: 0 },
+    fxGigHitY: { src: IMG + 'vfx/GigHitY.png',  w: 96, h: 672, frames: 7,  fw: 96, fh: 96, fps: 0 },
+    fxGigHitV: { src: IMG + 'vfx/GigHitV.png',  w: 80, h: 480, frames: 6,  fw: 80, fh: 80, fps: 0 }
   };
 
   /* THE DUNGEON (B5): its own map because none of these files ship yet, and fixes7 wants
@@ -570,6 +580,26 @@
                       dx, dy, dw | 0, dh | 0);
       }
     }
+    ctx.restore();
+    return true;
+  };
+
+  /* One-shot burst strips (Gigapack fxGig*): p in [0,1] walks the frames
+     once, alpha fades over the last third. Returns false until the image
+     is ready so callers keep their procedural burst underneath. */
+  NEU.fxBurst = function (ctx, key, x, y, p, scale) {
+    var sh = NEU.sheets[key], im;
+    if (!sh || p === undefined || p < 0 || p > 1) return false;
+    im = NEU.sheetReady(sh);
+    if (!im) return false;
+    var n = sh.frames || 1;
+    var fr = Math.min(n - 1, (p * n) | 0);
+    var sc = (scale || 1);
+    var dw = sh.fw * sc, dh = sh.fh * sc;
+    ctx.save();
+    ctx.globalAlpha = p > 0.66 ? Math.max(0, (1 - p) / 0.34) : 1;
+    ctx.drawImage(im, 0, fr * sh.fh, sh.fw, sh.fh,
+                  ((x - dw / 2) | 0), ((y - dh / 2) | 0), dw | 0, dh | 0);
     ctx.restore();
     return true;
   };
