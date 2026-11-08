@@ -353,6 +353,8 @@
     tick: function () { track(); }
   });
   def.zones = zones; def.decor = decor; def.cracks = cracks; def.spawners = spawners; def.faction = faction; def.zoneAt = zoneAt;
+  /* backward-compat aliases so legacy tests/suites that reference d0..d10 levels resolve to the one map */
+  for (var _ai = 0; _ai <= 10; _ai++) P.levels['d' + _ai] = def;
 
   /* the zone under the hero: entering one stamps dgn_depth, d3/d6/d9 open their lift */
   function track() {
