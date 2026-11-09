@@ -287,7 +287,42 @@
   kd('sign').draw = function (c, x, y) { cut(c, 'dgSign', 0, 0, 32, 32, x - 8, y - 16); };
   kd('keeper').draw = function (c, x, y) { cut(c, 'dgKeeper', 0, 0, 40, 56, x - 12, y + 16 - 56); };
   kd('pot').draw = function (c, x, y, e) { var v = (P.hash(e.x, e.y, 5) * 3) | 0; cut(c, 'dgPot', v * 36, 10 * 36, 32, 32, x, y - 16); };
-  kd('painting').draw = function (c, x, y) { var s = paintingSpr(); c.drawImage(s.cv, x, y); };
+  /* the painting hangs IN the wall: a dark niche recess, a dust sheet over it
+     until painting_found, then the gilt frame. The Z prompt floats above in
+     reach (same band plat.js uses for the touch), drawn through engine-look so
+     a rebound key shows its own letter. */
+  kd('painting').draw = function (c, x, y, e, now) {
+    var found = !!(NEU.save && NEU.save.flagged && NEU.save.flagged('painting_found'));
+    var s;
+    c.fillStyle = '#0A0614'; c.fillRect(x - 2, y - 2, 20, 20);
+    c.fillStyle = '#1A1028'; c.fillRect(x - 1, y - 1, 18, 18);
+    if (found) { s = paintingSpr(); c.drawImage(s.cv, x, y); }
+    else {
+      c.fillStyle = '#5A5664'; c.fillRect(x - 1, y - 1, 18, 20);
+      c.fillStyle = '#77727E'; c.fillRect(x - 1, y - 1, 18, 1);
+      c.fillStyle = '#46424E';
+      c.fillRect(x + 2, y, 1, 18); c.fillRect(x + 7, y, 1, 18); c.fillRect(x + 12, y, 1, 18);
+      c.fillStyle = INK; c.fillRect(x - 1, y + 17, 18, 1);
+    }
+  };
+  /* the interact prompt must survive the light map: entities draw before the
+     shade, so the key cap goes on a second foreground pass, after it. */
+  function paintingPrompt(c, cx, cy, L, now) {
+    var i, e, h = P.state, ex, ey;
+    if (!h || !NEU.engineLook || !NEU.engineLook.drawPrompt || P.replaying()) return;
+    for (i = 0; i < L.entities.length; i++) {
+      e = L.entities[i];
+      if (e.t !== 'painting' || e.dead) continue;
+      ex = (e.x + 0.5) * T; ey = (e.y + 1) * T;
+      if (Math.abs(h.x - ex) <= 22 && Math.abs((h.y - 11) - (ey - 8)) <= 48)
+        NEU.engineLook.drawPrompt(c, e.x * T - cx + 8, e.y * T - cy - 3, 1, now, !!(NEU.touch && NEU.touch.visible));
+    }
+  }
+  var prevFg2 = P.foreground;
+  P.foreground = function (c, cx, cy, L, now, a) {
+    if (prevFg2) prevFg2(c, cx, cy, L, now, a);
+    if (L && L.tileset === 'dungeon') paintingPrompt(c, cx, cy, L, now);
+  };
   kd('magegate').draw = function (c, x, y, e, now) {
     var s = mageSpr(), gx = x - 8, gy = y - 32, k = reducedNow() ? 0 : ((now / 600) | 0) % 6;
     c.drawImage(s.cv, gx, gy);
