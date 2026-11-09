@@ -233,6 +233,7 @@
     return { x: x, y: y, vy: 0, mode: 'red', modeT: 0, ground: false, focus: false,
              fx: 0, fy: -1, dvx: 0, dvy: 0, dashT: 0, dashI: 0, dashCd: 0,
              dashCdMax: (o && o.dashCd) || DASH_CD,
+             speed: (o && o.speed) || 0, focusSpd: (o && o.focus) || 0,
              trail: [], tapK: '', tapAt: -9, clock: 0,
              adren: 0, adrenT: 0, rage: 0, rageT: 0, rageFull: 0,
              swings: [], grazes: [], grazeFlashT: 0,
@@ -275,7 +276,7 @@
     if (F.dashI > 0) F.dashI -= dt;
     if (F.modeT > 0) F.modeT -= dt;
     /* Shift held: the soul's slow, precise speed. The dash has its own. */
-    var y0 = F.y, sp = keys.focus ? NEU.danmaku.FOCUS : NEU.danmaku.SPEED;
+    var y0 = F.y, sp = keys.focus ? (F.focusSpd || NEU.danmaku.FOCUS) : (F.speed || NEU.danmaku.SPEED);
     F.focus = !!keys.focus;
     var up = keys.up || keys.jump;
     if (F.dashT > 0) {

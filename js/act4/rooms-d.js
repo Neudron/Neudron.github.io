@@ -179,10 +179,10 @@
     return cutEl;
   }
   /* The black cut, shared: black in, mid() runs behind it, black out. */
-  NEU.cut = function (mid) {
+  NEU.cut = function (mid, ms) {
     var el = cutFx(), still = !!(NEU.motion && NEU.motion.reduced ? NEU.motion.reduced() : window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ||
       !!(NEU.settings && NEU.settings.reduced);
-    var d = still ? 0 : 500;
+    var d = still ? 0 : (ms || 500);
     el.style.transitionDuration = d + 'ms';
     el.style.pointerEvents = 'auto';
     el.style.opacity = '1';

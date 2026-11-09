@@ -70,12 +70,15 @@
      start; the arrows ease out before that and back after (see EASE_*). */
   var SECTIONS = 4, SONG = 104, DODGE = 8;
   var EASE_IN = 0.6;                 /* the arrows fade out before the soul moves */
-  var EASE_OUT = 0.1;                /* and are back almost at once after it: this is the return */
+  var EASE_OUT = 0.45;               /* and are back a beat later: this is the return */
   var INTRO = 2.4;                   /* mics collide, explode, the disco sphere drops */
   var MAX_MISS = 5;                  /* five notes in a row missed and the fight is lost */
   var SEC = [0, 26, 52, 78];
   var BREAK_AT = [14, 40, 66, 92];   /* four soul sections, four attack patterns */
   var PAT_GAP = [0.55, 1.0, 1.4, 1.5];   /* seconds between hazard spawns, per pattern */
+  var PAT_NAME = ['COIN VOLLEY', 'LOBS', 'RING', 'THE WALL'];
+  var PAT_COL = ['#E04A6B', '#4AC2E0', '#C24AE0', '#FFD34E'];
+  var MAX_GAP = 2.0;                 /* s: the chart never leaves the player waiting longer */
   var ITEMS = [
     [0.55, 1, 'bomb'], [7, 0, 'coin'], [8.2, 2, 'potion'], [9.4, 3, 'axe'],
     [10.6, 0, 'mushroom'], [11.8, 1, 'recall'],
@@ -101,7 +104,8 @@
             section: 0, mode: 'chart', arrowA: 1, sway: 0, swayUntil: 0,
             blockLane: -1, blockUntil: 0,
             soulx: 0, souly: 0, hazards: [], pattern: 0, spawnN: 0, paused: false, introT: 0,
-            drainFrom: 1, drainTo: 1, drainT: 0 };
+            drainFrom: 1, drainTo: 1, drainT: 0,
+            mercHit: 9, glare: false, soulA: 1, brkI: -1 };
   var pops = [], splashes = [];
   var raf = 0, soulF = null, hazBreak = -1, lastBrk = 0, loopSrc = null;
   var introOn = false, boomed = false, crowdCache = null;
@@ -151,23 +155,104 @@
     });
   }
 
-  function appendSong() {
-    var i, s, bl, chart, n, t;
-    for (i = 0; i < ITEMS.length; i++) {
-      notes.push({ t: ITEMS[i][0], end: ITEMS[i][0], lane: ITEMS[i][1], mine: true,
-        hit: false, done: false, kind: ITEMS[i][2] });
+  /* The song's four sections are generated, not hand-listed: each fills its
+     whole 26 s with a call-and-response stream (his note, your echo four
+     beats later), thins for the fill after the dodge, and never leaves more
+     than MAX_GAP seconds of nothing outside the break windows. */
+  function songChart(s) {
+    var bl = 60 / BPM[Math.min(s, 2)];
+    var span = (s === SECTIONS - 1 ? SONG : SEC[s + 1]) - SEC[s];
+    var total = Math.floor(span / bl + 1e-6);
+    var rel = BREAK_AT[s] - SEC[s];
+    var d0 = (rel - EASE_IN - 0.3) / bl;      /* last beat still hittable before the ease-in */
+    var d1 = (rel + DODGE + EASE_OUT + 0.3) / bl;  /* first beat after the arrows return */
+    var grid = s === 0 ? 1 : 0.5;
+    var gapLim = Math.max(grid, Math.floor((MAX_GAP - 0.5) / bl / grid) * grid);
+    var sameLim = Math.ceil(0.3 / bl / grid) * grid;
+    var out = [], seed = 977 + s * 131;
+    var laneLast = [-99, -99, -99, -99];
+    var lane = s & 3, lastM = -99, b;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    function free(bb) { return bb < d0 || bb > d1; }
+    for (b = 0; b <= total - 2; b += grid) {
+      /* the echo is four beats out, except the downbeat and the post-dodge
+         fill, where a two-beat answer keeps the line moving. e only ever
+         shrinks after the pickup, so must-gaps can't overshoot upward */
+      var e = (b === 0 || b > d1) ? 2 : 4;
+      if (b + e > total || SEC[s] + (b + e) * bl > SONG - 0.4) continue;
+      var must = b < 3 * grid || (b + e) - lastM >= gapLim;
+      var p = 0.5 + s * 0.13 + (b / total) * 0.3;
+      if (b > d1) p = Math.max(p, 0.85);    /* the post-dodge fill breathes, but not dead */
+      if (!must && rnd() > p) continue;
+      if (!free(b) || !free(b + e)) continue; /* his beat and your echo both clear the dodge */
+      var nl = lane, r = rnd();
+      if (r < 0.68) nl = (lane + (rnd() < 0.5 ? -1 : 1) + 4) % 4;
+      else nl = (lane + 2) % 4;
+      if (nl === lane && rnd() < 0.6) nl = (nl + 1) % 4;
+      if (b - laneLast[nl] < sameLim && !(must && (b + e) - lastM >= gapLim)) continue;
+      var hold = 0;
+      if (b % 4 === 0 && rnd() < 0.3 + s * 0.1 && b + e + 1.5 <= total && free(b + e + 1.5)) hold = 1.5;
+      lane = nl; laneLast[nl] = b; lastM = b + e;
+      out.push([b, nl, hold, e]);
     }
-    for (s = 1; s < SECTIONS; s++) {
+    return out;
+  }
+  function appendSong() {
+    var i, s, chart, n, t, bl;
+    for (s = 0; s < SECTIONS; s++) {
       bl = 60 / BPM[Math.min(s, 2)];
-      chart = CHARTS[Math.min(s, 2)];
+      chart = songChart(s);
       for (i = 0; i < chart.length; i++) {
         n = chart[i];
         t = SEC[s] + n[0] * bl;
         notes.push({ t: t, end: t + (n[2] || 0) * bl, lane: n[1], mine: false, hit: false, done: false });
-        t = SEC[s] + (4 + n[0]) * bl;
+        t = SEC[s] + ((n[3] || 4) + n[0]) * bl;
         notes.push({ t: t, end: t + (n[2] || 0) * bl, lane: n[1], mine: true, hit: false, done: false });
       }
     }
+    for (i = 0; i < ITEMS.length; i++) {
+      notes.push({ t: ITEMS[i][0], end: ITEMS[i][0], lane: ITEMS[i][1], mine: true,
+        hit: false, done: false, kind: ITEMS[i][2] });
+    }
+    /* an item and a chart note in one lane under 0.3 s would leave one of
+       them unhittable: the item stays, the chart note is spent */
+    var mn = [];
+    for (i = 0; i < notes.length; i++) if (notes[i].mine) mn.push(notes[i]);
+    mn.sort(function (a, b) { return a.t - b.t; });
+    for (i = 1; i < mn.length; i++) {
+      var p = mn[i - 1], c = mn[i];
+      if (p.lane === c.lane && c.t - p.t < 0.3 && p.kind && !c.kind) c.done = true;
+    }
+  }
+  /* the chart's longest wait, measured as the longest stretch of song time
+     with no note due — break windows split a gap in two, they don't fill it */
+  function chartStats() {
+    var ts = [];
+    for (var i = 0; i < notes.length; i++) if (notes[i].mine && !notes[i].done) ts.push(notes[i].t);
+    ts.sort(function (a, b) { return a - b; });
+    var wins = [];
+    for (var j = 0; j < BREAK_AT.length; j++) wins.push([BREAK_AT[j] - EASE_IN, BREAK_AT[j] + DODGE + EASE_OUT]);
+    /* gaps are measured on the player's notes: split each pair at the break
+       windows and take the longest free segment, not the window-subtracted
+       total (which would merge two gaps into one) */
+    var max = 0, over = [], i, j, k, pts, a, b, g;
+    for (i = 1; i < ts.length; i++) {
+      a = ts[i - 1]; b = ts[i]; pts = [];
+      var cur = a;
+      for (j = 0; j < wins.length; j++) {
+        var ws = wins[j][0], we = wins[j][1];
+        if (we <= a || ws >= b) continue;
+        if (ws > cur) pts.push([cur, Math.min(ws, b)]);
+        cur = Math.max(cur, we);
+      }
+      if (cur < b) pts.push([cur, b]);
+      for (k = 0; k < pts.length; k++) {
+        g = pts[k][1] - pts[k][0];
+        if (g > max) max = g;
+        if (g > MAX_GAP) over.push([pts[k][0], pts[k][1], g]);
+      }
+    }
+    return { maxGap: max, count: ts.length, over: over, limit: MAX_GAP };
   }
   function resetFeel() {
     S.section = 0; S.mode = 'chart'; S.arrowA = 1;
@@ -178,7 +263,7 @@
   /* the score, the streak and the judgement counts start from nothing */
   function resetScore() {
     S.score = 0; S.combo = 0; S.misses = 0; S.judged = 0; S.weight = 0; S.acc = 1;
-    S.consecMiss = 0; pops.length = 0;
+    S.consecMiss = 0; S.glare = false; pops.length = 0;
   }
   function backing() {
     if (NEU.settings && NEU.settings.muted) return;
@@ -209,8 +294,8 @@
   function startRound(lead) {
     introOn = !!lead; boomed = false;
     t0 = now() + (introOn ? INTRO : 0) + 4 * beatLen();   // then 3-2-1-GO before beat 0
-    notes = build(false).concat(build(true));
-    if (round === 0) appendSong();
+    if (round === 0) { notes = []; appendSong(); }
+    else notes = build(false).concat(build(true));
     lastSp = 0; phase = 0; S.round = round; S.judgement = '';
     resetFeel();
     say(TAUNT[round][0]);
@@ -260,7 +345,8 @@
     addHealth(-0.12);
     S.drainTo = S.health / HEALTH_MAX;
     S.drainT = performance.now();
-    soulF.dashI = 0.45;
+    S.mercHit = now();                     /* he flinches when the soul connects */
+    if (soulF) soulF.dashI = 0.45;
     if (NEU.juice) {
       NEU.juice.hit('medium');
       NEU.juice.burst(soulF.x, soulF.y - 10, 9, '#E04A6B', 1.3);
@@ -279,6 +365,7 @@
     S.judged++; S.weight += ACC[r]; S.acc = S.weight / S.judged;
     /* only a note that went by counts toward the five-in-a-row; a stray tap or a bomb neither adds nor clears */
     if (r === 4) { S.misses++; if (!free) S.consecMiss++; } else S.consecMiss = 0;
+    S.glare = S.consecMiss >= 3;           /* the merchant stops smiling */
     /* Funkin pops the rating and, from a combo of 10, the digits. Ours
        pop beside the player strumline, never in the middle. */
     var g = geom(), y = g.popY;
@@ -464,6 +551,9 @@
         var tx = k ? sx + (sx < g.w / 2 ? 200 : -200) : sx;       /* the second goes where you will step */
         out.push({ kind: 'bottle', x: x0, y: y0, vx: lobVx(x0, y0, vy0, sy, tx), vy: vy0, grav: true, broke: false, age: 0 });
       }
+      /* every third wave drops a wisp: it sways and curves toward you, so
+         standing still is how it lands */
+      if (n % 3 === 2) out.push({ kind: 'wisp', x: g.w * (0.25 + 0.5 * ((n / 3 | 0) % 2)), y: -12, vx: 0, vy: 70, grav: false, broke: false, age: 0, spin: 0 });
     } else if (pat === 2) {
       var ph = n * 2.1, ox = Math.max(48, Math.min(g.w - 48, sx + Math.cos(ph) * 220)), oy = Math.max(48, Math.min(g.h - 48, sy + Math.sin(ph) * 220));
       var aim = Math.atan2(sy - oy, sx - ox);
@@ -472,6 +562,8 @@
         var sp2 = k & 1 ? 230 : 150;
         out.push({ kind: 'axe', x: ox, y: oy, vx: Math.cos(a) * sp2, vy: Math.sin(a) * sp2, grav: false, broke: false, spin: 0 });
       }
+      /* every fourth burst leaves one wisp circling the rim */
+      if (n % 4 === 3) out.push({ kind: 'wisp', x: ox, y: oy, vx: Math.cos(aim + 1.9) * 55, vy: Math.sin(aim + 1.9) * 55 + 30, grav: false, broke: false, age: 0, spin: 0 });
     } else {
       var ns = wallSlots(g), sh = (g.h - 128) / ns, gap = Math.round(WALL_GAPS[n % WALL_GAPS.length] * (ns - 2)), v2 = g.w / 4.2;
       for (k = 0; k < ns; k++) {
@@ -496,20 +588,22 @@
     var dt = sp - lastBrk;
     if (!(dt > 0) || dt > 0.05) dt = 0.05;
     lastBrk = sp;
-    S.mode = 'break'; S.brk = bp.name;
-    if (!soulF && NEU.danmaku) soulF = NEU.danmaku.fight(g.cx, g.strumY);
+    S.mode = 'break'; S.brk = bp.name; S.brkI = bp.i;
+    if (!soulF && NEU.danmaku) soulF = NEU.danmaku.fight(g.cx, g.strumY, { speed: 170, focus: 85 });
     if (!soulF) soulF = { x: g.cx, y: g.strumY, dashI: 0 };
     if (bp.name === 'dodge') spawnHazards(bp.i, sp - BREAK_AT[bp.i], g);
     if (bp.name === 'in') {
       S.arrowA = 1 - u;
       soulF.x = g.cx + (cx - g.cx) * u;
-      soulF.y = g.strumY + (cy - g.strumY) * u;
+      soulF.y = g.strumY + (cy - g.strumY) * u - (still() ? 0 : Math.sin(u * Math.PI) * 34);
+      S.soulA = u;
     } else if (bp.name === 'out') {
       S.arrowA = u; S.hazards = [];
       soulF.x = cx + (g.cx - cx) * u;
       soulF.y = cy + (g.strumY - cy) * u;
+      S.soulA = 1 - u;
     } else {
-      S.arrowA = 0;
+      S.arrowA = 0; S.soulA = 1;
       var mk = {
         left: !!keys[LANES[0]], down: !!keys[LANES[1]],
         up: !!keys[LANES[2]], right: !!keys[LANES[3]], focus: !!keys.focus
@@ -523,6 +617,14 @@
         h.x += h.vx * dt; h.y += h.vy * dt;
         if (h.grav) h.vy += 280 * dt;
         if (h.kind === 'axe') h.spin += dt * 4;
+        if (h.kind === 'wisp') {
+          h.age += dt;
+          /* curves toward the soul, capped: it rewards keeping moving.
+             vx/vy were already integrated above; only the sway is added */
+          var want = Math.max(-50, Math.min(50, (soulF.x - h.x) * 0.35));
+          h.vx += (want - h.vx) * Math.min(1, dt * 3);
+          h.x += Math.sin(h.age * 2.6) * 36 * dt;
+        }
         if (h.kind === 'bottle' && !h.broke && h.y > g.h - 80) {
           h.broke = true; h.vx = 0; h.vy = 0;
           if (NEU.juice) NEU.juice.burst(h.x, h.y, 10, '#C8E8FF', 1);
@@ -553,17 +655,26 @@
     won = true;
     winAt = performance.now();
     if (NEU.juice) { NEU.juice.hit('big'); NEU.juice.burst(geom().hisX, geom().stage - 40, 18, '#FFD34E', 1.6); }
+    outroSp = songPos(); outroPrev = performance.now();
     outro();
     if (msg) { placeMsg(false); msg.hidden = true; }   /* the talk box says it; the stall carries the esc hint */
     /* The axe comes by hand-over, but only once the band is off the stage:
        the stall must wait for close(), not sit on top of the win screen. */
     draw(songPos());
   }
-  /* SONG CLEAR: a short loop so the beaten pose and the title animate */
-  function outro() {
+  /* SONG CLEAR: the stage keeps animating (crowd, beams, the title) until
+     the overlay actually closes — capped at 120 Hz like every other draw.
+     songPos is frozen once the notes end, so the outro walks a virtual
+     clock on from the win point and the beat keeps bouncing */
+  var outroAt = 0, outroSp = 0, outroPrev = 0;
+  function outro(ts) {
     if (!won || wrap.hidden) return;
-    draw(songPos());
-    if (performance.now() - winAt < 1500) requestAnimationFrame(outro);
+    var t = ts || performance.now();
+    var dt = (t - outroPrev) / 1000;
+    outroPrev = t;
+    if (dt > 0 && dt < 0.1) outroSp += dt;
+    if (t - outroAt > 8) { outroAt = t; draw(outroSp); }
+    requestAnimationFrame(outro);
   }
   /* the soul controls, as keycaps: Z retries, X dashes, the arrows move */
   function keycap(k) {
@@ -922,10 +1033,16 @@
     var bob = still() ? 0 : beatFrac(sp) < 0.25 ? (cs >> 1) : 0;
     var who = g.who;
     var CLOTH = [['#7A7688', '#A8A4BC'], ['#6F5FA6', '#8A7BC4']];
+    /* merchant reactions: a flinch when the soul connects, a hop as each
+       round starts (the phase change), a glare once the miss streak bites */
+    var mercHitA = S.mercHit === undefined ? 9 : t - S.mercHit;
+    var flinch = mercHitA < 0.3 ? (mercHitA < 0.15 ? 1 : -1) : 0;
+    var hop = (!still() && sp >= 0 && sp < 0.9) ? Math.round(Math.sin(sp / 0.9 * Math.PI) * 1.5 * cs) : 0;
     for (var side = 0; side < 2; side++) {
       var age = t - singAt[side], sing = age < 0.18 && age >= 0, pose = singLane[side];
       var x = who[side], y = g.stage + 8 + bob + ((sing && pose === 1 && !still()) ? cs : 0);
       if (won && !side) y += 3 * cs;      /* beaten: he slumps */
+      if (!side) { x += flinch * cs; y -= hop; }
       /* the figure is 9 cells wide and 13 tall, feet at y */
       var x0 = Math.round(x - 4.5 * cs), y0 = y - 13 * cs, shY = y0 + (side ? 7 : 8) * cs;
       if (side) L.drawPlayer(ctx, x, y, 'left', 0, false, cs, performance.now());
@@ -946,6 +1063,20 @@
         ctx.fillStyle = '#3A3A4A'; ctx.fillRect(mx, my, 2 * u, 6 * u);
         ctx.fillStyle = '#8A8A9A'; ctx.fillRect(mx - (u >> 1), my - 3 * u, 3 * u, 3 * u);
         ctx.fillStyle = '#C4C4D4'; ctx.fillRect(mx - (u >> 1), my - 3 * u, u, u);
+      }
+      if (!side && S.glare) {           /* miss streak: angry brows over the eyes */
+        ctx.fillStyle = '#2A1E14';
+        ctx.fillRect(Math.round(x - 2 * cs), Math.round(y - 10.5 * cs), Math.round(1.5 * cs), cs);
+        ctx.fillRect(Math.round(x - 0.5 * cs), Math.round(y - 9.5 * cs), Math.round(1.5 * cs), cs);
+        ctx.fillRect(Math.round(x + 0.5 * cs), Math.round(y - 9.5 * cs), Math.round(1.5 * cs), cs);
+        ctx.fillRect(Math.round(x + 2 * cs), Math.round(y - 10.5 * cs), Math.round(1.5 * cs), cs);
+      }
+      if (!side && flinch) {             /* hit: sparks at the shoulders */
+        ctx.fillStyle = '#FFE35A';
+        ctx.fillRect(Math.round(x - 6 * cs), Math.round(y - 12 * cs), cs, cs);
+        ctx.fillRect(Math.round(x + 5 * cs), Math.round(y - 12 * cs), cs, cs);
+        ctx.fillRect(Math.round(x - 6 * cs), Math.round(y - 9 * cs), cs, cs);
+        ctx.fillRect(Math.round(x + 5 * cs), Math.round(y - 9 * cs), cs, cs);
       }
     }
   }
@@ -1038,6 +1169,14 @@
     gSet(G, 4, 4, '#EDE7DE'); gSet(G, 5, 4, '#EDE7DE'); gSet(G, 9, 5, '#EDE7DE'); gSet(G, 8, 3, '#EDE7DE'); gSet(G, 3, 6, '#EDE7DE');
     gRect(G, 5, 9, 4, 6, '#EDE7DE'); gRect(G, 8, 9, 1, 6, '#C9B9A2'); gRect(G, 5, 9, 4, 1, '#C9B9A2');
     A.mushroom = gBake(gInk(G));
+    /* wisp 10x10: a slow soul-ember, magenta with a pale heart */
+    G = gMk(10, 10);
+    gDisc(G, 4.5, 4.5, 4.6, function (dx, dy, d) {
+      if (d > 3.6) return dx + dy < 0 ? '#D08AF0' : '#3A1050';
+      return dx + dy < -1 ? '#C24AE0' : '#7A2A9E';
+    });
+    gSet(G, 3, 3, '#F4D8FF'); gSet(G, 4, 3, '#F4D8FF');
+    A.wisp = gBake(gInk(G));
     return (hzArt = A);
   }
   function itemIcon(kind, lane, x, y, s) {
@@ -1065,6 +1204,7 @@
       ctx.globalAlpha = fade;
       if (hz.kind === 'coin') spr = A.coin;
       else if (hz.kind === 'axe') spr = A.axe[((hz.spin / (Math.PI / 4)) | 0) & 7];
+      else if (hz.kind === 'wisp') spr = A.wisp;
       else spr = A.bottle;
       if (hz.broke) {                          /* the bottle is glass on the floor */
         ctx.fillStyle = INKC; ctx.fillRect((hz.x - 5 * u) | 0, (hz.y - u) | 0, 10 * u, 2 * u);
@@ -1346,8 +1486,37 @@
       var dim = 0.5 * (1 - S.arrowA);
       if (dim > 0.01) { ctx.globalAlpha = dim; ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, g.w, g.h); ctx.globalAlpha = 1; }
       drawHazards(g);
+      /* the attack's name and colour mark the pattern while it reads in,
+         and the arena edge keeps the colour through the dodge */
+      if (S.brkI >= 0 && S.brk !== 'out') {
+        var bt = S.brk === 'in' ? 1 : Math.max(0, 1 - (sp - BREAK_AT[S.brkI]) / 1.2);
+        if (bt > 0) {
+          ctx.globalAlpha = still() ? bt : bt * (0.75 + 0.25 * Math.sin(sp * 6));
+          text(PAT_NAME[S.brkI], g.w / 2, 96, g.w < 600 ? 24 : 40, PAT_COL[S.brkI]);
+          ctx.globalAlpha = 1;
+        }
+      }
+      if (S.brk === 'dodge') {
+        var ba = still() ? 0.35 : 0.3 + 0.15 * Math.sin(sp * 5);
+        ctx.globalAlpha = ba; ctx.fillStyle = PAT_COL[S.pattern];
+        ctx.fillRect(64, 64, Math.max(32, g.w - 128), 4);
+        ctx.fillRect(64, g.h - 68, Math.max(32, g.w - 128), 4);
+        ctx.fillRect(64, 64, 4, Math.max(32, g.h - 128));
+        ctx.fillRect(g.w - 68, 64, 4, Math.max(32, g.h - 128));
+        ctx.globalAlpha = 1;
+      }
+      /* the soul materialises: a shrinking ring while it fades/rises in,
+         and it fades back out on the return */
+      var sa = S.soulA === undefined ? 1 : S.soulA;
+      if (S.brk === 'in' && sa > 0 && sa < 1 && !still()) {
+        ctx.globalAlpha = (1 - sa) * 0.8;
+        ring(soulF.x, soulF.y, 20 + (1 - sa) * 120, 3, '#B0EBF7');
+        ctx.globalAlpha = 1;
+      }
+      ctx.globalAlpha = sa;
       if (NEU.danmaku && NEU.danmaku.soul) NEU.danmaku.soul.draw(ctx, soulF.x, soulF.y, 0);
       else { ctx.fillStyle = '#FF00FF'; ctx.fillRect(soulF.x - 4, soulF.y - 4, 8, 8); }
+      ctx.globalAlpha = 1;
     }
     if (S.paused) {                     /* ESC pauses: the held frame under a veil */
       ctx.globalAlpha = 0.6; ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, g.w, g.h); ctx.globalAlpha = 1;
@@ -1471,7 +1640,7 @@
     if (closing) return;
     if (!won || !NEU.cut) { leave(); return; }
     closing = true; running = false;
-    NEU.cut(function () { closing = false; leave(); });
+    NEU.cut(function () { closing = false; leave(); }, 240);
   }
   function leave() {
     running = false;
@@ -1505,5 +1674,7 @@
                  get running() { return running; }, get notes() { return notes; },
                  state: S, pops: pops, geom: geom, noteY: noteY, dirOf: dirOf,
                  charts: CHARTS, bpm: BPM, WINDOW: WINDOW_MS / 1000,
-                 sections: SECTIONS, length: SONG, soulHit: soulHit };
+                 sections: SECTIONS, length: SONG, soulHit: soulHit,
+                 stats: chartStats, MAX_GAP: MAX_GAP,
+                 soul: function () { return soulF; } };
 })();
