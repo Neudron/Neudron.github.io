@@ -2400,9 +2400,14 @@
      the      flag it is a television. After it, it is a television you can
      put a thrown key through. Nothing about the television changes. */
   NEU.tvBreakable = function () {
-    return !!(NEU.save && NEU.save.flagged('tv_breakable')) && !tvBroken;
+    return !!(NEU.save && NEU.save.flagged('tv_breakable')) && !tvBroken && !tvFixed;
   };
   var tvBroken = false;
+  /* tvFixed is the restored state: the soup's wake and the Polterghast
+     card both land here. It is a flag, not a skin, so a reload cannot
+     flash the broken frame back and the set cannot be re-broken — the
+     key already spent its one new verb. */
+  var tvFixed = false;
   NEU.breakTV = function () {
     if (!NEU.tvBreakable()) return false;
     tvBroken = true;
@@ -2415,6 +2420,28 @@
          "something climbs out of it."], 'narr');
     setTimeout(function () { if (NEU.quiz) NEU.quiz.open(); }, 2600);
     return true;
+  };
+
+  /* Put the set back together: clear the broken state everywhere it
+     lives — the module var, the save flag and the DOM class — so the
+     restored picture survives a room change and a reload. A television
+     that was never broken stays breakable; only a real break is fixed. */
+  NEU.restoreTV = function () {
+    var was = tvBroken || !!(NEU.save && NEU.save.flagged('tv_broken'));
+    if (was) {
+      tvBroken = false; tvFixed = true;
+      hideHilt();
+      if (NEU.save) { NEU.save.flag('tv_broken', 0); NEU.save.flag('tv_fixed', 1); }
+      if (tvEl) {
+        tvEl.classList.remove('is-broke');
+        tvEl.classList.remove('is-ready');
+        tvEl.classList.add('is-live');
+      }
+      tvState();
+    } else if (NEU.save && NEU.save.flagged('tv_fixed')) {
+      tvFixed = true;
+    }
+    return tvFixed;
   };
 
   /* The handoff timer that opens the deck after a dock. Kept so a
@@ -2579,6 +2606,15 @@
   if (NEU.save && NEU.save.flagged('tv_broken')) {
     tvBroken = true;
     if (tvEl) { tvEl.classList.add('is-broke'); tvEl.classList.remove('is-live'); }
+  }
+  /* tv_fixed (the soup's wake) and tv_restored (the Polterghast card,
+     on saves from before the wake restored it) both mean the broken
+     frame is done — never paint it back. Runs after the block above so
+     the final state is fixed even when an old save still carries
+     tv_broken. */
+  if (NEU.save && (NEU.save.flagged('tv_fixed') || NEU.save.flagged('tv_restored'))) {
+    tvFixed = true; tvBroken = false;
+    if (tvEl) { tvEl.classList.remove('is-broke'); tvEl.classList.add('is-live'); }
   }
 
   NEU.sans = {

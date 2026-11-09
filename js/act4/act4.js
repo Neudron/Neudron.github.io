@@ -92,6 +92,8 @@
       NEU.save.flag('tripping', 0);
       NEU.save.flag('dog_gone', 1); NEU.save.flag('sans_sits', 1); NEU.save.flag('crack_armed', 1);
     }
+    /* The dream is over; the set you put a key through comes back. */
+    if (NEU.restoreTV) NEU.restoreTV();
     if (NEU.quest) { NEU.quest.mark('a4_wake'); NEU.quest.mark('a4_chair'); }
     if (already) return;
     document.body.classList.remove('is-trip');
