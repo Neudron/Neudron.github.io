@@ -1317,7 +1317,9 @@
       P.r(cx, cy, cw, 2, '#1A2448'); P.r(cx + 3, cy - 1, cw - 8, 1, '#26325C'); P.r(cx + 2, cy + 2, cw - 4, 1, '#0E1430');
     }
   }
-  PAINT.h1 = function (P, room) {
+  /* the inlet water and the portal repaint when the portal wakes */
+  STATE.h1 = function () { return flagged('water_portal') ? 'portal' : ''; };
+  PAINT.h1 = function (P, room, st) {
     var Wd = room.w * T, Hd = room.h * T, x, y, i;
     /* everything starts as sky; floor and rock are laid over it */
     stormSky(P, 0, 0, Wd, Hd, 3);
@@ -1342,6 +1344,12 @@
         continue;
       }
       if (ch === '#') continue;
+      if (ch === 'w') {
+        P.r(X, Y, T, T, '#0A1428');
+        if ('.o'.indexOf(cellAt(room, x, y - 1)) >= 0) { P.r(X, Y, T, 2, '#2A4A7A'); P.r(X, Y + 2, T, 1, '#16264A'); }
+        if (cellAt(room, x, y + 1) === 'v') P.r(X, Y + T - 4, T, 4, '#050B18');
+        continue;
+      }
       /* wet flagstones */
       for (i = 0; i < 4; i++) {
         var sx = X + (i & 1) * 8, sy = Y + (i >> 1) * 8, k = hsh(x * 13 + y * 31 + i);
@@ -1392,6 +1400,13 @@
     P.a(0.25); P.r(cx - 14, 4, 5, 44, '#6E8CFF'); P.r(cx + 9, 4, 5, 44, '#6E8CFF'); P.a(1);
     /* runes over the lintel */
     for (i = -3; i <= 3; i++) { P.r(cx + i * 8 - 1, 1, 3, 1, '#4A64A8'); P.px(cx + i * 8, 2, '#9FB8FF'); }
+    if (st === 'portal') {
+      /* the water portal, awake: rings and a shaft of light on the inlet */
+      var wx = 16.5 * T, wy = 9.5 * T;
+      P.a(0.3); P.r(wx - 3, wy - 30, 7, 30, '#6E8CFF'); P.oval(wx, wy - 2, 34, 6, '#6E8CFF'); P.a(1);
+      P.oval(wx, wy, 24, 8, '#0A1030');
+      P.ring(wx, wy, 21, 7, '#6E8CFF'); P.ring(wx, wy, 14, 5, '#9FB8FF');
+    }
   };
   ANIM.h1 = function (g, o, S, now) {
     /* a vein of lightning crawls across the door's leaves now and

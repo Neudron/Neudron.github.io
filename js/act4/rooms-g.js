@@ -66,7 +66,7 @@
     rects: { '#': [0, 0], '|': [16, 0], '.': [32, 0], ',': [48, 0], '=': [64, 0], '_': [80, 0], '+': [96, 0] },
     solid: '#|+ov',
     colours: { '#': '#0A0C18', '|': '#141A30', '.': '#101426',
-               ',': '#1A2140', '=': '#222A4A', '_': '#2E3A66', '+': '#3E4E82', 'o': '#101426', 'v': '#04050C' }
+               ',': '#1A2140', '=': '#222A4A', '_': '#2E3A66', '+': '#3E4E82', 'o': '#101426', 'v': '#04050C', 'w': '#0A1428' }
   });
 
   function say(c, l, w) { c.say(l, w || 'narr'); }
@@ -287,12 +287,13 @@
       '#.................vvv',
       '#................vvvv',
       '##..............vvvvv',
-      'vv.....vvv.....vvvvvv',
+      'vv.....vvv.....wwwvvv',
       'vvvvvvvvvvvvvvvvvvvvv'
     ]),
     spawns: { top: { x: 1, y: 5, face: 'right' }, door: { x: 10, y: 3, face: 'down' } },
     entities: [
       { t: 'prizefloor', v: 'h1', x: 0, y: 0 },
+      { t: 'trigger', x: 15, y: 9, w: 3, h: 1, run: function (c) { water(c); } },
       { t: 'save', x: 3, y: 7 },
       /* the gap between the leaves: a tear of weather (style rift) */
       { t: 'exit', x: 10, y: 2, to: 'h2_machine', spawn: 'door', style: 'rift' },
@@ -408,9 +409,88 @@
     c.say(['you click the pen. the wall takes the string back, with a sigh.', 'you cheated. you are now rank T.'], 'narr');
   }
 
-  function trip(c) {
+  /* ══ the trip home: one scripted walk ═══════════════════════════
+     After the eat, letterbox bars slide in (the cue — control is never
+     silently lost), the cine flag swallows real keys, and api.drive
+     walks h2 -> h1 -> the water inlet; the water trigger wakes the
+     portal and control returns on arrival in h3. */
+  var CINE = null, LB = null;
+  function letterbox(on) {
+    if (!document.body) return;
+    if (!LB) {
+      LB = document.createElement('div');
+      LB.id = 'cineBars'; LB.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(LB);
+    }
+    LB.classList.toggle('on', on);
+  }
+  function talkOpen() { return !!(NEU.tboxOpen && NEU.tboxOpen()); }
+
+  /* h1 waypoints: under the hatch column, then east into the inlet */
+  var H1_WP = [[168, 72], [168, 160], [232, 160], [264, 160]];
+  /* shared by the walk and a player wading in themselves: the flag,
+     not the cutscene, is the truth (a reload lands here too) */
+  function cineOn(c, phase) {
+    if (CINE) return;
+    CINE = { c: c, phase: phase, wp: 0, n: 0 };
     document.body.classList.add('is-trip');
-    setTimeout(function () { c.go('h3_trip', 'in'); }, 5200);
+    letterbox(true);
+    if (c.cine) c.cine(true);
+    if (talkOpen()) NEU.talk.close();
+  }
+  function cineTick() {
+    if (!CINE || CINE.phase !== 'walk') return;
+    var c = CINE.c, room = NEU.engine.room, p = c.player;
+    if (++CINE.n > 300) { cineRelease(); return; }                 /* watchdog */
+    if (room === 'h2_machine') {
+      c.drive((p.x - 248) / 8 | 0, CINE.n & 1);   /* tap: exits arm off-touch */
+    } else if (room === 'h1_storm') {
+      var w = H1_WP[CINE.wp];
+      if (!w) { c.drive(0, 0); water(c); return; }
+      var dx = w[0] - p.x, dy = w[1] - p.y;
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) { CINE.wp++; cineTick(); return; }
+      c.drive(dx / 10 | 0, dy / 10 | 0);
+    } else {
+      c.drive(0, 0);
+      if (NEU.save && NEU.save.flagged('water_portal')) return;   /* water() owns the tail */
+    }
+    setTimeout(cineTick, 80);
+  }
+  /* Control comes back only once the pot room has landed and settled. */
+  function cineRelease() {
+    var n = 0;
+    (function poll() {
+      n++;
+      if ((NEU.engine.room === 'h3_trip' && n > 3) || n > 30) {
+        if (CINE) CINE = null;
+        letterbox(false);
+        if (NEU.engine.api && NEU.engine.api.cine) NEU.engine.api.cine(false);
+        return;
+      }
+      setTimeout(poll, 150);
+    })();
+  }
+  function water(c) {
+    if (!NEU.save || !NEU.save.flagged('tripping') || NEU.save.flagged('water_portal')) return;
+    NEU.save.flag('water_portal', 1);
+    cineOn(c, 'portal');
+    CINE.c.drive(0, 0);
+    CINE.phase = 'portal';
+    if (NEU.juice) NEU.juice.hit('medium');
+    if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
+    setTimeout(function () {
+      if (NEU.engine.room === 'h1_storm') c.go('h3_trip', 'in');
+    }, 1400);
+    setTimeout(cineRelease, 2200);
+  }
+
+  function trip(c) {
+    var n = 0;   /* let the VEND lines finish; the eat already played */
+    (function waitTalk() {
+      n++;
+      if (talkOpen() && n < 40) { setTimeout(waitTalk, 150); return; }
+      cineOn(c, 'walk'); cineTick();
+    })();
   }
 
   /* ══ H3 — the hallucination ══════════════════════════════════════

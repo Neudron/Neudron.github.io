@@ -77,6 +77,7 @@
   var IRIS = 0.22, fadeSpan = IRIS;
   var busy = false;                    // a cutscene owns input
   var playerAct = null;                // { name, t, max } — a held player pose (the recall drink)
+  var cine = false;                    // a scripted walk owns the stick (api.drive)
   var ents = [];                       // live copy of room.entities
   var images = {};
   var layers = {};                     // baked static layer per room id
@@ -757,8 +758,9 @@
       if (!ix) vx = approach(vx, 0, FRICTION * dt);
       if (!iy) vy = approach(vy, 0, FRICTION * dt);
     } else {
-      vx = approach(vx, 0, FRICTION * dt);
-      vy = approach(vy, 0, FRICTION * dt);
+      /* a cinematic's released stick is a hard stop, no coast */
+      if (cine) { vx = 0; vy = 0; }
+      else { vx = approach(vx, 0, FRICTION * dt); vy = approach(vy, 0, FRICTION * dt); }
     }
     moving = !!(ix || iy);
     if (moving) movedFor += dt;
@@ -1025,6 +1027,8 @@
     if (!running) return;
     /* A minigame owns the page while it is open. */
     if (NEU.activeMinigame) return;
+    /* A cinematic owns the stick: real keys do nothing until api.cine(false). */
+    if (cine) { e.preventDefault(); return; }
     if (e.key === 'Escape') {
       e.preventDefault();
       /* ESC never leaves the console — leaving is the quit button's job.
@@ -1218,6 +1222,12 @@
     /* Hold a named pose on the player for secs (engine-look draws it).
        'drink' is the recall potion's. */
     act: function (name, secs) { playerAct = name ? { name: name, t: secs || 0, max: secs || 0 } : null; },
+    /* Scripted input for cinematics: real keys die, drive() walks. */
+    cine: function (on) { cine = !!on; keys = {}; },
+    drive: function (ix, iy) {
+      if (!cine) return;
+      keys.left = ix < 0; keys.right = ix > 0; keys.up = iy < 0; keys.down = iy > 0;
+    },
     entHere: entHere, reset: resetPuzzle, check: checkPuzzle,
     ents: function () { return ents; },
     solved: function (id) { return NEU.save ? NEU.save.flagged('solved:' + id) : false; },
@@ -1268,6 +1278,7 @@
       return { scale: S, cam: { x: camX, y: camY }, vel: { x: vx, y: vy }, padH: padH,
                baked: !!(room && layers[room.id]), fade: fade, iris: fadeSpan, prompt: promptFor,
                lights: (room && look()) ? lightsFor(0, camX, camY, view()).list.length : 0,
+               cine: cine,
                view: view(), timers: timers.length };
     },
     nearest: function () { return nearest(promptable); },

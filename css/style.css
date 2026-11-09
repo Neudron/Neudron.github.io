@@ -1673,6 +1673,15 @@ body.is-trip .eng canvas, body.is-trip .craft { filter: hue-rotate(75deg) satura
    settings choice), so the player can override the device. */
 html.rm body.is-trip .eng canvas, html.rm body.is-trip .craft { filter: saturate(1.2); }
 
+/* cinematic letterbox: one fixed layer, two black bands via gradients.
+   .on slides it in; html.rm (motion.js) kills the transition. */
+#cineBars { position: fixed; inset: 0; z-index: 72; pointer-events: none;
+  background: linear-gradient(#000 12vh, transparent 12vh),
+              linear-gradient(to top, #000 12vh, transparent 12vh);
+  transform: translateY(-102%); transition: transform .48s cubic-bezier(.6, 0, .3, 1); }
+#cineBars.on { transform: translateY(0); }
+html.rm #cineBars { transition: none; }
+
 
 /* ── act iv rooms ─────────────────────────────────────────────────
    Same layer as the other full-screen scenes. The chip tray (74) and
