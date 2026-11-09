@@ -1786,7 +1786,32 @@
     NEU.doorOpen = true;
     if (NEU.doorGlow) NEU.doorGlow(true);   // stays lit: it is usable, not locked
     if (NEU.quest) NEU.quest.mark('door');
-    showChip(insideChip, true);             // the way back in, for good
+    syncInsideChip();
+  }
+
+  /* The chip is the shortcut back into the room, so it is only
+     relevant while there is still a reason to go back: the door is
+     open and the console has not been docked — the deck is the way
+     back to the games after that, and the panel's last job (the
+     crack) is opened for you. It hides the moment that stops being
+     true and stays hidden on reload. */
+  function insideRelevant() {
+    return doorOpened && !(NEU.quest && NEU.quest.has && NEU.quest.has('docked'));
+  }
+  function syncInsideChip() {
+    if (!insideChip) return;
+    if (insideRelevant()) { showChip(insideChip, true); return; }
+    insideChip.classList.remove('is-in');
+    insideChip.hidden = true;
+  }
+  /* 'docked' is the moment the chip stops mattering, and quest.mark
+     is the only place progress changes — hang the sync off it. */
+  if (NEU.quest) {
+    var _qmark = NEU.quest.mark;
+    NEU.quest.mark = function (id) {
+      _qmark.call(NEU.quest, id);
+      syncInsideChip();
+    };
   }
 
   NEU.tryDoor = function () {
@@ -1900,7 +1925,10 @@
   }
 
   NEU.grantDogFood = function () {
-    if (hasFood || dogOut) return;
+    /* Fed once stays fed: the 'dog' mark outlives hasFood/dogOut, so a
+       reload or a replayed run cannot hand the reward out a second
+       time. */
+    if (hasFood || dogOut || (NEU.quest && NEU.quest.has && NEU.quest.has('dog'))) return;
     hasFood = true;
     showChip(foodChip, true);
   };
@@ -2491,7 +2519,7 @@
         kel.hidden = false;
       }
     }
-    if (has('door')) { doorOpened = true; NEU.doorOpen = true; if (NEU.doorGlow) NEU.doorGlow(true); showChip(insideChip, true); }
+    if (has('door')) { doorOpened = true; NEU.doorOpen = true; if (NEU.doorGlow) NEU.doorGlow(true); syncInsideChip(); }
 
     /* the cosmolight: the hammer stage, the jam, the smash, the blackout */
     if (has('hammer')) dogTalks = DOGTALK.length;
@@ -2508,6 +2536,20 @@
       showChip(darkChip, true);
     }
     if (has('clicker') && !has('fixed')) { hasClicker = true; showChip(clickerChip, true); }
+
+    /* dog food & toby: the quest marks are the truth. Fed once stays
+       fed — without this a reload handed the reward out again and the
+       dog came back from the dead. Food still held across a reload
+       comes back too: survived, not yet fed. */
+    var fedDog = has('dog');
+    dogOut = fedDog && !has('sleep') &&
+             !(NEU.save && NEU.save.flagged && NEU.save.flagged('dog_gone'));
+    hasFood = !fedDog && has('survive');
+    if (dogOut && dogEl) {
+      dogEl.hidden = false;
+      dogEl.classList.add('is-in');
+    }
+    if (hasFood) showChip(foodChip, true);
 
     /* the sleep, the console, the dock */
     if (has('sleep')) {
