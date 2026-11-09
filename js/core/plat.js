@@ -10,7 +10,7 @@
     dash: 480, endDash: 320, endUp: 0.75, dashTime: 0.15, dashCd: 0.2, refillCd: 0.1, dashCorner: 8, dashAttack: 0.3, jtNudge: 12,
     stamina: 110, climbUp: 45.45, climbStill: 10, climbJump: 27.5, climbUpV: -90, climbDownV: 160, climbSlip: 60, climbAccel: 1800,
     grabY: 0.2, hopY: -240, hopX: 200, hopForce: 0.2, boostTime: 0.2, climbNoMove: 0.1, buffer: 0.08, spring: -370, springVar: 0.2,
-    duckX: 1.25, duckY: 0.5, slideMult: 1.2, pogo: -280, swing: 0.15, hurtInv: 0.67, kbX: 270, kbY: -210 };
+    duckX: 1.25, duckY: 0.5, slideMult: 1.2, pogo: -280, swing: 0.15, hurtInv: 0.67, kbX: 270, kbY: -210, dashI: 0.25 };
   var levels = {}, kinds = {}, current = null, live = false, paused = false, replaying = false;
   var canvas = document.getElementById('platCanvas'), overlay = document.getElementById('plat');
   var ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
@@ -118,6 +118,7 @@
     if (player.dead > 0) return;
     player.dead = DEATH; player.vx = 0; player.vy = 0; player.st = 0;
     if (NEU.juice && NEU.juice.hit && !replaying) NEU.juice.hit('medium');
+    if (NEU.sfx && NEU.sfx.hit && !replaying) NEU.sfx.hit(1);
   }
   /* kit HP: a level that sets hp counts hits; one without it dies on the first (the mountain) */
   function hurt(n, dir) {
@@ -125,7 +126,8 @@
     if (!current || !current.hp) { die(); return true; }
     player.hp = Math.max(0, player.hp - (n || 1)); player.inv = C.hurtInv;
     player.vx = (dir || -player.face) * C.kbX; player.vy = C.kbY; player.st = 0; player.varJump = 0;
-    if (NEU.juice && NEU.juice.hit && !replaying) NEU.juice.hit('medium', { colour: '#FF5577' });
+    if (NEU.juice && NEU.juice.hit && !replaying) { NEU.juice.hit('medium', { colour: '#FF5577', dx: player.vx, dy: player.vy }); if (NEU.juice.burst) NEU.juice.burst(player.x, player.y - HH / 2, 10, '#FF5577', 140); }
+    if (NEU.sfx && NEU.sfx.hit && !replaying) NEU.sfx.hit(0.8);
     if (player.hp <= 0) die();
     return true;
   }
@@ -140,14 +142,18 @@
     } else if (input) for (k in input) if (Object.prototype.hasOwnProperty.call(input, k)) out[k.toLowerCase()] = !!input[k];
     return out;
   }
-  /* Spikes.cs: the hitbox is the 6 px band at the base, and it only kills a body moving into the points */
+  /* Spikes.cs: the hitbox is the 6 px band at the base, and it only hits a body moving into the points.
+     Damage goes through hurt(): 1 hp, knockback away from the tile, hurtInv i-frames — never a free instakill. */
   function spikes() {
     var x0 = Math.floor((player.x - HW) / TILE), x1 = Math.floor((player.x + HW - 0.01) / TILE);
-    var y0 = Math.floor((player.y - HH) / TILE), y1 = Math.floor((player.y - 0.01) / TILE), tx, ty, ch, bx, by;
+    var y0 = Math.floor((player.y - HH) / TILE), y1 = Math.floor((player.y - 0.01) / TILE), tx, ty, ch, bx, by, off;
     for (ty = y0; ty <= y1; ty++) for (tx = x0; tx <= x1; tx++) {
       ch = cell(tx, ty); bx = tx * TILE; by = ty * TILE;
       if ((ch === '^' && player.vy >= 0 && player.y > by + 10) || (ch === 'v' && player.vy <= 0 && player.y - HH < by + 6) ||
-        (ch === '<' && player.vx >= 0 && player.x + HW > bx + 10) || (ch === '>' && player.vx <= 0 && player.x - HW < bx + 6)) { die(); return true; }
+        (ch === '<' && player.vx >= 0 && player.x + HW > bx + 10) || (ch === '>' && player.vx <= 0 && player.x - HW < bx + 6)) {
+        off = player.x - (bx + TILE / 2);
+        return hurt(1, off ? sign(off) : -player.face);
+      }
     }
     return false;
   }
@@ -207,6 +213,7 @@
     var dx = mx, dy = my, len, sx;
     if (!dx && !dy) dx = player.face;
     player.dashBuf = 0; player.dashes--; player.dashCd = C.dashCd; player.refillCd = C.refillCd; player.dashAttack = C.dashAttack;
+    player.inv = Math.max(player.inv, C.dashI); /* dash i-frames: 250 ms, the 150 ms dash plus a 100 ms tail */
     len = Math.sqrt(dx * dx + dy * dy); player.dashX = dx / len; player.dashY = dy / len;
     sx = player.dashX * C.dash;
     if (sign(player.vx) === sign(sx) && Math.abs(player.vx) > Math.abs(sx)) sx = player.vx;
@@ -517,7 +524,7 @@
         ctx.fillRect((player.x - cx - 7) | 0, (player.y - cy + 1) | 0, 14, 1);
         ctx.globalAlpha = 1;
       }
-      if (player.inv > 0) ctx.globalAlpha = reduced ? 0.6 : ((((now / 80) | 0) & 1) ? 0.35 : 1);
+      if (player.inv > 0) ctx.globalAlpha = reduced ? 0.6 : ((((now / 170) | 0) & 1) ? 0.35 : 1); /* 340 ms period: under the 3 Hz flash cap */
       drawHero(ctx, player.x - cx, player.y - cy, player.face, player.onGround);
       ctx.globalAlpha = 1;
     } else deathRing(ctx, player.x - cx, player.y - cy - HH / 2, 1 - player.dead / DEATH);
