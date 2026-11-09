@@ -356,13 +356,14 @@
   /* backward-compat aliases so legacy tests/suites that reference d0..d10 levels resolve to the one map */
   for (var _ai = 0; _ai <= 10; _ai++) P.levels['d' + _ai] = def;
 
-  /* the zone under the hero: entering one stamps dgn_depth, d3/d6/d9 open their lift */
+  /* the zone under the hero: entering one keeps the deepest depth reached, and d3/d6/d9 open their lift */
   function track() {
-    var h = P.hero(), z = zoneAt(h.x, h.y - 11), id = z ? z.id : here;
+    var h = P.hero(), z = zoneAt(h.x, h.y - 11), id = z ? z.id : here, depth;
     if (id !== here) {
       here = id;
       if (z) {
-        flag('dgn_depth', z.n);
+        depth = NEU.save && NEU.save.flag ? NEU.save.flag('dgn_depth') : undefined;
+        if (depth === undefined || depth === null || z.n > depth) flag('dgn_depth', z.n);
         if (z.n === 3 || z.n === 6 || z.n === 9) flag('dgn_lift_' + z.n, 1);
         if (z.n === 10) { NEU.dungeon.bossOpen = false; NEU.dungeon.bossLine = ''; }
         if (z.n === 5) NEU.dungeon.mageSign = '';

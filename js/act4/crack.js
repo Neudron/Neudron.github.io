@@ -515,8 +515,17 @@
 
   el.addEventListener('click', function (e) { e.stopPropagation(); hit(); });
 
+  function showCrackPanel() {
+    var panel = document.getElementById('panel');
+    if (!panel) return;
+    if (NEU.sans && NEU.sans.openPanel) { NEU.sans.openPanel(); return; }
+    panel.hidden = false;
+    if (panel.classList) panel.classList.add('is-open');
+  }
+
   /* Restore across a reload — a crack that forgets you have hit it
-     twice is a crack you have to hit five times. */
+     twice is a crack you have to hit five times. The crack lives inside
+     the panel, so the panel has to come back with it. */
   if (NEU.save && NEU.save.flagged('crack_armed')) {
     arm();
     clicks = (NEU.save.flag('crack_clicks') || 0);
@@ -530,6 +539,7 @@
       paint();
       if (!NEU.save.flagged('crack_portal')) NEU.save.flag('crack_portal', 1);
     }
+    showCrackPanel();
   }
 
   NEU.crack = { arm: arm, hit: hit, reset: reset,
