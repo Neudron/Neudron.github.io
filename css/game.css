@@ -952,3 +952,79 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .photo, .photo * { animation: none !important; transition: none !important; }
 }
+
+
+/* ── W10: the rift and the sky arrival are fullscreen fixed layers.
+   The rift canvas renders at 1/4 res and stretches; pixelated keeps it
+   chunky. The sky cinematic is pure CSS (dusk gradient, star field,
+   ridge, jagged crack, offset-path hero) so the JS stays tiny; only the
+   hero sprite is a canvas, redrawn by a slow interval. */
+.crack-rift, .crack-sky { position: fixed; inset: 0; z-index: 82; }
+.crack-rift canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.crack-sky {
+  background: linear-gradient(#0B0716 0%, #1A1230 22%, #2A1B44 44%, #3A2652 62%, #4E3260 72%, #0E1A0E 74%, #0E1A0E 100%);
+  animation: crackSky 3.05s linear forwards; pointer-events: none;
+}
+@keyframes crackSky { 0% { opacity: 0; } 8% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+.crack-sky.is-rm { animation: none; background: #0B0716; }
+.crack-sky__stars {
+  position: absolute; left: 0; top: 0; width: 2px; height: 2px;
+  box-shadow: 9vw 7vh #B8A8D8, 17vw 16vh #B8A8D8, 26vw 5vh #E8DCC8, 34vw 21vh #B8A8D8,
+    43vw 9vh #B8A8D8, 51vw 26vh #E8DCC8, 58vw 12vh #B8A8D8, 66vw 30vh #B8A8D8,
+    74vw 6vh #E8DCC8, 82vw 18vh #B8A8D8, 90vw 27vh #B8A8D8, 95vw 10vh #B8A8D8;
+  animation: crackTw 1.1s steps(2) infinite;
+}
+@keyframes crackTw { 50% { opacity: .35; } }
+.crack-sky__ridge {
+  position: absolute; left: 0; right: 0; top: 55%; height: 19%; background: #140D26;
+  clip-path: polygon(0 34%, 5% 8%, 11% 30%, 18% 2%, 26% 26%, 34% 10%, 43% 32%, 52% 4%, 61% 28%, 70% 12%, 79% 30%, 87% 6%, 94% 24%, 100% 14%, 100% 100%, 0 100%);
+}
+.crack-sky__ground {
+  position: absolute; left: 0; right: 0; top: 74%; bottom: 0; background: #0E1A0E;
+}
+.crack-sky__ground::after {
+  content: ''; position: absolute; left: 0; right: 0; top: -6px; height: 6px;
+  background: repeating-linear-gradient(90deg, #2E4A22 0 3px, #0E1A0E 3px 9px);
+}
+.crack-sky__crack {
+  position: absolute; left: 50%; top: 13%; width: 120px; height: 72px;
+  transform: translateX(-50%); overflow: visible;
+}
+.crack-sky__crack path {
+  fill: none; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 70; stroke-dashoffset: 70;
+  animation: crackGrow .5s ease-out forwards;
+}
+.crack-sky__crack .glow { stroke: #FF2A3A; stroke-width: 7; opacity: .45; }
+.crack-sky__crack .core { stroke: #050008; stroke-width: 5; }
+.crack-sky__crack .rim { stroke: #FFB0A0; stroke-width: 1.4; }
+@keyframes crackGrow { to { stroke-dashoffset: 0; } }
+.crack-sky__hero {
+  position: absolute; left: 0; top: 0; width: 80px; height: 96px;
+  image-rendering: pixelated; transform-origin: 50% 85%;
+  animation: skyTumble 1.9s cubic-bezier(.5, .05, .75, .4) forwards;
+}
+@keyframes skyTumble {
+  0%   { transform: translate(45vw, 4vh) rotate(-160deg); }
+  45%  { transform: translate(55vw, 34vh) rotate(170deg); }
+  75%  { transform: translate(61vw, 55vh) rotate(340deg); }
+  100% { transform: translate(61vw, 61vh) rotate(360deg); }
+}
+.crack-sky__hero.is-landed { animation: skySettle .6s ease-out forwards; }
+@keyframes skySettle {
+  0%   { transform: translate(61vw, 61vh) rotate(360deg) scaleY(1); }
+  30%  { transform: translate(61vw, 61vh) rotate(360deg) scaleY(.6); }
+  100% { transform: translate(61vw, 61vh) rotate(360deg) scaleY(1); }
+}
+.crack-sky.is-rm .crack-sky__stars, .crack-sky.is-rm .crack-sky__ridge,
+.crack-sky.is-rm .crack-sky__ground, .crack-sky.is-rm .crack-sky__crack,
+.crack-sky.is-rm .crack-sky__hero { display: none; }
+.crack-sky__cap {
+  position: absolute; left: 0; right: 0; bottom: 14%;
+  text-align: center; color: #E8DCC8; font-size: 16px;
+  opacity: 0; transition: opacity .3s; pointer-events: none;
+}
+.crack-sky__cap.is-on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .crack-sky__cap { transition: none; }
+}

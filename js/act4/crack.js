@@ -396,6 +396,41 @@
     }
   }
 
+  /* ── SKY ARRIVAL (W10) ────────────────────────────────────────────
+     After the rift the hero is spat out of a crack in the sky, tumbles
+     down and lands on the surface grass — then the dungeon opens under
+     it. The look is all CSS (stars, ridge, crack, tumble keyframes);
+     JS only scaffolds the overlay and stamps the hero sprite once. */
+  var SKY_CAP = 'you fall out of a sky crack.', SKY_DONE = 2650, SKY_LAND = 1900;
+  function skyCine(done) {
+    var rm = reducedMotion(), box = document.createElement('div'), cap = document.createElement('div'), cv, c;
+    box.className = 'crack-sky' + (rm ? ' is-rm' : '');
+    box.setAttribute('aria-hidden', 'true');
+    box.innerHTML = '<i class="crack-sky__stars"></i><i class="crack-sky__ridge"></i><i class="crack-sky__ground"></i>' +
+      '<svg class="crack-sky__crack" viewBox="0 0 100 60" aria-hidden="true">' +
+      '<path class="glow" d="M50 4 44 15 52 24 45 37 51 60"/>' +
+      '<path class="core" d="M50 4 44 15 52 24 45 37 51 60"/>' +
+      '<path class="rim" d="M50 4 44 15 52 24 45 37 51 60"/></svg>' +
+      '<canvas class="crack-sky__hero" width="40" height="48"></canvas>';
+    cap.className = 'crack-sky__cap'; cap.textContent = SKY_CAP;
+    box.appendChild(cap); document.body.appendChild(box);
+    function finish() { if (box.parentNode) box.parentNode.removeChild(box); }
+    if (rm) {
+      window.setTimeout(function () { cap.className = 'crack-sky__cap is-on'; }, 60);
+      window.setTimeout(function () { done(); }, 620);
+      window.setTimeout(finish, 950);
+      return;
+    }
+    cv = box.querySelector('.crack-sky__hero');
+    try { c = cv.getContext('2d'); } catch (e) { c = null; }
+    if (c && NEU.engineLook && NEU.engineLook.drawPlayer)
+      NEU.engineLook.drawPlayer(c, 20, 44, 'right', 0, false, 3, 0, { settle: true });
+    window.setTimeout(function () { cv.classList.add('is-landed'); }, SKY_LAND);
+    window.setTimeout(function () { cap.className = 'crack-sky__cap is-on'; }, SKY_LAND + 120);
+    window.setTimeout(done, SKY_DONE);
+    window.setTimeout(finish, SKY_DONE + 400);
+  }
+
   function transitionToDungeon() {
     var rect = el.getBoundingClientRect(), cx, cy;
     transitioning = true;
@@ -405,8 +440,10 @@
     timer = window.setTimeout(function () {
       timer = null;
       rift(cx, cy, function () {
-        transitioning = false;
-        enterDungeon();
+        skyCine(function () {
+          transitioning = false;
+          enterDungeon();
+        });
       });
     }, reducedMotion() ? 0 : 380);
   }

@@ -292,6 +292,8 @@
   };
   var FOE = 'uUathNGXyTCEYQOW', DECOR = 'cLwbB';
   var zones = [], spawners = [], decor = [], ents = [], cracks = {}, save = null, lifts = {}, here = '', goal = '', live = null;
+  /* W10: the surface hut; BED is the respawn cell every death lands on. */
+  var BED = { x: 22, y: 14 }, HUT = { x0: 16, x1: 32, roof: 9, wall0: 10, wall1: 14 };
 
   function zoneAt(px, py) {
     var tx = Math.floor(px / T), ty = Math.floor(py / T), i, z;
@@ -328,6 +330,15 @@
         else if (ch === 'l') ents.push({ t: 'lift', x: wx, y: wy, n: n });
       }
     }
+    /* W10 surface hut: packed-earth hut on the open grass, west of the castle. */
+    for (x = HUT.x0 - 1; x <= HUT.x1 + 1; x++) g[HUT.roof][x] = 'g';
+    for (y = HUT.wall0; y <= HUT.wall1; y++) {
+      g[y][HUT.x0] = 'g'; g[y][HUT.x1] = 'g';
+      for (x = HUT.x0 + 1; x < HUT.x1; x++) g[y][x] = ' ';
+    }
+    g[HUT.wall1 - 1][HUT.x0] = ' '; g[HUT.wall1][HUT.x0] = ' ';   /* the door */
+    ents.push({ t: 'bed', x: 18, y: HUT.wall1 });
+    decor.push({ k: 'L', x: 26, y: HUT.wall0, f: 'B' });
     /* d0 holds the three lift heads, in order, for the lifts of d3, d6 and d9 */
     n = 0;
     for (i = 0; i < ents.length; i++) if (ents[i].t === 'lift') {
@@ -358,7 +369,10 @@
 
   /* the zone under the hero: entering one keeps the deepest depth reached, and d3/d6/d9 open their lift */
   function track() {
-    var h = P.hero(), z = zoneAt(h.x, h.y - 11), id = z ? z.id : here, depth;
+    var h = P.hero(), z = zoneAt(h.x, h.y - 11), id, depth;
+    /* the open surface band is d0's: castle and hut both live there */
+    if (!z && h.y - 11 < ZH * T) z = zones[0];
+    id = z ? z.id : here;
     if (id !== here) {
       here = id;
       if (z) {
@@ -377,10 +391,9 @@
     return false;
   }
   function toSurface() {
-    var s = save || zones[0].spawn;
     NEU.dungeon.lastDeath = here;
     if (NEU.mage && NEU.mage.active && NEU.mage.close) NEU.mage.close();
-    return origOpen('dgn', { spawn: { x: s.x, y: s.y }, zone: 'd0' });
+    return origOpen('dgn', { spawn: { x: BED.x, y: BED.y }, zone: 'd0' });
   }
 
   function kd(name, d) { var k = kinds[name] || (kinds[name] = {}), q; for (q in d) k[q] = d[q]; return k; }
@@ -428,6 +441,15 @@
     P.hero().x = (to.x + 0.5) * T; P.hero().y = (to.y + 1) * T; P.hero().vx = 0; P.hero().vy = 0; P.hero().wipe = 0.25; P.snap();
   } });
   kd('pot', {});
+  /* the bed tops you up and becomes the respawn (toSurface lands here anyway). */
+  kd('bed', { touch: function (e, input, melee) {
+    var L;
+    if (P.replaying()) return;
+    L = P.level0();
+    if (L) L.spawn = { x: BED.x, y: BED.y };
+    P.heal(6);
+    if (!flagged('dgn_bed_met')) { flag('dgn_bed_met', 1); talk(['* the bed is warm. whatever waits below, you wake up here.']); }
+  } });
 
   /* one input recording per zone, spawn to the next zone (d10: to the bone door); fixes201 replays each twice */
   var REC = {
@@ -461,6 +483,7 @@
     here: function () { return P.running() && P.levelId() === 'dgn' ? here : ''; },
     spawnPx: function (id) { var n = dN(id); return n < 0 ? null : px(zones[n].spawn); },
     savePx: function () { return px(save); },
+    bed: BED, bedPx: function () { return px(BED); },
     toSurface: toSurface
   };
 })();
