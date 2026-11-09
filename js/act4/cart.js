@@ -8,6 +8,7 @@
   var live = false, reduced = false;
   var spk = [], leanX = 0;
   var frames, lane, jumpN, dead, done, phase, holeN, checkpoint, cpLane, sparks, dust, held, sent;
+  var deathT, respT, respLane, respFrames, deathLane, deathKind, respX, respY;
 
   (function () {
     var f = 180, n = 0, cartLane = 1;
@@ -46,10 +47,14 @@
   function motion() {
     reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
+  function deathLen() { return reduced ? 40 : 66; }
+  function respawnLen() { return reduced ? 28 : 48; }
   function reset() {
     frames = 0; lane = 1; jumpN = 0; dead = false; done = false;
     phase = 'ride'; holeN = 0; checkpoint = false; cpLane = 1;
     sparks = 0; dust = []; spk = []; leanX = 0; sent = false;
+    deathT = 0; respT = 0; respLane = 1; respFrames = 0;
+    deathLane = 1; deathKind = ''; respX = 0; respY = 0;
     held = { up: false, down: false, jump: false };
   }
   function ensure() {
@@ -65,7 +70,7 @@
       canvas.height = 270;
       var hint = document.createElement('p');
       hint.className = 'cart__hint';
-      hint.innerHTML = 'lanes <span data-k="w,s"></span>  jump <span data-k="z"></span>';
+      hint.innerHTML = 'lanes <span data-k="a"></span>/<span data-k="d"></span>/←→  jump <span data-k="z"></span>/<span data-k="e"></span>/<span data-k="w"></span>/space/↑';
       overlay.appendChild(canvas);
       overlay.appendChild(hint);
       document.body.appendChild(overlay);
@@ -91,12 +96,19 @@
       NEU.juice.hit('small', { dx: dir, dy: 0 });
     }
   }
-  function die() {
+  function die(kind) {
     dead = true;
     jumpN = 0;
-    if (NEU.juice) NEU.juice.hit('medium', { dx: 0, dy: 1 });
-    if (checkpoint) { frames = MID; lane = cpLane; }
-    else { frames = 0; lane = 1; }
+    phase = 'dying';
+    deathT = 0;
+    deathLane = lane;
+    deathKind = kind || 'cart';
+    respFrames = checkpoint ? MID : 0;
+    respLane = checkpoint ? cpLane : 1;
+    if (NEU.juice) {
+      NEU.juice.hit('medium', { dx: 0, dy: 1 });
+      if (NEU.juice.burst) NEU.juice.burst(lx(lane, 226), 176, 14, '#FFC46A', 180);
+    }
   }
   function finish() {
     phase = 'done';
@@ -374,7 +386,7 @@
     ctx.fillStyle = '#FFE8A0'; ctx.fillRect(px + 21, py, 4, 1);
   }
   function draw() {
-    var i, ev, py, px, p, shook, lp;
+    var i, ev, py, px, p, shook, lp, dk, fall, rk, ease, fade;
     if (!ctx) return;
     ensureArt();
     ctx.imageSmoothingEnabled = false;
@@ -394,8 +406,26 @@
     py = 186 - (jumpN > 0 ? 18 : 0);
     px = lx(lane, 226);
     ctx.globalAlpha = 1;
-    ctx.drawImage(art.cone, px + 23 - 60, py + 3 - 136);
-    drawPlayerCart(px, py);
+    if (phase === 'dying') {
+      dk = Math.min(1, deathT / deathLen());
+      fall = reduced ? 0 : Math.round(dk * dk * (deathKind === 'gap' ? 64 : 40));
+      px = lx(deathLane, 226) + (reduced ? 0 : Math.round(dk * dk * (deathLane < 1 ? -12 : 12)));
+      py += fall;
+      ctx.globalAlpha = Math.max(0.35, 1 - dk * 0.65);
+      ctx.drawImage(art.cone, px + 23 - 60, py + 3 - 136);
+      drawPlayerCart(px, py);
+      ctx.globalAlpha = 1;
+    } else if (phase === 'respawn') {
+      rk = Math.min(1, respT / respawnLen());
+      ease = 1 - Math.pow(1 - rk, 3);
+      px = Math.round(respX + (lx(respLane, 226) - respX) * ease);
+      py = Math.round(respY + (186 - respY) * ease);
+      ctx.drawImage(art.cone, px + 23 - 60, py + 3 - 136);
+      drawPlayerCart(px, py);
+    } else {
+      ctx.drawImage(art.cone, px + 23 - 60, py + 3 - 136);
+      drawPlayerCart(px, py);
+    }
     if (!reduced) {
       ctx.fillStyle = '#8A7A60';
       for (i = 0; i < dust.length; i++) {
@@ -418,6 +448,15 @@
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 270 - (phase === 'done' ? 270 : holeN * 8), 480, 270);
     }
+    fade = 0;
+    if (phase === 'dying') fade = Math.max(0, Math.min(1, (deathT - (deathLen() - 18)) / 18));
+    else if (phase === 'respawn') fade = Math.max(0, Math.min(1, 1 - respT / 18));
+    if (fade > 0) {
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, 480, 270);
+      ctx.globalAlpha = 1;
+    }
     if (NEU.juice && NEU.juice.drawParts) NEU.juice.drawParts(ctx, STEP);
     if (NEU.juice && NEU.juice.end) NEU.juice.end(ctx, shook);
   }
@@ -429,7 +468,7 @@
     return {
       t: frames / 60, frames: frames, lane: lane, jumping: jumpN > 0,
       dead: dead, done: done, phase: phase, checkpoint: checkpoint,
-      glints: g, dust: dust.length, sparks: sparks, hole: phase !== 'ride'
+      glints: g, dust: dust.length, sparks: sparks, hole: phase === 'hole' || phase === 'done'
     };
   }
   function open() {
@@ -455,12 +494,32 @@
     document.body.classList.remove('is-playing');
     if (NEU.kernel && NEU.kernel.current() === 'cart') NEU.kernel.pop();
   }
+  function deathStep() {
+    deathT++;
+    if (deathT >= deathLen()) startRespawn();
+  }
+  function startRespawn() {
+    frames = respFrames;
+    lane = respLane;
+    jumpN = 0;
+    held = { up: false, down: false, jump: false };
+    phase = 'respawn';
+    respT = 0;
+    respX = lx(deathLane, 226);
+    respY = 186 + (reduced ? 0 : 54);
+  }
+  function respawnStep() {
+    respT++;
+    if (respT >= respawnLen()) {
+      phase = 'ride';
+      dead = false;
+    }
+  }
   function step(dt, input) {
     var up, down, jp, i, ev, p;
     if (!live) return null;
     /* ponytail: one fixed 60 Hz frame; kernel tick slices real time. */
     if (arguments.length < 2) input = keyString();
-    dead = false;
     if (phase === 'done') return getState();
     if (phase === 'hole') {
       holeN++;
@@ -468,6 +527,17 @@
       draw();
       return getState();
     }
+    if (phase === 'dying') {
+      deathStep();
+      draw();
+      return getState();
+    }
+    if (phase === 'respawn') {
+      respawnStep();
+      draw();
+      return getState();
+    }
+    dead = false;
     frames++;
     up = input.indexOf('up') >= 0;
     down = input.indexOf('down') >= 0;
@@ -494,8 +564,8 @@
     for (i = 0; i < EV.length; i++) {
       ev = EV[i];
       if (frames < ev.f || frames >= ev.f + HIT) continue;
-      if (ev.kind === 'cart' && ev.lane === lane) { die(); break; }
-      if (ev.kind === 'gap' && jumpN <= 0) { die(); break; }
+      if (ev.kind === 'cart' && ev.lane === lane) { die('cart'); break; }
+      if (ev.kind === 'gap' && jumpN <= 0) { die('gap'); break; }
     }
     if (!dead && !checkpoint && frames >= MID) {
       checkpoint = true;
@@ -542,15 +612,16 @@
   }
   var keys = { up: false, down: false, jump: false };
   function onKey(e) {
-    var routed, k, down;
+    var routed, k, kk, down;
     if (!live) return;
     routed = (NEU.keys && NEU.keys.route) ? NEU.keys.route(e.key, {}) : { to: e.key, swallow: false };
     if (routed.swallow) return;
     k = routed.to;
+    kk = k.length === 1 ? k.toLowerCase() : k;
     down = e.type === 'keydown';
-    if (k === 'ArrowUp' || k === 'w' || k === 'W') { keys.up = down; e.preventDefault(); }
-    else if (k === 'ArrowDown' || k === 's' || k === 'S') { keys.down = down; e.preventDefault(); }
-    else if (k === 'z' || k === 'Z' || k === ' ' || k === 'Spacebar') { keys.jump = down; e.preventDefault(); }
+    if (kk === 'a' || k === 'ArrowLeft') { keys.up = down; e.preventDefault(); }
+    else if (kk === 'd' || k === 'ArrowRight') { keys.down = down; e.preventDefault(); }
+    else if (kk === 'z' || kk === 'e' || kk === 'w' || k === ' ' || k === 'Spacebar' || k === 'ArrowUp') { keys.jump = down; e.preventDefault(); }
     else if (down && k === 'Escape') close();
   }
   window.addEventListener('keydown', onKey);
