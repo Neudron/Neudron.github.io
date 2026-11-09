@@ -1,0 +1,84 @@
+NEU V3 — rules for every work-order agent
+==========================================
+
+The spec is scripts/v3/out/PLAN.md (approved by the user 2026-11-09; same text at
+/home/neu/.claude/plans/pasted-content-id-728a-neu-declarative-dolphin.md).
+Your work order names one section or item of it. Build exactly that: its
+"Now" lines are verified facts, its "Do" lines are the change, its "Proof"
+lines are your tests. Do not redesign it. If the code contradicts a "Now"
+line, stop and report the contradiction instead of guessing.
+
+WHERE YOU WORK
+- Directory /home/neu/git/Neudron.github.io/.claude/worktrees/v3-integration,
+  branch v3/integration. Check first: `pwd`, then `git branch --show-current`.
+  Anything else: stop and report.
+- One agent writes at a time. Read-only for you: ../../../.worktrees/* (lane
+  worktrees), the main checkout, memory/, _sources/, .opencode/ (symlinks into
+  the shared checkout; the Write tool refuses them). Never touch .github/,
+  CNAME, manifest.json, og.png, robots.txt, sitemap.xml.
+- Your own notes, logs, shots and documents go under scripts/v3/out/ (inside this
+  worktree, never committed).
+- tests/ is untracked here on purpose (a copy; tests/node_modules is a
+  symlink). New and changed suites stay in tests/.
+- Shell: every command carries `timeout` (5 s for small things, 60 s for one
+  suite). Keep git commands plain and single: no `git -C`, no git inside
+  loops, pipes, functions or $(...); the session guard rejects those. Use
+  relative paths: the text /home/neu/git/ inside a compound command also
+  trips the guard. rsync is not installed; use cp or tar. If a hook rewrites
+  your command and the call is refused with "no verdict", re-issue it once
+  exactly as the refusal quotes it.
+- Never git push, never merge, never switch branch, never git stash.
+
+HOUSE RULES THE GATE ENFORCES
+ES5 in js/ (var, function declarations; js/page/scene.js is the one module).
+No new runtime dependency. Fonts are multiples of 16 px. .tbox stays the top
+layer. Honour reduced motion (NEU.motion.reduced()); no flash above 3 Hz.
+Pixel art: imageSmoothingEnabled = false, integer coordinates. Progress only
+in js/core/quest.js, world state only in js/core/save.js, dialogue only
+through NEU.talk. Keys stay rebindable (js/core/keys.js renames events before
+listeners; do not bypass it). No byte or size budgets. No screen-corner quit
+buttons. The story Console stays closed until `tv_restored` (PLAN section 3,
+B2-01); never add a route around that.
+
+Skills: load neu-site and neu-verify before anything; neu-room for rooms,
+puzzles and fights; neu-juice for feedback; plus the skills your work order
+names.
+
+BUILDER
+1. `timeout 5 sh scripts/v3/wo.sh begin <ID>`
+2. Read the PLAN item and the files it cites. Trace the real flow first.
+3. Test first: `timeout 5 node tests/newfix.mjs "<ID> <title>"` writes the
+   next tests/fixesN.mjs. Assertions drive the game through NEU.* APIs, keys
+   and timers, never regex over source. Red, then green. Replayable flows run
+   twice. Save changes round-trip and load tests/fixtures/save-v1.json and
+   save-v2.json. Puzzles carry a solver proof.
+4. Edit only the files your work order allows (tests/ is always allowed).
+   Need another file: stop and report it.
+5. `timeout 60 node tests/fixesN.mjs` green, plus every suite you touched.
+6. Player-visible change: `timeout 5 sh scripts/v3/wo.sh serve`, then
+   `timeout 60 node scripts/v3/shot.mjs scripts/v3/out/shots/<ID>-<name>.png "<js that reaches the scene>" 2500`
+   Capture before, during and after. Read the images. Fix what looks wrong.
+7. Do not commit. Report: files changed, root cause, what you built, suite
+   and pass count, shot paths, anything unmet.
+
+REVIEWER (independent; reads the diff and the shots, edits nothing)
+SHIP only if all hold: the diff is non-empty and stays inside the allowed
+files; every "Do" line of the PLAN item is present; every "Proof" line has a
+behavioural assertion; no house rule is broken; for visual work every rubric
+category is 4 or more of 5 on the shots. A REJECT names the exact failing
+check and file.
+Rubric: composition, art cohesion, silhouette readability, lighting,
+animation, environmental detail, interaction clarity, camera, transition
+quality, narrative impact.
+
+INTEGRATOR
+1. `NEU_JOBS=6 timeout 590 node tests/run-all.mjs > scripts/v3/out/snap/<ID>-gate.log 2>&1`
+   then read the tail. Baseline: ALL 185 SUITES PASS at bbb4331.
+2. Green: report green=true, committed=false, the changed files and gate log.
+   Never stage or commit. The primary orchestrator commits the reviewed change
+   before launching the next builder. Tests-only orders need no commit.
+3. Red: `timeout 20 sh scripts/v3/wo.sh rollback <ID>` and report BLOCKED
+   with the failing suite tail. Edit nothing. The workflow stops on failure;
+   the primary orchestrator verifies rollback before another builder starts.
+4. Append one row to scripts/v3/out/STATUS.md:
+   | ID | status | commit | suite | shots | remaining |
