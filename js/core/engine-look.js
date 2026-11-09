@@ -532,7 +532,25 @@
     return (((walked / (period || 6)) | 0) % 4);
   }
 
+  /* The recall potion's flask: neck, cork, bulb, one highlight. Same
+     purple as the inventory sprite. */
+  var FLASK_ROWS = ['...kk...', '..lLLl..', '..lLLl..', '.lllll.', 'lLLLLll', 'lLwwLLl', '.lllll.'];
+  var FLASK_PAL = { k: '#1A1024', l: '#6A4FA0', L: '#B892FF', w: '#FFFFFF' };
+
   function drawPlayer(ctx, sx, sy, face, walked, moving, s, now, extra) {
+    var act = extra && extra.act;
+    if (act === 'drink') {
+      /* Raise the flask, tip it back, put it away — actP is 0..1 across
+         the hold. The soul stands still and faces the way it was. */
+      stamp(ctx, playerRows(face, 0, false), PAL, sx, sy, s, { flip: face === 'right' });
+      var p = extra.actP || 0;
+      if (p < 0.8) {
+        var side = face === 'left' ? -1 : 1;
+        var raised = p >= 0.35;
+        stamp(ctx, FLASK_ROWS, FLASK_PAL, sx + side * (raised ? 3 : 6) * s, sy - (raised ? 9 : 6) * s, s, {});
+      }
+      return;
+    }
     var phase = walkPhase(walked, moving);
     var blink = !moving && !reduced && ((now || 0) % 3600) < 130;
     var dip = (phase === 1 || phase === 3) ? 0 : 0;

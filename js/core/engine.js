@@ -76,6 +76,7 @@
      through enter()'s opts, and it goes back to quick when it is done. */
   var IRIS = 0.22, fadeSpan = IRIS;
   var busy = false;                    // a cutscene owns input
+  var playerAct = null;                // { name, t, max } — a held player pose (the recall drink)
   var ents = [];                       // live copy of room.entities
   var images = {};
   var layers = {};                     // baked static layer per room id
@@ -715,6 +716,7 @@
     var decay = Math.exp(-14 * dt);
     kickX *= decay; kickY *= decay;
     if (settle > 0) settle -= dt;
+    if (playerAct && (playerAct.t -= dt) <= 0) playerAct = null;
     var L = look();
     if (L) L.weatherStep(dt, room);
   }
@@ -939,7 +941,8 @@
     for (i = 0; i < drawn.length; i++) {
       var dr = drawn[i];
       if (!dr.e) {
-        if (L) L.drawPlayer(ctx, sx(px), sy(py), face, walked, moving, S, now, { settle: settle > 0 });
+        if (L) L.drawPlayer(ctx, sx(px), sy(py), face, walked, moving, S, now,
+          { settle: settle > 0, act: playerAct && playerAct.name, actP: playerAct ? 1 - playerAct.t / playerAct.max : 0 });
         continue;
       }
       var pp = entAt(dr.e); d.sx = sx(pp.x); d.sy = sy(pp.y);
@@ -1212,6 +1215,9 @@
     has: function (i) { return NEU.save ? NEU.save.has(i) : false; },
     go: go, leave: leave,
     busy: function (on) { busy = !!on; },
+    /* Hold a named pose on the player for secs (engine-look draws it).
+       'drink' is the recall potion's. */
+    act: function (name, secs) { playerAct = name ? { name: name, t: secs || 0, max: secs || 0 } : null; },
     entHere: entHere, reset: resetPuzzle, check: checkPuzzle,
     ents: function () { return ents; },
     solved: function (id) { return NEU.save ? NEU.save.flagged('solved:' + id) : false; },

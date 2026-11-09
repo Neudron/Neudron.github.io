@@ -73,6 +73,59 @@
     return NEU.engine.enter(room, spawn);
   }
 
+  /* ── the recall potion ─────────────────────────────────────────
+     One sequence for both ways to drink it — the C menu and the chalk
+     circle in d3_square. The soul raises the flask (engine api.act), a
+     ring opens under it, and the iris carries it home: always e6_room
+     at the bed, never a corridor. busy holds every control until the
+     iris finishes; go() releases it. */
+  var recalling = false;
+  function reducedMotion() {
+    return !!(NEU.motion && NEU.motion.reduced ? NEU.motion.reduced() : window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ||
+      !!(NEU.settings && NEU.settings.reduced);
+  }
+  function ring() {
+    var still = reducedMotion();
+    var el = document.createElement('div');
+    el.id = 'recallRing';
+    el.setAttribute('aria-hidden', 'true');
+    el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:74;display:flex;align-items:center;justify-content:center';
+    var c = document.createElement('div');
+    c.style.cssText = 'width:140px;height:140px;border-radius:50%;border:4px solid #7FE6FF;' +
+      'box-shadow:0 0 28px rgba(127,230,255,.8),inset 0 0 28px rgba(127,230,255,.5);opacity:0';
+    el.appendChild(c); document.body.appendChild(el);
+    var gone = function () { if (el.parentNode) el.parentNode.removeChild(el); };
+    if (!still && c.animate) {
+      c.animate([{ transform: 'scale(.15)', opacity: 0 },
+                 { transform: 'scale(.15)', opacity: 1, offset: .25 },
+                 { transform: 'scale(1.5)', opacity: 0 }],
+                { duration: 700, easing: 'steps(6)' });
+    } else { c.style.opacity = '.8'; }
+    setTimeout(function () {
+      gone();
+      if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
+      /* enter(), not go(): go() silently no-ops while another iris is
+         still running, which would leave busy held forever. enter()
+         always lands and releases the lock itself. */
+      NEU.engine.enter('e6_room', 'bed', { iris: 0.6 });
+      recalling = false;
+    }, still ? 200 : 700);
+  }
+  function recall() {
+    if (recalling || !NEU.engine || !NEU.engine.enter || !NEU.engine.running) return false;
+    if (!NEU.save || !NEU.save.has('recall')) return false;
+    if (NEU.engine.rooms && NEU.engine.rooms.indexOf('e6_room') < 0) return false;
+    recalling = true;
+    NEU.save.take('recall');
+    NEU.save.flag('used_recall', 1);
+    if (NEU.quest) NEU.quest.mark('a4_home');
+    var api = NEU.engine.api;
+    if (api && api.busy) api.busy(true);
+    if (api && api.act) api.act('drink', 0.85);
+    setTimeout(ring, reducedMotion() ? 250 : 850);
+    return true;
+  }
+
   /* ── waking up ──────────────────────────────────────────────────
      The soup ends the trip. You come round on the page, next to the
      two of them, and they tell you what you did — which is the only
@@ -209,7 +262,7 @@
   }
 
   NEU.act4 = {
-    open: open, wake: wake, settle: settle, ending: ending, install: install,
+    open: open, wake: wake, settle: settle, ending: ending, install: install, recall: recall,
     get start() { return START; },
     get done() { return !!(NEU.save && NEU.save.flagged('act4_done')); },
     steps: STEPS

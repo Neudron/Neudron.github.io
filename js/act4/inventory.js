@@ -448,11 +448,11 @@
     var item = selectedItem();
     if (!item) return;
     if (item.id === 'soup') { drinkSoup(function () { NEU.save.take('soup'); }); return; }
-    /* The recall potion teleports you to the act's start once it is drunk. */
+    /* The recall potion runs the shared sequence: drink, ring, iris,
+       and always the bedroom — never a corridor. */
     if (item.fx === 'recall') {
       drinkPotion(item, function () {
-        NEU.save.take('recall');
-        if (NEU.engine) NEU.engine.enter((NEU.act4 && NEU.act4.start) || 'a1_clearing', 'default', { iris: 0.6 });
+        if (NEU.act4 && NEU.act4.recall) NEU.act4.recall();
       });
       return;
     }

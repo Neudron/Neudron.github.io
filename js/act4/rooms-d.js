@@ -347,12 +347,10 @@
              'it wants a potion. it is quite specific about which.'], 'narr');
       return;
     }
-    c.flag('used_recall', 1);
-    if (NEU.save) NEU.save.take('recall');
     c.say(['you drink it standing in the circle, which is what the circle wanted.',
            'the square folds up like a map.'], 'narr');
-    if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
-    setTimeout(function () { c.go('e1_hall', 'south'); }, 2200);
+    /* Same sequence as the C menu: drink, ring, iris, bedroom. */
+    if (NEU.act4 && NEU.act4.recall) NEU.act4.recall();
   }
 
   /* ══ E — New Home ════════════════════════════════════════════════
