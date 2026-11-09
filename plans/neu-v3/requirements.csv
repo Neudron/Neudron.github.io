@@ -1,0 +1,23 @@
+id,source,requirement,current_state,proposed_change,owner,dependency,test,status
+V3-R001,user V3 part 6,Seamless forest world,engine go uses iris,Opt-in connected A1-A2-A3 geometry,Opus,V3-100,held movement reverse browser test,NEEDS REDESIGN
+V3-R002,user V3 part 6,Camera continuity,land resets camera,Shared world camera bounds for seams,Opus,V3-101,pre-mid-post 60 and 144Hz,NEEDS REDESIGN
+V3-R003,user V3 part 7,Calamitas witch spell door,B1 sets witch_met at dialogue completion,Stateful hand-spell-projectile-lock-door scene,Opus,V3-200,door threshold and reload,NEEDS REDESIGN
+V3-R004,user V3 part 7,Second throne sitting,B1 NPC dialogue only,Seat/stand interact and collision-safe anchor,Opus,V3-200,enter/exit/reload screenshot,NEEDS REDESIGN
+V3-R005,user V3 part 7,Mouse under ice puzzle,B4 slide-only ring,Replace with solvable multisystem mouse cheese puzzle,Opus+Sonnet,V3-201,solver and failure-retry browser test,NEEDS REDESIGN
+V3-R006,user V3 part 7,Torch reasoning puzzle,B6 torch central socket,Directional light and reflection clues,Opus+Sonnet,V3-202,unique solution and save test,NEEDS REDESIGN
+V3-R007,user V3 part 7,Altar trapdoor,B7 stairs to arena,Physically authored heavy split hatch,Opus,V3-203,timeline and collision screenshot,NEEDS REDESIGN
+V3-R008,user V3 part 8,Sparse telegraphs,legacy Calamitas indicators exist,Retain useful old indicators and remove redundant new ones,Opus,V3-203,attack-by-attack review,UNVERIFIED
+V3-R009,user V3 part 9,Recall to real bed,W08 commit and act4 code returns e6_room,Verify consumption and spawn sequence,Haiku,V3-005,repeat/reload,PARTIAL
+V3-R010,user V3 part 9,Vending cinematic,W09 commit says scripted movement,Verify scene and no control leak,Haiku,V3-005,repeat and screenshot,PARTIAL
+V3-R011,user V3 part 9,Sky crack arrival and surface bed,W10 commit claims implemented,Retain and visually verify,Haiku,V3-005,death respawn reduced motion,PARTIAL
+V3-R012,user V3 part 9,Merchant FNF soul transition,W12 commit claims fixes,Verify sync box and cleared screen,Haiku,V3-005,full rhythm/soul video,PARTIAL
+V3-R013,user V3 part 9,Deterministic Mage cards,Existing js/act4/cards.js,Audit full rules and visual choices,Sonnet,V3-400,seeded replay,UNVERIFIED
+V3-R014,user V3 part 9,Polterghast fight,Existing boss-polt and polt-attacks,Audit attacks and rework confirmed weak ones,Opus,V3-400,phase/telegraph review,UNVERIFIED
+V3-R015,user V3 part 9,Minecart death,Existing cart.js,Verify physical crash and respawn,Opus,V3-500,death checkpoint repeat,UNVERIFIED
+V3-R016,user V3 part 9,Mountain fairness,Existing mountain.js,Measure and improve input forgiveness,Sonnet+Opus,V3-500,keyboard/mobile input test,UNVERIFIED
+V3-R017,user V3 part 9,Dad mystery canon,Private memory story absent,Reconcile before edits,Opus,V3-600,story checklist,BLOCKED
+V3-R018,user V3 part 7,Draedon nuclear finale,Existing boss-draedon/finale,Private canon plus detailed screen choreography,Opus,V3-700,full cutscene capture,UNVERIFIED
+V3-R019,user V3 parts 10-11,Asset provenance,Named franchise folders are present,Per-file rights review and replacement plan,Haiku,V3-003,creator license audit,BLOCKED
+V3-R020,user V3 parts 15-16,Full regression verification,Most local tests not remotely tracked,Run full private suite in actual worktree,Haiku,V3-900,185 suites plus build gates,BLOCKED
+V3-R021,user V3 part 13,Agent isolation,Local worktrees uninspectable,Create bounded tasks and isolated worktrees,Opus,V3-000,git worktree status,BLOCKED
+V3-R022,user V3 parts 4/16,Art and task policies,No public agent/docs foundation,Create design/work orders/release gates,Opus,B01,review committed files,IMPLEMENTED
