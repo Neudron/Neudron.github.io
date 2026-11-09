@@ -43,6 +43,7 @@
   ];
 
   var done = {}, counts = {};
+  var unveiled = {};
   var locked = false;                 // set while a sequence owns the screen
   var panel = document.getElementById('quest');
   var list  = document.getElementById('questList');
@@ -61,6 +62,7 @@
      one legible "next thing". */
   function reachable(i) {
     if (i === 0) return true;
+    if (unveiled[STEPS[i].id]) return true;
     /* show a little further ahead so the chain reads as a chain, not
        a single next step — the objectives tab used to stop at soup */
     var last = -1;
@@ -142,6 +144,7 @@
       if (NEU.save && NEU.save.capture) NEU.save.capture();
     },
     has: function (id) { return !!done[id]; },
+    unlock: function (id) { unveiled[id] = true; render(); },
 
     /* The first open step after the last completed one: the "what next"
        that the wake cue names. Falls back to the first open step at all. */

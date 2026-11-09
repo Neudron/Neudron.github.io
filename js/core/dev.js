@@ -38,6 +38,11 @@
      and is never set on its own. */
   NEU.cheat = { god: false, dmgMul: 1, startFrac: 0 };
 
+  /* The story Console is post-Polterghast progression (brief §0): no dev
+     command may grant or unlock it — its steps, flags and item are refused. */
+  var CONSOLE = { sleep: 1, console: 1, console_charge: 1, charge: 1, docked: 1, deck: 1 };
+  function consoleRefuse(v) { log('the story Console is post-Polterghast — dev console will not ' + v + ' it.'); }
+
   /* One ordered table, in the order the objectives tab reads it. Each
      stage lists what is true AFTER it: quest marks, counts, save flags,
      items. `skip <stage>` clears everything the table owns, then applies
@@ -133,6 +138,18 @@
 
   function sectionNames() { return CHAIN.map(function (s) { return s.id; }); }
 
+  /* tp bare lists engine.rooms + plat.levels; reset <enc> restarts one. */
+  function listAreas() {
+    var lv = (NEU.plat && NEU.plat.levels) || {}, names = [], k;
+    for (k in lv) if (Object.prototype.hasOwnProperty.call(lv, k)) names.push(k);
+    log('rooms: ' + ((NEU.engine && NEU.engine.rooms) || []).join(' ') + '  ·  levels: ' + names.join(' '));
+  }
+  var ENCOUNTERS = { bullet: 1, dark: 1, scal: 1, polt: 1, exo: 1, draedon: 1, rhythm: 1, quiz: 1, cart: 1, mage: 1 };
+  function encRunning(name, m) {
+    return NEU.activeMinigame === name || m.active === true || m.running === true ||
+           (typeof m.running === 'function' && !!m.running());
+  }
+
   var CMDS = {
     help: function () {
       log('sans   skip the whole sword errand, hand over the key');
@@ -154,14 +171,15 @@
       log('fps    frame-time meter · "fps off" to stop · "fps ?" to read it');
       log('save   write the save file and show it');
       log('wipe   delete the save file');
-      log('reset  back to the start');
+      log('reset  bare wipes + reloads · reset <enc> restarts that fight');
       log('state  dump quest steps, flags, items, room');
+      log('info   room, pos, flags, hp, tp, boss');
       log('skip   skip <section> applies every earlier step, then goes there');
-      log('god    toggle infinite soul hp (the fight)');
+      log('god    god [on|off] — no damage until off');
       log('dmg    dmg <mult|inf|off> multiplies the fight\'s damage');
       log('hp     hp <n> sets the soul\'s hp (in the fight)');
-      log('heal   soul back to full (in the fight)');
-      log('tp     tp <0-100> sets the soul\'s tp (in the fight)');
+      log('heal   top up the soul (fight) or the level\'s hp');
+      log('tp     bare lists · tp <area> warps · tp <0-100> is the fight\'s tp');
       log('close  esc also works');
       log('── tenna (tv time) ──');
       log('tenna            open the show          (aliases: tv, quiz)');
@@ -176,9 +194,9 @@
       log('scal             phase, hp, mode, hearts, booms (in the fight)');
       log('mark <id>        mark one quest step done');
       log('bump <id> <n>    raise a counted step to n');
+      log('unlock <id>      reveal a veiled objective (completes nothing) · reset <enc> restarts');
       log('flag <k> [v]     read or set a save flag (number or text)');
-      log('give <item>      add an item to the pack');
-      log('take <item>      remove an item from the pack');
+      log('give <item>      add an item; gear equips itself · take removes it');
       log('vol <0-100>      music volume');
       log('clear            empty this console (alias: cls)');
     },
@@ -230,16 +248,27 @@
       if (NEU.settings) { hide(); NEU.settings.open(); log('settings.'); }
       else log('settings.js not loaded');
     },
-    reset: function () {
-      if (NEU.devReset) { NEU.devReset(); log('reset.'); }
-      else log('nope');
+    reset: function (arg) {
+      var name = String(arg || '').trim().toLowerCase();
+      if (!name) { if (NEU.devReset) { NEU.devReset(); log('reset.'); } else log('nope'); return; }
+      var m = ENCOUNTERS[name] ? NEU[name] : null;
+      if (!m || !m.open) { log('no encounter "' + name + '". encounters: ' + Object.keys(ENCOUNTERS).join(' ')); return; }
+      var was = encRunning(name, m);
+      if (m.reset) m.reset(); else if (was && m.close) m.close();
+      if (!encRunning(name, m)) m.open();
+      log(name + (was ? ' restarted.' : ' opened fresh.'));
     },
     close: function () { hide(); },
 
-    /* ── cheats: read by the fight (boss-scal.js), nothing else ───── */
-    god: function () {
-      NEU.cheat.god = !NEU.cheat.god;
-      log('god ' + (NEU.cheat.god ? 'on. the soul cannot be hurt.' : 'off.'));
+    /* ── cheats: read by the fight (boss-scal.js) and the shared damage
+       paths (plat.hurt, bullet hitPlayer, exo/draedon hurtPlayer) ───── */
+    god: function (arg) {
+      var a = String(arg || '').trim().toLowerCase();
+      if (a === 'on') NEU.cheat.god = true;
+      else if (a === 'off') NEU.cheat.god = false;
+      else if (a) { log('usage: god [on|off]'); return; }
+      else NEU.cheat.god = !NEU.cheat.god;    /* bare `god` still toggles */
+      log('god ' + (NEU.cheat.god ? 'on — no damage until `god off`.' : 'off.'));
     },
     dmg: function (arg) {
       var a = String(arg || '').toLowerCase();
@@ -257,16 +286,25 @@
       log('soul hp ' + NEU.scal.soulHP + '.');
     },
     heal: function () {
-      if (!NEU.scal || !NEU.scal.active) { log('the soul is not on screen. go into the fight first.'); return; }
-      NEU.scal.heal();
-      log('soul healed to full.');
+      if (NEU.scal && NEU.scal.active) { NEU.scal.heal(); log('soul healed to full.'); return; }
+      var lv = NEU.plat && NEU.plat.state && NEU.plat.level0 ? NEU.plat.level0() : null;
+      if (!lv || !lv.hp) { log('nothing to heal here.'); return; }
+      NEU.plat.heal(lv.hp); log('hp -> ' + NEU.plat.state.hp + '.');
     },
     tp: function (arg) {
-      if (!NEU.scal || !NEU.scal.active) { log('the soul is not on screen. go into the fight first.'); return; }
-      var n = parseInt(arg, 10);
-      if (isNaN(n)) { log('usage: tp <0-100>'); return; }
-      NEU.scal.setTp(n);
-      log('tp ' + Math.round(NEU.scal.tp * 100) + '%.');
+      var a = String(arg || '').trim();
+      if (!a) { listAreas(); return; }
+      if (NEU.scal && NEU.scal.active && !isNaN(Number(a))) {
+        NEU.scal.setTp(Number(a)); log('tp ' + Math.round(NEU.scal.tp * 100) + '%.'); return;
+      }
+      var p = a.split(/\s+/), id = p[0];
+      if (NEU.engine && NEU.engine.rooms && NEU.engine.rooms.indexOf(id) >= 0) {
+        hide(); log(NEU.engine.enter(id, p[1]) ? 'warped to ' + id + '.' : 'could not enter ' + id + '.'); return;
+      }
+      if (NEU.plat && NEU.plat.levels && NEU.plat.levels[id]) {
+        hide(); log(NEU.plat.open(id) ? 'warped to ' + id + '.' : 'could not open ' + id + '.'); return;
+      }
+      log('no area "' + id + '". try: tp');
     },
 
     /* ── skip: apply every earlier stage, then drop into the target ── */
@@ -392,29 +430,62 @@
     mark: function (id) {
       if (!NEU.quest) { log('quest.js not loaded'); return; }
       if (!id) { log('usage: mark <step id>'); return; }
+      if (CONSOLE[id]) return consoleRefuse('complete');
       NEU.quest.mark(id); log('marked ' + id + '.');
     },
     bump: function (arg) {
       var p = String(arg || '').trim().split(/\s+/);
       if (!NEU.quest || !p[0] || isNaN(parseInt(p[1], 10))) { log('usage: bump <count id> <n>'); return; }
+      if (CONSOLE[p[0]]) return consoleRefuse('complete');
       NEU.quest.bump(p[0], parseInt(p[1], 10)); log('bumped ' + p[0] + ' to ' + p[1] + '.');
+    },
+    unlock: function (arg) {
+      var id = String(arg || '').trim();
+      if (!NEU.quest) { log('quest.js not loaded'); return; }
+      if (!id) { log('usage: unlock <step id>'); return; }
+      if (CONSOLE[id]) return consoleRefuse('unveil');
+      NEU.quest.unlock(id); log('unveiled ' + id + ' (not completed).');
     },
     flag: function (arg) {
       if (!NEU.save) { log('save.js not loaded'); return; }
       var p = String(arg || '').trim().split(/\s+/), k = p[0];
       if (!k) { log('usage: flag <name> [value]'); return; }
+      if (CONSOLE[k]) return consoleRefuse('set a flag on');
       if (p.length < 2) { log(k + ' = ' + NEU.save.flag(k)); return; }
       var v = p.slice(1).join(' '), n = Number(v);
       var val = isNaN(n) ? v : n;
       NEU.save.flag(k, val); log(k + ' set to ' + val + '.');
     },
-    give: function (item) {
+    give: function (arg) {
+      var item = String(arg || '').trim().split(/\s+/)[0];
       if (!NEU.save || !item) { log('usage: give <item>'); return; }
-      NEU.save.give(item); log('gave ' + item + '.');
+      if (CONSOLE[item]) return consoleRefuse('give');
+      NEU.save.give(item);
+      var d = NEU.items && NEU.items.get ? NEU.items.get(item) : null;
+      var slot = d && ({ melee: 'melee', ranged: 'ranged', spell: 'spell1' })[d.kind] || null;
+      if (slot) NEU.save.equip(slot, item);
+      log('gave ' + item + (slot ? ' · equipped ' + slot : '') + '.');
     },
     take: function (item) {
       if (!NEU.save || !item) { log('usage: take <item>'); return; }
+      if (CONSOLE[item]) return consoleRefuse('take');
       NEU.save.take(item); log('took ' + item + '.');
+    },
+    info: function () {
+      var w = NEU.engine && NEU.engine.where ? NEU.engine.where() : null;
+      var s = NEU.plat && NEU.plat.state, pl = s && NEU.plat.level0 ? NEU.plat.level0() : null;
+      var boss = '-', ks = Object.keys(ENCOUNTERS), i, m;
+      for (i = 0; i < ks.length; i++) { m = NEU[ks[i]];
+        if (m && encRunning(ks[i], m)) { boss = ks[i]; break; } }
+      var fl = (NEU.save && NEU.save.data && NEU.save.data.flags) || {};
+      var fk = Object.keys(fl).filter(function (k) { return fl[k]; }).sort();
+      var pd = w && NEU.engine.debug && NEU.engine.debug.player;
+      log('area ' + (w ? w.room + ' @' + w.spawn : s ? NEU.plat.levelId() : 'page') +
+          '  pos ' + (pd ? pd.x | 0 : s ? s.x | 0 : '-') + ',' + (pd ? pd.y | 0 : s ? s.y | 0 : '-') +
+          '  hp ' + (NEU.scal && NEU.scal.active ? NEU.scal.soulHP + '/8' : s && pl ? s.hp + '/' + pl.hp : '-') +
+          '  tp ' + (NEU.scal && NEU.scal.active ? Math.round(NEU.scal.tp * 100) + '%' : '-') +
+          '  boss ' + boss + '  god ' + NEU.cheat.god);
+      log('flags ' + (fk.join(' ') || 'none'));
     },
     vol: function (arg) {
       if (!NEU.music || !NEU.music.setVolume) { log('music.js not loaded'); return; }

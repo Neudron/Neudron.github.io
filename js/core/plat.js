@@ -123,6 +123,7 @@
   /* kit HP: a level that sets hp counts hits; one without it dies on the first (the mountain) */
   function hurt(n, dir) {
     if (player.dead > 0 || player.inv > 0) return false;
+    if (NEU.cheat && NEU.cheat.god) return false;
     if (!current || !current.hp) { die(); return true; }
     player.hp = Math.max(0, player.hp - (n || 1)); player.inv = C.hurtInv;
     player.vx = (dir || -player.face) * C.kbX; player.vy = C.kbY; player.st = 0; player.varJump = 0;

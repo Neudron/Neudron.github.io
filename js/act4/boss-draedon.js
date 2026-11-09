@@ -238,7 +238,7 @@
     return true;
   }
   function hurtPlayer(n) {
-    if (mode !== 'fight' || iframe > 0) return;
+    if ((NEU.cheat && NEU.cheat.god) || mode !== 'fight' || iframe > 0) return;   /* dev `god on` (dev.js) */
     iframe = 60;
     playerHp -= n || 1;
     if (NEU.juice) NEU.juice.hit('medium');

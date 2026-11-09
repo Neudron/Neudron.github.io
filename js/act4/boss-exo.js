@@ -240,7 +240,7 @@
     return true;
   }
   function hurtPlayer(n) {
-    if (god || mode !== 'fight') return;
+    if (god || (NEU.cheat && NEU.cheat.god) || mode !== 'fight') return;   /* dev `god on` (dev.js) */
     playerHp -= n || 1;
     if (NEU.juice) NEU.juice.hit('medium');
     /* A loss restarts the fight. The hour in the save stays. */

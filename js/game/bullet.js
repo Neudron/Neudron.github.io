@@ -410,7 +410,7 @@
 
   /* One hit, from anything. Dash i-frames count. Returns true on death. */
   function hitPlayer(dx, dy) {
-    if (inv > 0 || F.dashI > 0) return false;
+    if (inv > 0 || F.dashI > 0 || (NEU.cheat && NEU.cheat.god)) return false;   /* dev `god on` (dev.js) */
     hp--; inv = dm.IFRAMES || 1.15;
     if (cell > 0) { cell = 0; cellLostAt = performance.now(); if (NEU.juice) NEU.juice.burst(F.x, F.y, 12, PAL.elec, 160); }
     dm.hurt(F, F.x, F.y - 12);
