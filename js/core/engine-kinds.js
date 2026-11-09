@@ -88,7 +88,7 @@
      the entity (e._m) and is read from the frame's clock.
      ponytail: four-cell range is one constant; upgrade to per-room
      range when a room needs a mushroom that notices from further off. */
-  var MUSH = { range: 64, prep: 90, dance: 120, react: 160, hurt: 480, scale: 2 };
+  var MUSH = { range: 64, prep: 90, dance: 120, react: 160, hurt: 480, cut: 700, scale: 2 };
   var TILE = 16;   /* engine.js TILE: world units per cell */
   function mushPose(e, now, pl, reduced) {
     var m = e._m || (e._m = { since: -1, hurt: -1, now: now });
@@ -97,6 +97,14 @@
     /* the mushrooms only find their feet once you are tripping (the vending
        machines). The chop is still the same act either way. */
     var high = !!(NEU.save && NEU.save.flagged('tripping'));
+    /* mid-cut: rooms-g stamped e._cutAt on the swing; the mushroom
+       squashes flat over the beat before NEU.take removes it. */
+    if (e._cutAt !== undefined) {
+      var cp = (now - e._cutAt) / MUSH.cut;
+      if (cp >= 1) return { col: 2, row: 2, sx: 0.5, sy: 0.2 };
+      if (reduced) return { col: 2, row: 0, sx: 1, sy: 1 };
+      return { col: 2, row: Math.min(2, (cp * 3) | 0), sx: 1 - 0.3 * cp, sy: 1 - 0.6 * cp };
+    }
     if (!near || !high) m.since = -1; else if (m.since < 0) m.since = now;
     if (m.hurt >= 0 && now - m.hurt >= MUSH.hurt) m.hurt = -1;
     if (m.hurt >= 0) {
@@ -124,6 +132,25 @@
     if (p.sx !== 1 || p.sy !== 1) g.scale(p.sx, p.sy);
     var drawn = !!sh && NEU.sheetDraw && NEU.sheetDraw(g, 'mushroom', 0, 0, {
       frame: p.row, col: p.col, scale: MUSH.scale * sheetScale(sh, d.S, e), anchor: 'feet', now: d.now });
+    /* the axe: two bright slashes sweep across the cap while it falls.
+       Drawn in the entity's local space (origin = feet centre). */
+    if (e._cutAt !== undefined && drawn) {
+      var cp = Math.min(1, Math.max(0, ((d.now || 0) - e._cutAt) / MUSH.cut));
+      var sw = 16 * d.S, sh2 = 34 * d.S;
+      g.save();
+      g.globalAlpha = 0.9 * (1 - cp * 0.5);
+      g.strokeStyle = '#FFF6E0'; g.lineWidth = Math.max(1, d.S);
+      g.beginPath();
+      g.moveTo(-sw + sw * cp, -sh2);
+      g.lineTo(sw - sw * cp, -sh2 * 0.35);
+      g.stroke();
+      g.globalAlpha *= 0.6;
+      g.beginPath();
+      g.moveTo(-sw * 0.6 + sw * 0.4 * cp, -sh2 * 0.8);
+      g.lineTo(sw * 0.6 - sw * 0.4 * cp, -sh2 * 0.15);
+      g.stroke();
+      g.restore();
+    }
     g.restore();
     if (!drawn) drawSheet(g, e, d);
   }

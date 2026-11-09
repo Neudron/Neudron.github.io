@@ -401,7 +401,18 @@
         }
         continue;
       }
-      if (s.k === 'hammer') { NEU.dungeonLook.cut(c, 'dgHammer', 0, 0, 38, 38, s.x - 19, s.y - 19); continue; }
+      if (s.k === 'hammer') {
+        /* the mace turns with its flight — same rule fxShot applies to
+           the other projectiles */
+        var him = fxIm('dgHammer');
+        if (him) {
+          c.save(); c.translate(s.x | 0, s.y | 0);
+          c.rotate(Math.atan2(s.vy || 0, s.vx || 1));
+          c.drawImage(him, -19, -19, 38, 38);
+          c.restore();
+        } else NEU.dungeonLook.cut(c, 'dgHammer', 0, 0, 38, 38, s.x - 19, s.y - 19);
+        continue;
+      }
       k = { bullet: '#FFE8A0', pellet: '#FFD070', rocket: '#FF8A3A', soul: '#9AF0FF', flame: '#E8E8FF', ghost: '#7FE3C4', bolt: '#FF6A3A' }[s.k] || '#FFFFFF';
       P.glow(c, s.x, s.y, 12, k, 0.25);
       if (!fxShot(c, s, FXS[s.k])) P.fr(c, (s.x - s.r / 2) | 0, (s.y - s.r / 2) | 0, Math.max(2, s.r), Math.max(2, s.r), k);

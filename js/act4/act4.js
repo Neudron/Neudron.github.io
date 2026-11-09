@@ -133,12 +133,28 @@
   /* The dog leaves, he takes the chair, and the console becomes
      available — the object you spent an act charging is finally his,
      which is the small joke the whole chain has been walking toward. */
+  var settled = false;
   function settle() {
     var dog = document.getElementById('dog');
-    if (dog) {
-      dog.classList.remove('is-in');
-      dog.classList.add('is-leave');
-      setTimeout(function () { dog.hidden = true; dog.classList.remove('is-leave'); }, 520);
+    /* The sleep path hid #dog long before this beat runs, so is-leave on
+       its own animated an element nobody could see. Bring him back for
+       a beat (is-in), then let him go (is-leave), then hide — once. */
+    /* Only a dog that was actually fed ever appears — the 'dog' quest
+       mark is what sans.js sets on the first feed. */
+    var fedDog = !!(NEU.quest && NEU.quest.has && NEU.quest.has('dog'));
+    if (dog && fedDog && !settled) {
+      settled = true;
+      dog.hidden = false;
+      dog.classList.remove('is-leave');
+      dog.classList.add('is-in');
+      setTimeout(function () {
+        dog.classList.remove('is-in');
+        dog.classList.add('is-leave');
+      }, 400);
+      setTimeout(function () {
+        dog.hidden = true;
+        dog.classList.remove('is-leave', 'is-in');
+      }, 400 + 520);
     }
     var sleepDog = document.querySelector('.sleep__dog');
     if (sleepDog) sleepDog.hidden = true;

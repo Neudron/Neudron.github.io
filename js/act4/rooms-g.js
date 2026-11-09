@@ -513,8 +513,35 @@
     var lines = n < 5 ? ['you take the mushroom. ' + n + ' of five.']
       : ['you take the mushroom. five of five.',
          'bring them to the pot. the street has a door that opens only while you are tripping; it goes to the pot.'];
-    if (e) { NEU.take(e, id, lines, 'mush'); }
-    else { if (NEU.save) NEU.save.give(id); if (NEU.say) NEU.say(lines || ['* You got the ' + id.toUpperCase() + '.'], 'mush'); }
+    if (e) {
+      /* The cut takes a beat: the mushroom squashes (engine-kinds reads
+         e._cutAt for the pose), the axe lands, THEN NEU.take writes the
+         gone flag, the pocket and the line. A second swing inside the
+         beat is spent — the mushroom is already falling. */
+      if (e._cutAt !== undefined) return;
+      e._cutAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      var rid = c.room ? c.room.id : null;
+      setTimeout(function () {
+        if (e.dead) return;
+        var here = NEU.engine && NEU.engine.where ? NEU.engine.where() : null;
+        if (here && here.room === rid) {
+          NEU.take(e, id, lines, 'mush');
+        } else {
+          /* walked out mid-swing: the mushroom is still yours — flag
+             this room's copy gone and grant, or the cut would be lost
+             and the room would hand you a second one. */
+          if (NEU.save) {
+            NEU.save.give(id);
+            NEU.save.flag('gone:' + rid + ':' + (e.mush || e.x + ',' + e.y), 1);
+          }
+          if (NEU.say) NEU.say(lines, 'mush');
+        }
+        if (NEU.quest) NEU.quest.bump('a4_mush', mushrooms());
+      }, 700);
+      return;
+    }
+    if (NEU.save) NEU.save.give(id);
+    if (NEU.say) NEU.say(lines || ['* You got the ' + id.toUpperCase() + '.'], 'mush');
     if (NEU.quest) NEU.quest.bump('a4_mush', mushrooms());
   };
 
