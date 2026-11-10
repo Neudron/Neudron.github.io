@@ -2,7 +2,7 @@
    ───────────────────────────────────────────────────────────────────
    Ctrl + Shift + `  (backquote)
 
-   Everything past the contact section is gated behind a nine-swing
+   Everything past the contact section is gated behind a three-swing
    errand, and re-walking it to test the room behind the door is a
    minute of scrolling per attempt. This exists so it doesn't have to
    be.

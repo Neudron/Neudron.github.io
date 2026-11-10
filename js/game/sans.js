@@ -111,11 +111,6 @@
   var LINES = [
     "swing and a miss. classic.",
     "still here, buddy.",
-    "you're really puttin' your back into it. i'd lend you mine, but i'm using it.",
-    "i'd dodge, but that sounds like a lot of work.",
-    "tibia honest, i didn't think you'd still be going.",
-    "that's five round trips. i counted. i had the time.",
-    "i'm bone tired just watchin' you, kid.",
     "..."
   ];
   var BREAK = [

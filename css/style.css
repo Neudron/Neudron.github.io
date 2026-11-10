@@ -807,10 +807,7 @@ html.is-lite .glass { display: none; }
 .sans.is-armed .sans__pips{opacity:1}
 .sans__pips i{width:5px;height:5px;background:#14141C;box-shadow:0 0 0 1px #5C5C70}
 .sans__pips i.on.t1{background:#EFEBE4}.sans__pips i.on.t2{background:#C9A227}.sans__pips i.on.t3{background:#E07A3F}.sans__pips i.on.t4{background:#C2405F;box-shadow:0 0 0 1px #C2405F,0 0 6px #C2405F}
-.sans__pips i.pop{animation:pipPop .28s steps(3,end)}
-@keyframes pipPop{0%{transform:scale(2.2)}100%{transform:scale(1)}}
 .sans__pips.is-miss i{box-shadow:0 0 0 1px #C2405F}
-html.rm .sans__pips i.pop{animation:none}
 
 /* the page jolts under you on the middle carry beat */
 html.is-jolt { animation: neuJolt .26s steps(2, end); }
