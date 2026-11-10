@@ -423,9 +423,14 @@
         }
         snow(R2, g2, 2 * T + 2, 2 * T + 6, 14, 6); snow(R2, g2, 18 * T + 6, 2 * T + 6, 12, 5);
         snow(R2, g2, 2 * T, 10 * T + 10, 12, 5); snow(R2, g2, 18 * T + 8, 10 * T + 10, 13, 5);
-        /* plate rings: where the slides must die */
-        var pl = [[13, 3], [13, 8], [5, 8]];
-        for (var i = 0; i < pl.length; i++) ringPaint(R2, pl[i][0] * T + 8, pl[i][1] * T + 9, 10, 6, '#E8F8FF');
+        /* the pool's rim: a pale edge where the ice meets the flagstones */
+        for (var ry = 3; ry <= 8; ry++) for (var rx = 3; rx <= 16; rx++) {
+          if (c.at(rx, ry) !== 'i') continue;
+          if (c.at(rx, ry - 1) !== 'i') R2(rx * T, ry * T, T, 1, '#B8E0F4');
+          if (c.at(rx, ry + 1) !== 'i') R2(rx * T, ry * T + T - 1, T, 1, '#B8E0F4');
+          if (c.at(rx - 1, ry) !== 'i') R2(rx * T, ry * T, 1, T, '#B8E0F4');
+          if (c.at(rx + 1, ry) !== 'i') R2(rx * T + T - 1, ry * T, 1, T, '#B8E0F4');
+        }
       } });
     },
     b5_two: function (R, g, room, c) {
@@ -527,15 +532,44 @@
       }
     },
     b4_ice: function (g, o, S, d, c) {
-      var w = c.ice;
-      if (!w || still()) return;
-      var t = d.now / 1000;
-      for (var i = 0; i < w.length; i += 2) {
-        var x = w[i], y = w[i + 1], ph = (t * 0.45 + (x + y) * 0.13) % 1.4;
-        if (ph > 1) continue;
-        W(g, o, S, x * T + ((ph * 16) | 0), y * T + 2, 1, 12, '#F4FCFF');
-        W(g, o, S, x * T + ((ph * 16) | 0) + 2, y * T + 4, 1, 8, '#C8E8FA');
+      var room = roomOf(d), m = null, ch = null;
+      if (room && room.mouseAt) { m = room.mouseAt(); ch = room.cheeseAt(); }
+      var w = c.ice, t = d.now / 1000, i;
+      /* the glints that crawl across the ice */
+      if (w && !still()) {
+        for (i = 0; i < w.length; i += 2) {
+          var x = w[i], y = w[i + 1], ph = (t * 0.45 + (x + y) * 0.13) % 1.4;
+          if (ph > 1) continue;
+          W(g, o, S, x * T + ((ph * 16) | 0), y * T + 2, 1, 12, '#F4FCFF');
+          W(g, o, S, x * T + ((ph * 16) | 0) + 2, y * T + 4, 1, 8, '#C8E8FA');
+        }
       }
+      if (!m || !ch) return;
+      /* the cheese: a wedge under the ice, seen through it */
+      var cx = ch.x * T + 8, cy = ch.y * T + 9;
+      g.globalAlpha = 0.85;
+      W(g, o, S, cx - 4, cy - 2, 8, 5, '#F0CC72');
+      W(g, o, S, cx - 2, cy - 3, 5, 2, '#FCE8A0');
+      W(g, o, S, cx - 2, cy, 1, 1, '#C8A04A');
+      W(g, o, S, cx + 1, cy + 1, 1, 1, '#C8A04A');
+      g.globalAlpha = 1;
+      /* the mouse: a dark shape under the ice, tail, body, head, ear.
+         A thin pane of ice is laid over it so it reads as submerged,
+         but it stays dark enough to track. */
+      var mx = m.x * T + 8, my = m.y * T + 9;
+      var bob = still() ? 0 : (Math.sin(t * 5) > 0 ? 1 : 0);
+      g.globalAlpha = 0.9;
+      W(g, o, S, mx - 8, my + 1 + bob, 4, 1, '#30283A');
+      W(g, o, S, mx - 8, my - 1 + bob, 1, 2, '#30283A');
+      W(g, o, S, mx - 5, my - 3 + bob, 9, 6, '#30283A');
+      W(g, o, S, mx - 3, my - 4 + bob, 5, 1, '#30283A');
+      W(g, o, S, mx + 3, my - 4 + bob, 4, 5, '#30283A');
+      W(g, o, S, mx + 2, my - 7 + bob, 3, 3, '#30283A');
+      W(g, o, S, mx + 3, my - 6 + bob, 1, 1, '#E1A9B6');
+      W(g, o, S, mx + 5, my - 3 + bob, 1, 1, '#F4EDF2');
+      g.globalAlpha = 0.18;
+      W(g, o, S, mx - 6, my - 7 + bob, 13, 11, '#82B4D4');    /* the ice over it */
+      g.globalAlpha = 1;
     },
     b5_two: function (g, o, S, d, c) {
       /* the mirror's gaze: a dotted beam to the plate it holds, and on
