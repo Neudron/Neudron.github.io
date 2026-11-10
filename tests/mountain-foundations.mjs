@@ -148,6 +148,27 @@ check('quick death recovery retains a valid spawn', () => {
   assert.equal(p.state.x, initial.x);
   assert.equal(p.state.y, initial.y);
 });
+check('opt-in transition momentum carries into next mountain prototype', () => {
+  assert.ok(neu.mountain.openPrototype('easy'));
+  for (let n = 0; n < 9; n++) p.step(1 / 60, 'right');
+  const previous = p.state;
+  assert.ok(previous.vx > 0);
+  assert.ok(p.open('mtest_medium', { carry: true }));
+  assert.equal(p.state.vx, previous.vx);
+  assert.equal(p.state.dashes, previous.dashes);
+  assert.ok(p.open('h0'));
+  assert.equal(p.state.vx, 0, 'legacy default room entry resets momentum');
+});
+check('non-mountain rooms keep preexisting entity persistence semantics', () => {
+  assert.ok(p.open('h0'));
+  const entity = p.level0().entities[0];
+  const old = entity.x;
+  entity.x += 2;
+  entity.dead = true;
+  p.restartRoom();
+  assert.equal(p.level0().entities[0].x, old + 2);
+  assert.equal(p.level0().entities[0].dead, true);
+});
 check('non-mountain platformer camera mode remains unchanged', () => {
   assert.ok(p.open('h0'));
   assert.notEqual(p.level0().cameraMode, 'mountain');
