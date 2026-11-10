@@ -104,17 +104,27 @@
   /* foe shot sprites (img/act4/vfx, CC0/AI sources — see .opencode/plans/vfx-assets.md).
      A missing file just falls back to the old glow+rect, same as before. */
   var FXS = { bullet: 'dgFxBullet', pellet: 'dgFxPellet', soul: 'dgFxSoul', flame: 'dgFxFlame', ghost: 'dgFxGhost', bolt: 'dgFxBolt' };
-  function fxIm(k) { var sh = k && NEU.dgSheets && NEU.dgSheets[k]; return sh ? NEU.sheetReady(sh) : null; }
+  function fxIm(k) {
+    var sh = k && NEU.dgSheets && NEU.dgSheets[k];
+    if (!sh) return null;
+    /* Draw the alpha-cleaned dungeon sprites for projectiles too. */
+    return NEU.dungeonLook && NEU.dungeonLook.sheet ? NEU.dungeonLook.sheet(k) : NEU.sheetReady(sh);
+  }
   function fxShot(c, s, k) {
-    var im = fxIm(k), sh = im && NEU.dgSheets[k], w, h;
+    var im = fxIm(k), sh = im && NEU.dgSheets[k], w, h, angle;
     if (!im) return false;
     w = sh.fw || sh.w; h = sh.fh || sh.h;
-    c.save(); c.translate(s.x | 0, s.y | 0); c.rotate(Math.atan2(s.vy || 0, s.vx || 1));
-    c.drawImage(im, 0, 0, w, h, (-w / 2) | 0, (-h / 2) | 0, w, h); c.restore();
+    angle = Math.atan2(s.vy || 0, s.vx || 1);
+    if (sh.forward === 'up') angle += Math.PI / 2;
+    else if (sh.forward === 'down') angle -= Math.PI / 2;
+    else if (sh.forward === 'left') angle += Math.PI;
+    c.save(); c.translate(Math.round(s.x), Math.round(s.y)); c.rotate(angle);
+    c.imageSmoothingEnabled = false;
+    c.drawImage(im, 0, 0, w, h, -w / 2, -h / 2, w, h); c.restore();
     return true;
   }
 
-  /* ── AI families ───────────────────────────────────────────────────── */
+    /* ── AI families ───────────────────────────────────────────────────── */
   function fighter(f, dt) {
     var d = f.d, dx = hx() - f.x, stuck, v;
     if (f.st === 1) { f.t -= dt; f.vx *= 0.8; if (f.t <= 0) { throwHammer(f); f.st = 0; f.cd = 3; } body(f, dt); return; }
@@ -349,22 +359,39 @@
   }
 
   /* ── drawing: bodies under the light map, telegraphs and shots above it ── */
-  function frameOf(f, sh) {
-    var n = sh.frames, d = f.d, t = (Date.now() / 160) | 0, a;
-    if (d.ai === 'fighter' || d.ai === 'warlock') return !f.ground ? 1 % n : Math.abs(f.vx) > 8 ? 2 + ((f.walked / 8) | 0) % Math.max(1, n - 2) : 0;
-    if (d.ai === 'ranged') { if (f.warn || f.t >= 0 && Math.abs(f.vx) < 8) { a = Math.atan2((f.aim ? f.aim.y : f.y) - f.y, Math.abs((f.aim ? f.aim.x : f.x) - f.x) || 1); return Math.max(0, Math.min(4, Math.round(2 + a / 0.6))); } return 5 + ((f.walked / 8) | 0) % (n - 5); }
-    if (d.ai === 'caster') return f.t < 0.5 ? (f.t < 0.15 ? 2 : 1) : 0;
-    if (d.ai === 'skull') return n > 3 ? (f.glow > 0 ? 3 + t % 3 : t % 3) : f.st ? 2 : 0;
-    return t % n;
+  /* Terraria NPC textures face left. Keep state-specific frame windows
+     inside each sheet and drive walk cycles by distance, not wall clock. */
+  function frameOf(f, sh, now) {
+    var n = Math.max(1, sh.frames | 0), d = f.d;
+    var t = Math.floor((now === undefined ? Date.now() : now) / 160);
+    var walk = Math.floor((f.walked || 0) / 10), moving = Math.abs(f.vx || 0) > 8, a, idx;
+    if (d.ai === 'fighter' || d.ai === 'warlock') {
+      if (!f.ground) idx = Math.min(1, n - 1);
+      else if (moving) idx = 2 + walk % Math.max(1, Math.min(n - 2, 6));
+      else idx = 0;
+    } else if (d.ai === 'ranged') {
+      if (f.warn || (f.t >= 0 && !moving)) {
+        a = Math.atan2((f.aim ? f.aim.y : f.y) - f.y, Math.abs((f.aim ? f.aim.x : f.x) - f.x) || 1);
+        idx = Math.max(0, Math.min(4, Math.round(2 + a / 0.6)));
+      } else idx = moving ? 5 + walk % Math.max(1, Math.min(n - 5, 6)) : 0;
+    } else if (d.ai === 'caster') idx = f.t < 0.5 ? (f.t < 0.15 ? 2 : 1) : 0;
+    else if (d.ai === 'skull') idx = n > 3 ? (f.glow > 0 ? 3 + t % 3 : t % 3) : f.st ? 2 : 0;
+    else idx = t % n;
+    return Math.max(0, Math.min(n - 1, idx));
   }
-  function draw(c, cx, cy) {
+    function draw(c, cx, cy) {
     var i, f, sh, k, L = NEU.dungeonLook;
     for (i = 0; i < foes.length; i++) {
       f = foes[i]; if (f.dead || !onScreen(f.x, f.y, 64)) continue;
       sh = sheet(f.s); if (!sh) continue;
       if (f.d.ai === 'ball') for (k = 0; k < f.len; k += 12) L.cut(c, 'dgLink', 0, 0, 12, 12, f.px + (f.x - f.px) * k / f.len - 6 - cx, f.py + (f.y - f.py) * k / f.len - 6 - cy);
       if (f.tp && ((Date.now() / 150) | 0) & 1) c.globalAlpha = 0.5;
-      L.cut(c, f.s, 0, frameOf(f, sh) * sh.fh, sh.fw, sh.fh, f.x - sh.fw / 2 - cx, f.y + f.h / 2 - sh.fh - cy + (f.d.ai === 'skull' || f.d.ai === 'spirit' || f.d.ai === 'ball' || f.d.ai === 'wheel' ? (sh.fh - f.h) / 2 : 2), f.face > 0);
+       /* Floating bodies use centre pivots; grounded bodies use their feet.
+          Turning changes the sprite, never its collision box. */
+       var floating = f.d.ai === 'skull' || f.d.ai === 'spirit' || f.d.ai === 'ball' || f.d.ai === 'wheel';
+       var sy = floating ? f.y - sh.fh / 2 - cy : f.y + f.h / 2 - sh.fh - cy + 2;
+       L.cut(c, f.s, 0, frameOf(f, sh) * sh.fh, sh.fw, sh.fh,
+             Math.round(f.x - sh.fw / 2 - cx), Math.round(sy), f.face > 0);
       c.globalAlpha = 1;
       if (f.flash > 0) { c.globalAlpha = 0.5; P.fr(c, (f.x - f.w / 2 - cx) | 0, (f.y - f.h / 2 - cy) | 0, f.w, f.h, '#FFFFFF'); c.globalAlpha = 1; }
     }
@@ -407,7 +434,7 @@
         var him = fxIm('dgHammer');
         if (him) {
           c.save(); c.translate(s.x | 0, s.y | 0);
-          c.rotate(Math.atan2(s.vy || 0, s.vx || 1));
+          c.rotate((s.age || 0) * 12); c.imageSmoothingEnabled = false;
           c.drawImage(him, -19, -19, 38, 38);
           c.restore();
         } else NEU.dungeonLook.cut(c, 'dgHammer', 0, 0, 38, 38, s.x - 19, s.y - 19);
@@ -445,5 +472,5 @@
   def.tp = function () { return kit ? kit.tp : 0; };
   def.onClose = function () { shots.length = 0; };
   NEU.dgnFoes = { kinds: KIND, foes: foes, shots: shots, pops: pops, spawn: spawn, hit: hitFoe, axe: axe, kit: function () { return kit; },
-    gun: GUN, spell: SPELL, moods: MOODS, beamPath: beamPath, spot: spot };
+    gun: GUN, spell: SPELL, moods: MOODS, beamPath: beamPath, spot: spot, frameOf: frameOf };
 })();
