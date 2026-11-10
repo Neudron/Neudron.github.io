@@ -10,7 +10,8 @@
     dash: 480, endDash: 320, endUp: 0.75, dashTime: 0.15, dashCd: 0.2, refillCd: 0.1, dashCorner: 8, dashAttack: 0.3, jtNudge: 12,
     stamina: 110, climbUp: 45.45, climbStill: 10, climbJump: 27.5, climbUpV: -90, climbDownV: 160, climbSlip: 60, climbAccel: 1800,
     grabY: 0.2, hopY: -240, hopX: 200, hopForce: 0.2, boostTime: 0.2, climbNoMove: 0.1, buffer: 0.08, spring: -370, springVar: 0.2,
-    duckX: 1.25, duckY: 0.5, slideMult: 1.2, pogo: -280, swing: 0.15, hurtInv: 0.67, kbX: 270, kbY: -210, dashI: 0.25 };
+    duckX: 1.25, duckY: 0.5, slideMult: 1.2, pogo: -280, swing: 0.15, hurtInv: 0.67, kbX: 270, kbY: -210, dashI: 0.25,
+    meleeCharge: 0.4, meleeFull: 1.0 };
   var levels = {}, kinds = {}, current = null, live = false, paused = false, replaying = false;
   var canvas = document.getElementById('platCanvas'), overlay = document.getElementById('plat');
   var ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
@@ -27,7 +28,8 @@
       stamina: C.stamina, dead: 0, wipe: 0, coyote: 0, jumpBuf: 0, dashBuf: 0, meleeBuf: 0, varJump: 0, varSpeed: 0,
       maxFall: C.maxFall, dashTime: 0, dashCd: 0, refillCd: 0, dashAttack: 0, dashX: 0, dashY: 0, duck: false,
       wallSlide: C.slideTime, slideDir: 0, wallBoost: 0, boostDir: 0, forceX: 0, forceDir: 0, climbNoMove: 0, lastClimb: 0,
-      swing: 0, pogo: false, squash: 0, stretch: 0, walked: 0, hp: 0, inv: 0, hopWait: 0 };
+      swing: 0, pogo: false, squash: 0, stretch: 0, walked: 0, hp: 0, inv: 0, hopWait: 0,
+      meleeHold: 0, charging: false, chargeK: 0, swingPow: 1, swingDown: false, hitStop: 0 };
   }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function sign(v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
@@ -299,6 +301,19 @@
     if (player.dashY <= 0) { player.vx = player.dashX * C.endDash; player.vy = player.dashY * C.endDash; }
     if (player.vy < 0) player.vy *= C.endUp;
   }
+  /* one swing entry point: armed timer + level hook + juice/sfx. charged = the full-hold payoff */
+  function doSwing(down, charged) {
+    var hits;
+    player.swing = C.swing; player.swingPow = charged ? 2 : 1; player.swingDown = !!down;
+    hits = current && current.swing ? current.swing(player, down, charged) : 0;
+    if (NEU.sfx && !replaying) { if (charged && NEU.sfx.snap) NEU.sfx.snap(); else if (NEU.sfx.whoosh) NEU.sfx.whoosh(); }
+    if (hits > 0 && !replaying) {
+      player.hitStop = (charged ? 0.09 : 0.045) * (reduced ? 0.33 : 1);
+      if (NEU.juice && NEU.juice.hit) NEU.juice.hit(charged ? 'medium' : 'small', { dx: player.face, dy: 0 });
+      if (NEU.juice && NEU.juice.burst) NEU.juice.burst(player.x + player.face * 22, player.y - 12, charged ? 16 : 8, charged ? '#FFD36A' : '#FFF0A6', charged ? 180 : 120);
+      if (NEU.sfx && NEU.sfx.hit) NEU.sfx.hit(charged ? 0.9 : 0.45);
+    }
+  }
   function breakBlocks() {
     var x0 = Math.floor((player.x + player.vx * STEP - HW) / TILE), x1 = Math.floor((player.x + player.vx * STEP + HW) / TILE);
     var y0 = Math.floor((player.y + player.vy * STEP - HH) / TILE), y1 = Math.floor((player.y + player.vy * STEP - 1) / TILE), tx, ty, broke = false;
@@ -310,6 +325,9 @@
     var input = parseInput(raw), prev = player.prev, mx, my, i, e;
     if (!current || current.exited) return getState();
     dt = clamp(Number(dt) || STEP, 0, 0.1);
+    /* melee hit-stop: a short sim freeze in game time (unlike juice's real-clock freeze,
+       this stays deterministic for fixed-step tests and replays) */
+    if (player.hitStop > 0) { player.hitStop = Math.max(0, player.hitStop - dt); return getState(); }
     player.prev = input;
     if (player.wipe > 0) player.wipe = Math.max(0, player.wipe - dt);
     if (player.dead > 0) {
@@ -334,7 +352,14 @@
       player.wallBoost -= dt;
       if (mx && mx === player.boostDir) { player.vx = C.wallH * mx; player.stamina += C.climbJump; player.wallBoost = 0; }
     }
-    if (player.meleeBuf > 0 && player.swing <= 0) { player.meleeBuf = 0; player.swing = C.swing; if (current.swing) current.swing(player, my === 1); }
+    /* melee charge: a held melee key builds toward a charged release swing */
+    var meleeUp = prev.melee && !input.melee, wasHold = player.meleeHold;
+    if (input.melee && current.swing) { if (!prev.melee) player.meleeHold = 0; player.meleeHold += dt; }
+    else player.meleeHold = 0;
+    player.charging = !!current.swing && player.meleeHold > C.meleeCharge;
+    player.chargeK = player.charging ? clamp((player.meleeHold - C.meleeCharge) / (C.meleeFull - C.meleeCharge), 0, 1) : 0;
+    if (meleeUp && wasHold >= C.meleeFull && current.swing) doSwing(my === 1, true);
+    if (player.meleeBuf > 0 && player.swing <= 0) { player.meleeBuf = 0; doSwing(my === 1, false); }
     if (player.st === 1) climb(dt, input, mx, my);
     else if (player.st === 2) dashing(dt, input, mx);
     else normal(dt, input, mx, my);
@@ -355,7 +380,7 @@
   }
   function getState() { return { x: player.x, y: player.y, vx: player.vx, vy: player.vy, face: player.face, st: player.st,
     dashes: player.dashes, onGround: player.onGround, stamina: player.stamina, dead: player.dead > 0, hp: player.hp, inv: player.inv > 0,
-    swing: player.swing > 0 }; }
+    swing: player.swing > 0, charging: !!player.charging, chargeK: player.chargeK }; }
   function respawn() {
     player.x = (current.spawn.x + 0.5) * TILE; player.y = (current.spawn.y + 1) * TILE;
     player.vx = 0; player.vy = 0; player.onGround = false; player.dashes = 1; player.st = 0; player.hp = current.hp || 0; player.wipe = WIPE;
@@ -529,12 +554,9 @@
       drawHero(ctx, player.x - cx, player.y - cy, player.face, player.onGround);
       ctx.globalAlpha = 1;
     } else deathRing(ctx, player.x - cx, player.y - cy - HH / 2, 1 - player.dead / DEATH);
-    if (player.dead <= 0 && player.swing > 0) {
-      ctx.fillStyle = '#fff0a6'; ctx.globalAlpha = Math.min(1, player.swing / C.swing);
-      ctx.fillRect(player.x - cx + player.face * 10, player.y - cy - 20, player.face * 12, 3);
-      ctx.fillRect(player.x - cx + player.face * 15, player.y - cy - 14, player.face * 3, 8);
-      ctx.globalAlpha = 1;
-    }
+    if (player.dead <= 0 && player.swing > 0)
+      meleeArc(ctx, player.x - cx, player.y - cy, player.face, player.swingDown, player.swingPow === 2, 1 - player.swing / C.swing);
+    if (player.dead <= 0 && player.charging) chargeArc(ctx, player.x - cx, player.y - cy, player.face, player.chargeK);
     if (J && J.drawParts) { ctx.save(); ctx.translate(-cx, -cy); J.drawParts(ctx, dtf || 0.016); ctx.restore(); }
     if (api.foreground) api.foreground(ctx, cx, cy, L, now, area);
     if (J && J.end) J.end(ctx, shook);
@@ -731,6 +753,32 @@
     if (ENT[e.t]) { ENT[e.t](c, px, py, e, now || 0); return; }
     c.fillStyle = '#FF00FF';
     c.fillRect(px, py, 16, 16);
+  }
+  /* melee swing trail: a short arc that sweeps with the swing and mirrors on facing.
+     charged swings are wider, gold and longer. p runs 0 -> 1 across the swing. */
+  function meleeArc(c, x, y, face, down, charged, p) {
+    var r = charged ? 32 : 22, n = charged ? 10 : 7, i, a, sx, sy, head;
+    var cx0 = x | 0, cy0 = (y - (down ? 4 : 12)) | 0;
+    head = down ? 0.3 + p * 1.1 : -2.1 + p * 2.5;
+    for (i = 0; i < n; i++) {
+      a = head - i * (charged ? 0.16 : 0.13);
+      sx = cx0 + Math.round(Math.cos(a) * r * face);
+      sy = cy0 + Math.round(Math.sin(a) * r);
+      c.fillStyle = charged ? (i < 3 ? '#FFFFFF' : i < 7 ? '#FFD36A' : '#FF9E30') : (i < 2 ? '#FFFFFF' : i < 5 ? '#FFF0A6' : '#30AFFF');
+      c.fillRect(sx - (charged ? 2 : 1), sy - (charged ? 2 : 1), charged ? 5 : 3, charged ? 5 : 3);
+    }
+  }
+  /* hold-Z charge: an arc centred on the facing that fills blue -> gold -> white */
+  function chargeArc(c, x, y, face, k) {
+    var cx0 = x | 0, cy0 = (y - 12) | 0, r = 26, n = 14, i, a, sx, sy, on;
+    for (i = 0; i < n; i++) {
+      on = (i + 0.5) / n <= k;
+      a = (face > 0 ? 0 : Math.PI) - 1.2 + (i / (n - 1)) * 2.4;
+      sx = cx0 + Math.round(Math.cos(a) * r);
+      sy = cy0 + Math.round(Math.sin(a) * r);
+      c.fillStyle = !on ? '#1A3058' : k >= 1 ? '#FFFFFF' : (i % 4 === 0 ? '#FFD36A' : '#30AFFF');
+      c.fillRect(sx - 1, sy - 1, 3, 3);
+    }
   }
   function drawHero(c, wx, wy, face, moving) {
     var look = NEU.engineLook;

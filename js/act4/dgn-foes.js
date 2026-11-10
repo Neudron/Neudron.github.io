@@ -269,20 +269,23 @@
     }
   }
   /* the axe: a front arc 28 px out, or under the feet on a down-swing; it breaks pots and hits foes */
-  function axe(h, down) {
-    var x0 = down ? h.x - 14 : h.face > 0 ? h.x : h.x - 30, x1 = down ? h.x + 14 : h.face > 0 ? h.x + 30 : h.x, y0 = down ? h.y - 4 : h.y - 30, y1 = down ? h.y + 18 : h.y + 2, i, f, e, L = P.level0();
+  function axe(h, down, charged) {
+    var x0 = down ? h.x - (charged ? 26 : 14) : h.face > 0 ? h.x - (charged ? 2 : 0) : h.x - (charged ? 48 : 30);
+    var x1 = down ? h.x + (charged ? 26 : 14) : h.face > 0 ? h.x + (charged ? 48 : 30) : h.x + (charged ? 2 : 0);
+    var y0 = down ? h.y - (charged ? 8 : 4) : h.y - (charged ? 44 : 30), y1 = down ? h.y + (charged ? 26 : 18) : h.y + (charged ? 8 : 2), i, f, e, hits = 0, L = P.level0();
     for (i = 0; i < foes.length; i++) {
       f = foes[i];
-      if (!f.dead && f.x + f.w / 2 > x0 && f.x - f.w / 2 < x1 && f.y + f.h / 2 > y0 && f.y - f.h / 2 < y1) hitFoe(f, 1, h.face);
+      if (!f.dead && f.x + f.w / 2 > x0 && f.x - f.w / 2 < x1 && f.y + f.h / 2 > y0 && f.y - f.h / 2 < y1) { hitFoe(f, charged ? 2 : 1, h.face); hits++; }
     }
     for (i = 0; i < L.entities.length; i++) {
       e = L.entities[i];
       if (e.t === 'pot' && !e.dead && (e.x + 2) * T > x0 && e.x * T < x1 && (e.y + 1) * T > y0 && (e.y - 1) * T < y1) {
-        e.dead = true;
+        e.dead = true; hits++;
         if (NEU.juice && NEU.juice.burst) NEU.juice.burst((e.x + 1) * T, e.y * T, 8, '#8A9AB8', 90);
         if (NEU.save && NEU.save.addCoins && !P.replaying()) NEU.save.addCoins(1 + ((rnd() * 2) | 0));
       }
     }
+    return hits;
   }
 
   /* ── the level hooks ──────────────────────────────────────────────── */
