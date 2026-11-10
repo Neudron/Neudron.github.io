@@ -1101,9 +1101,11 @@
     if (door) {
       door.classList.remove('is-open');
       clearTimeout(doorT);
-      doorT = setTimeout(function () { door.hidden = true; }, 420);
+      doorT = setTimeout(function () { door.hidden = true; open({}); },
+        NEU.motion && NEU.motion.reduced && NEU.motion.reduced() ? 0 : 420);
+    } else {
+      open({});
     }
-    open({});
   });
   if (NEU.kernel) NEU.kernel.register('bullet', {
     tick: function (dt) { if (running) step(performance.now()); },
