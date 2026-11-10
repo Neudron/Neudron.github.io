@@ -64,7 +64,7 @@ check('three original, tall, explicitly provisional prototype levels are authore
     assert.ok(def.h > 18 && def.w >= 24, 'tall geometry');
     assert.equal(def.cameraMode, 'mountain');
     assert.equal(def.chunked, true);
-    assert.equal(def.testing.status, 'not-playtested');
+    assert.equal(def.testing.status, difficulty === 'easy' ? 'simulated-route-passed' : 'not-playtested');
     assert.ok(def.entities.some(e => e.t === 'exit'));
     assert.ok(def.grid.every(line => line.length === def.w), 'rectangular authored tile grid');
   }
@@ -126,21 +126,18 @@ check('author-configured wind accelerates an airborne player reproducibly', () =
   assert.ok(windy[windy.length - 1] > calm[calm.length - 1], 'wind moves player');
   assert.deepEqual(windy, again, 'fresh room produces same movement frames');
 });
-/* This is gameplay simulation using the real controller (not graph reachability).
- * Search a small, reproducible menu of jump timing sequences for one safe room.
- * Any discovery is stored as input evidence, not a claim of human playtesting. */
-check('easy prototype accepts a successful real-controller input replay', () => {
-  let solution = null;
-  for (let approach = 18; approach <= 42 && !solution; approach += 2) {
-    for (let jump = 8; jump <= 30 && !solution; jump += 2) {
-      const recording = [[approach, 'right'], [jump, 'right jump'], [125, 'right']];
-      const outcome = p.replay('mtest_easy', recording);
-      if (outcome.reached && outcome.deaths === 0) solution = { recording, outcome };
-    }
-  }
-  assert.ok(solution, 'no verified deathless run+held-jump route found; geometry needs revision');
-  console.log('  easy valid input: ' + JSON.stringify(solution.recording) +
-    ' frames=' + solution.outcome.frames + ' deaths=' + solution.outcome.deaths);
+/* Gameplay simulation on the actual controller, not graph reachability.
+ * This sequence was discovered by deterministic input-timing enumeration. */
+check('easy prototype has a committed, deathless controller replay', () => {
+  const def = p.levels.mtest_easy;
+  assert.ok(Array.isArray(def.recording));
+  const outcome = p.replay('mtest_easy', def.recording);
+  assert.equal(outcome.reached, true);
+  assert.equal(outcome.deaths, 0);
+  assert.equal(outcome.frames, 94);
+  assert.equal(def.testing.successFrames, outcome.frames);
+  console.log('  easy valid input: ' + JSON.stringify(def.recording) +
+    ' frames=' + outcome.frames + ' deaths=' + outcome.deaths);
 });
 check('quick death recovery retains a valid spawn', () => {
   assert.ok(neu.mountain.openPrototype('easy'));
