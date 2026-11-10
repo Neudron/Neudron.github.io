@@ -308,6 +308,10 @@
   /* ── open / close ───────────────────────────────────────────────*/
   function open() {
     if (open_) return;
+    if (NEU.save && NEU.save.flagged('tv_fixed') && !NEU.save.flagged('tv_restored')) {
+      if (NEU.talk) NEU.talk(['the television has nothing new for you yet.'], 'tv');
+      return false;
+    }
     open_ = true;
     if (NEU.kernel) NEU.kernel.push('deck');
     wrap.hidden = false;
