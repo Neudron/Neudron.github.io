@@ -362,36 +362,39 @@
        e2  a half moon; the clock runs backwards; a mended vase, a chair
        e3  a full moon; the clock has no hands; the wallpaper has eyes;
            a door you have no key for, with light under it          */
-  var HALL = [
-    '########################',
-    '########################',
-    '#......................#',
-    '#......................#',
-    '#......................#',
-    '#......................#',
-    '#......................#',
-    '########################'
-  ];
-  function grid(solids) {
-    var rows = HALL.slice();
-    for (var i = 0; i < solids.length; i += 2) {
-      var x = solids[i], y = solids[i + 1], r = rows[y];
-      rows[y] = r.substr(0, x) + 'o' + r.substr(x + 1);
+  /* W18: the walk home is shorter and it is not the same room four
+     times. e1 is a 20-tile entry hall, e2 a 14-tile squeeze with a door
+     into the nook you outgrew, e3 the 24-tile hub (dad's door, and now
+     a locked cellar door), e4 a 16-tile last corridor. Two more rooms
+     exist behind doors that never open — the larder and the cellar —
+     and they say so when you bump them. */
+  function hallGrid(w, solids) {
+    var rows = [], x, y, i, h, r;
+    for (y = 0; y < 8; y++) {
+      if (y < 2 || y === 7) { h = ''; for (x = 0; x < w; x++) h += '#'; }
+      else { h = '#'; for (x = 1; x < w - 1; x++) h += '.'; h += '#'; }
+      rows.push(h);
+    }
+    for (i = 0; i < solids.length; i += 2) {
+      var sx = solids[i], sy = solids[i + 1]; r = rows[sy];
+      rows[sy] = r.substr(0, sx) + 'o' + r.substr(sx + 1);
     }
     return rows.join('\n');
   }
-  function corridor(id, next, prev, styles, solids, odd) {
-    var spawns = { south: { x: 1, y: 4, face: 'right' }, north: { x: 22, y: 4, face: 'left' } };
+  function corridor(id, w, next, prev, styles, solids, odd, xspawns) {
+    var spawns = { south: { x: 1, y: 4, face: 'right' }, north: { x: w - 2, y: 4, face: 'left' } };
     if (id === 'e3_hall') spawns.dad = { x: 12, y: 2, face: 'down' };
+    if (xspawns) for (var k in xspawns) spawns[k] = xspawns[k];
     E.register(id, {
       tileset: 'home',
-      tiles: grid(solids),
+      tiles: hallGrid(w, solids),
       spawns: spawns,
       entities: [
         { t: 'cityfloor', v: id, x: 0, y: 0 },
-        P('moon', 5, 1), P('moon', 19, 1),
-        P('sconce', 6, 1), P('sconce', 10, 1), P('sconce', 14, 1, { flick: id === 'e3_hall' }),
-        { t: 'exit', x: 23, y: 4, to: next, spawn: 'south', style: styles[1] },
+        P('moon', Math.round(w * 0.2), 1), P('moon', Math.round(w * 0.8), 1),
+        P('sconce', Math.round(w * 0.25), 1), P('sconce', Math.round(w * 0.42), 1),
+        P('sconce', Math.round(w * 0.58), 1, { flick: id === 'e3_hall' }),
+        { t: 'exit', x: w - 1, y: 4, to: next, spawn: 'south', style: styles[1] },
         { t: 'exit', x: 0, y: 4, to: prev, spawn: 'north', style: styles[0] }
       ].concat(odd),
       onEnter: function (c) {
@@ -401,25 +404,132 @@
     });
   }
 
-  corridor('e1_hall', 'e2_hall', 'd3_square', ['door', 'arch'], [2, 2, 21, 2], [
-    P('none', 12, 1, { lines: ['a picture frame with nothing in it.', 'the nail is still in the wall.'] }),
-    P('coatstand', 2, 2), P('gclock', 21, 2, { n: 1 })
+  corridor('e1_hall', 20, 'e2_hall', 'd3_square', ['door', 'arch'], [2, 2, 17, 2], [
+    { t: 'exit', x: 12, y: 1, to: 'e8_larder', spawn: 'door', style: 'door',
+      locked: 'home_larder', label: 'larder',
+      lines: ['a door with a towel rolled along the bottom.',
+              'it is locked from this side. it has opinions about you.'] },
+    P('none', 7, 1, { lines: ['a picture frame with nothing in it.',
+                              'the nail is still in the wall.'] }),
+    P('coatstand', 2, 2, { lines: ['a coat on a stand.',
+                                   'it is not yours. it is everyone\'s.'] }),
+    P('gclock', 17, 2, { n: 1, lines: ['the clock says ten past three.',
+                                      'it has said ten past three since you got here.'] })
   ]);
-  corridor('e2_hall', 'e3_hall', 'e1_hall', ['arch', 'door'], [2, 2, 12, 2, 17, 2, 21, 2], [
-    P('vasetable', 12, 2, { lines: function (s) {
+  corridor('e2_hall', 14, 'e3_hall', 'e1_hall', ['arch', 'door'], [4, 2, 9, 2, 11, 2], [
+    { t: 'exit', x: 7, y: 1, to: 'e7_nook', spawn: 'door', style: 'door' },
+    P('vasetable', 9, 2, { lines: function (s) {
       return s && s.flagged('tv_breakable')
         ? ['a vase. it has been swept up and put back together at least once.',
            'there is a new crack in the glaze. you know the feeling.']
         : ['a vase. it has been swept up and put back together at least once.'];
     } }),
-    P('coatstand', 2, 2), P('chair', 17, 2), P('gclock', 21, 2, { n: 2 })
-  ]);
-  corridor('e3_hall', 'e4_corridor', 'e2_hall', ['door', 'curtain'], [12, 6, 21, 2], [
+    P('chair', 4, 2, { lines: ['a chair, facing the wall.',
+                              'you could sit in it. you won\'t.'] }),
+    P('gclock', 11, 2, { n: 2, lines: ['the clock runs backwards.',
+                                      'it is in a hurry to be earlier.'] })
+  ], { nook: { x: 7, y: 3, face: 'down' } });
+  corridor('e3_hall', 24, 'e4_corridor', 'e2_hall', ['door', 'curtain'], [12, 6, 21, 2], [
     { t: 'exit', x: 12, y: 1, to: 'e5_dad', spawn: 'door', style: 'door', locked: 'dad_door',
       label: 'dad',
       lines: ['a door you do not have a key for.', 'it wants a card.'] },
-    P('pot', 12, 6), P('gclock', 21, 2, { n: 3 })
+    { t: 'exit', x: 8, y: 1, to: 'e9_cellar', spawn: 'door', style: 'door',
+      locked: 'home_cellar', label: 'cellar',
+      lines: ['a door with a towel rolled along the bottom.',
+              'it is locked from this side. it has opinions about you.'] },
+    P('pot', 12, 6, { lines: ['a plant. it has been here longer than you have.',
+                            'it does not seem to mind the wallpaper watching.'] }),
+    P('none', 18, 1, { lines: ['a scuff mark at shoulder height.',
+                               'something wide was carried through here. recently.'] }),
+    P('gclock', 21, 2, { n: 3, lines: ['the clock has no hands.',
+      'it does not want to tell you the time. it wants you to know that.'] })
   ]);
+
+  /* The nook you outgrew: a music box that still plays its five notes,
+     and a floorboard that was never about what was under it. */
+  var boxCtx = null;
+  function jingle() {
+    if (NEU.settings && NEU.settings.muted) return;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      boxCtx = boxCtx || new AC();
+      if (boxCtx.state === 'suspended' && boxCtx.resume) boxCtx.resume();
+      var notes = [659.25, 783.99, 880, 783.99, 659.25], i;
+      for (i = 0; i < notes.length; i++) (function (f, d) {
+        var t = boxCtx.currentTime + d, o = boxCtx.createOscillator(), g = boxCtx.createGain();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(f, t);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.035, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+        o.connect(g); g.connect(boxCtx.destination);
+        o.start(t); o.stop(t + 0.55);
+      })(notes[i], i * 0.16);
+    } catch (err) {}
+  }
+  function windBox(c) {
+    if (!NEU.save.flagged('nook_wind')) {
+      NEU.save.flag('nook_wind', 1);
+      c.say(['a music box. you wound it as a kid.',
+             'it plays the same five notes it always played.'], 'narr');
+    } else {
+      c.say(['the same five notes it always played.',
+             'you never did learn the song.'], 'narr');
+    }
+    jingle();
+  }
+  function boardPeek(c) {
+    if (!NEU.save.flagged('nook_board')) {
+      NEU.save.flag('nook_board', 1);
+      c.say(['one floorboard is loose.',
+             'under it: nothing but dust, and a smell of rain on hot pavement.'], 'narr');
+    } else {
+      c.say(['the loose board again. still nothing under it.',
+             'it was never about what was under it.'], 'narr');
+    }
+  }
+
+  E.register('e7_nook', {
+    tileset: 'home',
+    tiles: hallGrid(12, [8, 2]),
+    spawns: { door: { x: 6, y: 5, face: 'up' }, default: { x: 6, y: 5, face: 'up' } },
+    entities: [
+      { t: 'cityfloor', v: 'e7_nook', x: 0, y: 0 },
+      P('moon', 6, 1), P('sconce', 3, 1), P('sconce', 9, 1),
+      P('musicbox', 8, 2, { run: function (c) { windBox(c); } }),
+      P('none', 3, 5, { run: function (c) { boardPeek(c); } }),
+      { t: 'exit', x: 6, y: 6, to: 'e2_hall', spawn: 'nook', style: 'door' }
+    ],
+    onEnter: function (c) {
+      if (c.flagged('nook_seen')) return;
+      c.flag('nook_seen', 1);
+      say(c, ['a room you outgrew.',
+              'it kept your things anyway.']);
+    }
+  });
+
+  /* The two doors that never open. They are real rooms — the engine
+     draws them shut, the bump gives them a line — but no flag in the
+     game ever satisfies their locks. */
+  E.register('e8_larder', {
+    tileset: 'home',
+    tiles: hallGrid(10, [4, 2]),
+    spawns: { door: { x: 5, y: 4, face: 'up' }, default: { x: 5, y: 4, face: 'up' } },
+    entities: [
+      { t: 'cityfloor', v: 'e8_larder', x: 0, y: 0 },
+      { t: 'exit', x: 5, y: 6, to: 'e1_hall', spawn: 'north', style: 'door' }
+    ]
+  });
+  E.register('e9_cellar', {
+    tileset: 'home',
+    tiles: hallGrid(10, [4, 2]),
+    spawns: { door: { x: 5, y: 4, face: 'up' }, default: { x: 5, y: 4, face: 'up' } },
+    entities: [
+      { t: 'cityfloor', v: 'e9_cellar', x: 0, y: 0 },
+      { t: 'exit', x: 5, y: 6, to: 'e3_hall', spawn: 'north', style: 'door' }
+    ]
+  });
 
   function homeIn(c) {
     if (c.flagged('home_seen')) return;
@@ -438,22 +548,24 @@
   E.register('e4_corridor', {
     tileset: 'home',
     tiles: [
-      '########################',
-      '########################',
-      '#o....................o#',
-      '#......................#',
-      '#......................#',
-      '#......................#',
-      '#.....................o#',
-      '########################'
+      '################',
+      '################',
+      '#o............o#',
+      '#..............#',
+      '#..............#',
+      '#..............#',
+      '#.............o#',
+      '################'
     ].join('\n'),
     spawns: { south: { x: 1, y: 4, face: 'right' } },
     entities: [
       { t: 'cityfloor', v: 'e4_corridor', x: 0, y: 0 },
       { t: 'save', x: 3, y: 6 },
-      P('goldlight', 6, 3), P('goldlight', 11, 3), P('goldlight', 15, 3),
-      P('pot', 1, 2), P('pot', 22, 2), P('pot', 22, 6),
-      { t: 'npc', x: 19, y: 4, colour: '#EDE7DE', look: 'sans', run: function (c) { lastTalk(c); } },
+      P('goldlight', 5, 3), P('goldlight', 9, 3), P('goldlight', 13, 3),
+      P('pot', 1, 2), P('pot', 14, 2), P('pot', 14, 6),
+      P('none', 8, 1, { lines: ['a photograph of this hallway.',
+                                'the date on the back is tomorrow.'] }),
+      { t: 'npc', x: 13, y: 4, colour: '#EDE7DE', look: 'sans', run: function (c) { lastTalk(c); } },
       { t: 'exit', x: 0, y: 4, to: 'e3_hall', spawn: 'north', style: 'curtain' }
     ],
     onEnter: function (c) {
@@ -493,5 +605,6 @@
   }
 
   NEU.act4RoomsD = ['d1_street','d2_alley','d3_square',
-                    'e1_hall','e2_hall','e3_hall','e4_corridor'];
+                    'e1_hall','e2_hall','e3_hall','e4_corridor',
+                    'e7_nook','e8_larder','e9_cellar'];
 })();
