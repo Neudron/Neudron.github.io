@@ -1,0 +1,36 @@
+# Validate the research-gated mountain changes without publishing or merging.
+name: Mountain verification
+on:
+  pull_request:
+    paths:
+      - 'js/core/plat.js'
+      - 'js/act4/mountain.js'
+      - 'js/act4/look-mountain.js'
+      - 'tests/mountain-foundations.mjs'
+      - 'docs/mountain/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/mountain-verification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mountain-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Check ES5 compatibility
+        run: npm run check
+      - name: Run actual movement-controller tests
+        run: npm run test:mountain
+      - name: Build
+        run: npm run build
+      - name: Verify published artifact
+        run: npm run verify
