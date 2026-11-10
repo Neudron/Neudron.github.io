@@ -126,6 +126,22 @@ check('author-configured wind accelerates an airborne player reproducibly', () =
   assert.ok(windy[windy.length - 1] > calm[calm.length - 1], 'wind moves player');
   assert.deepEqual(windy, again, 'fresh room produces same movement frames');
 });
+/* This is gameplay simulation using the real controller (not graph reachability).
+ * Search a small, reproducible menu of jump timing sequences for one safe room.
+ * Any discovery is stored as input evidence, not a claim of human playtesting. */
+check('easy prototype accepts a successful real-controller input replay', () => {
+  let solution = null;
+  for (let approach = 18; approach <= 42 && !solution; approach += 2) {
+    for (let jump = 8; jump <= 30 && !solution; jump += 2) {
+      const recording = [[approach, 'right'], [jump, 'right jump'], [125, 'right']];
+      const outcome = p.replay('mtest_easy', recording);
+      if (outcome.reached && outcome.deaths === 0) solution = { recording, outcome };
+    }
+  }
+  assert.ok(solution, 'no verified deathless run+held-jump route found; geometry needs revision');
+  console.log('  easy valid input: ' + JSON.stringify(solution.recording) +
+    ' frames=' + solution.outcome.frames + ' deaths=' + solution.outcome.deaths);
+});
 check('quick death recovery retains a valid spawn', () => {
   assert.ok(neu.mountain.openPrototype('easy'));
   const initial = { ...p.state };
