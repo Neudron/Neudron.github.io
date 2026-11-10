@@ -406,7 +406,7 @@
     player.wipe = current.quickRespawn ? 0.07 : WIPE;
     simClock = 0;
     if (current.onRespawn) current.onRespawn();
-    placeCamera(-1);
+    if (current.cameraMode === 'mountain') placeCamera(-1);
   }
   function bake() {
     if (!current || !document.createElement) return;
@@ -931,8 +931,8 @@
   function overlapsHero(e) { return player.x + HW > e.x * TILE && player.x - HW < e.x * TILE + TILE && player.y > e.y * TILE && player.y - HH < e.y * TILE + TILE; }
   kinds.pogo = { touch: function (e, input, melee) { if (player.swing > 0 && input.down && player.vy > 0) { bounce(); e.dead = e.once ? true : e.dead; } } };
   kinds.checkpoint = { touch: function (e) {
-    if (e.active) return;
     current.spawn = { x: e.x, y: e.y - 1 };
+    if (e.active) return;
     e.active = true;
     if (!replaying && current.onCheckpoint) current.onCheckpoint(e);
   } };

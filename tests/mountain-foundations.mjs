@@ -109,6 +109,31 @@ check('checkpoint selection survives deterministic restart', () => {
   assert.equal(p.state.y, checkpoint.y * 16);
   assert.equal(p.level0().entities.find(e => e.t === 'checkpoint').active, true);
 });
+check('checkpoint revisits select spawn in legacy and prototype rooms', () => {
+  for (const id of ['m0', 'mtest_medium']) {
+    assert.ok(p.open(id));
+    const room = p.level0();
+    const a = room.entities.find(e => e.t === 'checkpoint') || { t: 'checkpoint', x: 4, y: 11 };
+    if (!room.entities.includes(a)) room.entities.push(a);
+    const b = { t: 'checkpoint', x: a.x + 5, y: a.y };
+    room.entities.push(b);
+    const callbacks = [];
+    room.onCheckpoint = e => callbacks.push(e);
+    for (const checkpoint of [a, b, a]) {
+      const hero = p.hero();
+      hero.x = (checkpoint.x + 0.5) * 16;
+      hero.y = (checkpoint.y + 1) * 16;
+      hero.vx = hero.vy = 0;
+      p.step(1 / 60, '');
+      assert.equal(room.spawn.x, checkpoint.x, id + ': touch selects spawn x');
+      assert.equal(room.spawn.y, checkpoint.y - 1, id + ': touch selects spawn y');
+    }
+    assert.deepEqual(callbacks, [a, b], id + ': callback fires only on first activation');
+    p.restartRoom();
+    assert.equal(p.state.x, (a.x + 0.5) * 16, id + ': restart uses revisited checkpoint');
+    assert.equal(p.state.y, a.y * 16, id + ': restart uses revisited checkpoint');
+  }
+});
 check('author-configured wind accelerates an airborne player reproducibly', () => {
   function run(noWind) {
     assert.ok(neu.mountain.openPrototype('medium'));
@@ -155,6 +180,24 @@ check('quick death recovery retains a valid spawn', () => {
   assert.ok(!p.state.dead, 'respawn completed');
   assert.equal(p.state.x, initial.x);
   assert.equal(p.state.y, initial.y);
+});
+check('legacy scrolling respawn preserves camera easing', () => {
+  assert.ok(p.open('h0'));
+  const room = p.level0();
+  room.view = 'terraria';
+  p.hero().x = 600;
+  p.snap();
+  const displaced = p.cam();
+  assert.ok(displaced.x > 0, 'room camera displaced from spawn');
+  p.die();
+  for (let n = 0; n < 36; n++) p.step(1 / 60, '');
+  assert.ok(!p.state.dead, 'respawn completed');
+  assert.deepEqual(p.cam(), displaced, 'respawn does not teleport camera to spawn');
+  const now = fakeWindow.performance.now;
+  fakeWindow.performance.now = () => now() + 1000 / 60;
+  p.tick(1000 / 60);
+  fakeWindow.performance.now = now;
+  assert.ok(p.cam().x < displaced.x, 'legacy camera eases toward respawned player');
 });
 check('opt-in transition momentum carries into next mountain prototype', () => {
   assert.ok(neu.mountain.openPrototype('easy'));

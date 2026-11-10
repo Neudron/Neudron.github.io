@@ -52,4 +52,4 @@ if (!deploy.includes('branches: [main]') || !deploy.includes("path: './dist'"))
 if (problems.length) {
   for(const p of problems) console.error('FAIL '+p);
   process.exitCode=1;
-} else console.log('v3 plan: '+required.length+' files, '+ids.size+' requirements, asset review queues, private paths and main-only deploy checked');
+} else console.log('v3 plan: '+required.length+' required files, '+ids.size+' requirements, asset review queues, ignore entries and main-only dist deploy configuration checked');
