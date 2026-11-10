@@ -30,6 +30,7 @@
   if (!ctx) { NEU.bullet = { open: function () {}, close: function () {} }; return; }
 
   var msg  = document.getElementById('bhMsg');
+  var duration = document.getElementById('bhDuration');
 
   /* dm.hud keeps #bhLive on HP and phase; the death and the end lines
      are written here, after it, so they are the last thing said. */
@@ -879,7 +880,7 @@
        finish, so the bar drains with the difficulty and the name is
        the clock counting up. */
     dm.hud(ctx, F, { w: w, h: h, AY: AY, AH: AH,
-                     name: endless ? t.toFixed(1) + 's, endless' : durationText(),
+                     name: endless ? t.toFixed(1) + 's, endless' : span() + 's',
                      hp: endless ? 1 - ramp() / 2.4 : span() - t,
                      max: endless ? 1 : span(),
                      ticks: endless ? null : table().slice(1).map(function (p) { return 1 - p.at / span(); }),
@@ -1070,6 +1071,7 @@
     /* Act III passes { variant: true } for the bounded room. */
     variant = !endless && (opts && 'variant' in opts ? !!opts.variant
                                                     : !!(NEU.quest && NEU.quest.has && NEU.quest.has('console')));
+    if (duration) duration.textContent = span();
     NEU.activeMinigame = 'bullet';
     wrap.hidden = false;
     document.body.classList.add('is-playing');

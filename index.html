@@ -142,7 +142,7 @@
   <h2 class="panel__h">inside</h2>
   <p>It's darker in here than the outside suggested, and something at the
      far end is already aiming.</p>
-  <p>Twenty seconds. That's the whole ask.</p>
+  <p>Thirty seconds. That's the whole ask.</p>
   <p><button class="btn" id="bhStart">step in</button></p>
   <p class="panel__note">arrows or <kbd data-k="w,a,s,d">wasd</kbd> &middot; <kbd data-k="x">x</kbd> to dash &middot; <kbd data-k="Shift">shift</kbd> to focus &middot;
      three hits and you're out</p>
@@ -166,7 +166,7 @@
 <div class="bh" id="bh" hidden>
   <canvas id="bhCanvas"></canvas>
   <div class="bh__msg" id="bhMsg" hidden></div>
-  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &middot; <kbd data-k="x">x</kbd> dash &middot; <kbd data-k="Shift">shift</kbd> focus &middot; survive 20s</p>
+  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &middot; <kbd data-k="x">x</kbd> dash &middot; <kbd data-k="Shift">shift</kbd> focus &middot; survive <span id="bhDuration">20</span>s</p>
 </div>
 <!-- The HP is drawn on the canvas, which a screen reader cannot read.
      This line carries the same number as text, and only the bullet-hell
