@@ -12,6 +12,7 @@
 
   var menuEl = document.getElementById('mageMenu');
   var sayEl = document.getElementById('mageSay');
+  var warnEl = document.getElementById('mageWarn');
   var KINDS = { melee: 1, ranged: 1, spell: 1, heal: 1 };
   var TOPICS = [
     { n: 1, label: 'the shelves', first: '* they hold what they hold. the shelves do not care.', again: '* still shelves. still dust.' },
@@ -33,6 +34,16 @@
   var clock = 0;
   var ctx = null;
   var api;
+  var seq = null;
+
+  /* The Brimstone cast: four beats, then the cards. Durations are ms of
+     tick time; reduced motion plays the same order at roughly half pace. */
+  var PHASES = ['cast', 'travel', 'react', 'warn'];
+  var PHASE_MS = [420, 620, 560, 1000];
+  var PHASE_MS_CALM = [160, 220, 260, 700];
+  /* the spell leaves from the player's hands at the counter's edge and
+     lands between the mage's eyes; the arc bows toward the window */
+  var ORB_A = { x: 160, y: 186 }, ORB_C = { x: 206, y: 112 }, ORB_B = { x: 172, y: 56 };
 
   function reduced() {
     try {
@@ -416,17 +427,25 @@
 
   function draw() {
     var a, i, m, bob, still, ph, lx, fl, dx, dy, near, cry;
+    var sId = seq ? PHASES[seq.i] : null, sP = seq ? phaseP() : 0, lunge = 0, op, k2;
     if (!context()) return;
     ctx.imageSmoothingEnabled = false;
     a = build();
     still = reduced();
     bob = still ? 0 : (Math.floor(clock / 600) % 2);
     ph = still ? 0 : (Math.floor(clock / 800) % 2);
+    /* the mage flinches when the brimstone lands */
+    if (sId === 'react') lunge = sP < 0.4 ? -3 : (sP < 0.75 ? 3 : 0);
     blit(a.bg, 0, 0);
     if (!a.bg) { box(0, 0, 320, 192, '#1C1814'); return; }
     cry = 57 + bob;
     blit(a.cg[ph], 187 - 40, cry - 40);
-    blit(a.mage, 164 - 32, 140 - 95 + bob);
+    blit(a.mage, 164 - 32 + lunge, 140 - 95 + bob);
+    if (sId === 'react') {
+      ctx.globalAlpha = sP < 0.35 ? 0.55 : 0.28;
+      box(136 + lunge, 48, 56, 88, '#FF2A1A');
+      ctx.globalAlpha = 1;
+    }
     if (!still && clock % 3600 < 120) {
       box(160, 140 - 67 + bob, 2, 2, '#C4A574');
       box(165, 140 - 67 + bob, 2, 2, '#C4A574');
@@ -458,6 +477,36 @@
       dx = m.x - 187; dy = m.y - cry;
       if (dx * dx + dy * dy < 30 * 30) near = 1;
       if (near) ctx.fillRect(m.x | 0, m.y | 0, 2, 2);
+    }
+    /* ── the Brimstone cast, drawn over the room ── */
+    if (sId === 'cast' && NEU.fxBurst) {
+      NEU.fxBurst(ctx, 'fxGigBrim', ORB_A.x, ORB_A.y - 6, Math.min(1, sP * 1.15), 1.5);
+    } else if (sId === 'travel') {
+      for (k2 = 6; k2 >= 1; k2--) {
+        op = qbezPt(Math.max(0, sP - k2 * 0.055));
+        ctx.globalAlpha = 0.5 - k2 * 0.07;
+        ctx.fillStyle = k2 > 3 ? '#B02838' : '#FF6A2A';
+        ctx.fillRect((op.x - 1) | 0, (op.y - 1) | 0, 3, 3);
+      }
+      ctx.globalAlpha = 1;
+      op = qbezPt(sP);
+      ctx.fillStyle = '#FF6A2A'; ctx.fillRect((op.x - 2) | 0, (op.y - 2) | 0, 5, 5);
+      ctx.fillStyle = '#FFD060'; ctx.fillRect((op.x - 1) | 0, (op.y - 1) | 0, 3, 3);
+      ctx.fillStyle = '#FFF6C0'; ctx.fillRect(op.x | 0, op.y | 0, 1, 1);
+    } else if (sId === 'react') {
+      if (NEU.fxBurst) NEU.fxBurst(ctx, 'fxGigBrim', ORB_B.x, ORB_B.y, Math.min(1, sP * 1.3), 1.4);
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = '#FF6A2A';
+      ctx.fillRect(ORB_B.x - 3, ORB_B.y - 3, 7, 7);
+      ctx.globalAlpha = 1;
+    } else if (sId === 'warn') {
+      ctx.globalAlpha = 0.10;
+      ctx.fillStyle = '#FF2A1A';
+      ctx.fillRect(0, 0, 320, 192);
+      ctx.globalAlpha = 0.55;
+      ctx.fillRect(0, 0, 320, 6); ctx.fillRect(0, 186, 320, 6);
+      ctx.fillRect(0, 0, 6, 192); ctx.fillRect(314, 0, 6, 192);
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -562,7 +611,7 @@
         b.appendChild(price);
       }
       (function (n) {
-        b.addEventListener('click', function () { sel = n; render(); confirm(); });
+        b.addEventListener('click', function () { if (seq) return; sel = n; render(); confirm(); });
       })(i);
       menuEl.appendChild(b);
     }
@@ -666,6 +715,8 @@
   function open() {
     var beaten, met;
     active = true;
+    seq = null;
+    if (warnEl) warnEl.hidden = true;
     if (api) api.active = true;
     NEU.activeMinigame = 'mage';
     wrap.hidden = false;
@@ -684,6 +735,8 @@
 
   function close() {
     active = false;
+    seq = null;
+    if (warnEl) warnEl.hidden = true;
     if (api) api.active = false;
     if (NEU.activeMinigame === 'mage') NEU.activeMinigame = null;
     wrap.hidden = true;
@@ -692,13 +745,59 @@
     unstack();
   }
 
-  function provoke() {
+  function phaseMs(i) { return (reduced() ? PHASE_MS_CALM : PHASE_MS)[i]; }
+  function phaseP() { return seq ? Math.min(1, seq.t / phaseMs(seq.i)) : 0; }
+  function qbezPt(p) {
+    var u = 1 - p;
+    return {
+      x: u * u * ORB_A.x + 2 * u * p * ORB_C.x + p * p * ORB_B.x,
+      y: u * u * ORB_A.y + 2 * u * p * ORB_C.y + p * p * ORB_B.y
+    };
+  }
+  function sfx(name) { if (NEU.sfx && NEU.sfx[name]) NEU.sfx[name](); }
+
+  function seqEnter() {
+    var id = PHASES[seq.i];
+    if (id === 'cast') sfx('whoosh');
+    else if (id === 'react') sfx('snap');
+    else if (id === 'warn') {
+      if (warnEl) warnEl.hidden = false;
+      sfx('stinger');
+    }
+  }
+
+  function seqTick(dt) {
+    var guard = 0;
+    if (!seq) return;
+    seq.t += dt;
+    while (seq && seq.t >= phaseMs(seq.i) && guard++ < 8) {
+      seq.t -= phaseMs(seq.i);
+      seq.i++;
+      if (seq.i >= PHASES.length) { finishSeq(); return; }
+      seqEnter();
+    }
+  }
+
+  function finishSeq() {
+    seq = null;
+    if (warnEl) warnEl.hidden = true;
+    close();
     if (NEU.cards && NEU.cards.open) NEU.cards.open();
+  }
+
+  function provoke() {
+    if (!active || seq) return;
+    seq = { i: 0, t: 0 };
+    seqEnter();
   }
 
   function tick(dt) {
     if (!active) return;
     if (dt !== dt || dt < 0) dt = 0;
+    /* a stalled frame must not swallow a whole beat: the warning has to
+       be on screen for at least a few drawn frames */
+    seqTick(Math.min(dt, 100));
+    if (!active) return;
     if (!reduced()) clock += dt;
     if (!reduced() && shown < full.length) {
       shown += dt * 30 / 1000;
@@ -716,6 +815,8 @@
     r = (NEU.keys && NEU.keys.route) ? NEU.keys.route(e.key, {}) : { to: e.key, swallow: false };
     if (r.swallow) return;
     k = r.to;
+    /* the cast cinematic owns the room until the cards take over */
+    if (seq) { e.preventDefault(); return; }
     if (k === 'ArrowUp' || k === 'w' || k === 'W') { move(-1); e.preventDefault(); return; }
     if (k === 'ArrowDown' || k === 's' || k === 'S') { move(1); e.preventDefault(); return; }
     if (k === 'Escape') {
@@ -736,10 +837,9 @@
       exitAction();
       return;
     }
-    /* C or spell cast: cast a spell at the mage -> triggers card duel */
+    /* C or spell cast: brimstone at the mage -> the cast plays out, then the duel */
     if (k === 'c' || k === 'C') {
       e.preventDefault();
-      close();
       provoke();
       return;
     }
@@ -748,6 +848,11 @@
   api = {
     open: open, close: close, provoke: provoke, buy: buy, sell: sell, tick: tick,
     running: function () { return active; },
+    phase: function () { return seq ? PHASES[seq.i] : null; },
+    orb: function () {
+      if (!seq || PHASES[seq.i] !== 'travel') return null;
+      return qbezPt(phaseP());
+    },
     active: false
   };
   NEU.mage = api;
