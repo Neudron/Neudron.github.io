@@ -380,23 +380,30 @@
   function getState() { return { x: player.x, y: player.y, vx: player.vx, vy: player.vy, face: player.face, st: player.st,
     dashes: player.dashes, onGround: player.onGround, stamina: player.stamina, dead: player.dead > 0, hp: player.hp, inv: player.inv > 0,
     swing: player.swing > 0 }; }
-  /* Restore the actual authoring snapshot. A death must not leave moved zip movers,
-     consumed refills or smashed walls in a state different from entering this room. */
+  /* Only opted-in rooms reset interactive entities. Other acts retain their
+     original death behavior (including coin/quest state), avoiding regressions. */
   function respawn() {
-    var source = levels[current.id], checkpoint = current.spawn, i, hadBroken = !!current.broken;
-    current.entities = source.entities.map(function (e) { return Object.assign({}, e); });
-    current.solids = current.entities.filter(function (e) { return e.solid; });
-    current.broken = {};
-    for (i = 0; i < current.entities.length; i++) if (current.entities[i].t === 'checkpoint') {
-      current.entities[i].active = checkpoint.x === current.entities[i].x && checkpoint.y === current.entities[i].y - 1;
+    var source, checkpoint, i, hadBroken;
+    if (current.resetOnDeath) {
+      source = levels[current.id];
+      checkpoint = current.spawn;
+      hadBroken = !!current.broken;
+      current.entities = source.entities.map(function (e) { return Object.assign({}, e); });
+      current.solids = current.entities.filter(function (e) { return e.solid; });
+      current.broken = {};
+      for (i = 0; i < current.entities.length; i++) if (current.entities[i].t === 'checkpoint') {
+        current.entities[i].active = checkpoint.x === current.entities[i].x && checkpoint.y === current.entities[i].y - 1;
+      }
+      if (hadBroken) {
+        if (current.chunked) { chunks = {}; chunkOrder = []; }
+        else { delete bakeCache[current.id]; bake(); bakeCache[current.id] = baked; }
+      }
+      player = fresh();
     }
-    if (hadBroken) {
-      if (current.chunked) { chunks = {}; chunkOrder = []; }
-      else { delete bakeCache[current.id]; bake(); bakeCache[current.id] = baked; }
-    }
-    player = fresh();
-    player.x = (checkpoint.x + 0.5) * TILE; player.y = (checkpoint.y + 1) * TILE;
-    player.hp = current.hp || 0; player.wipe = current.quickRespawn ? 0.07 : WIPE;
+    player.x = (current.spawn.x + 0.5) * TILE; player.y = (current.spawn.y + 1) * TILE;
+    player.vx = 0; player.vy = 0; player.onGround = false;
+    player.dashes = 1; player.st = 0; player.hp = current.hp || 0;
+    player.wipe = current.quickRespawn ? 0.07 : WIPE;
     simClock = 0;
     if (current.onRespawn) current.onRespawn();
     placeCamera(-1);
