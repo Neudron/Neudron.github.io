@@ -139,6 +139,14 @@ check('easy prototype has a committed, deathless controller replay', () => {
   console.log('  easy valid input: ' + JSON.stringify(def.recording) +
     ' frames=' + outcome.frames + ' deaths=' + outcome.deaths);
 });
+check('headless replay does not corrupt the active mountain room identity', () => {
+  assert.ok(neu.mountain.openPrototype('medium'));
+  const before = neu.mountain.here();
+  const result = p.replay('mtest_easy', p.levels.mtest_easy.recording);
+  assert.equal(result.reached, true);
+  assert.equal(neu.mountain.here(), before);
+  assert.equal(p.levelId(), before);
+});
 check('quick death recovery retains a valid spawn', () => {
   assert.ok(neu.mountain.openPrototype('easy'));
   const initial = { ...p.state };
