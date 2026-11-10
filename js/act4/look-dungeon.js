@@ -32,7 +32,7 @@
      Tiles and background walls are never keyed: black belongs in those. */
   var cleaned = {};
   function isActorSheet(k) {
-    return /^dg(?:Keeper|Skull|Bones|BoneLee|Paladin|Sniper|Tactic|Commando|Necro|Ragged|Diabol|Warlock|Phantom|Spirit|Ball|Wheel|Hammer|Fx)/.test(k);
+    return /^dg(?:Keeper|Skull|Bones|BoneLee|Paladin|Sniper|Tactic|Commando|Necro|Ragged|Diabol|Warlock|Phantom|Spirit|Ball|Wheel|Hammer|Link|Fx)/.test(k);
   }
   function cleanMatte(im, sh) {
     var w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
