@@ -527,10 +527,11 @@
     return ok;
   };
   P.replay = function (id, rec) {
-    var prev = NEU.mountain.active, mood = NEU.mountain.mood, r;
+    var prev = NEU.mountain.active, mood = NEU.mountain.mood, priorId = currentId, r;
     r = origReplay(id, rec);
     NEU.mountain.active = prev;
     NEU.mountain.mood = mood;
+    currentId = priorId;
     return r;
   };
   if (NEU.kernel && NEU.kernel.scenes && NEU.kernel.scenes.plat && NEU.kernel.scenes.plat.tick) {
