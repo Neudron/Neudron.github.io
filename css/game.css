@@ -88,6 +88,10 @@
   overflow-wrap: anywhere;
 }
 .tbox__txt::before { content: '*'; position: absolute; left: 0; top: 0; }
+/* boss victory cine (boss-scal.js): the fight keeps playing behind the
+   box — a translucent ground keeps the scene visible while the white
+   frame and text stay readable over it. Still top of the z-ladder. */
+.tbox.tbox--cine { background: rgba(2, 0, 8, 0.72); }
 /* Sans: a real 23x30 crop at integer scale. */
 .sans__btn img { width: 69px; height: auto; image-rendering: pixelated; }
 @media (max-width: 600px) {
