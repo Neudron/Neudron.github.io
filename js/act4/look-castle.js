@@ -327,6 +327,28 @@
           if (fy < 3 * T) break;
           g2.globalAlpha = 0.5; R2(fx + 18 - s * 2, fy, 2, 3, '#1A1622'); g2.globalAlpha = 1;
         }
+        /* the runner flares to five carpets below the dais steps: repaint
+           the whole band so the '_' borders don't stripe it */
+        for (var wx = 9; wx <= 13; wx++) for (var wy = 5; wy <= 12; wy++) {
+          if (c.at(wx, wy) === '#') continue;
+          var X = wx * T, Y = wy * T;
+          R2(X, Y, T, T, C.k0);
+          if (((wx + wy) & 1) === 0) { R2(X + 6, Y + 5, 4, 6, C.k1); R2(X + 5, Y + 7, 6, 2, C.k1); R2(X + 7, Y + 7, 2, 2, C.goldHi); }
+          else { R2(X + 7, Y + 2, 2, 2, C.kD); R2(X + 7, Y + 12, 2, 2, C.kD); }
+          if (wx === 9) { R2(X, Y, 2, T, C.gold); R2(X + 2, Y, 1, T, C.kD); R2(X, Y + ((wy & 1) * 8) + 3, 2, 2, C.goldHi); }
+          if (wx === 13) { R2(X + T - 2, Y, 2, T, C.gold); R2(X + T - 3, Y, 1, T, C.kD); }
+          if (wy === 12) { R2(X, Y + T - 2, T, 2, C.gold); for (var fi = 1; fi < 16; fi += 3) R2(X + fi, Y + T, 1, 2, C.gold); }
+        }
+        /* the lock's mark: a faint sigil inlaid in the floor before the
+           east door — the thing her bolt breaks (FX.b1_throne wakes it) */
+        var sgx = 19 * T + 8, sgy = 7 * T + 10;
+        ringPaint(R2, sgx, sgy, 30, 17, '#332A4E');
+        ringPaint(R2, sgx, sgy, 22, 12, '#2A2040');
+        for (var a = 0; a < 8; a++) {
+          var ang = a / 8 * Math.PI * 2;
+          for (var rr = 10; rr <= 20; rr += 3)
+            R2(Math.round(sgx + Math.cos(ang) * rr * 1.7), Math.round(sgy + Math.sin(ang) * rr), 2, 2, '#3A2E55');
+        }
         cobweb(R2, g2, 1 * T, 2 * T, false); cobweb(R2, g2, 22 * T, 2 * T, true);
       } });
     },
@@ -735,6 +757,82 @@
   }
   /* live things that sit ABOVE the shade */
   var FX = {
+    /* b1_throne: dust motes adrift in the moonlight, and the spell
+       Calamitas casts at the east door. World coords in, screen out via
+       W(g, O, S, …); the room hands us castFx() while a cast runs. */
+    b1_throne: function (g, e, d) {
+      var room = roomOf(d);
+      if (!room || !room.grid) return;
+      var S = d.S, now = d.now;
+      var O = { x: d.sx - (e.x + 0.5) * T * S, y: d.sy - (e.y + 1) * T * S };
+      /* motes drifting down the three shafts */
+      if (!still()) {
+        var SX = [4, 18, 11], SL = [90, 90, 110], SS = [0.32, -0.32, 0];
+        for (var i = 0; i < 15; i++) {
+          var k = i % 3, len = SL[k];
+          var yy = ((now / 14 + i * 53) % (len + 60)) - 30;
+          var xx = SX[k] * T + 8 + yy * SS[k] + Math.sin(now / 1100 + i * 2.2) * 2.5;
+          var fade = 1 - yy / (len + 60);
+          if (fade <= 0) continue;
+          g.globalAlpha = 0.26 * fade;
+          W(g, O, S, xx, T + 8 + yy, 1, 1, i % 4 ? '#C8D8FF' : '#FFFFFF');
+        }
+        g.globalAlpha = 1;
+      }
+      var fx = room.castFx && room.castFx();
+      if (!fx) return;
+      /* the lock's sigil wakes while the bolt is away */
+      var sgx = 19 * T + 8, sgy = 7 * T + 10;
+      if (fx.phase !== 'wind') {
+        var sa = fx.phase === 'hit' ? 0.55 : 0.3;
+        g.globalAlpha = sa;
+        for (var b = 0; b < 26; b++) {
+          var ba = b / 26 * Math.PI * 2;
+          W(g, O, S, Math.round(sgx + Math.cos(ba) * 26), Math.round(sgy + Math.sin(ba) * 15), 1, 1,
+            b % 3 ? '#7A5AE0' : '#C9A0FF');
+        }
+        g.globalAlpha = 1;
+      }
+      /* witch's hands → the door */
+      var x0 = 9 * T + 8, y0 = 3 * T - 2, x1 = 22 * T - 4, y1 = 8 * T + 8;
+      if (fx.phase === 'wind') {
+        /* motes drawn up into her hands */
+        for (var m = 0; m < 6; m++) {
+          var my = y0 - ((now / 12 + m * 9) % 26);
+          var mx = x0 + Math.sin(now / 300 + m) * 4;
+          g.globalAlpha = still() ? 0.5 : 0.35 + 0.3 * Math.sin(now / 120 + m);
+          W(g, O, S, mx, my, 1, 1, '#C9A0FF');
+        }
+        g.globalAlpha = 1;
+      } else if (fx.phase === 'fly') {
+        var p = Math.min(1, (fx.t - 700) / 1000);
+        var e2 = p * p * (3 - 2 * p);
+        for (var tr = 1; tr <= 4; tr++) {
+          var tp = Math.max(0, e2 - tr * 0.06);
+          g.globalAlpha = 0.3 / tr;
+          W(g, O, S, x0 + (x1 - x0) * tp, y0 + (y1 - y0) * tp - Math.sin(tp * Math.PI) * 22, 2, 2, '#8A5AE0');
+        }
+        var bx = x0 + (x1 - x0) * e2, by = y0 + (y1 - y0) * e2 - Math.sin(p * Math.PI) * 22;
+        g.globalAlpha = 1;
+        W(g, O, S, bx - 4, by - 4, 8, 8, '#6A2A9E');
+        W(g, O, S, bx - 2, by - 2, 5, 5, '#C9A0FF');
+        W(g, O, S, bx - 1, by - 1, 2, 2, '#FFFFFF');
+      } else if (fx.phase === 'hit') {
+        var hp = Math.min(1, (fx.t - 1700) / 700);
+        for (var r2 = 0; r2 < 3; r2++) {
+          var rr = 4 + hp * 26 + r2 * 6;
+          g.globalAlpha = (1 - hp) * 0.5 / (r2 + 1);
+          for (var a2 = 0; a2 < 16; a2++) {
+            var ang = a2 / 16 * Math.PI * 2;
+            W(g, O, S, Math.round(x1 + Math.cos(ang) * rr), Math.round(y1 - 6 + Math.sin(ang) * rr * 0.6), 1, 1,
+              r2 ? '#8A5AE0' : '#EDE7FF');
+          }
+        }
+        g.globalAlpha = (1 - hp) * 0.6;
+        W(g, O, S, x1 - 5, y1 - 5, 10, 10, '#FFFFFF');
+        g.globalAlpha = 1;
+      }
+    },
     b5_two: function (g, e, d) {
       /* stand where the mirror looks, and your reflection holds the other plate */
       var room = roomOf(d), f = room && room.mirrorFace ? room.mirrorFace() : 0;
@@ -820,6 +918,31 @@
         R(-9, -6, 2, 6, '#1E121E'); R(7, -6, 2, 6, '#1E121E');
         gg.globalAlpha = 0.5; R(-9, -31, 18, 1, '#8A8290'); R(-8, -14, 16, 1, '#8A8290'); gg.globalAlpha = 1;   /* dust */
       }), d);
+    }
+  };
+  /* the witch while she casts the door open: her own sprite, hands
+     raised, a gathering orb between them, and a violet spill of light */
+  skins.witchcast = {
+    width: function () { var L = Lk(); return L ? L.propWidth('witch') : 9; },
+    draw: function (g, e, d) {
+      var room = roomOf(d), fx = room && room.castFx ? room.castFx() : null;
+      var casting = !!(fx && fx.t < 1700);
+      Lk().drawProp(g, 'witch', e.colour, d.sx, d.sy, d.S, d.now, e.x * 7 + e.y);
+      if (!casting) return;
+      var S = d.S, t = fx.t;
+      g.fillStyle = e.colour || '#C2405F';
+      g.fillRect(d.sx - 7 * S, d.sy - 14 * S, 2 * S, 3 * S);
+      g.fillRect(d.sx + 5 * S, d.sy - 14 * S, 2 * S, 3 * S);
+      var r = (3 + (t / 700) * 3) * S, cx = d.sx, cy = d.sy - 17 * S;
+      var pulse = still() ? 0.7 : 0.55 + 0.45 * Math.sin(t / 80);
+      g.globalAlpha = pulse * 0.5; g.fillStyle = '#6A2A9E'; g.fillRect(Math.round(cx - r), Math.round(cy - r), Math.round(r * 2), Math.round(r * 2));
+      g.globalAlpha = pulse; g.fillStyle = '#B46AE0'; g.fillRect(Math.round(cx - r * 0.6), Math.round(cy - r * 0.6), Math.round(r * 1.2), Math.round(r * 1.2));
+      g.fillStyle = '#F0DCFF'; g.fillRect(cx - S, cy - S, 2 * S, 2 * S);
+      g.globalAlpha = 1;
+    },
+    light: function (e, d) {
+      var room = d && roomOf(d), fx = room && room.castFx ? room.castFx() : null;
+      return (fx && fx.t < 1700) ? { r: 46, col: '#B46AE0', glow: 0.3, flicker: true } : null;
     }
   };
   /* the riddle, read where it is carved: the engine npc sits on the wall

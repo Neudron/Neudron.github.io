@@ -77,6 +77,7 @@
   var IRIS = 0.22, fadeSpan = IRIS;
   var busy = false;                    // a cutscene owns input
   var playerAct = null;                // { name, t, max } — a held player pose (the recall drink)
+  var sitting = null;                  // { ent, x, y } — seated on a seat entity until a move key
   var cine = false;                    // a scripted walk owns the stick (api.drive)
   var ents = [];                       // live copy of room.entities
   var images = {};
@@ -604,7 +605,7 @@
     }
     px = (s.x + 0.5) * TILE; py = (s.y + 1) * TILE;
     vx = 0; vy = 0; walked = 0; face = s.face || 'down';
-    slideD = 0; slideDead = false; promptFor = null;
+    slideD = 0; slideDead = false; promptFor = null; sitting = null;
     room.__spawn = spawn;
     bake();
     camSnap();
@@ -725,6 +726,12 @@
   function move(dt) {
     var ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
     var iy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+    /* Seated: the stick is dead until a direction is pressed, which is
+       also what stands you back up. */
+    if (sitting) {
+      if (ix || iy) { sitting = null; settle = 0.09; }
+      else { vx = 0; vy = 0; moving = false; return; }
+    }
     /* A fresh press is a fresh commitment; the key that killed a slide
        must not immediately re-commit to the same line. */
     if (!ix && !iy) slideDead = false;
@@ -943,8 +950,8 @@
     for (i = 0; i < drawn.length; i++) {
       var dr = drawn[i];
       if (!dr.e) {
-        if (L) L.drawPlayer(ctx, sx(px), sy(py), face, walked, moving, S, now,
-          { settle: settle > 0, act: playerAct && playerAct.name, actP: playerAct ? 1 - playerAct.t / playerAct.max : 0 });
+        if (L) L.drawPlayer(ctx, sx(px), sy(py) - (sitting ? 11 * S : 0), face, walked, moving, S, now,
+          { settle: settle > 0, act: playerAct && playerAct.name, actP: playerAct ? 1 - playerAct.t / playerAct.max : 0, sit: sitting });
         continue;
       }
       var pp = entAt(dr.e); d.sx = sx(pp.x); d.sy = sy(pp.y);
@@ -1206,7 +1213,7 @@
     wrap.hidden = false;
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
-    keys = {}; busy = false; acc = 0;
+    keys = {}; busy = false; acc = 0; sitting = null;
     running = true; last = performance.now();
     requestAnimationFrame(step);
     return true;
@@ -1222,6 +1229,18 @@
     /* Hold a named pose on the player for secs (engine-look draws it).
        'drink' is the recall potion's. */
     act: function (name, secs) { playerAct = name ? { name: name, t: secs || 0, max: secs || 0 } : null; },
+    /* Sit on a seat entity (b1_throne's second throne): pins the player
+       to the seat's anchor, facing the room, until any move key — or a
+       second interact on the same seat — stands them up. */
+    sit: function (e) {
+      if (!e) { sitting = null; return false; }
+      if (sitting && sitting.ent === e) { sitting = null; settle = 0.09; return false; }
+      var p = entAt(e);
+      sitting = { ent: e, x: p.x, y: p.y + 5 };
+      px = sitting.x; py = sitting.y; vx = 0; vy = 0; face = 'down';
+      settle = 0.09;
+      return true;
+    },
     /* Scripted input for cinematics: real keys die, drive() walks. */
     cine: function (on) { cine = !!on; keys = {}; },
     drive: function (ix, iy) {
@@ -1278,7 +1297,7 @@
       return { scale: S, cam: { x: camX, y: camY }, vel: { x: vx, y: vy }, padH: padH,
                baked: !!(room && layers[room.id]), fade: fade, iris: fadeSpan, prompt: promptFor,
                lights: (room && look()) ? lightsFor(0, camX, camY, view()).list.length : 0,
-               cine: cine,
+               cine: cine, seat: sitting ? { x: sitting.x, y: sitting.y } : null,
                view: view(), timers: timers.length };
     },
     nearest: function () { return nearest(promptable); },

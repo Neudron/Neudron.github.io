@@ -583,7 +583,8 @@
     entities: castleLook(14).concat([
       { t: 'exit', x: 11, y: 13, to: 'a3_fork', spawn: 'castle', style: 'arch' },
       Q('throne', 9, 2),
-      /* the second throne. never pointed at. */
+      /* the second throne. never pointed at — but it is a seat:
+         interact sits, any move key stands. */
       { t: 'npc', x: 13, y: 2, colour: '#3A2140', look: 'throne', skin: 'throne2',
         lines: function (s) {
           return s.flagged('witch_met')
@@ -591,8 +592,16 @@
                'the cushion has not been plumped since.']
             : ['a second throne, beside the first.',
                'the dust on it has been disturbed recently.'];
+        },
+        run: function (c) {
+          var es = c.ents(), self = null, i;
+          for (i = 0; i < es.length; i++)
+            if (es[i].t === 'npc' && es[i].x === 13 && es[i].y === 2) self = es[i];
+          if (!self || !c.sit(self)) return;      /* already seated: stands up */
+          if (!c.flagged('throne2_sit')) c.say(self.lines(c), 'narr');
+          if (NEU.save) NEU.save.flag('throne2_sit', 1);
         } },
-      { t: 'npc', x: 9, y: 3, colour: '#C2405F', key: 'witch',
+      { t: 'npc', x: 9, y: 3, colour: '#C2405F', key: 'witch', skin: 'witchcast',
         lines: ['...'],
         run: function (c) { witchTalk(c); } },
       { t: 'exit', x: 22, y: 8, to: 'b2_blocks', spawn: 'west', locked: 'witch_met', style: 'door',
@@ -603,9 +612,16 @@
       Q('armour', 1, 12, { solid: true }), Q('armour', 21, 12, { solid: true }),
       Q('glow', 4, 5, { r: 50 }), Q('glow', 18, 5, { r: 50 }), Q('glow', 11, 7, { r: 64 }),
       Q('glow', 11, 3, { r: 54, col: '#FFC873', g: 0.08 }), Q('glow', 11, 10, { r: 50, col: '#FFC873', g: 0.05 }),
-      Q('candles', 7, 12, { solid: true }), Q('candles', 15, 12, { solid: true, seed: 1 })
+      Q('glow', 19, 7, { r: 46, col: '#9A7AE0', g: 0.07 }),
+      Q('statue', 5, 4, { solid: true }), Q('statue', 17, 4, { solid: true }),
+      Q('urn', 4, 11, { solid: true }), Q('urn', 18, 11, { solid: true }),
+      Q('bones', 3, 10), Q('rubble', 20, 10),
+      Q('candles', 7, 12, { solid: true }), Q('candles', 15, 12, { solid: true, seed: 1 }),
+      Q('candles', 4, 12, { solid: true, seed: 2 }), Q('candles', 18, 12, { solid: true, seed: 3 })
     ]).concat(columns([2, 3, 2, 5, 2, 7, 2, 9, 2, 11, 20, 3, 20, 5, 20, 7, 20, 9, 20, 11])),
+    castFx: function () { return castState(); },
     onEnter: function (c) {
+      cast = null;
       if (c.flagged('witch_met')) return;
       say(c, ['the room is much too big for one person.']);
     }
@@ -619,17 +635,69 @@
     ["solve them and i will deal with the rest. go on.", 'witch']
   ];
 
+  /* ── the door she opens herself ──────────────────────────────────
+     Her last line used to flip witch_met the same frame, so the east
+     door opened because a dialogue box closed. Now the talk only gets
+     her started: she raises her hands (the witchcast skin draws the
+     wind-up), a hex bolt crosses the nave, and witch_met lands where it
+     hits the door — about 2.4 s of api.later ticks. castFx() feeds the
+     castlefx layer; the sigil on the floor is the lock she breaks. */
+  var cast = null;
+  var CAST_T = { fly: 700, hit: 1700, done: 2400 };
+
+  function castState() {
+    if (!cast) return null;
+    var t = cast.t;
+    return { t: t, phase: t < CAST_T.fly ? 'wind' : t < CAST_T.hit ? 'fly' : t < CAST_T.done ? 'hit' : 'done' };
+  }
+
+  function castTick() {
+    if (!cast) return;
+    var c = cast.c;
+    cast.t += 16;
+    var t = cast.t;
+    if (t >= CAST_T.fly && !cast.whooshed) {
+      cast.whooshed = 1;
+      if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
+    }
+    if (t >= CAST_T.hit && !cast.struck) {
+      cast.struck = 1;
+      if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(2);
+      if (NEU.juice && NEU.juice.hit) NEU.juice.hit('medium');
+      c.flag('witch_met', 1);
+    }
+    if (t >= CAST_T.done) {
+      cast = null;
+      c.busy(false);
+      c.say(['the door is open.', 'it only ever needed asking.'], 'narr');
+      return;
+    }
+    c.later(castTick, 16);
+  }
+
+  function startCast(c) {
+    if (cast || c.flagged('witch_met')) return;
+    cast = { c: c, t: 0, whooshed: 0, struck: 0 };
+    c.busy(true);
+    if (NEU.talk && NEU.talk.close) NEU.talk.close();
+    if (NEU.sfx && NEU.sfx.rise) NEU.sfx.rise(1000);
+    c.later(castTick, 16);
+  }
+
   function witchTalk(c) {
     var n = NEU.save ? (NEU.save.flag('witch_talks') || 0) : 0;
     if (n >= witchLines.length) {
+      /* she has said her piece; if the door is somehow still shut she
+         simply casts again */
+      if (!c.flagged('witch_met')) { startCast(c); return; }
       c.say(["it is through there. i will wait here.", "i am very good at waiting."], 'witch');
       return;
     }
     c.say([witchLines[n][0]], 'witch');
     if (NEU.save) NEU.save.flag('witch_talks', n + 1);
     if (n + 1 >= witchLines.length) {
-      c.flag('witch_met', 1);
       if (NEU.quest) NEU.quest.mark('a4_witch');
+      startCast(c);
     }
   }
 
