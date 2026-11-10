@@ -77,12 +77,12 @@
     { at: 0,  mode: 'red',  line: '* thirty seconds. that\'s the whole ask.',
       em: [['ring', 1.30], ['aimed', 0.95]] },
     { at: 9,  mode: 'blue', line: '* your SOUL is blue now. stay on the ground.',
-      em: [['bone', 1.04], ['blaster', 2.2], ['elec', 2.1]] },
+      em: [['bone', 0.86], ['blaster', 2.2], ['elec', 2.1]] },
     { at: 19, mode: 'red',  line: '* it is still aiming.',
-      em: [['spiral', 0.08625], ['wall', 3.2], ['blaster', 3.1], ['aimed', 1.4]] },
+      em: [['spiral', 0.10], ['wall', 3.2], ['blaster', 3.1], ['aimed', 1.4]] },
     /* the 4th: the 3rd's spiral, a touch faster (third element = spin step) */
     { at: 25, mode: 'red',  line: '* the last few seconds. stay in the open.',
-      em: [['spiral', 0.069, 0.374], ['wall', 2.3], ['aimed', 0.9]] }
+      em: [['spiral', 0.08, 0.374], ['wall', 2.3], ['aimed', 0.9]] }
   ];
 
   /* Undertale's blaster: 6 frames of 43x57, mouth down. 0 = charging,
@@ -199,21 +199,21 @@
   }
   addEventListener('resize', function () { if (running) layout(); });
 
-  /* Phase 4: the walls close in over 1.5 s, 9% a side, then hold. */
+  /* Phase 4: the walls close in over 1.5 s, 6% a side, then hold. */
   function squeezeBox() {
     if (!running) return;                  // open() lays out before its plan exists
     var s = (phase && phase === table().length) ? Math.min(1, (t - phaseAt) / 1.5) : 0;
     var ease;
     if (reducedFx()) ease = s ? 1 : 0;
     else ease = 1 + 2.70158 * Math.pow(s - 1, 3) + 1.70158 * Math.pow(s - 1, 2);
-    var ins = (BAW * 0.09 * ease) | 0; AX = BAX + ins; AW = BAW - ins * 2;
+    var ins = (BAW * 0.06 * ease) | 0; AX = BAX + ins; AW = BAW - ins * 2;
   }
 
   function add(x, y, vx, vy, r, c) { spot(x, y); dm.shot(bullets, x, y, vx, vy, r, c, 0, MAX_B); }
 
   /* Spawn markers: the first shot of each emitter leaves a 2px ring on the
      box's rim for 0.35 s, at its spawn point projected onto the rim. */
-  var curE = null, marks = [], grazeFx = -9;
+  var curE = null, marks = [], telegraphs = [], grazeFx = -9;
   function spot(x, y) {
     if (!curE || curE.shown) return;
     curE.shown = true;
@@ -227,13 +227,55 @@
     marks.push({ x: rx, y: ry, t0: t });
   }
 
+  function prepareTelegraph(e, at, left, angle) {
+    if (e.kind !== 'ring' && e.kind !== 'spiral' && e.kind !== 'bone') return;
+    var w = { kind: e.kind, start: at - AIM_TELE, end: at };
+    if (e.kind === 'ring') {
+      w.x = AX + AW / 2; w.y = AY + AH / 2;
+    } else if (e.kind === 'spiral') {
+      w.x = AX + AW / 2; w.y = AY + AH / 2;
+      w.angle = typeof angle === 'number' ? angle : e.ang + (e.spin || 0.42);
+      w.arms = 2 + Math.round(rampAt(at) * 2);
+    } else {
+      w.left = typeof left === 'boolean' ? left : e.ang === 0;
+      w.x = w.left ? AX : AX + AW;
+    }
+    telegraphs.push(w);
+  }
+
+  function drawTelegraphs() {
+    telegraphs = telegraphs.filter(function (w) { return t < w.end; });
+    for (var i = 0; i < telegraphs.length; i++) {
+      var w = telegraphs[i], p = Math.min(1, Math.max(0, (t - w.start) / (w.end - w.start)));
+      if (t < w.start) continue;
+      ctx.save(); ctx.strokeStyle = PAL.ui; ctx.lineWidth = 2; ctx.globalAlpha = 0.3 + p * 0.55;
+      if (w.kind === 'ring') {
+        ctx.beginPath(); ctx.arc(w.x, w.y, 14, 0, Math.PI * 2); ctx.stroke();
+      } else if (w.kind === 'spiral') {
+        for (var r = 0; r < w.arms; r++) {
+          var a = w.angle + r * (Math.PI * 2 / w.arms);
+          ctx.beginPath(); ctx.moveTo(w.x, w.y);
+          ctx.lineTo(w.x + Math.cos(a) * 28, w.y + Math.sin(a) * 28); ctx.stroke();
+        }
+      } else {
+        ctx.beginPath(); ctx.moveTo(w.x - 7, AY + 2); ctx.lineTo(w.x + 7, AY + 2);
+        ctx.moveTo(w.x - 7, AY + AH - 2); ctx.lineTo(w.x + 7, AY + AH - 2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   /* Difficulty: 0 at the start, 1 at the end. Endless keeps climbing —
      the curve is the content once there is no finish line. */
   /* The run's length: Act III's plan is twenty seconds, the room is thirty. */
   function span() { return variant ? VLEN : SURVIVE; }
   function durationText() { return variant ? 'twenty seconds' : 'thirty seconds'; }
-  function ramp() {
-    return endless ? Math.min(2.4, t / SURVIVE) : Math.min(1, t / span());
+  function rampAt(at) { return endless ? Math.min(2.4, at / SURVIVE) : Math.min(1, at / span()); }
+  function ramp() { return rampAt(t); }
+  function planReleaseAt(at) {
+    var start = 0, pause = reducedFx() ? 0 : LULL;
+    for (var i = 0; i < plan.phases.length && plan.phases[i].at <= at; i++) start = plan.phases[i].at;
+    return Math.max(at, start + pause);
   }
 
   /* Endless loops the three phases every twenty seconds. */
@@ -253,9 +295,13 @@
         wallTelegraphs[wi].at = transitionUntil + WALL_TELE;
     dm.soulMode(F, P.mode);
     emitters = []; aims = [];
-    for (var i = 0; i < (P.em || []).length; i++)
-      emitters.push({ kind: P.em[i][0], every: P.em[i][1], next: t + TELE + i * 0.3, ang: 0,
-                      spin: P.em[i][2], shown: false });
+    if (!variant) telegraphs = [];
+    for (var i = 0; i < (P.em || []).length; i++) {
+      var e = { kind: P.em[i][0], every: P.em[i][1], next: t + Math.max(TELE, AIM_TELE) + i * 0.3, ang: 0,
+                spin: P.em[i][2], shown: false };
+      emitters.push(e);
+      prepareTelegraph(e, e.next);
+    }
     /* The short phase pause gives the next pattern room to read. */
     if (n > 1 && NEU.juice) NEU.juice.hit('small');
   }
@@ -389,7 +435,7 @@
                    h: 18 + ((Math.random() * 12) | 0) });
     } else if (e.kind === 'wall') {
       /* The ghost and the delayed wall share this exact gap and direction. */
-      wallTelegraphs.push({ at: t + WALL_TELE, vertical: wallRandom() < 0.5,
+      wallTelegraphs.push({ at: t + WALL_TELE, e: e, vertical: wallRandom() < 0.5,
                             gap: 3 + ((wallRandom() * 10) | 0),
                             fromStart: wallRandom() < 0.5, speed: 104 + k * 46 });
     }
@@ -397,6 +443,7 @@
 
   function spawnWall(w) {
     var step = w.vertical ? AW / WALL_CELLS : AH / WALL_CELLS;
+    curE = w.e;
     for (var q = 0; q < WALL_CELLS; q++) {
       if (q === w.gap) continue;
       if (w.vertical) {
@@ -407,6 +454,7 @@
             w.fromStart ? w.speed : -w.speed, 0, 4, PAL.dim);
       }
     }
+    curE = null;
   }
 
   /* One hit, from anything. Dash i-frames count. Returns true on death. */
@@ -441,13 +489,20 @@
     dm.tick(F, dt, null);
     var bdt = dt * dm.slow(F);           // adrenaline's first beat slows the room
 
-    if (t >= transitionUntil && variant) {
-      while (qi < plan.events.length && t >= plan.events[qi].t) fire(plan.events[qi++].e);
+    if (variant) {
+      while (qi < plan.events.length) {
+        var ev = plan.events[qi];
+        if (t < transitionUntil || t < ev.releaseAt) break;
+        curE = ev.e; fire(curE); qi++; curE = null;
+      }
     }
     if (t >= transitionUntil) {
       for (var i = 0; i < emitters.length; i++) {
         var e = emitters[i];
-        if (t >= e.next) { e.next = t + e.every; curE = e; fire(e); curE = null; }
+        if (t >= e.next) {
+          e.next = t + e.every; curE = e; fire(e); curE = null;
+          if (e.kind === 'ring' || e.kind === 'bone') prepareTelegraph(e, e.next);
+        }
       }
       var kw = [];
       for (var wi = 0; wi < wallTelegraphs.length; wi++) {
@@ -781,8 +836,8 @@
     if (phase && phase === table().length && t - phaseAt < 1.5) {
       /* the walls' final stop, telegraphed */
       ctx.fillStyle = PAL.box; ctx.globalAlpha = 0.35;
-      ctx.fillRect(BAX + BAW * 0.09 - 1, AY, 2, AH);
-      ctx.fillRect(BAX + BAW * 0.91 - 1, AY, 2, AH);
+      ctx.fillRect(BAX + BAW * 0.06 - 1, AY, 2, AH);
+      ctx.fillRect(BAX + BAW * 0.94 - 1, AY, 2, AH);
       ctx.globalAlpha = 1;
     }
 
@@ -812,6 +867,7 @@
       }
     }
     ctx.globalAlpha = 1;
+    drawTelegraphs();
 
     /* bullets — squares on integer coords over a soft glow */
     for (var i = 0; i < bullets.length; i++) {
@@ -920,10 +976,24 @@
     layout();
     F.x = AX + AW / 2; F.y = AY + AH - 60;
     bullets = []; blasters = []; bones = []; aims = []; wallTelegraphs = []; grazeSparks = [];
-    meter = 0; lastGz = -9; grazeFx = -9; pulseAt = -9; marks = [];
+    meter = 0; lastGz = -9; grazeFx = -9; pulseAt = -9; marks = []; telegraphs = [];
     cell = 0; cellLostAt = 0;
     var seed = attempt++;
     plan = variant ? buildPlan(seed) : null;
+    if (variant) for (var i = 0; i < plan.events.length; i++) {
+      var ev = plan.events[i], e = ev.e;
+      ev.releaseAt = planReleaseAt(ev.t);
+      if (e.kind === 'ring') prepareTelegraph(e, ev.releaseAt);
+      else if (e.kind === 'bone') {
+        var left = typeof e.previewSide === 'boolean' ? e.previewSide : e.ang === 0;
+        prepareTelegraph(e, ev.releaseAt, left);
+        e.previewSide = !left;
+      } else if (e.kind === 'spiral') {
+        var angle = (typeof e.previewAngle === 'number' ? e.previewAngle : e.ang) + (e.spin || 0.42);
+        prepareTelegraph(e, ev.releaseAt, null, angle);
+        e.previewAngle = angle;
+      }
+    }
     planRng = variant ? rng(seed) : null;
     qi = 0;
     PAL = variant ? PAL_III : PAL_II;
@@ -1118,7 +1188,8 @@
                  get variant() { return variant; }, get plan() { return plan; }, get meter() { return meter; }, get hp() { return hp; },
                  get phases() { return PHASES; }, get bullets() { return bullets; },
                  get aims() { return aims; },
-                 get box() { return { AX: AX, AW: AW, BAW: BAW }; },
+                 get box() { return { AX: AX, AW: AW, BAW: BAW }; }, get telegraphs() { return telegraphs; }, get marks() { return marks; },
+                 get attacks() { return { bullets: bullets.length, bones: bones.length, aims: aims.length, blasters: blasters.length, blasterAge: blasters.length ? blasters[0].t : -1, walls: wallTelegraphs.length, wallAt: wallTelegraphs.length ? wallTelegraphs[0].at : -1 }; }, get t() { return t; },
                  buildPlan: buildPlan, teleAlpha: teleAlpha, chargeTime: BL_CHARGE, cellCfg: CELL, coreGain: coreGain, sparkCols: sparkCols, get cell() { return cell; }, get pal() { return PAL; },
                  set t(v) { t = +v || 0; } };   /* dev/screenshots: jump the clock */
 })();
