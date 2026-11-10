@@ -1,0 +1,67 @@
+{
+  "schema": "neu-v3-asset-inventory/1",
+  "baseline": "bbb4331e9ded30a9160bee3d087d6f08cc3479eb",
+  "status": "INITIAL_FOLDER_INVENTORY_ONLY",
+  "warning": "No image dimensions, license grants, frame counts or pivots have been inspected. Do not ship candidates.",
+  "fields": [
+    "asset_id",
+    "scene_id",
+    "source",
+    "license",
+    "status",
+    "dimensions",
+    "frame_count",
+    "pivot",
+    "palette",
+    "alpha",
+    "atlas",
+    "compression",
+    "author",
+    "review_status"
+  ],
+  "groups": [
+    {
+      "id": "existing-calamity",
+      "prefix": "img/act4/calamity/",
+      "license": null,
+      "status": "RIGHTS_PENDING"
+    },
+    {
+      "id": "existing-terraria",
+      "prefix": "img/act4/terraria/",
+      "license": null,
+      "status": "RIGHTS_PENDING"
+    },
+    {
+      "id": "existing-deltarune",
+      "prefix": "img/act4/deltarune/",
+      "license": null,
+      "status": "RIGHTS_PENDING"
+    },
+    {
+      "id": "existing-undertale",
+      "prefix": "img/act4/undertale/",
+      "license": null,
+      "status": "RIGHTS_PENDING"
+    },
+    {
+      "id": "existing-vfx",
+      "prefix": "img/act4/vfx/",
+      "license": null,
+      "status": "PROVENANCE_UNVERIFIED"
+    },
+    {
+      "id": "existing-tiles",
+      "prefix": "img/act4/tiles/",
+      "license": null,
+      "status": "PROVENANCE_UNVERIFIED"
+    },
+    {
+      "id": "existing-audio",
+      "prefix": "audio/act4/",
+      "license": null,
+      "status": "PROVENANCE_UNVERIFIED"
+    }
+  ],
+  "prompts_ref": "plans/neu-v3/IMAGE_PROMPTS.md"
+}

@@ -1,0 +1,35 @@
+name: Validate NEU pull request
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout proposed changes
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Game syntax compatibility
+        run: npm run check
+      - name: Produce deployable bundle (without deploying)
+        run: npm run build
+      - name: Verify artifact boundaries and surface
+        run: npm run verify
+      - name: Verify V3 planning inventory
+        run: node scripts/check-v3-plan.mjs

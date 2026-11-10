@@ -1,0 +1,5 @@
+# Work order V3-200 — throne room / spell opening / sit interaction
+
+**Base:** after approved forest slice. **Owner:** Opus visual director and implementer. **Allowed:** `js/act4/rooms-a.js`, `js/act4/look-castle.js`, relevant approved art, targeted tests. **Forbidden:** other chapters, console story flags, unrelated core engine system. **Depends:** V3-103.
+
+Implement `SC-B1` with deliberately framed witch -> raised hand -> crimson buildup -> projectile from hand to east lock -> cracked seal -> opening door panels -> collision safely removed -> persisted `witch_met` -> control returned. Initial coordinates from source: witch (9,3), east door (22,8), second throne (13,2). B1 spawns south (11,12), north (21,8). Dialogue must not expose passable door before animation threshold. Second throne is sit/stand and visually aligned, not a dialogue-only chair. Design skip/reduced-motion and interrupted/reload paths. Test completion/re-entry once-only flag, collision threshold, seating clipping, both control schemes and browser screenshots. **Rollback:** isolated commit revert preserving old gate.
