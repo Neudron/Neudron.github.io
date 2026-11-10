@@ -179,7 +179,7 @@
     tiles = rows.join('\n');
     return P.level(id, {
       tiles: tiles, spawn: spawn, entities: entities, tileset: 'mountain',
-      chunked: true, cameraMode: 'mountain', camera: detail.camera || { focusY: 0.52 },
+      chunked: true, resetOnDeath: true, cameraMode: 'mountain', camera: detail.camera || { focusY: 0.52 },
       wind: detail.wind || null, quickRespawn: true,
       stage: detail.stage, altitude: detail.altitude,
       mechanicRequirements: detail.mechanics,
@@ -256,6 +256,14 @@
     reference: 'Celeste Summit 7B a-03 tall-room bounds; SJ DashZipMover source (not copied)',
     wind: { x: -88, y: -12, period: 3.6, duty: 0.76 },
     camera: { focusY: 0.61 } });
+
+  /* CI replayed this authored input on the real movement controller:
+     94 frames, 0 deaths, room exit triggered. Not a human-playtest time. */
+  P.levels.mtest_easy.recording = [[18, 'right'], [8, 'right jump'], [125, 'right']];
+  P.levels.mtest_easy.testing.status = 'simulated-route-passed';
+  P.levels.mtest_easy.testing.successFrames = 94;
+  P.levels.mtest_easy.testing.deaths = 0;
+  NEU.mountain.recordings.mtest_easy = P.levels.mtest_easy.recording;
 
   NEU.mountain.prototypes = ['mtest_easy', 'mtest_medium', 'mtest_hard'];
   NEU.mountain.openPrototype = function (difficulty) {
