@@ -588,7 +588,7 @@
       if (player.inv > 0) ctx.globalAlpha = reduced ? 0.6 : ((((now / 170) | 0) & 1) ? 0.35 : 1); /* 340 ms period: under the 3 Hz flash cap */
       drawHero(ctx, player.x - cx, player.y - cy, player.face, player.onGround);
       ctx.globalAlpha = 1;
-    } else deathRing(ctx, player.x - cx, player.y - cy - HH / 2, 1 - player.dead / DEATH);
+    } else deathRing(ctx, player.x - cx, player.y - cy - HH / 2, 1 - player.dead / (current.quickRespawn ? 0.18 : DEATH));
     if (player.dead <= 0 && player.swing > 0) {
       ctx.fillStyle = '#fff0a6'; ctx.globalAlpha = Math.min(1, player.swing / C.swing);
       ctx.fillRect(player.x - cx + player.face * 10, player.y - cy - 20, player.face * 12, 3);
