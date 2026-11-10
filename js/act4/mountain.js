@@ -160,6 +160,117 @@
   var n;
   for (n = 0; n <= 7; n++) build(n);
 
+  /*
+   * Research-gated precision-platforming PROTOTYPES. Deliberately separate
+   * from the eight-room story route: none counts toward the promised 60
+   * until a full-source map study and deterministic successful playthrough.
+   * Every surface below is hand-positioned, not generated from RNG.
+   */
+  function prototype(id, width, height, spawn, geometry, entities, detail) {
+    var rows = [], y, x, i, g, line, tiles;
+    for (y = 0; y < height; y++) rows.push(new Array(width + 1).join('.'));
+    for (i = 0; i < geometry.length; i++) {
+      g = geometry[i];
+      if (g.y < 0 || g.y >= height) throw new Error('mountain geometry outside room: ' + id);
+      line = rows[g.y].split('');
+      for (x = Math.max(0, g.from); x <= Math.min(width - 1, g.to); x++) line[x] = g.tile;
+      rows[g.y] = line.join('');
+    }
+    tiles = rows.join('\n');
+    return P.level(id, {
+      tiles: tiles, spawn: spawn, entities: entities, tileset: 'mountain',
+      chunked: true, resetOnDeath: true, cameraMode: 'mountain', camera: detail.camera || { focusY: 0.52 },
+      wind: detail.wind || null, quickRespawn: true,
+      stage: detail.stage, altitude: detail.altitude,
+      mechanicRequirements: detail.mechanics,
+      prototype: true, testing: { status: 'not-playtested', reference: detail.reference },
+      onExit: function () { NEU.mountain.prototypeCleared = id; },
+      onCheckpoint: function (e) { NEU.mountain.prototypeCheckpoint = id + ':' + e.id; }
+    });
+  }
+  /* First input: run and clear a short exposed crevasse. The overhead
+     one-way ledge offers a safe alternate route, not an unavoidable trap. */
+  prototype('mtest_easy', 24, 34, { x: 2, y: 29 }, [
+    { from: 0, to: 7, y: 30, tile: '#' },
+    { from: 10, to: 23, y: 30, tile: '#' },
+    { from: 0, to: 23, y: 33, tile: '#' },
+    { from: 8, to: 9, y: 32, tile: '^' },
+    { from: 12, to: 16, y: 25, tile: '=' },
+    { from: 17, to: 18, y: 26, tile: '#' },
+    { from: 17, to: 18, y: 25, tile: '#' }
+  ], [
+    { t: 'checkpoint', x: 12, y: 29 },
+    { t: 'exit', x: 21, y: 29 }
+  ], { stage: 'foot', altitude: 0, mechanics: ['ground jump', 'basic air control'],
+    reference: 'Forsaken City 1A rooms 1–3; verify preview and route before final use' });
+
+  /* Spring sends the player from the ravine floor to a first landing.
+     Each next landing is offset laterally: aim, land, then climb again. */
+  prototype('mtest_medium', 26, 44, { x: 3, y: 40 }, [
+    { from: 1, to: 8, y: 41, tile: '#' },
+    { from: 0, to: 25, y: 43, tile: '#' },
+    { from: 10, to: 20, y: 42, tile: '^' },
+    { from: 7, to: 12, y: 34, tile: '#' },
+    { from: 13, to: 18, y: 31, tile: '=' },
+    { from: 17, to: 24, y: 27, tile: '#' },
+    { from: 8, to: 13, y: 23, tile: '#' },
+    { from: 15, to: 22, y: 19, tile: '#' },
+    { from: 22, to: 24, y: 18, tile: '#' }
+  ], [
+    { t: 'spring', x: 5, y: 40 },
+    { t: 'refill', x: 11, y: 30 },
+    { t: 'checkpoint', x: 19, y: 26 },
+    { t: 'exit', x: 22, y: 18 }
+  ], { stage: 'ridge', altitude: 600, mechanics: ['spring', 'diagonal dash', 'landing control'],
+    reference: 'SpringCollab MultiNodeMovingPlatform and Celeste 7A wall springs (mechanic study only)',
+    wind: { x: 55, y: 0, period: 4.2, duty: 0.65 } });
+
+  /* Vertical stress-test: alternating shelves make camera tracking,
+     momentum changes, dash refills and precise resets observable. The
+     placed zip block is intentionally a collision/state-machine test. */
+  prototype('mtest_hard', 28, 60, { x: 4, y: 56 }, [
+    { from: 1, to: 10, y: 57, tile: '#' },
+    { from: 8, to: 14, y: 52, tile: '#' },
+    { from: 17, to: 24, y: 45, tile: '#' },
+    { from: 8, to: 14, y: 39, tile: '#' },
+    { from: 15, to: 22, y: 31, tile: '#' },
+    { from: 5, to: 12, y: 24, tile: '#' },
+    { from: 13, to: 21, y: 17, tile: '#' },
+    { from: 20, to: 26, y: 10, tile: '#' },
+    { from: 0, to: 27, y: 59, tile: '#' },
+    { from: 1, to: 7, y: 58, tile: '^' },
+    { from: 23, to: 27, y: 37, tile: 'v' },
+    { from: 0, to: 4, y: 32, tile: '>' },
+    { from: 22, to: 27, y: 22, tile: '<' }
+  ], [
+    { t: 'spring', x: 7, y: 56 },
+    { t: 'zip', x: 13, y: 51, targetX: 19, targetY: 45 },
+    { t: 'refill', x: 19, y: 42 },
+    { t: 'refill', x: 10, y: 35 },
+    { t: 'checkpoint', x: 16, y: 30 },
+    { t: 'refill', x: 9, y: 21 },
+    { t: 'refill', x: 16, y: 14 },
+    { t: 'exit', x: 24, y: 9 }
+  ], { stage: 'summit', altitude: 2400,
+    mechanics: ['spring', 'zip', 'walljump', 'dash refill', 'wind management'],
+    reference: 'Celeste Summit 7B a-03 tall-room bounds; SJ DashZipMover source (not copied)',
+    wind: { x: -88, y: -12, period: 3.6, duty: 0.76 },
+    camera: { focusY: 0.61 } });
+
+  /* CI replayed this authored input on the real movement controller:
+     94 frames, 0 deaths, room exit triggered. Not a human-playtest time. */
+  P.levels.mtest_easy.recording = [[18, 'right'], [8, 'right jump'], [125, 'right']];
+  P.levels.mtest_easy.testing.status = 'simulated-route-passed';
+  P.levels.mtest_easy.testing.successFrames = 94;
+  P.levels.mtest_easy.testing.deaths = 0;
+  NEU.mountain.recordings.mtest_easy = P.levels.mtest_easy.recording;
+
+  NEU.mountain.prototypes = ['mtest_easy', 'mtest_medium', 'mtest_hard'];
+  NEU.mountain.openPrototype = function (difficulty) {
+    var id = 'mtest_' + difficulty;
+    return NEU.mountain.prototypes.indexOf(id) >= 0 && P.open(id);
+  };
+
   /* Heaven is gold and cloud. Evil is crimson and ash. Four screens each. */
   var EX = 160, INK = '#12081E';
   var HSKY = ['#FFF6DE', '#F8E7A8', '#F4D0E8', '#E7D4F4', '#D8E6FF', '#E7F2FF'];
@@ -404,7 +515,7 @@
 
   var origOpen = P.open, origReplay = P.replay;
   P.open = function (id, opts) {
-    var ascent = !!P.levels[id] && /^m[0-7]$/.test(id);
+    var ascent = !!P.levels[id] && (/^m[0-7]$/.test(id) || /^mtest_(easy|medium|hard)$/.test(id));
     var drop = !!P.levels[id] && /^[hv][0-3]$/.test(id);
     var ok;
     NEU.mountain.mood = drop ? (id.charAt(0) === 'v' ? 'evil' : 'heaven') : '';
@@ -416,10 +527,11 @@
     return ok;
   };
   P.replay = function (id, rec) {
-    var prev = NEU.mountain.active, mood = NEU.mountain.mood, r;
+    var prev = NEU.mountain.active, mood = NEU.mountain.mood, priorId = currentId, r;
     r = origReplay(id, rec);
     NEU.mountain.active = prev;
     NEU.mountain.mood = mood;
+    currentId = priorId;
     return r;
   };
   if (NEU.kernel && NEU.kernel.scenes && NEU.kernel.scenes.plat && NEU.kernel.scenes.plat.tick) {

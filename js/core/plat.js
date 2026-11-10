@@ -14,7 +14,7 @@
   var levels = {}, kinds = {}, current = null, live = false, paused = false, replaying = false;
   var canvas = document.getElementById('platCanvas'), overlay = document.getElementById('plat');
   var ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
-  var keys = {}, accumulator = 0, camera = { x: 0, y: 0 }, baked = null, afterimages = [], bakeCache = {};
+  var keys = {}, accumulator = 0, simClock = 0, camera = { x: 0, y: 0 }, baked = null, afterimages = [], bakeCache = {};
   var reduced = redNow(), view = { w: 640, h: 360, scale: 1 }, area = { x0: 0, y0: 0, x1: 640, y1: 360 };
   var painters = [], padB = {}, sprCache = {}, lastDraw = 0, chunks = {}, chunkOrder = [], CHUNK = 32, LRU = 12;
   function redNow() {
@@ -116,7 +116,7 @@
   function refill() { player.dashes = 1; }
   function die() {
     if (player.dead > 0) return;
-    player.dead = DEATH; player.vx = 0; player.vy = 0; player.st = 0;
+    player.dead = current && current.quickRespawn ? 0.18 : DEATH; player.vx = 0; player.vy = 0; player.st = 0;
     if (NEU.juice && NEU.juice.hit && !replaying) NEU.juice.hit('medium');
     if (NEU.sfx && NEU.sfx.hit && !replaying) NEU.sfx.hit(1);
   }
@@ -238,8 +238,25 @@
     player.wallBoost = 0; player.lastClimb = 0;
     for (i = 0; i < 4 && !wallAt(player.face, 1); i++) player.x += player.face;
   }
+  /* Room-authored wind: no RNG and no force during dash/cutscene frames.
+     Cycles are anchored to the room simulation clock, so retry starts on the same gust. */
+  function windNow() {
+    var w = current && current.wind, period, phase, duty, edge, gain = 1;
+    if (!w) return { x: 0, y: 0, active: false };
+    period = Number(w.period) || 0;
+    if (period > 0) {
+      phase = ((((simClock + (Number(w.phase) || 0)) % period) + period) % period) / period;
+      duty = clamp(w.duty == null ? 0.7 : Number(w.duty), 0, 1);
+      if (phase >= duty || duty <= 0) gain = 0;
+      else {
+        edge = Math.min(0.12, duty / 3);
+        gain = edge ? Math.min(1, phase / edge, (duty - phase) / edge) : 1;
+      }
+    }
+    return { x: (Number(w.x) || 0) * gain, y: (Number(w.y) || 0) * gain, active: gain > 0 };
+  }
   function normal(dt, input, mx, my) {
-    var mult, max;
+    var mult, max, wind;
     if (player.hopWait) {
       if (sign(player.vx) === -player.hopWait || player.vy > 0) player.hopWait = 0;
       else if (!wallAt(player.hopWait, 1)) { player.vx = player.hopWait * C.hopX; player.hopWait = 0; }
@@ -259,6 +276,12 @@
       player.vy = approach(player.vy, max, C.grav * (Math.abs(player.vy) < C.halfGrav && input.jump ? 0.5 : 1) * dt);
     }
     if (player.varJump > 0) { if (input.jump) player.vy = Math.min(player.vy, player.varSpeed); else player.varJump = 0; }
+    if (!player.onGround && current.wind) {
+      wind = windNow();
+      /* Preserve deliberate hyper/dash momentum instead of clamping existing high speed. */
+      player.vx += wind.x * dt;
+      player.vy = clamp(player.vy + wind.y * dt, -C.fastFall, C.fastFall);
+    }
     if (player.jumpBuf > 0) { if (player.coyote > 0) jump(mx); else wallJumps(input, mx); }
   }
   function climb(dt, input, mx, my) {
@@ -310,6 +333,7 @@
     var input = parseInput(raw), prev = player.prev, mx, my, i, e;
     if (!current || current.exited) return getState();
     dt = clamp(Number(dt) || STEP, 0, 0.1);
+    simClock += dt;
     player.prev = input;
     if (player.wipe > 0) player.wipe = Math.max(0, player.wipe - dt);
     if (player.dead > 0) {
@@ -356,9 +380,33 @@
   function getState() { return { x: player.x, y: player.y, vx: player.vx, vy: player.vy, face: player.face, st: player.st,
     dashes: player.dashes, onGround: player.onGround, stamina: player.stamina, dead: player.dead > 0, hp: player.hp, inv: player.inv > 0,
     swing: player.swing > 0 }; }
+  /* Only opted-in rooms reset interactive entities. Other acts retain their
+     original death behavior (including coin/quest state), avoiding regressions. */
   function respawn() {
+    var source, checkpoint, i, hadBroken;
+    if (current.resetOnDeath) {
+      source = levels[current.id];
+      checkpoint = current.spawn;
+      hadBroken = !!current.broken;
+      current.entities = source.entities.map(function (e) { return Object.assign({}, e); });
+      current.solids = current.entities.filter(function (e) { return e.solid; });
+      current.broken = {};
+      for (i = 0; i < current.entities.length; i++) if (current.entities[i].t === 'checkpoint') {
+        current.entities[i].active = checkpoint.x === current.entities[i].x && checkpoint.y === current.entities[i].y - 1;
+      }
+      if (hadBroken) {
+        if (current.chunked) { chunks = {}; chunkOrder = []; }
+        else { delete bakeCache[current.id]; bake(); bakeCache[current.id] = baked; }
+      }
+      player = fresh();
+    }
     player.x = (current.spawn.x + 0.5) * TILE; player.y = (current.spawn.y + 1) * TILE;
-    player.vx = 0; player.vy = 0; player.onGround = false; player.dashes = 1; player.st = 0; player.hp = current.hp || 0; player.wipe = WIPE;
+    player.vx = 0; player.vy = 0; player.onGround = false;
+    player.dashes = 1; player.st = 0; player.hp = current.hp || 0;
+    player.wipe = current.quickRespawn ? 0.07 : WIPE;
+    simClock = 0;
+    if (current.onRespawn) current.onRespawn();
+    placeCamera(-1);
   }
   function bake() {
     if (!current || !document.createElement) return;
@@ -431,7 +479,19 @@
     }
   }
   function placeCamera(dt) {
-    var worldH = current.h * TILE, worldW = current.w * TILE, tx, ty, k;
+    var worldH = current.h * TILE, worldW = current.w * TILE, tx, ty, k, cfg;
+    if (current.cameraMode === 'mountain') {
+      cfg = current.camera || {};
+      tx = clamp(player.x + clamp(player.vx * 0.12, -50, 50) + player.face * 16 - view.w / 2 + (cfg.offsetX || 0), 0, Math.max(0, worldW - view.w));
+      ty = clamp(player.y - HH + clamp(player.vy * 0.16, -70, 70) - view.h * (cfg.focusY || 0.55) + (cfg.offsetY || 0), 0, Math.max(0, worldH - view.h));
+      if (dt >= 0) {
+        if (Math.abs(tx - camera.x) < 18) tx = camera.x;
+        if (Math.abs(ty - camera.y) < 22) ty = camera.y;
+      }
+      k = dt < 0 ? 1 : 1 - Math.pow(0.72, dt * 60);
+      camera.x += (tx - camera.x) * k; camera.y += (ty - camera.y) * k;
+      return;
+    }
     if (current.view === 'terraria') {
       /* Terraria: smooth follow on both axes with a small look-ahead, clamped to the world, rounded at draw */
       tx = clamp(player.x + player.face * 24 - view.w / 2, 0, Math.max(0, worldW - view.w));
@@ -528,7 +588,7 @@
       if (player.inv > 0) ctx.globalAlpha = reduced ? 0.6 : ((((now / 170) | 0) & 1) ? 0.35 : 1); /* 340 ms period: under the 3 Hz flash cap */
       drawHero(ctx, player.x - cx, player.y - cy, player.face, player.onGround);
       ctx.globalAlpha = 1;
-    } else deathRing(ctx, player.x - cx, player.y - cy - HH / 2, 1 - player.dead / DEATH);
+    } else deathRing(ctx, player.x - cx, player.y - cy - HH / 2, 1 - player.dead / (current.quickRespawn ? 0.18 : DEATH));
     if (player.dead <= 0 && player.swing > 0) {
       ctx.fillStyle = '#fff0a6'; ctx.globalAlpha = Math.min(1, player.swing / C.swing);
       ctx.fillRect(player.x - cx + player.face * 10, player.y - cy - 20, player.face * 12, 3);
@@ -742,14 +802,20 @@
     c.fillRect((wx - HW) | 0, (wy - HH) | 0, HW * 2, HH);
   }
   function open(id, opts) {
-    var i;
+    var i, carry;
     if (!levels[id]) return false;
+    opts = opts || {};
+    carry = live && opts.carry ? { vx: player.vx, vy: player.vy, dashes: player.dashes, face: player.face } : null;
     if (live) close();
-    current = cloneLevel(levels[id]); player = fresh(); opts = opts || {};
+    current = cloneLevel(levels[id]); player = fresh(); simClock = 0;
     if (opts.spawn) current.spawn = opts.spawn;
     current.solids = current.entities.filter(function (e) { return e.solid; });
     player.x = (current.spawn.x + 0.5) * TILE; player.y = (current.spawn.y + 1) * TILE; player.hp = current.hp || 0;
     if (opts.face) player.face = opts.face;
+    if (carry) {
+      player.vx = carry.vx; player.vy = carry.vy;
+      player.dashes = carry.dashes; if (!opts.face) player.face = carry.face;
+    }
     accumulator = 0; afterimages = []; live = true; paused = false; reduced = redNow(); if (overlay) overlay.hidden = false;
     if (current.chunked) { baked = null; for (i in chunks) if (i.indexOf(id + ':') !== 0) delete chunks[i]; chunkOrder = chunkOrder.filter(function (k) { return !!chunks[k]; }); }
     /* ponytail: per-room bake cache, dropped when a crumble breaks; a room bakes on its first open only */
@@ -785,7 +851,7 @@
   }
   function replay(id, recording, opts) {
     var oldLevel = current, oldPlayer = player, oldLive = live, oldPaused = paused;
-    var oldAccumulator = accumulator, oldImages = afterimages, oldBaked = baked;
+    var oldAccumulator = accumulator, oldClock = simClock, oldImages = afterimages, oldBaked = baked;
     var oldStack = NEU.kernel ? NEU.kernel.stack.slice() : null;
     var oldMini = NEU.activeMinigame;
     replaying = true;
@@ -799,7 +865,7 @@
     var reached = !!current.exited, end = getState();
     replaying = false;
     live = oldLive; current = oldLevel; player = oldPlayer; paused = oldPaused;
-    accumulator = oldAccumulator; afterimages = oldImages; baked = oldBaked;
+    accumulator = oldAccumulator; simClock = oldClock; afterimages = oldImages; baked = oldBaked;
     if (oldStack && NEU.kernel) { NEU.kernel.stack.length = 0; for (i = 0; i < oldStack.length; i++) NEU.kernel.stack.push(oldStack[i]); }
     NEU.activeMinigame = oldMini;
     if (overlay) overlay.hidden = !live; return { reached: reached, deaths: deaths, frames: frames, end: end };
@@ -864,7 +930,12 @@
   } };
   function overlapsHero(e) { return player.x + HW > e.x * TILE && player.x - HW < e.x * TILE + TILE && player.y > e.y * TILE && player.y - HH < e.y * TILE + TILE; }
   kinds.pogo = { touch: function (e, input, melee) { if (player.swing > 0 && input.down && player.vy > 0) { bounce(); e.dead = e.once ? true : e.dead; } } };
-  kinds.checkpoint = { touch: function (e) { current.spawn = { x: e.x, y: e.y - 1 }; e.active = true; } };
+  kinds.checkpoint = { touch: function (e) {
+    if (e.active) return;
+    current.spawn = { x: e.x, y: e.y - 1 };
+    e.active = true;
+    if (!replaying && current.onCheckpoint) current.onCheckpoint(e);
+  } };
   kinds.exit = { touch: function () { current.exited = true; if (!replaying && typeof current.onExit === 'function') current.onExit(); } };
   kinds.coin = { touch: function (e) { e.dead = true; if (!replaying && NEU.save && NEU.save.addCoins && !NEU.save.flagged('plat_coin:' + e.id)) { NEU.save.addCoins(1); NEU.save.flag('plat_coin:' + e.id, 1); } } };
   kinds.npc = { touch: function (e, input, melee) { if (melee && NEU.talk) NEU.talk(e.lines || [e.text || '...'], e.who || 'narr'); } };
@@ -897,6 +968,8 @@
     get state() { return getStateSafe(); }, step: step, replay: replay, tick: tick,
     hurt: hurt, die: die, heal: function (n) { if (current && current.hp) player.hp = Math.min(current.hp, player.hp + n); },
     hero: function () { return player; }, level0: function () { return current; },
+    wind: windNow, time: function () { return simClock; },
+    restartRoom: function () { if (!current) return false; respawn(); return true; },
     solid: function (tx, ty) { return !!current && solidCell(cell(tx, ty)); }, cell: function (tx, ty) { return current ? cell(tx, ty) : '#'; },
     chunkCount: function () { return chunkOrder.length; }, replaying: function () { return replaying; },
     snap: function () { if (current) placeCamera(-1); }, fallOf: fallOf, dropChunks: function () { chunks = {}; chunkOrder = []; }, ent: function (t, c, x, y, e, now) { if (ENT[t]) ENT[t](c, x, y, e, now || 0); },

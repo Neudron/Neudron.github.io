@@ -167,7 +167,7 @@
       c.fillRect(x | 0, y | 0, near ? 2 : 1, near ? 2 : 1);
     }
   }
-  function mine(level) { return level && level.tileset === 'mountain' && /^m\d/.test(level.id); }
+  function mine(level) { return level && level.tileset === 'mountain' && /^m(?:\d|test_)/.test(level.id); }
   function chainHook(name, fn) {
     var prev = P[name];
     P[name] = function (c, camX, camY, level, now, a) {
@@ -330,7 +330,8 @@
     for (n = 0; n < flakes.length; n++) {
       f = flakes[n];
       f.y += f.v * sec;
-      f.x += (8 + (n % 3) * 6) * sec;
+      /* Same deterministic physical gust that pushes the airborne hero; ambient drift remains visible while calm. */
+      f.x += ((8 + (n % 3) * 6) + (P.wind ? P.wind().x * 0.45 : 0)) * sec;
       if (f.y > 420) f.y = 0;
       if (f.x > 820) f.x = 0;
     }
