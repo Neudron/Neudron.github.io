@@ -123,6 +123,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   .sleep__shelf { left: -52px; width: 52px; }
   .sleep__lamp  { left: -4px; }
 }
+@media (max-width: 900px) { .sleep__rug { left: -52px; } }
 
 /* The deck (js/game/deck.js), Deltarune style: the selected game's
    panel is the black two-step box, the selected caption is yellow, and
