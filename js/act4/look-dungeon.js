@@ -25,21 +25,97 @@
   var lights = [], sunTop = null, lc = null, lg = null, map = null, cache = {};
 
   function reducedNow() { return P.reduced(); }
-  /* a sheet that lands after a chunk baked magenta drops the chunk cache, so the next frame rebakes with art */
+  /* Some externally prepared PNGs have an opaque black matte instead of
+     transparent pixels. Clean only NPC and effect sheets, only when a
+     frame's border is predominantly opaque black. Flood filling from the
+     border preserves isolated black outlines/eyes inside the silhouette.
+     Tiles and background walls are never keyed: black belongs in those. */
+  var cleaned = {};
+  function isActorSheet(k) {
+    return /^dg(?:Keeper|Skull|Bones|BoneLee|Paladin|Sniper|Tactic|Commando|Necro|Ragged|Diabol|Warlock|Phantom|Spirit|Ball|Wheel|Hammer|Link|Fx)/.test(k);
+  }
+  function cleanMatte(im, sh) {
+    var w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+    var fw = sh.fw || w, fh = sh.fh || h;
+    if (!w || !h || fw > w || fh > h) return im;
+    var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    var g = cv.getContext && cv.getContext('2d');
+    if (!g || !g.drawImage || !g.getImageData || !g.putImageData) return im;
+    try {
+      g.drawImage(im, 0, 0);
+      var id = g.getImageData(0, 0, w, h), d = id.data, changed = false;
+      if (!d || d.length !== w * h * 4) return im;
+      var cols = Math.floor(w / fw), rows = Math.floor(h / fh), col, row, x0, y0, x, y, n, dark, pos, q, seen, head, v;
+      function black(px) {
+        var j = px * 4;
+        return d[j + 3] >= 250 && d[j] <= 12 && d[j + 1] <= 12 && d[j + 2] <= 12;
+      }
+      for (row = 0; row < rows; row++) for (col = 0; col < cols; col++) {
+        x0 = col * fw; y0 = row * fh; n = 0; dark = 0;
+        for (x = 0; x < fw; x++) {
+          n += 2;
+          if (black(y0 * w + x0 + x)) dark++;
+          if (black((y0 + fh - 1) * w + x0 + x)) dark++;
+        }
+        for (y = 1; y < fh - 1; y++) {
+          n += 2;
+          if (black((y0 + y) * w + x0)) dark++;
+          if (black((y0 + y) * w + x0 + fw - 1)) dark++;
+        }
+        if (!n || dark / n < 0.80) continue;
+        q = []; seen = new Uint8Array(fw * fh); head = 0;
+        function push(xx, yy) {
+          if (xx < 0 || yy < 0 || xx >= fw || yy >= fh) return;
+          var p = yy * fw + xx;
+          if (seen[p] || !black((y0 + yy) * w + x0 + xx)) return;
+          seen[p] = 1; q.push(p);
+        }
+        for (x = 0; x < fw; x++) { push(x, 0); push(x, fh - 1); }
+        for (y = 1; y < fh - 1; y++) { push(0, y); push(fw - 1, y); }
+        while (head < q.length) {
+          v = q[head++]; x = v % fw; y = (v / fw) | 0;
+          pos = ((y0 + y) * w + x0 + x) * 4;
+          d[pos] = d[pos + 1] = d[pos + 2] = d[pos + 3] = 0;
+          push(x - 1, y); push(x + 1, y); push(x, y - 1); push(x, y + 1);
+        }
+        if (q.length) changed = true;
+      }
+      if (changed) { g.putImageData(id, 0, 0); return cv; }
+    } catch (e) { /* cross-origin or unsupported canvas: use original PNG */ }
+    return im;
+  }
+  /* A sheet loaded after its chunk was baked invalidates that chunk. */
   function sheet(k) {
     var sh = NEU.dgSheets && NEU.dgSheets[k], im;
     if (!sh || !NEU.sheetReady) return null;
     im = NEU.sheetImg(sh.src);
     if (!im.__dg && im.addEventListener) { im.__dg = 1; im.addEventListener('load', function () { P.dropChunks(); }); }
-    return NEU.sheetReady(sh);
+    im = NEU.sheetReady(sh);
+    if (!im || !isActorSheet(k)) return im;
+    if (!cleaned[sh.src] || cleaned[sh.src].original !== im) {
+      cleaned[sh.src] = { original: im, result: cleanMatte(im, sh) };
+    }
+    return cleaned[sh.src].result;
   }
   function mag(c, x, y, w, h) { c.fillStyle = MAG; c.fillRect(x | 0, y | 0, w, h); c.fillStyle = MAGD; c.fillRect(x | 0, (y | 0) + h - 1, w, 1); c.fillRect((x | 0) + w - 1, y | 0, 1, h); }
-  /* blit one frame (fx, fy in pixels) or the magenta box of the same size */
-  function cut(c, k, fx, fy, w, h, x, y, flip) {
-    var im = sheet(k);
-    if (!im) { mag(c, x, y, w, h); return false; }
-    if (flip) { c.save(); c.translate((x | 0) + w, y | 0); c.scale(-1, 1); c.drawImage(im, fx, fy, w, h, 0, 0, w, h); c.restore(); }
-    else c.drawImage(im, fx, fy, w, h, x | 0, y | 0, w, h);
+  /* Source frame in pixels; flip and rotation share the exact frame centre.
+     Never sample outside an atlas or interpolate pixel art. */
+  function cut(c, k, fx, fy, w, h, x, y, flip, rot) {
+    var im = sheet(k), iw = im && (im.naturalWidth || im.width), ih = im && (im.naturalHeight || im.height);
+    if (!im || fx < 0 || fy < 0 || fx + w > iw || fy + h > ih) { mag(c, x, y, w, h); return false; }
+    c.save();
+    c.imageSmoothingEnabled = false;
+    if (rot) {
+      c.translate(Math.round(x + w / 2), Math.round(y + h / 2));
+      c.rotate(rot);
+      if (flip) c.scale(-1, 1);
+      c.drawImage(im, fx, fy, w, h, -w / 2, -h / 2, w, h);
+    } else if (flip) {
+      c.translate(Math.round(x) + w, Math.round(y));
+      c.scale(-1, 1);
+      c.drawImage(im, fx, fy, w, h, 0, 0, w, h);
+    } else c.drawImage(im, fx, fy, w, h, Math.round(x), Math.round(y), w, h);
+    c.restore();
     return true;
   }
   function frame(idx, x, y) { var f = FR[idx], v = (P.hash(x, y, 7) * 3) | 0; return [f[0] + f[2] * v, f[1] + f[3] * v]; }
@@ -70,7 +146,13 @@
       ch = (L.grid[y] || '').charAt(x);
       if (ch === '#') { f = frame(nb(L, x, y, isBrick), x, y); cut(g, BRICK[L.faction(x, y)], f[0] * 18, f[1] * 18, T, T, x * T, y * T); }
       else if (ch === 'g') { f = frame(nb(L, x, y, isGrass), x, y); cut(g, 'dgGrass', f[0] * 18, f[1] * 18, T, T, x * T, y * T); }
-      else if (isSpike(ch)) { f = frame(nb(L, x, y, isSpike), x, y); cut(g, 'dgSpike', f[0] * 18, f[1] * 18, T, T, x * T, y * T); }
+      else if (isSpike(ch)) {
+        /* Each glyph denotes the direction of the teeth; a mixed pair
+           must not be auto-joined or rendered as two upward spikes. */
+        f = frame(nb(L, x, y, function (other) { return other === ch; }), x, y);
+        cut(g, 'dgSpike', f[0] * 18, f[1] * 18, T, T, x * T, y * T, false,
+            ch === 'v' ? Math.PI : ch === '<' ? -Math.PI / 2 : ch === '>' ? Math.PI / 2 : 0);
+      }
       else if (ch === '=') { cut(g, 'dgShelf', shelfX(L, x, y) * 18, SHELF[L.faction(x, y)] * 18, T, T, x * T, y * T); }
     }
     for (i = 0; i < L.decor.length; i++) {
