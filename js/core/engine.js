@@ -85,6 +85,7 @@
   var IRIS = 0.22, fadeSpan = IRIS;
   var busy = false;                    // a cutscene owns input
   var hideTransitionPlayer = false, transitionCanvas = null, transitionNewCanvas = null, transitionPlayer = null, transitionStarting = false;
+  var physical = null, physicalExit = null;
   var playerAct = null;                // { name, t, max } — a held player pose (the recall drink)
   var sitting = null;                  // { ent, x, y } — seated on a seat entity until a move key
   var cine = false;                    // a scripted walk owns the stick (api.drive)
@@ -216,6 +217,7 @@
   }
 
   function solidAt(cx, cy) {
+    if (physicalExit && physicalExit.x === cx && physicalExit.y === cy) return false;
     var ts = tilesets[room.tileset];
     var ch = at(cx, cy);
     return !ts || ts.solid.indexOf(ch) >= 0;
@@ -534,7 +536,7 @@
   function doorCtx(d, e) {
     d.open = !e.locked || !!(NEU.save && NEU.save.flagged(e.locked));
     d.side = exitSide(e);
-    d.near = exitNear(e);
+    d.near = e.__transitionNear === undefined ? exitNear(e) : e.__transitionNear;
     d.tileset = room.tileset;
     d.room = room.id;                 /* exits see the id; every other kind the room */
     d.T = TILE;
@@ -611,6 +613,93 @@
   }
 
   /* ── transitions ──────────────────────────────────────────────── */
+  function dirVector(dir) { return DIRV[dir] || ({ n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] })[dir] || [0, 1]; }
+  function captureTransition(canvas) {
+    canvas.width = cv.width; canvas.height = cv.height;
+    hideTransitionPlayer = true; draw(Date.now()); hideTransitionPlayer = false;
+    var c = canvas.getContext('2d'); if (c) c.drawImage(cv, 0, 0);
+  }
+  function finishPhysical() {
+    var held = physical && physical.heldKeys || {};
+    if (physicalExit) delete physicalExit.__transitionNear;
+    physicalExit = null; physical = null; transitionPlayer = null; transitionStarting = false;
+    cine = false; keys = held; busy = false;
+  }
+  function startPhysicalSlide(kind, dir, ms) {
+    var wall = tilesets[room.tileset] && tilesets[room.tileset].colours && tilesets[room.tileset].colours['#'];
+    captureTransition(transitionCanvas);
+    var x = Math.round(px * S) - Math.round((camX + kickX) * S), y = Math.round(py * S) - Math.round((camY + kickY) * S);
+    if (physicalExit) delete physicalExit.__transitionNear;
+    physicalExit = null;
+    if (!land(physical.id, physical.spawn)) { finishPhysical(); return; }
+    captureTransition(transitionNewCanvas);
+    if (!NEU.engineTrans.start(kind, transitionCanvas, dir, reduced, transitionNewCanvas, { ms: ms, wall: wall })) { finishPhysical(); return; }
+    transitionPlayer = { x: x, y: y, toX: Math.round(px * S) - Math.round((camX + kickX) * S), toY: Math.round(py * S) - Math.round((camY + kickY) * S) };
+    physical.stage = 'slide'; physical.elapsed = 0;
+  }
+  function walkPhysical(dt) {
+    var p = physical, v = p.vector;
+    API.drive(v[0], v[1]);
+    move(dt);
+    if (Math.sqrt(Math.pow(p.target.x - px, 2) + Math.pow(p.target.y - py, 2)) < 1 || p.elapsed > 0.16) {
+      px = p.target.x; py = p.target.y; vx = 0; vy = 0; moving = false; p.stage = p.next;
+      if (p.stage === 'capture') startPhysicalSlide('slide', p.dir, 220);
+      else if (p.stage === 'close') p.elapsed = 0;
+    }
+  }
+  function advancePhysical(dt) {
+    var p = physical;
+    if (!p) return;
+    p.elapsed += dt;
+    if (p.stage === 'open') {
+      var step = Math.min(2, Math.floor(p.elapsed / 0.09));
+      while (step > p.step) { p.step++; p.exit.__transitionNear = p.step / 2; if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick(); }
+      if (p.elapsed >= 0.18) { p.stage = 'inwalk'; p.elapsed = 0; p.vector = dirVector(exitSide(p.exit)); p.vector = [-p.vector[0], -p.vector[1]]; p.target = { x: px + p.vector[0] * TILE, y: py + p.vector[1] * TILE }; p.next = 'capture'; }
+      return;
+    }
+    if (p.stage === 'inwalk' || p.stage === 'outwalk') { walkPhysical(dt); return; }
+    if (p.stage === 'close') {
+      var shut = 2 - Math.min(2, Math.floor(p.elapsed / 0.09));
+      if (shut < p.shut) { p.shut = shut; p.exit.__transitionNear = shut / 2; if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick(); }
+      if (p.elapsed >= 0.18) finishPhysical();
+      return;
+    }
+    if (p.stage === 'fall') {
+      py = p.fromY + Math.min(1, p.elapsed / 0.18) * 8;
+      if (p.elapsed >= 0.18) startPhysicalSlide('fall', 'down', 520);
+      return;
+    }
+    if (p.stage === 'slide') {
+      if (p.kind === 'stairs') {
+        var ticks = Math.min(3, Math.floor((p.elapsed + 0.001) / 0.09));
+        while (ticks > p.step) { p.step++; if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick(); }
+        transitionPlayer.bob = p.step % 2 ? -S : 0;
+      }
+      if (NEU.engineTrans.active && NEU.engineTrans.step(dt)) return;
+      transitionPlayer = null;
+      if (p.kind === 'door') {
+        var reverse = ents.filter(function (e) { return e.t === 'exit' && e.to === p.from; })[0];
+        if (!reverse) { finishPhysical(); return; }
+        physicalExit = reverse; reverse.__transitionNear = 1;
+        p.exit = reverse; p.vector = dirVector(exitSide(reverse)); p.target = { x: px + p.vector[0] * TILE, y: py + p.vector[1] * TILE }; p.stage = 'outwalk'; p.next = 'close'; p.elapsed = 0; p.shut = 2;
+      } else {
+        if (p.kind === 'fall') { settle = 0.09; if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(Math.round((px - camX) * S), Math.round((py - camY) * S), 8, '#D8C8B0'); } }
+        finishPhysical();
+      }
+    }
+  }
+  function beginPhysical(id, spawn, kind, dir, exit) {
+    if (!exit || reduced) { land(id, spawn); busy = false; return; }
+    var held = {}, key;
+    for (key in keys) if (keys[key]) held[key] = true;
+    physicalExit = exit; transitionStarting = true; busy = true; cine = true; keys = {};
+    if (!transitionCanvas) transitionCanvas = document.createElement('canvas');
+    if (!transitionNewCanvas) transitionNewCanvas = document.createElement('canvas');
+    physical = { id: id, spawn: spawn, kind: kind, dir: dir, exit: exit, from: room.id, heldKeys: held, stage: kind === 'door' ? 'open' : kind === 'fall' ? 'fall' : 'slide', elapsed: 0, step: 0, shut: 2, fromY: py };
+    if (kind === 'door') { exit.__transitionNear = 0; exit.__arm = false; }
+    if (kind === 'fall') settle = 0.18;
+    if (kind === 'stairs') startPhysicalSlide('slide', dir, 270);
+  }
   function go(id, spawn, via, exit) {
     if (!resolve(id, spawn)) { say(['there is nothing through there. yet.'], 'narr'); return; }
     var T = NEU.engineTrans, kind = null, dir = face;
@@ -627,6 +716,7 @@
       else if (pick && /^(left|right|up|down)$/.test(pick.dir || '')) dir = pick.dir;
     }
     busy = true;
+    if (/^(door|stairs|fall)$/.test(kind || '')) { beginPhysical(id, spawn, kind, dir, exit); return; }
     if (kind) {
       if (reduced) { land(id, spawn); busy = false; return; }
       transitionStarting = true;
@@ -885,11 +975,13 @@
       if (fade >= 1 && fadeDir > 0) { fade = 1; fadeDir = 0; fadeSpan = IRIS; var f = fadeThen; fadeThen = null; if (f) f(); }
       else if (fade <= 0 && fadeDir < 0) { fade = 0; fadeDir = 0; fadeSpan = IRIS; var g = fadeThen; fadeThen = null; if (g) g(); }
     }
-    if (transitionPlayer && NEU.engineTrans && NEU.engineTrans.active && !NEU.engineTrans.step(dt)) { busy = false; transitionPlayer = null; }
+    if (physical) advancePhysical(dt);
+    else if (transitionPlayer && NEU.engineTrans && NEU.engineTrans.active && !NEU.engineTrans.step(dt)) { busy = false; transitionPlayer = null; }
     if ((padPoll -= dt) <= 0) { padPoll = 0.5; var ph = measurePad(); if (ph !== padH) padH = ph; }
     if (!room) return;
 
-    if (!busy) { if (!NEU.activeMinigame) move(dt); walkExits(); } else { vx = 0; vy = 0; moving = false; }
+    if (!busy) { if (!NEU.activeMinigame) move(dt); walkExits(); }
+    else if (!physical || !/^(inwalk|outwalk)$/.test(physical.stage)) { vx = 0; vy = 0; moving = false; }
     checkArea();
     camFollow(dt);
     camZoomStep(dt);
@@ -1062,7 +1154,7 @@
       if (tl && tp) {
         var pt = 1 - Math.pow(1 - tr.t, 3);
         var tx = Math.round((tp.x + (tp.toX - tp.x) * pt) / S) * S;
-        var ty = Math.round((tp.y + (tp.toY - tp.y) * pt) / S) * S;
+        var ty = Math.round((tp.y + (tp.toY - tp.y) * pt) / S) * S + (tp.bob || 0);
         tl.drawPlayer(ctx, tx, ty, face, walked, true, S, now);
       }
       return;
@@ -1234,7 +1326,7 @@
     /* A minigame owns the page while it is open. */
     if (NEU.activeMinigame) return;
     /* A cinematic owns the stick: real keys do nothing until api.cine(false). */
-    if (cine) { e.preventDefault(); return; }
+    if (cine) { var heldKey = keyName(e); if (physical && heldKey) physical.heldKeys[heldKey] = true; e.preventDefault(); return; }
     if (e.key === 'Escape') {
       e.preventDefault();
       /* ESC never leaves the console — leaving is the quit button's job.
@@ -1277,12 +1369,14 @@
   });
   addEventListener('keyup', function (e) {
     if (!running || NEU.activeMinigame) return;
-    var kn = keyName(e); if (kn) keys[kn] = false;
+    var kn = keyName(e);
+    if (physical && kn) { delete physical.heldKeys[kn]; e.preventDefault(); return; }
+    if (kn) keys[kn] = false;
   });
   /* Alt-tab away with a key held and the keyup never arrives. */
-  addEventListener('blur', function () { keys = {}; });
+  addEventListener('blur', function () { keys = {}; if (physical) physical.heldKeys = {}; });
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) keys = {};
+    if (document.hidden) { keys = {}; if (physical) physical.heldKeys = {}; }
   });
 
   /* ── talking ──────────────────────────────────────────────────── */
@@ -1293,8 +1387,9 @@
   /* opts.iris: seconds for the iris to open on arrival (default 0.22). */
   function enter(id, spawn, opts) {
     if (!resolve(id, spawn)) return false;
-    if (transitionPlayer && NEU.engineTrans) NEU.engineTrans.cut();
-    transitionPlayer = null; transitionStarting = false;
+    if (physicalExit) delete physicalExit.__transitionNear;
+    if ((transitionPlayer || physical) && NEU.engineTrans) NEU.engineTrans.cut();
+    physical = null; physicalExit = null; transitionPlayer = null; transitionStarting = false; cine = false;
     if (NEU.kernel) NEU.kernel.push('engine');
     if (NEU.settings && NEU.settings.warnFlash) NEU.settings.warnFlash();
     wrap.hidden = false;
@@ -1395,8 +1490,9 @@
 
   function leave() {
     running = false;
-    if (transitionPlayer && NEU.engineTrans) NEU.engineTrans.cut();
-    transitionPlayer = null; transitionStarting = false; fadeDir = 0; fadeThen = null; busy = false;
+    if (physicalExit) delete physicalExit.__transitionNear;
+    if ((transitionPlayer || physical) && NEU.engineTrans) NEU.engineTrans.cut();
+    physical = null; physicalExit = null; transitionPlayer = null; transitionStarting = false; cine = false; fadeDir = 0; fadeThen = null; busy = false;
     camReset();
     if (NEU.kernel && NEU.kernel.current() === 'engine') NEU.kernel.pop();
     clearLater();

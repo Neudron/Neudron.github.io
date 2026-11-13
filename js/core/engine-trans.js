@@ -5,7 +5,7 @@
   var kinds = {}, enabled = { woods: 1 }, active = null;
   function kind(name, def) { kinds[name] = def; return def; }
   function get(name) { return kinds[name] || null; }
-  function start(name, canvas, dir, reduced, incoming) {
+  function start(name, canvas, dir, reduced, incoming, opts) {
     var k = get(name), snapshot;
     if (reduced) { active = null; return null; }
     if (!k) return null;
@@ -14,7 +14,7 @@
       if (!snapshot) { active = null; return null; }
       canvas = snapshot;
     }
-    active = { name: name, def: k, canvas: canvas, incoming: incoming || null, dir: dir || 'right', t: 0, ms: k.ms };
+    active = { name: name, def: k, canvas: canvas, incoming: incoming || null, dir: dir || 'right', t: 0, ms: opts && opts.ms || k.ms, wall: opts && opts.wall || '#16141E' };
     if (k.pre) k.pre(active);
     if (k.cover) k.cover(active);
     return active;
@@ -35,7 +35,16 @@
       oldX: Math.round(-x * t / scale) * scale, oldY: Math.round(-y * t / scale) * scale };
   }
   function draw(ctx, w, h, scale) {
-    if (!active || !active.canvas) return;
+    if (!active) return;
+    if (active.name === 'fall') {
+      var t = active.t, oldY = -Math.round(t * h), shaftY = Math.round((1 - t) * h), newY = Math.round((2.5 - 2.5 * t) * h);
+      ctx.save(); ctx.imageSmoothingEnabled = false; ctx.fillStyle = active.wall; ctx.fillRect(0, 0, w, h);
+      for (var y = 0; y < h * 1.5; y += 16 * scale) { ctx.fillStyle = (y / (16 * scale) | 0) % 2 ? active.wall : '#201B28'; ctx.fillRect(0, shaftY + y, w, 8 * scale); }
+      if (active.canvas) ctx.drawImage(active.canvas, 0, oldY, w, h);
+      if (active.incoming) ctx.drawImage(active.incoming, 0, newY, w, h);
+      ctx.restore(); return;
+    }
+    if (!active.canvas) return;
     var m = motion(w, h, scale);
     ctx.save(); ctx.imageSmoothingEnabled = false;
     if (active.incoming) ctx.drawImage(active.incoming, m.x, m.y, w, h);
@@ -43,6 +52,9 @@
     ctx.restore();
   }
   kind('slide', { ms: 320, pre: function () {}, cover: function () {}, post: function () {} });
+  kind('door', { ms: 220 });
+  kind('stairs', { ms: 270 });
+  kind('fall', { ms: 520 });
   kind('mode', { ms: 320 });
   kind('portal:d1_street>b7_altar', { ms: 380 });
   kind('portal:d1_street>h3_trip', { ms: 380 });
