@@ -1479,6 +1479,7 @@
   }
 
   if (NEU.kernel) NEU.kernel.register('engine', {
+    canvas: cv,
     tick: function (dt) {},
     running: function () { return running; }
   });

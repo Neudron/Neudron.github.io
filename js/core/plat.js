@@ -1029,7 +1029,7 @@
     get levels() { return levels; }, _kinds: kinds,
     cam: function () { return { x: camera.x, y: camera.y }; } };
   NEU.plat = api;
-  if (NEU.kernel) NEU.kernel.register('plat', { tick: tick, open: open, close: close, running: function () { return live; } });
+  if (NEU.kernel) NEU.kernel.register('plat', { canvas: canvas, tick: tick, open: open, close: close, running: function () { return live; } });
   document.addEventListener('keydown', function (e) {
     var k;
     if (!live || !onTop()) return;

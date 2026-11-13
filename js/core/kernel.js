@@ -75,6 +75,21 @@
 
   function after(ms, fn) { afterQueue.push({ due: now() + (ms || 0), fn: fn }); }
 
+  function bridge() {
+    var name = stack.length ? stack[stack.length - 1] : null;
+    var scene = name && scenes[name], source, copy, ctx;
+    if (!scene) return null;
+    try { source = typeof scene.snapshot === 'function' ? scene.snapshot() : scene.canvas; }
+    catch (e) { return null; }
+    if (!source || !source.width || !source.height || !document || !document.createElement) return null;
+    copy = document.createElement('canvas');
+    copy.width = source.width; copy.height = source.height;
+    try { ctx = copy.getContext && copy.getContext('2d'); } catch (e) { return null; }
+    if (!ctx || !ctx.drawImage) return null;
+    try { ctx.drawImage(source, 0, 0); } catch (e) { return null; }
+    return copy;
+  }
+
   // Adapter for an unmigrated scene: delegates open/close/running/tick to it
   // so music.js and touch.js (which poll `.running`) keep working.
   function legacy(scene) {
@@ -108,6 +123,7 @@
     pop: pop,
     replace: replace,
     after: after,
+    bridge: bridge,
     legacy: legacy,
     start: start,
     stop: stop,

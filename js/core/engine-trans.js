@@ -1,4 +1,4 @@
-/* engine-trans.js — small registry and the woods room slide. */
+/* engine-trans.js — transition registry and scene bridge. */
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
@@ -6,8 +6,14 @@
   function kind(name, def) { kinds[name] = def; return def; }
   function get(name) { return kinds[name] || null; }
   function start(name, canvas, dir, reduced, incoming) {
-    var k = get(name);
-    if (!k || reduced || active) return null;
+    var k = get(name), snapshot;
+    if (reduced) { active = null; return null; }
+    if (!k) return null;
+    if (name === 'mode' && !canvas) {
+      snapshot = NEU.kernel && NEU.kernel.bridge && NEU.kernel.bridge();
+      if (!snapshot) { active = null; return null; }
+      canvas = snapshot;
+    }
     active = { name: name, def: k, canvas: canvas, incoming: incoming || null, dir: dir || 'right', t: 0, ms: k.ms };
     if (k.pre) k.pre(active);
     if (k.cover) k.cover(active);
@@ -37,6 +43,11 @@
     ctx.restore();
   }
   kind('slide', { ms: 320, pre: function () {}, cover: function () {}, post: function () {} });
+  kind('mode', { ms: 320 });
+  kind('portal:d1_street>b7_altar', { ms: 380 });
+  kind('portal:d1_street>h3_trip', { ms: 380 });
+  kind('cine:rooms-g-trip', { ms: 320 });
+  kind('cine:crack-sky', { ms: 320 });
   NEU.engineTrans = { kind: kind, get: get, enabled: enabled, start: start, step: step, draw: draw, motion: motion,
     get active() { return active; }, cut: function () { active = null; } };
 })();
