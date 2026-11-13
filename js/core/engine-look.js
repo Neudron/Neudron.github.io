@@ -123,10 +123,69 @@
     city:   { floor: 'cobble',  ambient: 0.78, night: '#04050C', weather: 'drizzle', warm: '#FFB45E' },
     home:   { floor: 'plank',   ambient: 0.86, night: '#050506', weather: 'dust',    warm: '#F3D2A8' },
     prize:  { floor: 'checker', ambient: 0.84, night: '#06040D', weather: 'sparkle', warm: '#D9B8FF' },
-    storm:  { floor: 'wet',     ambient: 0.62, night: '#02030B', weather: 'storm',   warm: '#BFD3FF' }
+    storm:  { floor: 'wet',     ambient: 0.62, night: '#02030B', weather: 'storm',   warm: '#BFD3FF' },
+    savanna:{ floor: 'sand',    ambient: 0.82, night: '#08070A', weather: null,      warm: '#FFE2A0' },
+    exo:    { floor: 'metal',   ambient: 0.72, night: '#05060C', weather: null,      warm: '#BFD3FF' }
   };
   var DEFAULT_ZONE = { floor: 'flag', ambient: 0.8, night: '#05050A', weather: null, warm: '#FFE2A0' };
   function zone(name) { return ZONES[name] || DEFAULT_ZONE; }
+
+  /* Cached 64px surrounds; woods may replace its tile with the canopy art. */
+  var surroundTiles = {}, surroundPatterns = [];
+  var SURROUND = {
+    woods: ['#263B2D', '#385239', '#52704A'], castle: ['#38313D', '#524653', '#756477'],
+    city: ['#343440', '#4C4A58', '#77717B'], home: ['#493A36', '#6B514A', '#9A7667'],
+    savanna: ['#59452D', '#84643A', '#B58A4B'], exo: ['#26303C', '#3F4C5C', '#647487']
+  };
+  function surroundTile(name, level) {
+    var key = name + ':' + level, tile = surroundTiles[key], colors = SURROUND[name] || SURROUND.castle;
+    if (tile) return tile;
+    tile = mkCanvas(64, 64); var g = tile.getContext && tile.getContext('2d');
+    if (!g) return tile;
+    function r(x, y, w, h, c) { g.fillStyle = shade(c, level); g.fillRect(x, y, w, h); }
+    r(0, 0, 64, 64, colors[0]);
+    if (name === 'woods') {
+      r(0, 0, 32, 24, colors[1]); r(32, 16, 32, 24, colors[1]);
+      r(8, 8, 16, 8, colors[2]); r(40, 28, 16, 8, colors[2]);
+    } else if (name === 'castle' || name === 'exo') {
+      r(0, 0, 64, 2, colors[2]); r(0, 30, 64, 2, colors[2]);
+      r(30, 0, 2, 32, colors[1]); r(8, 8, 4, 4, colors[1]); r(52, 8, 4, 4, colors[1]);
+      r(8, 40, 4, 4, colors[1]); r(52, 40, 4, 4, colors[1]);
+    } else if (name === 'city') {
+      r(4, 8, 24, 16, colors[1]); r(36, 36, 24, 20, colors[1]);
+      r(8, 4, 16, 4, colors[2]); r(40, 32, 16, 4, colors[2]);
+    } else if (name === 'home') {
+      r(0, 12, 64, 2, colors[1]); r(0, 44, 64, 2, colors[1]);
+      r(12, 0, 2, 64, colors[2]); r(44, 0, 2, 64, colors[2]);
+    } else {
+      r(0, 36, 64, 8, colors[1]); r(0, 48, 64, 4, colors[2]);
+      r(0, 16, 24, 4, colors[2]); r(40, 8, 24, 4, colors[1]);
+    }
+    surroundTiles[key] = tile;
+    return tile;
+  }
+  function surround(ctx, name, x, y, rw, rh, w, h, S) {
+    if (!SURROUND[name] || !ctx.createPattern) return false;
+    var factors = [0.6, 0.7, 0.8, 1], patterns = [], i, key, tile, cache;
+    for (i = 0; i < surroundPatterns.length; i++) if (surroundPatterns[i].ctx === ctx) { cache = surroundPatterns[i].tiles; break; }
+    if (!cache) { cache = {}; surroundPatterns.push({ ctx: ctx, tiles: cache }); }
+    for (i = 0; i < factors.length; i++) {
+      key = name + ':' + factors[i];
+      tile = surroundTile(name, factors[i]);
+      patterns[i] = cache[key] || (cache[key] = ctx.createPattern(tile, 'repeat'));
+      if (!patterns[i]) return false;
+    }
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(S, S);
+    var left = -x / S, top = -y / S, width = w / S, height = h / S, step = 16;
+    ctx.fillStyle = patterns[0]; ctx.fillRect(left, top, width, height);
+    ctx.fillStyle = patterns[1]; ctx.fillRect(-step * 2, -step * 2, rw / S + step * 4, rh / S + step * 4);
+    ctx.fillStyle = patterns[2]; ctx.fillRect(-step, -step, rw / S + step * 2, rh / S + step * 2);
+    ctx.fillStyle = patterns[3]; ctx.fillRect(0, 0, rw / S, rh / S);
+    ctx.restore();
+    return true;
+  }
 
   /* What each tile character IS, independent of its colour. Solid
      characters come from the tileset; these are the walkable specials. */
@@ -973,6 +1032,7 @@
   NEU.engineLook = {
     zone: zone, palette: palette, material: material, bakeRoom: bakeRoom,
     drawAnimated: drawAnimated, stamp: stamp, shadow: shadow,
+    surround: surround, surroundTiles: surroundTiles,
     drawPlayer: drawPlayer, playerRows: function (f, p, b) { return playerRows(f, p, b).slice(); }, walkPhase: walkPhase,
     lookFor: lookFor, drawProp: drawProp, propWidth: propWidth, props: PROPS, living: LIVING,
     drawLight: drawLight, glow: glow,
