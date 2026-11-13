@@ -73,7 +73,7 @@
   var rooms = {}, tilesets = {}, aliases = {};
   var room = null, running = false, last = 0, acc = 0;
   var currentArea = null;
-  var px = 0, py = 0, vx = 0, vy = 0, keys = {}, face = 'down', walked = 0, moving = false;
+  var px = 0, py = 0, prevPX = 0, prevPY = 0, prevCamX = 0, prevCamY = 0, vx = 0, vy = 0, keys = {}, face = 'down', walked = 0, moving = false;
   var movedFor = 0, settle = 0;
   var camX = 0, camY = 0, camFocusX = 0, camFocusY = 0, camLeadX = 0, camLeadY = 0;
   var camHold = false, camPan = null, camZoomState = null, kickX = 0, kickY = 0;
@@ -736,6 +736,7 @@
     if (NEU.talk && NEU.talk.close) NEU.talk.close();
     if (room.onEnter) room.onEnter(API);
     if (selected && selected.onEnter) selected.onEnter(API);
+    prevPX = px; prevPY = py; prevCamX = camX; prevCamY = camY;
     if (NEU.save) NEU.save.capture();
     return true;
   }
@@ -797,7 +798,7 @@
     camHold = false; camPan = null; camZoomState = null; camLeadX = camLeadY = 0;
     cv.style.transform = ''; cv.style.transformOrigin = '';
   }
-  function camSnap() { camReset(); camFocusX = px; camFocusY = py - 6; var t = camTarget(); camX = t.x; camY = t.y; camClamp(); }
+  function camSnap() { camReset(); camFocusX = px; camFocusY = py - 6; var t = camTarget(); camX = t.x; camY = t.y; camClamp(); prevPX = px; prevPY = py; prevCamX = camX; prevCamY = camY; }
   function camFollow(dt) {
     if (camPan) {
       camPan.t += dt;
@@ -821,7 +822,7 @@
   function camTo(x, y, ms) {
     var v = view(), tx = x - v.w / 2, ty = y - v.uh / 2;
     camHold = true;
-    if (reduced || !ms) { camX = tx; camY = ty; camFocusX = x; camFocusY = y; camPan = null; camClamp(); return; }
+    if (reduced || !ms) { camX = tx; camY = ty; camFocusX = x; camFocusY = y; camPan = null; camClamp(); prevCamX = camX; prevCamY = camY; return; }
     camPan = { sx: camX, sy: camY, x: tx, y: ty, t: 0, ms: ms / 1000 };
   }
   function camZoom(k, ms) {
@@ -872,6 +873,7 @@
   });
 
   function update(dt) {
+    if (room) { prevPX = px; prevPY = py; prevCamX = camX; prevCamY = camY; }
     clock += dt;
     if (fadeDir) {
       fade += fadeDir * dt / fadeSpan;
@@ -982,7 +984,7 @@
   }
 
   /* ── draw ─────────────────────────────────────────────────────── */
-  function lightsFor(now, camSX, camSY, v) {
+  function lightsFor(now, camSX, camSY, v, playerX, playerY) {
     var L = look(), K = kinds(), out = [];
     var z = L.zone(room.tileset);
     var darkAmt = typeof room.dark === 'function' ? room.dark(API) : room.dark;
@@ -996,9 +998,9 @@
       ambient = 0.03;
       var lt = room.light ? room.light(API) : null;
       if (lt) out.push({ x: lt.x, y: lt.y - 6, r: darkAmt * 0.7, col: z.warm, glow: 0.18, a: 1 });
-      else out.push({ x: px, y: py - 6, r: 20, a: 0.8 });
+      else out.push({ x: playerX, y: playerY - 6, r: 20, a: 0.8 });
     } else if (ambient < 0.8) {
-      out.push({ x: px, y: py - 6, r: 34, a: 0.5 });
+      out.push({ x: playerX, y: playerY - 6, r: 34, a: 0.5 });
     }
     /* entity lights */
     for (var i = 0; i < ents.length; i++) {
@@ -1066,7 +1068,10 @@
     /* Pixel-snap the camera once; every world→screen conversion below
        rounds against the same origin, so sprites never shimmer against
        the floor. */
-    var ox = Math.round((camX + kickX) * S), oy = Math.round((camY + kickY) * S);
+    var alpha = reduced ? 1 : acc / STEP;
+    var drawPX = prevPX + (px - prevPX) * alpha, drawPY = prevPY + (py - prevPY) * alpha;
+    var drawCamX = prevCamX + (camX - prevCamX) * alpha, drawCamY = prevCamY + (camY - prevCamY) * alpha;
+    var ox = Math.round((drawCamX + kickX) * S), oy = Math.round((drawCamY + kickY) * S);
     var camSX = ox / S, camSY = oy / S;
     function sx(wx) { return Math.round(wx * S) - ox; }
     function sy(wy) { return Math.round(wy * S) - oy; }
@@ -1130,7 +1135,7 @@
     if (L) {
       for (i = 0; i < drawn.length; i++) {
         var it = drawn[i];
-        if (!it.e) { L.shadow(ctx, sx(px), sy(py), 9, S, 0.42); continue; }
+        if (!it.e) { L.shadow(ctx, sx(drawPX), sy(drawPY), 9, S, 0.42); continue; }
         var ww = it.k && it.k.width ? it.k.width(it.e, S) : 9;
         if (ww > 0) { var pe = entAt(it.e); L.shadow(ctx, sx(pe.x), sy(pe.y), Math.min(14, ww * 0.8), S, 0.32); }
       }
@@ -1138,7 +1143,7 @@
     for (i = 0; i < drawn.length; i++) {
       var dr = drawn[i];
       if (!dr.e) {
-        if (L && !hideTransitionPlayer) L.drawPlayer(ctx, sx(px), sy(py) - (sitting ? 11 * S : 0), face, walked, moving, S, now,
+        if (L && !hideTransitionPlayer) L.drawPlayer(ctx, sx(drawPX), sy(drawPY) - (sitting ? 11 * S : 0), face, walked, moving, S, now,
           { settle: settle > 0, act: playerAct && playerAct.name, actP: playerAct ? 1 - playerAct.t / playerAct.max : 0, sit: sitting });
         continue;
       }
@@ -1158,7 +1163,7 @@
 
     if (L) {
       L.weatherDraw(ctx, camSX, camSY, S, w, h);
-      var lt = lightsFor(now, camSX, camSY, v);
+      var lt = lightsFor(now, camSX, camSY, v, drawPX, drawPY);
       L.drawLight(ctx, w, h, lt.ambient, lt.night, lt.list, camSX, camSY, S);
     }
 
@@ -1179,7 +1184,7 @@
                      NEU.juice.overlay(ctx, w, h); }
 
     if (fade > 0) {
-      if (L && !reduced) L.drawIris(ctx, w, h, sx(px), sy(py - 8), fade);
+      if (L && !reduced) L.drawIris(ctx, w, h, sx(drawPX), sy(drawPY - 8), fade);
       else { ctx.fillStyle = 'rgba(5,5,7,' + fade.toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); }
     }
   }
