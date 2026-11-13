@@ -578,6 +578,7 @@
     go: function (id, sp, via, exit) { go(id, sp, via, exit); },
     flag: function (k, v) { return flag(k, v); },
     room: function () { return room; },
+    key: function (prefix, e) { return entityKey(prefix, room, e); },
     burst: function (e, n, col) {
       if (!NEU.juice || !NEU.juice.burst) return;
       var p = entAt(e);
@@ -659,9 +660,13 @@
     if (reduced) { fade = 1; }              // no iris, just the cut
   }
 
-  /* An entity taken for good (NEU.take). Keyed by its mushroom id, else
-     its tile, so two things in one room cannot share a flag. */
-  function goneKey(r, e) { return 'gone:' + r.id + ':' + (e.mush || e.x + ',' + e.y); }
+  function entityKey(prefix, r, e) {
+    var o = e.origin || {}, id = o.room || r.id;
+    var x = o.x != null ? o.x : e.x, y = o.y != null ? o.y : e.y;
+    return prefix + ':' + id + ':' + (prefix === 'gone' && e.mush ? e.mush : x + ',' + y);
+  }
+
+  function goneKey(r, e) { return entityKey('gone', r, e); }
 
   function spawnEnts(r) {
     return (r.entities || []).filter(function (e) {
@@ -673,8 +678,8 @@
          infinite copies of every item. "Taken" is its own flag now, not
          "still in your pocket" (see engine-kinds pickup). */
       if (c.t === 'pickup' && NEU.save &&
-          (NEU.save.has(c.item) || NEU.save.flagged('p:' + r.id + ':' + c.x + ',' + c.y))) c.dead = true;
-      if (c.once && NEU.save && NEU.save.flagged('t:' + r.id + ':' + c.x + ',' + c.y)) c.dead = true;
+          (NEU.save.has(c.item) || NEU.save.flagged(entityKey('p', r, c)))) c.dead = true;
+      if (c.once && NEU.save && NEU.save.flagged(entityKey('t', r, c))) c.dead = true;
       return c;
     });
   }
@@ -682,10 +687,10 @@
   /* Taking an entity's item for good. The gone flag keeps spawnEnts from
      putting it back on any later visit; the chime and burst match the
      pickup kind so a taken thing feels the same whichever kind it is. */
-  NEU.take = function (e, item, lines, who) {
+  NEU.take = function (e, item, lines, who, key) {
     if (!room || !e) return;
     e.dead = true;
-    if (NEU.save) { NEU.save.give(item); NEU.save.flag(goneKey(room, e), 1); }
+    if (NEU.save) { NEU.save.give(item); NEU.save.flag(key || goneKey(room, e), 1); }
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     if (NEU.juice) { NEU.juice.hit('small'); SYS.burst(e, 10, '#B892FF'); }
     say(lines || ['* You got the ' + item.toUpperCase() + '.'], who || 'narr');
@@ -1453,6 +1458,7 @@
     },
     entHere: entHere, reset: resetPuzzle, check: checkPuzzle,
     ents: function () { return ents; },
+    key: function (prefix, e) { return entityKey(prefix, room, e); },
     solved: function (id) { return NEU.save ? NEU.save.flagged('solved:' + id) : false; },
     markSolved: function (id) { if (NEU.save) NEU.save.flag('solved:' + id, 1); },
     later: later,

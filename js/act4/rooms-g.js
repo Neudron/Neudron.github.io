@@ -600,19 +600,20 @@
          beat is spent — the mushroom is already falling. */
       if (e._cutAt !== undefined) return;
       e._cutAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-      var rid = c.room ? c.room.id : null;
+      var rid = NEU.engine.room, key = c.key('gone', e);
       setTimeout(function () {
         if (e.dead) return;
-        var here = NEU.engine && NEU.engine.where ? NEU.engine.where() : null;
-        if (here && here.room === rid) {
-          NEU.take(e, id, lines, 'mush');
+        var here = NEU.engine && NEU.engine.room;
+        if (here === rid) {
+          NEU.take(e, id, lines, 'mush', key);
         } else {
           /* walked out mid-swing: the mushroom is still yours — flag
              this room's copy gone and grant, or the cut would be lost
              and the room would hand you a second one. */
+          e.dead = true;
           if (NEU.save) {
             NEU.save.give(id);
-            NEU.save.flag('gone:' + rid + ':' + (e.mush || e.x + ',' + e.y), 1);
+            NEU.save.flag(key, 1);
           }
           if (NEU.say) NEU.say(lines, 'mush');
         }
