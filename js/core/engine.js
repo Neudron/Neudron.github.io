@@ -1110,6 +1110,7 @@
       if (!li) continue;
       var p = entAt(e);
       var r = li.r;
+      if (p.x + r + 32 < camX || p.x - r - 32 > camX + v.w || p.y + r + 32 < camY || p.y - r - 32 > camY + v.h) continue;
       if (li.flicker && !reduced) r *= 1 + Math.sin(now / 70 + e.x * 3) * 0.05;
       out.push({ x: p.x, y: p.y - 8, r: r, col: li.col, glow: li.glow, a: li.a });
     }
@@ -1193,11 +1194,22 @@
     } else drawFlat(camSX, camSY, v);
 
     var d = drawCtx(now);
+    var renderEnts = [];
+    /* Woods sprite anchors stay within 64x112 px; full-room FX skip anchor culling. */
+    var marginX = room.id === 'a_woods' ? 64 : 128, marginY = room.id === 'a_woods' ? 112 : 128;
+    for (i = 0; i < ents.length; i++) {
+      e = ents[i];
+      if (e.dead) continue;
+      var ep = entAt(e);
+      if ((K && K.get(e).floor) || OPAQUE_FLOOR[e.t] || e.t === 'woodsfx' ||
+          (ep.x + marginX >= camSX && ep.x - marginX <= camSX + v.w && ep.y + marginY >= camSY && ep.y - marginY <= camSY + v.h))
+        renderEnts.push(e);
+    }
     /* floor decals first and unsorted — sorting a plate by foot Y makes
        a block vanish underneath its own plate */
     var i, e, k;
-    for (i = 0; i < ents.length; i++) {
-      e = ents[i];
+    for (i = 0; i < renderEnts.length; i++) {
+      e = renderEnts[i];
       if (e.dead) continue;
       k = K ? K.get(e) : null;
       if (!k || !k.floor || !k.draw) continue;
@@ -1208,8 +1220,8 @@
        furniture the player stands IN FRONT of: sorted by their bottom edge
        they covered the player at the arrival spawn. Draw them as decals;
        only north-wall doors (side 's') take part in the foot-Y sort. */
-    for (i = 0; i < ents.length; i++) {
-      e = ents[i];
+    for (i = 0; i < renderEnts.length; i++) {
+      e = renderEnts[i];
       if (e.dead || e.t !== 'exit' || exitHidden(e) || exitSide(e) === 's') continue;
       k = K ? K.get(e) : null;
       if (!k || !k.draw) continue;
@@ -1218,8 +1230,8 @@
     }
     /* everything that stands, sorted by foot Y */
     var drawn = [];
-    for (i = 0; i < ents.length; i++) {
-      e = ents[i];
+    for (i = 0; i < renderEnts.length; i++) {
+      e = renderEnts[i];
       if (e.dead || e.t === 'trigger' || exitHidden(e)) continue;
       if (e.t === 'exit' && exitSide(e) !== 's') continue;   /* drawn in the pre-pass above */
       k = K ? K.get(e) : null;
@@ -1251,8 +1263,8 @@
     }
     /* speech bubbles (e.hint) go over everything: a counter drawn after
        its shopkeeper must not hide the sign that he has something to say */
-    for (i = 0; K && i < ents.length; i++) {
-      e = ents[i];
+    for (i = 0; K && i < renderEnts.length; i++) {
+      e = renderEnts[i];
       if (!e.hint || e.dead) continue;
       var ph = entAt(e); d.sx = sx(ph.x); d.sy = sy(ph.y);
       K.hint(ctx, e, d);
