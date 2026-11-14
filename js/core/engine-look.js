@@ -166,23 +166,46 @@
   }
   function surround(ctx, name, x, y, rw, rh, w, h, S) {
     if (!SURROUND[name] || !ctx.createPattern) return false;
-    var factors = [0.6, 0.7, 0.8, 1], patterns = [], i, key, tile, cache;
+    var i, key, tile, cache, p0, p1, p2, p3;
+    if (x <= 0 && y <= 0 && x + rw >= w && y + rh >= h) return true;
     for (i = 0; i < surroundPatterns.length; i++) if (surroundPatterns[i].ctx === ctx) { cache = surroundPatterns[i].tiles; break; }
     if (!cache) { cache = {}; surroundPatterns.push({ ctx: ctx, tiles: cache }); }
-    for (i = 0; i < factors.length; i++) {
-      key = name + ':' + factors[i];
-      tile = surroundTile(name, factors[i]);
-      patterns[i] = cache[key] || (cache[key] = ctx.createPattern(tile, 'repeat'));
-      if (!patterns[i]) return false;
-    }
+    key = name + ':0.6'; tile = surroundTile(name, 0.6); p0 = cache[key] || (cache[key] = ctx.createPattern(tile, 'repeat'));
+    key = name + ':0.7'; tile = surroundTile(name, 0.7); p1 = cache[key] || (cache[key] = ctx.createPattern(tile, 'repeat'));
+    key = name + ':0.8'; tile = surroundTile(name, 0.8); p2 = cache[key] || (cache[key] = ctx.createPattern(tile, 'repeat'));
+    key = name + ':1'; tile = surroundTile(name, 1); p3 = cache[key] || (cache[key] = ctx.createPattern(tile, 'repeat'));
+    if (!p0 || !p1 || !p2 || !p3) return false;
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(S, S);
-    var left = -x / S, top = -y / S, width = w / S, height = h / S, step = 16;
-    ctx.fillStyle = patterns[0]; ctx.fillRect(left, top, width, height);
-    ctx.fillStyle = patterns[1]; ctx.fillRect(-step * 2, -step * 2, rw / S + step * 4, rh / S + step * 4);
-    ctx.fillStyle = patterns[2]; ctx.fillRect(-step, -step, rw / S + step * 2, rh / S + step * 2);
-    ctx.fillStyle = patterns[3]; ctx.fillRect(0, 0, rw / S, rh / S);
+    if (!ctx.clip || !ctx.beginPath || !ctx.rect) {
+      ctx.fillStyle = p0; ctx.fillRect(-x / S, -y / S, w / S, h / S);
+      ctx.fillStyle = p1; ctx.fillRect(-32, -32, rw / S + 64, rh / S + 64);
+      ctx.fillStyle = p2; ctx.fillRect(-16, -16, rw / S + 32, rh / S + 32);
+      ctx.fillStyle = p3; ctx.fillRect(0, 0, rw / S, rh / S);
+      ctx.restore();
+      return true;
+    }
+    var left = -x / S, top = -y / S, right = left + w / S, bottom = top + h / S,
+        roomW = rw / S, roomH = rh / S, outerL = -32, outerT = -32,
+        outerR = roomW + 32, outerB = roomH + 32, innerL = -16,
+        innerT = -16, innerR = roomW + 16, innerB = roomH + 16;
+    ctx.fillStyle = p0;
+    ctx.fillRect(left, top, right - left, Math.max(0, Math.min(bottom, outerT) - top));
+    ctx.fillRect(left, Math.max(top, outerB), right - left, Math.max(0, bottom - Math.max(top, outerB)));
+    ctx.fillRect(left, Math.max(top, outerT), Math.max(0, Math.min(right, outerL) - left), Math.max(0, Math.min(bottom, outerB) - Math.max(top, outerT)));
+    ctx.fillRect(Math.max(left, outerR), Math.max(top, outerT), Math.max(0, right - Math.max(left, outerR)), Math.max(0, Math.min(bottom, outerB) - Math.max(top, outerT)));
+    ctx.fillStyle = p1;
+    ctx.fillRect(outerL, outerT, outerR - outerL, innerT - outerT);
+    ctx.fillRect(outerL, innerB, outerR - outerL, outerB - innerB);
+    ctx.fillRect(outerL, innerT, innerL - outerL, innerB - innerT);
+    ctx.fillRect(innerR, innerT, outerR - innerR, innerB - innerT);
+    ctx.fillStyle = p2;
+    ctx.fillRect(innerL, innerT, innerR - innerL, -innerT);
+    ctx.fillRect(innerL, 0, innerR - innerL, 16);
+    ctx.fillRect(innerL, roomH, innerR - innerL, 16);
+    ctx.fillRect(innerL, 0, -innerL, roomH);
+    ctx.fillRect(roomW, 0, 16, roomH);
     ctx.restore();
     return true;
   }
