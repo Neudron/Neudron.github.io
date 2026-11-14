@@ -814,9 +814,11 @@
       if (c.mist && room.mist) {
         var rows = room.mist, rw = room.w * T;
         for (var i = 0; i < rows.length; i++) {
+          var row = typeof rows[i] === 'number' ? { y: rows[i], x0: 0, x1: room.w - 1 } : rows[i];
           var dir = i & 1 ? 1 : -1, drift = still() ? 0 : (d.now / 140 + i * 37) % 128;
           var sx0 = Math.round(dir > 0 ? drift : 128 - drift);
-          g.drawImage(c.mist, sx0, 0, rw, 16, ox, oy + (rows[i] * T) * S, rw * S, 16 * S);
+          var mx = row.x0 * T, mw = (row.x1 - row.x0 + 1) * T;
+          g.drawImage(c.mist, sx0 + mx, 0, mw, 16, ox + mx * S, oy + (row.y * T) * S, mw * S, 16 * S);
         }
       }
       g.imageSmoothingEnabled = sm;

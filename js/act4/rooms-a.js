@@ -561,13 +561,13 @@
   function mergeBeams(room, dx, dy) {
     return room.beams.map(function (b) { return [b[0] + dx, b[1] + dy, b[2], b[3]]; });
   }
-  function mergeMist(room, dy) {
-    return room.mist.map(function (y) { return dy + y; });
+  function mergeMist(room, dx, dy, x0, x1) {
+    return room.mist.map(function (y) { return { y: dy + y, x0: dx + x0, x1: dx + x1 }; });
   }
   E.register('a_woods', {
     tileset: 'woods', tiles: mergeWoods(),
     beams: mergeBeams(A1, 0, 0).concat(mergeBeams(A2, 22, 4), mergeBeams(A3, 46, 4)),
-    mist: mergeMist(A1, 0).concat(mergeMist(A2, 4), mergeMist(A3, 4)),
+    mist: mergeMist(A1, 0, 0, 0, 22).concat(mergeMist(A2, 22, 4, 1, 24), mergeMist(A3, 46, 4, 1, 23)),
     spawns: {
       a1_default: { x: 10, y: 7, face: 'right' }, a1_north: { x: 10, y: 3, face: 'down' }, a1_east: { x: 22, y: 7, face: 'left' },
       a2_west: { x: 23, y: 7, face: 'right' }, a2_east: { x: 46, y: 11, face: 'left' },
