@@ -33,7 +33,8 @@
     var y = d === 'down' ? h : d === 'up' ? -h : 0;
     return { t: t, x: Math.round(x * (1 - t) / scale) * scale,
       y: Math.round(y * (1 - t) / scale) * scale,
-      oldX: Math.round(-x * t / scale) * scale, oldY: Math.round(-y * t / scale) * scale };
+      oldX: d === 'right' ? Math.round(x * (1 - t) / scale) * scale - w : d === 'left' ? Math.round(x * (1 - t) / scale) * scale + w : Math.round(-x * t / scale) * scale,
+      oldY: d === 'down' ? Math.round(y * (1 - t) / scale) * scale - h : d === 'up' ? Math.round(y * (1 - t) / scale) * scale + h : Math.round(-y * t / scale) * scale };
   }
   function draw(ctx, w, h, scale) {
     if (!active) return;

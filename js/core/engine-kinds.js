@@ -340,7 +340,7 @@
       /* E while THIS dialogue is showing is a no-op. */
       if (tboxOpen()) return;
       var room = sys.room();
-      var dk = 'd:' + room.id + ':' + e.x + ',' + e.y;
+      var dk = sys.key('d', e);
       var at = NEU.save ? (NEU.save.flag(dk) || 0) : 0;
       /* lines may be a function of (save, quest): resolved here, at talk
          time, so an npc can say what the player has already done. Give

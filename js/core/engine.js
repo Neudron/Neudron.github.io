@@ -84,7 +84,7 @@
      through enter()'s opts, and it goes back to quick when it is done. */
   var IRIS = 0.22, fadeSpan = IRIS;
   var busy = false;                    // a cutscene owns input
-  var hideTransitionPlayer = false, transitionCanvas = null, transitionNewCanvas = null, transitionPlayer = null, transitionStarting = false;
+  var hideTransitionPlayer = false, transitionCanvas = null, transitionNewCanvas = null, transitionPlayer = null, transitionStarting = false, frameNow = 0;
   var physical = null, physicalExit = null;
   var playerAct = null;                // { name, t, max } — a held player pose (the recall drink)
   var sitting = null;                  // { ent, x, y } — seated on a seat entity until a move key
@@ -617,14 +617,15 @@
   function dirVector(dir) { return DIRV[dir] || ({ n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] })[dir] || [0, 1]; }
   function captureTransition(canvas) {
     canvas.width = cv.width; canvas.height = cv.height;
-    hideTransitionPlayer = true; draw(Date.now()); hideTransitionPlayer = false;
+    prevPX = px; prevPY = py; prevCamX = camX; prevCamY = camY;
+    hideTransitionPlayer = true; draw(frameNow); hideTransitionPlayer = false;
     var c = canvas.getContext('2d'); if (c) c.drawImage(cv, 0, 0);
   }
   function finishPhysical() {
     var held = physical && physical.heldKeys || {};
     if (physicalExit) delete physicalExit.__transitionNear;
     physicalExit = null; physical = null; transitionPlayer = null; transitionStarting = false;
-    cine = false; keys = held; busy = false;
+    cine = physical && physical.wasCine; if (!cine) keys = held; busy = false;
   }
   function startPhysicalSlide(kind, dir, ms) {
     var wall = tilesets[room.tileset] && tilesets[room.tileset].colours && tilesets[room.tileset].colours['#'];
@@ -702,7 +703,7 @@
     physicalExit = exit; transitionStarting = true; busy = true; cine = true; keys = {};
     if (!transitionCanvas) transitionCanvas = document.createElement('canvas');
     if (!transitionNewCanvas) transitionNewCanvas = document.createElement('canvas');
-    physical = { id: id, spawn: spawn, kind: kind, dir: dir, exit: exit, from: room.id, heldKeys: held, stage: kind === 'door' ? 'open' : kind === 'fall' ? 'fall' : 'slide', elapsed: 0, step: 0, shut: 2, fromY: py };
+    physical = { id: id, spawn: spawn, kind: kind, dir: dir, exit: exit, from: room.id, heldKeys: held, wasCine: cine, stage: kind === 'door' ? 'open' : kind === 'fall' ? 'fall' : 'slide', elapsed: 0, step: 0, shut: 2, fromY: py };
     if (kind === 'door') { exit.__transitionNear = 0; exit.__arm = false; }
     if (kind === 'fall') settle = 0.18;
     if (kind === 'stairs') startPhysicalSlide('slide', dir, 270);
@@ -1074,6 +1075,7 @@
 
   function step(now) {
     if (!running) return;
+    frameNow = now;
     requestAnimationFrame(step);
     var dt = (now - last) / 1000; last = now;
     if (!(dt > 0)) dt = 0;
@@ -1102,8 +1104,8 @@
       ambient = 0.03;
       var lt = room.light ? room.light(API) : null;
       if (lt) out.push({ x: lt.x, y: lt.y - 6, r: darkAmt * 0.7, col: z.warm, glow: 0.18, a: 1 });
-      else out.push({ x: playerX, y: playerY - 6, r: 20, a: 0.8 });
-    } else if (ambient < 0.8) {
+      else if (!hideTransitionPlayer) out.push({ x: playerX, y: playerY - 6, r: 20, a: 0.8 });
+    } else if (ambient < 0.8 && !hideTransitionPlayer) {
       out.push({ x: playerX, y: playerY - 6, r: 34, a: 0.5 });
     }
     /* entity lights */
@@ -1173,7 +1175,7 @@
     /* Pixel-snap the camera once; every world→screen conversion below
        rounds against the same origin, so sprites never shimmer against
        the floor. */
-    var alpha = reduced ? 1 : acc / STEP;
+    var alpha = reduced || hideTransitionPlayer ? 1 : acc / STEP;
     var drawPX = prevPX + (px - prevPX) * alpha, drawPY = prevPY + (py - prevPY) * alpha;
     var drawCamX = prevCamX + (camX - prevCamX) * alpha, drawCamY = prevCamY + (camY - prevCamY) * alpha;
     var ox = Math.round((drawCamX + kickX) * S), oy = Math.round((drawCamY + kickY) * S);
@@ -1251,7 +1253,7 @@
     if (L) {
       for (i = 0; i < drawn.length; i++) {
         var it = drawn[i];
-        if (!it.e) { L.shadow(ctx, sx(drawPX), sy(drawPY), 9, S, 0.42); continue; }
+        if (!it.e) { if (!hideTransitionPlayer) L.shadow(ctx, sx(drawPX), sy(drawPY), 9, S, 0.42); continue; }
         var ww = it.k && it.k.width ? it.k.width(it.e, S) : 9;
         if (ww > 0) { var pe = entAt(it.e); L.shadow(ctx, sx(pe.x), sy(pe.y), Math.min(14, ww * 0.8), S, 0.32); }
       }
@@ -1561,7 +1563,7 @@
       if (sitting && sitting.ent === e) { sitting = null; settle = 0.09; return false; }
       var p = entAt(e);
       sitting = { ent: e, x: p.x, y: p.y + 5 };
-      px = sitting.x; py = sitting.y; vx = 0; vy = 0; face = 'down';
+      px = sitting.x; py = sitting.y; prevPX = px; prevPY = py; vx = 0; vy = 0; face = 'down';
       settle = 0.09;
       return true;
     },
