@@ -581,7 +581,7 @@
     get entities() {
       var out = woodsLook(16)
         .concat(mergeWoodsEntities(A1, 'a1_clearing', 0, 0), mergeWoodsEntities(A2, 'a2_path', 22, 4), mergeWoodsEntities(A3, 'a3_fork', 46, 4));
-      out.push(P('oak', 21, 7, { big: 1 }), P('oak', 24, 7, { big: 1 }), P('oak', 45, 11, { big: 1 }), P('oak', 48, 11, { big: 1 }));
+      out.push(P('oak', 20, 7, { big: 1 }), P('oak', 25, 7, { big: 1 }), P('oak', 44, 11, { big: 1 }), P('oak', 49, 11, { big: 1 }));
       if (NEU.save && (NEU.save.has('mush1') || NEU.save.flagged('gone:a2_path:mush1'))) {
         return out.filter(function (e) { return e.mush !== 'mush1'; });
       }

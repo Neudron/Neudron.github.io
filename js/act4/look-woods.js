@@ -135,8 +135,8 @@
     g.imageSmoothingEnabled = false;
     if (g.canvas && g.canvas.width && g.canvas.height) {
       var x0 = Math.max(0, Math.floor(-ox / S)), y0 = Math.max(0, Math.floor(-oy / S));
-      var x1 = Math.min(c.cv.width, Math.ceil((g.canvas.width - ox) / S));
-      var y1 = Math.min(c.cv.height, Math.ceil((g.canvas.height - oy) / S));
+      var x1 = Math.min(c.cv.width, Math.ceil(((g.canvas.clientWidth || g.canvas.width) - ox) / S));
+      var y1 = Math.min(c.cv.height, Math.ceil(((g.canvas.clientHeight || g.canvas.height) - oy) / S));
       if (x1 > x0 && y1 > y0) g.drawImage(c.cv, x0, y0, x1 - x0, y1 - y0, ox + x0 * S, oy + y0 * S, (x1 - x0) * S, (y1 - y0) * S);
     } else g.drawImage(c.cv, ox, oy, c.cv.width * S, c.cv.height * S);
     g.imageSmoothingEnabled = sm;
@@ -447,21 +447,21 @@
     },
     a2_path: function (R, g, room, c) {
       paintWoods(R, g, room, c, { extra: function (R2, g2) {
-        moonPool(R2, g2, 8 * T + 8, 6 * T + 10, 22, 12);
-        moonPool(R2, g2, 18 * T + 8, 2 * T + 10, 20, 10);
+        moonPool(R2, g2, 7 * T + 8, 6 * T + 10, 22, 12);
+        moonPool(R2, g2, 17 * T + 8, 2 * T + 10, 20, 10);
       } });
     },
     a3_fork: function (R, g, room, c) {
       paintWoods(R, g, room, c, { extra: function (R2, g2, rm, cc, at) {
-        castleWall(R2, g2, 0, rm.w - 1, 10);
-        moonPool(R2, g2, 10 * T + 8, 4 * T + 8, 36, 22);
+        castleWall(R2, g2, 0, rm.w - 1, 9);
+        moonPool(R2, g2, 9 * T + 8, 4 * T + 8, 36, 22);
         /* swept steps up to the gate */
         for (var s = 0; s < 3; s++) {
           var sy = 2 * T + s * 6, w = 3 * T + 4 - s * 2;
-          R2(9 * T - 2 + s, sy, w, 2, '#7E6650'); R2(9 * T - 2 + s, sy + 2, w, 1, '#3A2E2A');
+          R2(8 * T - 2 + s, sy, w, 2, '#7E6650'); R2(8 * T - 2 + s, sy + 2, w, 1, '#3A2E2A');
         }
         /* the unswept way: fallen leaves over the east path */
-        for (var x = 11; x < rm.w - 1; x++) for (var y = 6; y < 9; y++) {
+        for (var x = 10; x < rm.w - 1; x++) for (var y = 6; y < 9; y++) {
           if (at(x, y) !== 'm') continue;
           for (var i = 0; i < 6; i++) R2(x * T + ((hash(x, y, 300 + i) * 14) | 0), y * T + ((hash(x, y, 310 + i) * 14) | 0), 2, 1, i & 1 ? C.leaf : '#6A4A2A');
         }
@@ -480,11 +480,6 @@
     paintPart(R, g, room, c, 'a1_clearing', 0, 0, 23, 13);
     paintPart(R, g, room, c, 'a2_path', 23, 4, 24, 11);
     paintPart(R, g, room, c, 'a3_fork', 47, 4, 23, 12);
-    /* Fill the cut edges with canopy while the seam trees shade the path. */
-    for (var i = 0; i < 4; i++) {
-      canopy(R, g, (22 + i) * T + 8, 7 * T, 18, 9, 410 + i, OAK);
-      canopy(R, g, (46 + i) * T + 8, 11 * T, 18, 9, 450 + i, OAK);
-    }
   };
 
   /* water glints: a few pixels a frame, phase-walked along the stream */
@@ -767,6 +762,10 @@
       }
     }
     g.globalAlpha = 1;
+    for (i = 0; i < 4; i++) {
+      canopy(R, g, (22 + i) * T + 8, 7 * T, 18, 9, 410 + i, OAK);
+      canopy(R, g, (46 + i) * T + 8, 11 * T, 18, 9, 450 + i, OAK);
+    }
     /* PERF: the beams are a few thin shafts in a canvas that is otherwise
        clear, so the frame blits this rect only. Padded a px so a cut edge
        lands on clear pixels. Null when nothing was painted. */
