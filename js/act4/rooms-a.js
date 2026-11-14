@@ -290,7 +290,7 @@
       { t: 'exit', x: 23, y: 7, to: 'a2_path', spawn: 'west', style: 'tunnel' },
       P('moon', 10, 7),
       P('campfire', 13, 4, { solid: true }),
-      P('lantern', 12, 6, { solid: true }), P('lantern', 16, 8, { solid: true }), P('lantern', 20, 6),
+      P('lantern', 12, 6, { solid: true }), P('lantern', 16, 8, { solid: true }), P('lantern', 20, 5),
       P('oak', 4, 3), P('oak', 16, 2, { big: 1 }), P('pine', 7, 2, { h: 70 }), P('pine', 19, 4),
       P('dead', 21, 9), P('oak', 3, 9), P('pine', 18, 10, { h: 56 }), P('oak', 6, 11),
       P('stump', 4, 7, { solid: true }), P('rock', 15, 9, { solid: true }), P('ferns', 7, 9),
@@ -450,7 +450,7 @@
       { t: 'exit', x: 0, y: 3, to: 'a1_clearing', spawn: 'east', style: 'tunnel' },
       P('moon', 8, 6, { r: 40 }), P('moon', 18, 2, { r: 36 }),
       P('lantern', 4, 2, { solid: true }), P('lantern', 11, 4, { solid: true }), P('lantern', 19, 4, { solid: true }),
-      P('lantern', 5, 8, { solid: true }), P('lantern', 15, 8, { solid: true }), P('lantern', 22, 6),
+      P('lantern', 5, 8, { solid: true }), P('lantern', 15, 8, { solid: true }), P('lantern', 22, 5),
       P('pine', 2, 1, { h: 60 }), P('oak', 7, 1), P('pine', 13, 1, { h: 72 }), P('oak', 22, 1, { big: 1 }),
       P('pine', 3, 9, { h: 46 }), P('oak', 10, 10, { h: 34, rx: 22, ry: 14 }), P('oak', 18, 10, { h: 36, rx: 24, ry: 15 }), P('pine', 23, 9, { h: 44 }),
       P('dead', 15, 4), P('log', 13, 5), P('rock', 3, 4, { solid: true }), P('rock', 21, 2, { solid: true }),
@@ -581,7 +581,7 @@
     get entities() {
       var out = woodsLook(16)
         .concat(mergeWoodsEntities(A1, 'a1_clearing', 0, 0), mergeWoodsEntities(A2, 'a2_path', 22, 4), mergeWoodsEntities(A3, 'a3_fork', 46, 4));
-      out.push(P('oak', 20, 7, { big: 1 }), P('oak', 25, 7, { big: 1 }), P('oak', 44, 11, { big: 1 }), P('oak', 49, 11, { big: 1 }));
+      out.push(P('oak', 20, 7, { big: 1, rx: 18 }), P('oak', 25, 7, { big: 1, rx: 18 }), P('oak', 44, 11, { big: 1, rx: 18 }), P('oak', 49, 11, { big: 1, rx: 18 }));
       if (NEU.save && (NEU.save.has('mush1') || NEU.save.flagged('gone:a2_path:mush1'))) {
         return out.filter(function (e) { return e.mush !== 'mush1'; });
       }

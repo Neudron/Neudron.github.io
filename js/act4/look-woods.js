@@ -480,6 +480,17 @@
     paintPart(R, g, room, c, 'a1_clearing', 0, 0, 23, 13);
     paintPart(R, g, room, c, 'a2_path', 23, 4, 24, 11);
     paintPart(R, g, room, c, 'a3_fork', 47, 4, 23, 12);
+    function filler(x0, y0, x1, y1, seed) {
+      var x, y;
+      for (y = y0; y <= y1; y++) for (x = x0; x <= x1; x++) {
+        var px = x * T, py = y * T;
+        R(px, py, T, T, C.u0);
+        canopy(R, g, px + 8, py + 8, 11, 8, seed + x * 17 + y * 31, OAK);
+      }
+    }
+    filler(23, 0, 69, 3, 810);
+    filler(23, 15, 46, 15, 910);
+    filler(0, 13, 22, 15, 1010);
   };
 
   /* water glints: a few pixels a frame, phase-walked along the stream */
@@ -763,8 +774,8 @@
     }
     g.globalAlpha = 1;
     for (i = 0; i < 4; i++) {
-      canopy(R, g, (22 + i) * T + 8, 7 * T, 18, 9, 410 + i, OAK);
-      canopy(R, g, (46 + i) * T + 8, 11 * T, 18, 9, 450 + i, OAK);
+      canopy(R, g, (22 + i) * T + 8, 7 * T - 40, 18, 9, 410 + i, OAK);
+      canopy(R, g, (46 + i) * T + 8, 11 * T - 40, 18, 9, 450 + i, OAK);
     }
     /* PERF: the beams are a few thin shafts in a canvas that is otherwise
        clear, so the frame blits this rect only. Padded a px so a cut edge
