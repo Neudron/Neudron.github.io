@@ -545,7 +545,7 @@
     var seam = [46, 47, 48, 46, 45, 47, 48, 46, 47, 45, 46, 48], chars;
     for (y = 4; y <= 15; y++) {
       chars = rows[y].split('');
-      for (i = 45; i <= 50; i++) if (chars[i] === '.' || chars[i] === '~') chars[i] = i <= seam[y - 4] ? '~' : '.';
+      for (i = 45; i <= 50; i++) if (chars[i] === '.' && i <= seam[y - 4]) chars[i] = '~';
       rows[y] = chars.join('');
     }
     return rows.join('\n');

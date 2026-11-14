@@ -784,7 +784,7 @@
     g.globalAlpha = 1;
     for (i = 0; i < 4; i++) {
       canopy(R, g, (22 + i) * T + 8, 7 * T - 28, 18, 9, 410 + i, OAK);
-      canopy(R, g, (49 + i) * T + 8, 11 * T - 28, 18, 9, 450 + i, OAK);
+      canopy(R, g, (49 + i) * T + 8, 11 * T - 52, 18, 6, 450 + i, OAK);
     }
     /* PERF: the beams are a few thin shafts in a canvas that is otherwise
        clear, so the frame blits this rect only. Padded a px so a cut edge
@@ -813,6 +813,7 @@
         for (var phase = 0; phase <= 128; phase++) for (var j = 0; j < 3; j++) {
           eg.globalAlpha = (j + 1) / 3;
           eg.drawImage(mc, phase + mx + j * 8, 0, 8, 16, phase * 48 + j * 8, 0, 8, 16);
+          eg.globalAlpha = (3 - j) / 3;
           eg.drawImage(mc, phase + mx + bandW - 24 + j * 8, 0, 8, 16, phase * 48 + 24 + j * 8, 0, 8, 16);
         }
         eg.globalAlpha = 1;

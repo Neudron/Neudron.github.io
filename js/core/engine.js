@@ -622,10 +622,10 @@
     var c = canvas.getContext('2d'); if (c) c.drawImage(cv, 0, 0);
   }
   function finishPhysical() {
-    var held = physical && physical.heldKeys || {};
+    var held = physical && physical.heldKeys || {}, wasCine = !!(physical && physical.wasCine);
     if (physicalExit) delete physicalExit.__transitionNear;
     physicalExit = null; physical = null; transitionPlayer = null; transitionStarting = false;
-    cine = physical && physical.wasCine; if (!cine) keys = held; busy = false;
+    cine = wasCine; if (!cine) keys = held; busy = false;
   }
   function startPhysicalSlide(kind, dir, ms) {
     var wall = tilesets[room.tileset] && tilesets[room.tileset].colours && tilesets[room.tileset].colours['#'];
@@ -698,12 +698,12 @@
   }
   function beginPhysical(id, spawn, kind, dir, exit) {
     if (!exit || reduced) { land(id, spawn); busy = false; return; }
-    var held = {}, key;
+    var held = {}, key, wasCine = cine;
     for (key in keys) if (keys[key]) held[key] = true;
     physicalExit = exit; transitionStarting = true; busy = true; cine = true; keys = {};
     if (!transitionCanvas) transitionCanvas = document.createElement('canvas');
     if (!transitionNewCanvas) transitionNewCanvas = document.createElement('canvas');
-    physical = { id: id, spawn: spawn, kind: kind, dir: dir, exit: exit, from: room.id, heldKeys: held, wasCine: cine, stage: kind === 'door' ? 'open' : kind === 'fall' ? 'fall' : 'slide', elapsed: 0, step: 0, shut: 2, fromY: py };
+    physical = { id: id, spawn: spawn, kind: kind, dir: dir, exit: exit, from: room.id, heldKeys: held, wasCine: wasCine, stage: kind === 'door' ? 'open' : kind === 'fall' ? 'fall' : 'slide', elapsed: 0, step: 0, shut: 2, fromY: py };
     if (kind === 'door') { exit.__transitionNear = 0; exit.__arm = false; }
     if (kind === 'fall') settle = 0.18;
     if (kind === 'stairs') startPhysicalSlide('slide', dir, 270);
@@ -732,13 +732,13 @@
       transitionCanvas.width = cv.width; transitionCanvas.height = cv.height;
       var fromX = Math.round(px * S) - Math.round((camX + kickX) * S);
       var fromY = Math.round(py * S) - Math.round((camY + kickY) * S);
-      hideTransitionPlayer = true; draw(Date.now()); hideTransitionPlayer = false;
+      hideTransitionPlayer = true; draw(frameNow); hideTransitionPlayer = false;
       var tc = transitionCanvas.getContext('2d');
       if (tc) tc.drawImage(cv, 0, 0);
       land(id, spawn);
       if (!transitionNewCanvas) transitionNewCanvas = document.createElement('canvas');
       transitionNewCanvas.width = cv.width; transitionNewCanvas.height = cv.height;
-      hideTransitionPlayer = true; draw(Date.now()); hideTransitionPlayer = false;
+      hideTransitionPlayer = true; draw(frameNow); hideTransitionPlayer = false;
       tc = transitionNewCanvas.getContext('2d');
       if (tc) tc.drawImage(cv, 0, 0);
       if (T.start(kind, transitionCanvas, dir, reduced, transitionNewCanvas)) {
