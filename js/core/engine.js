@@ -641,7 +641,7 @@
     var p = physical, v = p.vector;
     API.drive(v[0], v[1]);
     move(dt);
-    if (Math.sqrt(Math.pow(p.target.x - px, 2) + Math.pow(p.target.y - py, 2)) < 1 || p.elapsed > 0.16) {
+    if (Math.sqrt(Math.pow(p.target.x - px, 2) + Math.pow(p.target.y - py, 2)) < 1 || p.elapsed > 0.28) {
       px = p.target.x; py = p.target.y; vx = 0; vy = 0; moving = false; p.stage = p.next;
       if (p.stage === 'capture') startPhysicalSlide('slide', p.dir, 220);
       else if (p.stage === 'close') p.elapsed = 0;
@@ -678,7 +678,13 @@
       if (NEU.engineTrans.active && NEU.engineTrans.step(dt)) return;
       transitionPlayer = null;
       if (p.kind === 'door') {
-        var reverse = ents.filter(function (e) { return e.t === 'exit' && e.to === p.from; })[0];
+        var reverse = null, reverseDistance = Infinity, reverseCandidate, reverseD, ri;
+        for (ri = 0; ri < ents.length; ri++) {
+          reverseCandidate = ents[ri];
+          if (reverseCandidate.t !== 'exit' || reverseCandidate.to !== p.from) continue;
+          reverseD = Math.abs(reverseCandidate.x * TILE + TILE / 2 - px) + Math.abs(reverseCandidate.y * TILE + TILE / 2 - py);
+          if (reverseD < reverseDistance) { reverse = reverseCandidate; reverseDistance = reverseD; }
+        }
         if (!reverse) { finishPhysical(); return; }
         physicalExit = reverse; reverse.__transitionNear = 1;
         p.exit = reverse; p.vector = dirVector(exitSide(reverse)); p.target = { x: px + p.vector[0] * TILE, y: py + p.vector[1] * TILE }; p.stage = 'outwalk'; p.next = 'close'; p.elapsed = 0; p.shut = 2;
@@ -1156,7 +1162,7 @@
         var pt = 1 - Math.pow(1 - tr.t, 3);
         var tx = Math.round((tp.x + (tp.toX - tp.x) * pt) / S) * S;
         var ty = Math.round((tp.y + (tp.toY - tp.y) * pt) / S) * S + (tp.bob || 0);
-        tl.drawPlayer(ctx, tx, ty, face, walked, true, S, now);
+        tl.drawPlayer(ctx, tx, ty, face, walked + (Math.abs(tx - tp.x) + Math.abs(ty - tp.y)) / S, true, S, now);
       }
       return;
     }

@@ -1630,7 +1630,7 @@
     })[0];
     if (!axe) return;
     axe.dead = true;
-    if (NEU.save) NEU.save.flag('gone:' + 'd1_street' + ':' + (axe.mush || axe.x + ',' + axe.y), 1);
+    if (NEU.save && api.key) NEU.save.flag(api.key('gone', axe), 1);
   }
 
   /* A win leaves through the black cut: black in, rooms swap behind it, the

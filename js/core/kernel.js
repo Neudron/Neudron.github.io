@@ -81,7 +81,7 @@
     if (!scene) return null;
     try { source = typeof scene.snapshot === 'function' ? scene.snapshot() : scene.canvas; }
     catch (e) { return null; }
-    if (!source || !source.width || !source.height || !document || !document.createElement) return null;
+    if (!source || !source.width || !source.height || typeof document === 'undefined' || !document.createElement) return null;
     copy = document.createElement('canvas');
     copy.width = source.width; copy.height = source.height;
     try { ctx = copy.getContext && copy.getContext('2d'); } catch (e) { return null; }

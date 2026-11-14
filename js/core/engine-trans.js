@@ -7,6 +7,7 @@
   function get(name) { return kinds[name] || null; }
   function start(name, canvas, dir, reduced, incoming, opts) {
     var k = get(name), snapshot;
+    if (active) return active;
     if (reduced) { active = null; return null; }
     if (!k) return null;
     if (name === 'mode' && !canvas) {

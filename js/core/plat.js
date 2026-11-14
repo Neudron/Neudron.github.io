@@ -19,6 +19,7 @@
   var reduced = redNow(), view = { w: 640, h: 360, scale: 1 }, area = { x0: 0, y0: 0, x1: 640, y1: 360 };
   var painters = [], padB = {}, sprCache = {}, lastDraw = 0, chunks = {}, chunkOrder = [], CHUNK = 32, LRU = 12;
   function redNow() {
+    if (NEU.motion && NEU.motion.reduced) return NEU.motion.reduced();
     try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
   }
   var player = fresh();
@@ -582,9 +583,9 @@
     ox = Math.round((w - view.w * view.scale) / 2); oy = Math.round((h - view.h * view.scale) / 2);
     area.x0 = Math.floor(-ox / view.scale) - 1; area.y0 = Math.floor(-oy / view.scale) - 1;
     area.x1 = Math.ceil((w - ox) / view.scale) + 1; area.y1 = Math.ceil((h - oy) / view.scale) + 1;
-    cx = Math.round(prevCamX + (camera.x - prevCamX) * (reduced ? 1 : accumulator / STEP)); cy = Math.round(prevCamY + (camera.y - prevCamY) * (reduced ? 1 : accumulator / STEP));
-    var drawX = reduced ? player.x : prevX + (player.x - prevX) * (accumulator / STEP);
-    var drawY = reduced ? player.y : prevY + (player.y - prevY) * (accumulator / STEP);
+    cx = Math.round(prevCamX + (camera.x - prevCamX) * (reduced ? 1 : Math.min(1, accumulator / STEP))); cy = Math.round(prevCamY + (camera.y - prevCamY) * (reduced ? 1 : Math.min(1, accumulator / STEP)));
+    var drawX = reduced ? player.x : prevX + (player.x - prevX) * Math.min(1, accumulator / STEP);
+    var drawY = reduced ? player.y : prevY + (player.y - prevY) * Math.min(1, accumulator / STEP);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (!api.backdrop) { ctx.fillStyle = '#0b0a12'; ctx.fillRect(0, 0, w, h); }
     ctx.setTransform(view.scale, 0, 0, view.scale, ox, oy); ctx.imageSmoothingEnabled = false;
