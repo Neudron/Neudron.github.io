@@ -176,7 +176,7 @@
     return e;
   }
   function woodsLook(h) {
-    return [{ t: 'woodsfloor', x: 0, y: 0 }, { t: 'woodsfx', x: 0, y: h - 1 }];
+    return [{ t: 'woodsfloor', x: 0, y: 0 }, { t: 'woodsfx', x: 0, y: h - 1, roomSpan: true }];
   }
 
   /* The crack back to the dungeon. It is a picture (kind `crack`) plus
@@ -606,7 +606,7 @@
     return e;
   }
   function castleLook(h) {
-    return [{ t: 'castlefloor', x: 0, y: 0 }, { t: 'castlefx', x: 0, y: h - 1 }];
+    return [{ t: 'castlefloor', x: 0, y: 0 }, { t: 'castlefx', x: 0, y: h - 1, roomSpan: true }];
   }
   function columns(xy, extra) {
     var out = [];
@@ -649,7 +649,7 @@
     shade: 0.55,
     spawns: { south: { x: 11, y: 12, face: 'up' }, north: { x: 21, y: 8, face: 'left' } },
     entities: castleLook(14).concat([
-      { t: 'exit', x: 11, y: 13, to: 'a3_fork', spawn: 'castle', style: 'arch' },
+      { t: 'exit', x: 11, y: 13, to: 'a_woods', spawn: 'castle', style: 'arch' },
       Q('throne', 9, 2),
       /* the second throne. never pointed at — but it is a seat:
          interact sits, any move key stands. */
@@ -1363,7 +1363,7 @@
                 'a door opens in the south wall. it is on fire. it does not seem bothered.'] },
       { t: 'npc', x: 19, y: 10, colour: '#C4705F', mush: 'mush2', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush2'); } },
-      { t: 'exit', x: 22, y: 6, to: 'a3_fork', spawn: 'altar', style: 'arch' },
+      { t: 'exit', x: 22, y: 6, to: 'a_woods', spawn: 'altar', style: 'arch' },
       { t: 'exit', x: 11, y: 1, to: 'b8_arena', spawn: 'west', locked: 'solved:b6_dark', style: 'stairs',
         lines: ['stairs going down, and something at the bottom of them with a heartbeat.',
                 'a grate is down across them. it lifts when the dark room is lit.'] },

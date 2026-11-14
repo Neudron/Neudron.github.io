@@ -68,7 +68,7 @@
   }
   function prop(v, x, y) { return { t: 'savannaprop', v: v, x: x, y: y }; }
   function dress(ents) {
-    return [{ t: 'savannafloor', x: 0, y: 0 }, { t: 'savannafx', x: 5, y: 8 }].concat(ents);
+    return [{ t: 'savannafloor', x: 0, y: 0 }, { t: 'savannafx', x: 5, y: 8, roomSpan: true }].concat(ents);
   }
   /* Lockdown is a flag, read when the room is entered. chase.js
      swaps the entity list. The exo rooms are not the village. */
@@ -492,7 +492,7 @@
     tileset: 'savanna',
     tiles: sandTiles(),
     spawns: { west: { x: 1, y: 5, face: 'right' }, east: { x: 360, y: 5, face: 'left' } },
-    entities: [{ t: 'savannafloor', x: 0, y: 0 }, { t: 'savannafx', x: 1, y: 8 }]
+    entities: [{ t: 'savannafloor', x: 0, y: 0 }, { t: 'savannafx', x: 1, y: 8, roomSpan: true }]
       .concat(trees)
       .concat([
         { t: 'exit', x: 0, y: 5, to: 'd2_alley', spawn: 'garage', style: 'door' },
