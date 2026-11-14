@@ -450,7 +450,7 @@
       { t: 'exit', x: 0, y: 3, to: 'a1_clearing', spawn: 'east', style: 'tunnel' },
       P('moon', 8, 6, { r: 40 }), P('moon', 18, 2, { r: 36 }),
       P('lantern', 4, 2, { solid: true }), P('lantern', 11, 4, { solid: true }), P('lantern', 19, 4, { solid: true }),
-      P('lantern', 5, 8, { solid: true }), P('lantern', 15, 8, { solid: true }), P('lantern', 22, 5),
+      P('lantern', 5, 8, { solid: true }), P('lantern', 15, 8, { solid: true }), P('lantern', 21, 6),
       P('pine', 2, 1, { h: 60 }), P('oak', 7, 1), P('pine', 13, 1, { h: 72 }), P('oak', 22, 1, { big: 1 }),
       P('pine', 3, 9, { h: 46 }), P('oak', 10, 10, { h: 34, rx: 22, ry: 14 }), P('oak', 18, 10, { h: 36, rx: 24, ry: 15 }), P('pine', 23, 9, { h: 44 }),
       P('dead', 15, 4), P('log', 13, 5), P('rock', 3, 4, { solid: true }), P('rock', 21, 2, { solid: true }),
@@ -581,7 +581,7 @@
     get entities() {
       var out = woodsLook(16)
         .concat(mergeWoodsEntities(A1, 'a1_clearing', 0, 0), mergeWoodsEntities(A2, 'a2_path', 22, 4), mergeWoodsEntities(A3, 'a3_fork', 46, 4));
-      out.push(P('oak', 20, 7, { big: 1, rx: 18 }), P('oak', 25, 7, { big: 1, rx: 18 }), P('oak', 44, 11, { big: 1, rx: 18 }), P('oak', 49, 11, { big: 1, rx: 18 }));
+      out.push(P('oak', 20, 6, { big: 1, rx: 18, solid: true }), P('oak', 25, 8, { big: 1, rx: 18, solid: true }), P('oak', 44, 10, { big: 1, rx: 18, solid: true }), P('oak', 49, 12, { big: 1, rx: 18, solid: true }));
       if (NEU.save && (NEU.save.has('mush1') || NEU.save.flagged('gone:a2_path:mush1'))) {
         return out.filter(function (e) { return e.mush !== 'mush1'; });
       }

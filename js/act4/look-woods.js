@@ -134,9 +134,9 @@
     var sm = g.imageSmoothingEnabled;
     g.imageSmoothingEnabled = false;
     if (g.canvas && g.canvas.width && g.canvas.height) {
-      var x0 = Math.max(0, Math.floor(-ox / S)), y0 = Math.max(0, Math.floor(-oy / S));
-      var x1 = Math.min(c.cv.width, Math.ceil(((g.canvas.clientWidth || g.canvas.width) - ox) / S));
-      var y1 = Math.min(c.cv.height, Math.ceil(((g.canvas.clientHeight || g.canvas.height) - oy) / S));
+      var x0 = Math.max(0, Math.floor(-ox / S) - 24), y0 = Math.max(0, Math.floor(-oy / S) - 24);
+      var x1 = Math.min(c.cv.width, Math.ceil(((g.canvas.clientWidth || g.canvas.width) - ox) / S) + 24);
+      var y1 = Math.min(c.cv.height, Math.ceil(((g.canvas.clientHeight || g.canvas.height) - oy) / S) + 24);
       if (x1 > x0 && y1 > y0) g.drawImage(c.cv, x0, y0, x1 - x0, y1 - y0, ox + x0 * S, oy + y0 * S, (x1 - x0) * S, (y1 - y0) * S);
     } else g.drawImage(c.cv, ox, oy, c.cv.width * S, c.cv.height * S);
     g.imageSmoothingEnabled = sm;
@@ -350,26 +350,7 @@
     }
     g.globalAlpha = 1;
     /* 6. the forest wall: black canopy, trunks where it meets open ground */
-    for (y = 0; y < Ht; y++) for (x = 0; x < Wd; x++) {
-      if (at(x, y) !== '#') continue;
-      X = x * T; Y = y * T;
-      R(X, Y, T, T, C.f0);
-      var faceDown = !solid(x, y + 1) || at(x, y + 1) === '~';
-      if (faceDown && open(x, y + 1)) {
-        /* trunks rising into the dark, roots spilling onto the floor */
-        var tx = X + 2 + ((hash(x, y, 90) * 6) | 0), tw = 4 + ((hash(x, y, 91) * 3) | 0);
-        R(tx, Y + 4, tw, 12, C.bark); R(tx, Y + 4, 1, 12, C.barkHi); R(tx + tw - 1, Y + 4, 1, 12, C.f1);
-        R(tx - 2, Y + T - 1, 2, 2, C.bark); R(tx + tw, Y + T - 1, 3, 2, C.bark);
-        if (hash(x, y, 92) < 0.6) { var t2 = X + 11 + ((hash(x, y, 93) * 3) | 0); R(t2, Y + 7, 3, 9, C.bark2); R(t2, Y + T - 1, 4, 1, C.bark2); }
-        R(X, Y + T - 1, T, 1, C.f1);
-      }
-      for (i = 0; i < 3; i++) {
-        var cx = X + ((hash(x, y, 100 + i) * 16) | 0), cy = Y + ((hash(x, y, 110 + i) * (faceDown ? 6 : 14)) | 0);
-        blob(R, cx, cy, 5 + i, 3 + i, i === 2 ? C.f2 : C.f1);
-      }
-      /* moonlit rim on a canopy edge facing the room */
-      if (open(x, y + 1) && hash(x, y, 120) < 0.7) R(X + ((hash(x, y, 121) * 8) | 0), Y + 1, 5, 1, C.fRim);
-    }
+    for (y = 0; y < Ht; y++) for (x = 0; x < Wd; x++) wallCell(R, g, room, x, y);
     /* 7. undergrowth: layered fronds, top-down so lower rows overhang */
     for (y = 0; y < Ht; y++) for (x = 0; x < Wd; x++) {
       if (at(x, y) !== '~') continue;
@@ -395,6 +376,36 @@
     /* 8. the room's own extras (moon pools, the castle wall at the fork) */
     if (opts.extra) opts.extra(R, g, room, c, at);
   }
+  function wallCell(R, g, room, x, y) {
+    var rows = room.grid, Wd = room.w, Ht = room.h, X, Y, i;
+    function at(xx, yy) { return xx < 0 || yy < 0 || yy >= Ht || xx >= rows[yy].length ? '#' : rows[yy].charAt(xx); }
+    function solid(xx, yy) { return WOOD_SOLID.indexOf(at(xx, yy)) >= 0; }
+    function open(xx, yy) { return !solid(xx, yy); }
+    if (at(x, y) !== '#') return;
+    X = x * T; Y = y * T;
+    R(X, Y, T, T, C.f0);
+    var faceDown = !solid(x, y + 1) || at(x, y + 1) === '~';
+    if (faceDown && open(x, y + 1)) {
+      var tx = X + 2 + ((hash(x, y, 90) * 6) | 0), tw = 4 + ((hash(x, y, 91) * 3) | 0);
+      R(tx, Y + 4, tw, 12, C.bark); R(tx, Y + 4, 1, 12, C.barkHi); R(tx + tw - 1, Y + 4, 1, 12, C.f1);
+      R(tx - 2, Y + T - 1, 2, 2, C.bark); R(tx + tw, Y + T - 1, 3, 2, C.bark);
+      if (hash(x, y, 92) < 0.6) { var t2 = X + 11 + ((hash(x, y, 93) * 3) | 0); R(t2, Y + 7, 3, 9, C.bark2); R(t2, Y + T - 1, 4, 1, C.bark2); }
+      R(X, Y + T - 1, T, 1, C.f1);
+    }
+    for (i = 0; i < 3; i++) {
+      var cx = X + ((hash(x, y, 100 + i) * 16) | 0), cy = Y + ((hash(x, y, 110 + i) * (faceDown ? 6 : 14)) | 0);
+      blob(R, cx, cy, 5 + i, 3 + i, i === 2 ? C.f2 : C.f1);
+    }
+    if (open(x, y + 1) && hash(x, y, 120) < 0.7) R(X + ((hash(x, y, 121) * 8) | 0), Y + 1, 5, 1, C.fRim);
+  }
+  A.woodsCanopy = function (level) {
+    var cv = mkCanvas(64, 64), g = cv.getContext && cv.getContext('2d');
+    if (!g) return cv;
+    var rows = ['####', '####', '####', '####'], room = { grid: rows, w: 4, h: 4 };
+    var R = function (x, y, w, h, col) { g.fillStyle = NEU.engineLook.shade(col, level); g.fillRect(x, y, w, h); };
+    for (var y = 0; y < 4; y++) for (var x = 0; x < 4; x++) wallCell(R, g, room, x, y);
+    return cv;
+  };
 
   /* moonlight pool on the ground: stepped, three bands */
   function moonPool(R, g, cx, cy, rx, ry) {
@@ -480,17 +491,15 @@
     paintPart(R, g, room, c, 'a1_clearing', 0, 0, 23, 13);
     paintPart(R, g, room, c, 'a2_path', 23, 4, 24, 11);
     paintPart(R, g, room, c, 'a3_fork', 47, 4, 23, 12);
-    function filler(x0, y0, x1, y1, seed) {
+    function filler(x0, y0, x1, y1) {
       var x, y;
       for (y = y0; y <= y1; y++) for (x = x0; x <= x1; x++) {
-        var px = x * T, py = y * T;
-        R(px, py, T, T, C.u0);
-        canopy(R, g, px + 8, py + 8, 11, 8, seed + x * 17 + y * 31, OAK);
+        wallCell(R, g, room, x, y);
       }
     }
-    filler(23, 0, 69, 3, 810);
-    filler(23, 15, 46, 15, 910);
-    filler(0, 13, 22, 15, 1010);
+    filler(23, 0, 69, 3);
+    filler(23, 15, 46, 15);
+    filler(0, 13, 22, 15);
   };
 
   /* water glints: a few pixels a frame, phase-walked along the stream */
@@ -748,7 +757,7 @@
     var c = fxCache[room.id];
     if (c) return c;
     var cv = mkCanvas(room.w * T, room.h * T), g = cv.getContext && cv.getContext('2d');
-    c = fxCache[room.id] = { cv: cv, mist: null, box: null };
+    c = fxCache[room.id] = { cv: cv, mist: null, edges: [], box: null };
     if (!g) return c;
     /* the bounds of every rect painted into cv, for the blit box below */
     var bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
@@ -774,8 +783,8 @@
     }
     g.globalAlpha = 1;
     for (i = 0; i < 4; i++) {
-      canopy(R, g, (22 + i) * T + 8, 7 * T - 40, 18, 9, 410 + i, OAK);
-      canopy(R, g, (46 + i) * T + 8, 11 * T - 40, 18, 9, 450 + i, OAK);
+      canopy(R, g, (22 + i) * T + 8, 7 * T - 28, 18, 9, 410 + i, OAK);
+      canopy(R, g, (46 + i) * T + 8, 11 * T - 28, 18, 9, 450 + i, OAK);
     }
     /* PERF: the beams are a few thin shafts in a canvas that is otherwise
        clear, so the frame blits this rect only. Padded a px so a cut edge
@@ -796,6 +805,19 @@
         mg.globalAlpha = 0.05; blob(MR, px, cy, (rx * 0.6) | 0, Math.max(1, ry - 1), '#BFD3FF');
       }
       c.mist = mc;
+      var rows = room.mist || [];
+      for (var ri = 0; ri < rows.length; ri++) {
+        var row = typeof rows[ri] === 'number' ? { x0: 0, x1: room.w - 1 } : rows[ri];
+        var mx = row.x0 * T, bandW = (row.x1 - row.x0 + 1) * T, ec = mkCanvas(129 * 48, 16), eg = ec.getContext && ec.getContext('2d');
+        if (!eg) { c.edges[ri] = null; continue; }
+        for (var phase = 0; phase <= 128; phase++) for (var j = 0; j < 3; j++) {
+          eg.globalAlpha = (j + 1) / 3;
+          eg.drawImage(mc, phase + mx + j * 8, 0, 8, 16, phase * 48 + j * 8, 0, 8, 16);
+          eg.drawImage(mc, phase + mx + bandW - 24 + j * 8, 0, 8, 16, phase * 48 + 24 + j * 8, 0, 8, 16);
+        }
+        eg.globalAlpha = 1;
+        c.edges[ri] = ec;
+      }
     }
     return c;
   }
@@ -815,10 +837,17 @@
         var rows = room.mist, rw = room.w * T;
         for (var i = 0; i < rows.length; i++) {
           var row = typeof rows[i] === 'number' ? { y: rows[i], x0: 0, x1: room.w - 1 } : rows[i];
-          var dir = i & 1 ? 1 : -1, drift = still() ? 0 : (d.now / 140 + i * 37) % 128;
+          var dir = row.y & 1 ? 1 : -1, drift = still() ? 0 : (d.now / 140 + row.y * 37) % 128;
           var sx0 = Math.round(dir > 0 ? drift : 128 - drift);
           var mx = row.x0 * T, mw = (row.x1 - row.x0 + 1) * T;
-          g.drawImage(c.mist, sx0 + mx, 0, mw, 16, ox + mx * S, oy + (row.y * T) * S, mw * S, 16 * S);
+          var dx = ox + mx * S, dy = oy + (row.y * T) * S, fade = 24, edge = c.edges[i];
+          if (edge) g.drawImage(edge, sx0 * 48, 0, 48, 16, dx, dy, 48 * S, 16 * S);
+          else {
+            fade = 0;
+            g.drawImage(c.mist, sx0 + mx, 0, mw, 16, dx, dy, mw * S, 16 * S);
+            continue;
+          }
+          g.drawImage(c.mist, sx0 + mx + fade, 0, mw - fade * 2, 16, dx + fade * S, dy, (mw - fade * 2) * S, 16 * S);
         }
       }
       g.imageSmoothingEnabled = sm;

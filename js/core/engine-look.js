@@ -133,20 +133,28 @@
   /* Cached 64px surrounds; woods may replace its tile with the canopy art. */
   var surroundTiles = {}, surroundPatterns = [];
   var SURROUND = {
-    woods: ['#263B2D', '#385239', '#52704A'], castle: ['#38313D', '#524653', '#756477'],
+    woods: ['#05080B', '#0A1216', '#101C20'], castle: ['#38313D', '#524653', '#756477'],
     city: ['#343440', '#4C4A58', '#77717B'], home: ['#493A36', '#6B514A', '#9A7667'],
     savanna: ['#59452D', '#84643A', '#B58A4B'], exo: ['#26303C', '#3F4C5C', '#647487']
   };
   function surroundTile(name, level) {
     var key = name + ':' + level, tile = surroundTiles[key], colors = SURROUND[name] || SURROUND.castle;
     if (tile) return tile;
+    if (name === 'woods' && NEU.roomArt && NEU.roomArt.woodsCanopy) {
+      tile = NEU.roomArt.woodsCanopy(level);
+      if (tile) { surroundTiles[key] = tile; return tile; }
+    }
     tile = mkCanvas(64, 64); var g = tile.getContext && tile.getContext('2d');
     if (!g) return tile;
     function r(x, y, w, h, c) { g.fillStyle = shade(c, level); g.fillRect(x, y, w, h); }
     r(0, 0, 64, 64, colors[0]);
     if (name === 'woods') {
-      r(0, 0, 32, 24, colors[1]); r(32, 16, 32, 24, colors[1]);
-      r(8, 8, 16, 8, colors[2]); r(40, 28, 16, 8, colors[2]);
+      r(0, 0, 64, 64, colors[0]);
+      r(0, 0, 18, 18, colors[1]); r(5, 0, 26, 15, colors[1]); r(37, 0, 23, 18, colors[1]);
+      r(0, 15, 25, 13, colors[1]); r(29, 13, 24, 14, colors[1]); r(49, 16, 15, 12, colors[1]);
+      r(3, 5, 10, 6, colors[2]); r(18, 9, 8, 4, colors[2]); r(40, 5, 14, 7, colors[2]);
+      r(9, 38, 4, 10, '#1E1820'); r(10, 38, 1, 10, '#3E3036');
+      r(42, 31, 5, 13, '#1E1820'); r(43, 31, 1, 13, '#3E3036');
     } else if (name === 'castle' || name === 'exo') {
       r(0, 0, 64, 2, colors[2]); r(0, 30, 64, 2, colors[2]);
       r(30, 0, 2, 32, colors[1]); r(8, 8, 4, 4, colors[1]); r(52, 8, 4, 4, colors[1]);
@@ -167,7 +175,7 @@
   function surround(ctx, name, x, y, rw, rh, w, h, S) {
     if (!SURROUND[name] || !ctx.createPattern) return false;
     var i, key, tile, cache, p0, p1, p2, p3;
-    if (x <= 0 && y <= 0 && x + rw >= w && y + rh >= h) return true;
+    if (x <= -24 && y <= -24 && x + rw >= w + 24 && y + rh >= h + 24) return true;
     for (i = 0; i < surroundPatterns.length; i++) if (surroundPatterns[i].ctx === ctx) { cache = surroundPatterns[i].tiles; break; }
     if (!cache) { cache = {}; surroundPatterns.push({ ctx: ctx, tiles: cache }); }
     key = name + ':0.6'; tile = surroundTile(name, 0.6); p0 = cache[key] || (cache[key] = ctx.createPattern(tile, 'repeat'));
