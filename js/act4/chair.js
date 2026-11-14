@@ -39,6 +39,7 @@
     rooms = NEU.engine && NEU.engine.rooms;
     if (rooms && rooms.length) {
       for (i = 0; i < rooms.length; i++) {
+        if (rooms[i] === 'a_woods') continue; /* merged room: its three areas are the stops, as before the merge */
         if (NEU.save && NEU.save.flagged('visit:' + rooms[i])) out.push(rooms[i]);
       }
       return out;
