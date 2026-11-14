@@ -542,6 +542,12 @@
         rows[y] = rows[y].substring(0, start) + grid[j].substring(source[i].x0, source[i].x1 + 1) + rows[y].substring(end);
       }
     }
+    var seam = [46, 47, 48, 46, 45, 47, 48, 46, 47, 45, 46, 48], chars;
+    for (y = 4; y <= 15; y++) {
+      chars = rows[y].split('');
+      for (i = 45; i <= 50; i++) if (chars[i] === '.' || chars[i] === '~') chars[i] = i <= seam[y - 4] ? '~' : '.';
+      rows[y] = chars.join('');
+    }
     return rows.join('\n');
   }
   function mergeWoodsEntities(room, id, dx, dy) {
@@ -581,7 +587,7 @@
     get entities() {
       var out = woodsLook(16)
         .concat(mergeWoodsEntities(A1, 'a1_clearing', 0, 0), mergeWoodsEntities(A2, 'a2_path', 22, 4), mergeWoodsEntities(A3, 'a3_fork', 46, 4));
-      out.push(P('oak', 20, 6, { big: 1, rx: 18, solid: true }), P('oak', 25, 8, { big: 1, rx: 18, solid: true }), P('oak', 44, 10, { big: 1, rx: 18, solid: true }), P('oak', 49, 12, { big: 1, rx: 18, solid: true }));
+      out.push(P('oak', 20, 6, { big: 1, rx: 18, solid: true }), P('oak', 25, 8, { big: 1, rx: 18, solid: true }), P('oak', 44, 10, { big: 1, rx: 18, solid: true }), P('oak', 47, 6, { big: 1, solid: true }), P('oak', 49, 12, { big: 1, rx: 18, solid: true }));
       if (NEU.save && (NEU.save.has('mush1') || NEU.save.flagged('gone:a2_path:mush1'))) {
         return out.filter(function (e) { return e.mush !== 'mush1'; });
       }
