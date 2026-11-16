@@ -689,7 +689,7 @@
     clearInterval(typing);
     typing = setInterval(function () {
       ttxt.textContent = line.slice(0, ++typePos);
-      if (typePos % 2 === 0) blip(v);
+      if (typePos % 2 === 0 && (!xHeld || typePos % 10 === 0)) blip(v);
       if (typePos >= line.length) {
         clearInterval(typing); typing = null;
         if (tmore) tmore.hidden = false;
