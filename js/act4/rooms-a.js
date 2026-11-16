@@ -496,7 +496,7 @@
               altar: { x: 22, y: 7, face: 'left' } },
     entities: woodsLook(12).concat([
       { t: 'save', x: 5, y: 6 },
-      { t: 'exit', x: 10, y: 1, to: 'b1_throne', spawn: 'south', style: 'gate' },
+      { t: 'exit', x: 10, y: 1, to: 'b1_throne', spawn: 'south', style: 'stairs', dir: 'up' },
       { t: 'exit', x: 23, y: 7, to: 'b7_altar', spawn: 'east', style: 'arch' },
       { t: 'exit', x: 0, y: 7, to: 'a2_path', spawn: 'east', style: 'path' },
       { t: 'npc', x: 11, y: 6, colour: '#8A8598', look: 'signpost', skin: 'signfork',
@@ -678,7 +678,7 @@
       { t: 'npc', x: 9, y: 3, colour: '#C2405F', key: 'witch', skin: 'witchcast',
         lines: ['...'],
         run: function (c) { witchTalk(c); } },
-      { t: 'exit', x: 22, y: 8, to: 'b2_blocks', spawn: 'west', locked: 'witch_met', style: 'door',
+      { t: 'exit', x: 22, y: 8, to: 'b2_blocks', spawn: 'west', locked: 'witch_met', style: 'door', via: 'door',
         lines: ['a heavy door, and it is locked from her side.',
                 'she has not told you about it yet. go and be told.'] },
       Q('candelabra', 6, 3, { solid: true }), Q('candelabra', 16, 3, { solid: true }),
@@ -855,7 +855,7 @@
       { t: 'exit', x: 20, y: 6, to: 'b3_braziers', spawn: 'west', locked: 'solved:b2_blocks', style: 'door',
         lines: ['a door with no handle, set flush in the wall.',
                 'it opens when both pale plates hold a stone.'] },
-      { t: 'exit', x: 0, y: 6, to: 'b1_throne', spawn: 'north', style: 'arch' },
+      { t: 'exit', x: 0, y: 6, to: 'b1_throne', spawn: 'north', style: 'arch', via: 'door' },
       Q('urn', 4, 2, { solid: true }), Q('urn', 16, 2, { solid: true }),
       Q('candelabra', 4, 9, { solid: true }), Q('candelabra', 16, 9, { solid: true }),
       Q('books', 1, 10, { solid: true }), Q('books', 19, 10, { solid: true }),
@@ -1079,7 +1079,7 @@
       { t: 'exit', x: 19, y: 6, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice', style: 'door',
         lines: ['the door is frozen into its frame.',
                 'it opens when the mouse reaches the cheese.'] },
-      { t: 'exit', x: 0, y: 6, to: 'b3_braziers', spawn: 'east', style: 'arch' },
+      { t: 'exit', x: 0, y: 6, to: 'b3_braziers', spawn: 'east', style: 'arch', via: 'door' },
       Q('statue', 9, 5, { frozen: true, solid: true }),
       Q('glow', 3, 4, { r: 46, col: '#BFE0FF' }), Q('glow', 16, 4, { r: 46, col: '#BFE0FF' }),
       Q('sconce', 9, 1), Q('armour', 1, 2, { solid: true }), Q('armour', 18, 10, { solid: true }),
@@ -1297,7 +1297,7 @@
       { t: 'exit', x: 19, y: 6, to: 'b7_altar', spawn: 'west', locked: 'solved:b6_dark', style: 'gate',
         lines: ['an iron gate. there is no light on the other side of it either.',
                 'it will not lift for somebody standing in the dark.'] },
-      { t: 'exit', x: 0, y: 6, to: 'b5_two', spawn: 'east', style: 'arch' },
+      { t: 'exit', x: 0, y: 6, to: 'b5_two', spawn: 'east', style: 'arch', via: 'door' },
       /* no wall torches here: the dark is the puzzle */
       Q('bones', 6, 2), Q('bones', 13, 10, { seed: 1 }), Q('rubble', 18, 2), Q('bones', 1, 10),
       /* nothing solid in the corridors: they are one cell wide and the
@@ -1369,7 +1369,7 @@
                 'a door opens in the south wall. it is on fire. it does not seem bothered.'] },
       { t: 'npc', x: 19, y: 10, colour: '#C4705F', mush: 'mush2', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush2'); } },
-      { t: 'exit', x: 22, y: 6, to: 'a_woods', spawn: 'altar', style: 'arch' },
+      { t: 'exit', x: 22, y: 6, to: 'a_woods', spawn: 'altar', style: 'arch', via: 'slide' },
       { t: 'exit', x: 11, y: 1, to: 'b8_arena', spawn: 'west', locked: 'solved:b6_dark', style: 'stairs',
         lines: ['stairs going down, and something at the bottom of them with a heartbeat.',
                 'a grate is down across them. it lifts when the dark room is lit.'] },
@@ -1380,7 +1380,7 @@
          is drawn burning so it cannot be mistaken for the other
          exits in a room that already has three. */
       { t: 'exit', x: 11, y: 12, to: 'd1_street', spawn: 'fire', locked: 'firedoor',
-        sheet: 'firedoor', style: 'portal',
+        sheet: 'firedoor', style: 'portal', via: 'portal:fire',
         lines: ['the south wall is a wall.'] },
       Q('candles', 9, 5, { solid: true }), Q('candles', 13, 5, { solid: true, seed: 1 }),
       Q('candles', 9, 8, { solid: true, seed: 1 }), Q('candles', 13, 8, { solid: true }),

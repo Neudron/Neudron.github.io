@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
-  var kinds = {}, enabled = { woods: 1 }, active = null;
+  var kinds = {}, enabled = { woods: 1, castle: 1 }, active = null;
   function kind(name, def) { kinds[name] = def; return def; }
   function get(name) { return kinds[name] || null; }
   function start(name, canvas, dir, reduced, incoming, opts) {
@@ -58,6 +58,7 @@
   kind('stairs', { ms: 270 });
   kind('fall', { ms: 520 });
   kind('mode', { ms: 320 });
+  kind('portal:fire', { ms: 380 });
   kind('portal:d1_street>b7_altar', { ms: 380 });
   kind('portal:d1_street>h3_trip', { ms: 380 });
   kind('cine:rooms-g-trip', { ms: 320 });
