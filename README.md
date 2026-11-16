@@ -46,7 +46,7 @@ node tests/run-all.mjs
 npm run check
 npm run build && npm run verify
 # or one suite at a time:
-node tests/fixes5.mjs    # ... through fixes111.mjs
+node tests/fixes5.mjs    # ... through fixes569.mjs (251 fixes*.mjs present; 244 suites in the last recorded gate run)
 node tests/playthrough.mjs
 ```
 
