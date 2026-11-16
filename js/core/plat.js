@@ -1016,6 +1016,16 @@
       if (levels[id] && !bakeCache[id] && !levels[id].chunked) { current = cloneLevel(levels[id]); current.solids = []; bake(); bakeCache[id] = baked; }
       current = keepLevel; baked = keepBaked;
     },
+    /* PLAN 9.1: CSS px where a terraria level's spawn stands once opened at this window size (same camera and rounding as placeCamera and draw) */
+    spawnScreen: function (id) {
+      var L = levels[id], dpr = window.devicePixelRatio || 1, w = Math.round(window.innerWidth * dpr), h = Math.round(window.innerHeight * dpr), s, vw, vh, px, py, cx, cy;
+      if (!L || L.view !== 'terraria') return null;
+      s = Math.max(1, Math.round(h / 540)); vw = Math.ceil(w / s); vh = Math.ceil(h / s);
+      px = (L.spawn.x + 0.5) * TILE; py = (L.spawn.y + 1) * TILE;
+      cx = Math.round(clamp(px + 24 - vw / 2, 0, Math.max(0, L.w * TILE - vw)));
+      cy = Math.round(clamp(py - HH - vh / 2, 0, Math.max(0, L.h * TILE - vh)));
+      return { x: (Math.round((w - vw * s) / 2) + (px - cx) * s) / dpr, y: (Math.round((h - vh * s) / 2) + (py - cy) * s) / dpr };
+    },
     view: function () { return { w: view.w, h: view.h, scale: view.scale }; },
     backdrop: null, live: null, foreground: null, hud: null, skin: null,
     get state() { return getStateSafe(); }, step: step, replay: replay, tick: tick,

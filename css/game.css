@@ -1136,19 +1136,20 @@ html.rm .inv, html.rm .inv *, html.rm .inv *::before, html.rm .inv *::after { an
 @media (prefers-reduced-motion: reduce) {
   .crack-sky__cap { transition: none; }
 }
-/* D1 hand-off: the horizon and the landing are the d0 spawn's screen spot (feet at 240px, x = w/2 - 24 on 720p-class views, see plat.js terraria camera) */
-.crack-sky__ground { top: 240px; }
-.crack-sky__ridge { top: auto; bottom: calc(100% - 240px); }
+/* D1 hand-off: --fx/--fy are the d0 spawn's screen point (hero feet), set by crack.js from NEU.plat.spawnScreen; feet sit at (40, 88) in the 80x96 hero box */
+.crack-sky { --fx: calc(50vw - 24px); --fy: 240px; }
+.crack-sky__ground { top: var(--fy); }
+.crack-sky__ridge { top: auto; bottom: calc(100% - var(--fy)); }
 .crack-sky__hero { animation: skyFallD0 1.9s cubic-bezier(.5, .05, .75, .4) forwards; }
 .crack-sky__hero.is-landed { animation: skySettleD0 .6s ease-out forwards; }
 @keyframes skyFallD0 {
-  0%   { transform: translate(calc(50vw - 64px), 4vh) rotate(-160deg); }
-  45%  { transform: translate(calc(50vw - 64px), 98px) rotate(170deg); }
-  75%  { transform: translate(calc(50vw - 64px), 136px) rotate(340deg); }
-  100% { transform: translate(calc(50vw - 64px), 152px) rotate(360deg); }
+  0%   { transform: translate(calc(var(--fx) - 40px), 4vh) rotate(-160deg); }
+  45%  { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 142px)) rotate(170deg); }
+  75%  { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 104px)) rotate(340deg); }
+  100% { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 88px)) rotate(360deg); }
 }
 @keyframes skySettleD0 {
-  0%   { transform: translate(calc(50vw - 64px), 152px) rotate(360deg) scaleY(1); }
-  30%  { transform: translate(calc(50vw - 64px), 152px) rotate(360deg) scaleY(.6); }
-  100% { transform: translate(calc(50vw - 64px), 152px) rotate(360deg) scaleY(1); }
+  0%   { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 88px)) rotate(360deg) scaleY(1); }
+  30%  { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 88px)) rotate(360deg) scaleY(.6); }
+  100% { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 88px)) rotate(360deg) scaleY(1); }
 }
