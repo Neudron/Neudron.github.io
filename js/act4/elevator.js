@@ -485,7 +485,7 @@
       if (raw > 1) raw = 1;
       u = raw * raw * (3 - 2 * raw);
       y = yFrom + (-96 - yFrom) * u;
-      if (t >= span) { phase = 'doors'; t = 0; mountain = true; openMountain(); }
+      if (t >= span) { phase = 'doors'; t = 0; }
     } else if (phase === 'doors') {
       span = reduced ? 0.4 : 2.8;
       raw = t / span;
