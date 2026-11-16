@@ -7,6 +7,7 @@
   var ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
   var active = false;
   var state = null;
+  var losePending = null;
   var CW = 72;
   var CH = 104;
 
@@ -53,7 +54,7 @@
       sel: 0, over: false, result: null, awarded: false,
       clock: 0, flies: [], slide: null, grain: [], grainAt: -1000,
       disp: { you: 15, mage: 15 }, fx: [], intent: null,
-      pops: [], flash: null,
+      pops: [], flash: null, legacy: false,
       exiting: false, exitT: 0, returned: false, endT: 0
     };
   }
@@ -181,6 +182,15 @@
     if (NEU.dungeon && NEU.dungeon.toSurface) NEU.dungeon.toSurface();
   }
 
+  /* The board is held, then the surface teleport fires. A new duel cannot
+     swallow the pending death: the closure still pays it exactly once. */
+  function finishLose(s) {
+    if (!losePending || losePending.s !== s) return;
+    losePending = null;
+    if (state === s && active) close();
+    dungeonDeath();
+  }
+
   /* Both decks and both hands empty, both still up: the duel has nowhere
      to go. Higher HP wins. A tie is a loss. */
   function settle() {
@@ -193,8 +203,9 @@
   }
 
   function play(idx) {
-    var intent, youCard, mageCard, mi;
-    if (!state) return state;
+    var intent, youCard, mageCard, mi, wasOver, s, done;
+    if (!state || losePending) return state;
+    wasOver = state.over;
     if (!state.over) {
       intent = state.intent;
       youCard = state.you.hand[idx];
@@ -212,8 +223,17 @@
       if (!state.over) beginTurn();
     }
     if (state.result === 'win') grant();
-    if (state.result === 'lose') { close(); dungeonDeath(); }
-    else draw();
+    if (state.result === 'lose') {
+      if (wasOver || state.legacy || reduced()) { close(); dungeonDeath(); }
+      else if (!losePending) {
+        draw();
+        s = state;
+        losePending = { s: s };
+        done = function () { finishLose(s); };
+        if (NEU.kernel && NEU.kernel.after) NEU.kernel.after(1200, done);
+        else setTimeout(done, 1200);
+      }
+    } else draw();
     return state;
   }
 
@@ -229,6 +249,7 @@
 
   function open(opts) {
     var rng;
+    if (losePending) { losePending = null; dungeonDeath(); }
     opts = opts || {};
     rng = opts.rng;
     if (!rng && opts.seed != null && NEU.rand && NEU.rand.seeded) rng = NEU.rand.seeded(opts.seed);
@@ -237,6 +258,7 @@
     /* Shipped game: fixed orders. An explicit rng/seed is kept only as a
        compatibility adapter for the older scripted suites. */
     if (opts.rng || opts.seed != null) {
+      state.legacy = true;
       state.deck = shuffle(buildDeck(), rng);
       state.mageDeck = shuffle(buildDeck(), rng);
     } else {
