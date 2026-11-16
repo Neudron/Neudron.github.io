@@ -1005,6 +1005,8 @@
   function move(dt) {
     var ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
     var iy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+    /* Seated: a move key stands you up through api.sit's reverse frames. */
+    if (sitting && (ix || iy)) { API.sit(sitting.ent); return; }
     /* Seated: the stick is dead until a direction is pressed, which is
        also what stands you back up. */
     if (sitting) {
@@ -1557,16 +1559,48 @@
     /* Hold a named pose on the player for secs (engine-look draws it).
        'drink' is the recall potion's. */
     act: function (name, secs) { playerAct = name ? { name: name, t: secs || 0, max: secs || 0 } : null; },
-    /* Sit on a seat entity (b1_throne's second throne): pins the player
-       to the seat's anchor, facing the room, until any move key — or a
-       second interact on the same seat — stands them up. */
+    /* Sit on a seat entity (b1_throne's second throne). The player walks
+       to the cell in front of it, then faces the room and plays stand ->
+       crouch -> seated, 120 ms each. A second call, or a move key via
+       move(), plays the same frames in reverse. busy holds input meanwhile. */
     sit: function (e) {
       if (!e) { sitting = null; return false; }
-      if (sitting && sitting.ent === e) { sitting = null; settle = 0.09; return false; }
-      var p = entAt(e);
-      sitting = { ent: e, x: p.x, y: p.y + 5 };
-      px = sitting.x; py = sitting.y; prevPX = px; prevPY = py; vx = 0; vy = 0; face = 'down';
-      settle = 0.09;
+      if (busy || cine) return false;
+      var p = entAt(e), front = entAt({ x: e.x, y: e.y + 1 }), fx = e.x, fy = e.y + 1;
+      function frame(ms, fn) { if (reduced) fn(); else later(fn, ms); }
+      function cellOf(q) { return [Math.floor(q.x / TILE), Math.floor((q.y - 1) / TILE)]; }
+      function sitDown() {
+        busy = true; face = 'down'; moving = false; vx = 0; vy = 0;
+        frame(120, function () {
+          sitting = { ent: e, x: p.x, y: p.y + 5 };
+          px = sitting.x; py = sitting.y; prevPX = px; prevPY = py;
+          API.act('crouch', 9);             /* cleared by the timer below, never by its own clock */
+        });
+        frame(240, function () { API.act(null); busy = false; settle = 0.09; });
+      }
+      if (sitting && sitting.ent === e) {
+        busy = true; API.act('crouch', 9);
+        frame(120, function () {
+          sitting = null; px = front.x; py = front.y; prevPX = px; prevPY = py;
+          face = 'down'; moving = false; API.act(null);
+        });
+        frame(240, function () { busy = false; settle = 0.09; });
+        return false;
+      }
+      if (sitting) return false;
+      var cur = cellOf(API.playerAt());
+      if (cur[0] === fx && cur[1] === fy) { sitDown(); return true; }
+      /* not in front yet: walk there on the scripted stick, one axis at a time */
+      var n = 0;
+      API.cine(true);
+      (function walk() {
+        var c = cellOf(API.playerAt());
+        if (c[0] === fx && c[1] === fy) { API.cine(false); sitDown(); return; }
+        if (n++ > 300) { API.cine(false); return; }
+        if (c[1] !== fy) API.drive(0, fy > c[1] ? 1 : -1);
+        else API.drive(fx > c[0] ? 1 : -1, 0);
+        later(walk, 16);
+      })();
       return true;
     },
     /* Scripted input for cinematics: real keys die, drive() walks. */

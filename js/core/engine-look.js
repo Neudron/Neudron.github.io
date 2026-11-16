@@ -609,6 +609,8 @@
   var SIT = ['..hhhhh..', '.hHhhhHh.', '.hsssssh.', '.hsesesh.', '.hsssssh.',
              '..sssss..', '.cCcccCc.', 'scccccccs', '.cdcccdc.',
              '..cccccc..', '..bbbbbb..'];
+  /* Crouch (api.sit's middle frame, act 'crouch'): the standing torso on bent knees, SIT's 11 rows. */
+  var CROUCH = BODY.down.slice(0, 8).concat(['..cccccc..', '.cccccccc.', '..bbbbbb..']);
 
   var rowsMemo = {};   /* one rows array per pose, so stamp() can cache the baked sprite on it */
   function playerRows(face, phase, blink) {
@@ -646,6 +648,7 @@
       }
       return;
     }
+    if (act === 'crouch') { stamp(ctx, CROUCH, PAL, sx, sy, s, { flip: face === 'right' }); return; }
     if (extra && extra.sit) {
       /* seated on a throne: short pose, feet on the seat's edge */
       stamp(ctx, SIT, PAL, sx, sy, s, { flip: face === 'right', squash: extra.settle && !reduced });
