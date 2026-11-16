@@ -435,7 +435,7 @@
     bob = still ? 0 : (Math.floor(clock / 600) % 2);
     ph = still ? 0 : (Math.floor(clock / 800) % 2);
     /* the mage flinches when the brimstone lands */
-    if (sId === 'react') lunge = sP < 0.4 ? -3 : (sP < 0.75 ? 3 : 0);
+    if (sId === 'react' && !still) lunge = sP < 0.4 ? -3 : (sP < 0.75 ? 3 : 0);
     blit(a.bg, 0, 0);
     if (!a.bg) { box(0, 0, 320, 192, '#1C1814'); return; }
     cry = 57 + bob;
