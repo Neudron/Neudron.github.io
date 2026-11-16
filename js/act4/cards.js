@@ -197,7 +197,7 @@
     opts = opts || {};
     rng = opts.rng;
     if (!rng && opts.seed != null && NEU.rand && NEU.rand.seeded) rng = NEU.rand.seeded(opts.seed);
-    if (!rng) rng = Math.random;
+    if (!rng) rng = (NEU.rand && NEU.rand.rng) || Math.random;
     state = blank();
     state.rng = rng;
     state.deck = shuffle(buildDeck(), rng);
@@ -603,19 +603,21 @@
     text('BLK' + state.you.block + (state.you.parry ? ' PARRY' : ''), 544, 90, 12, '#C8B898');
     text('STREAK' + state.you.streak, 544, 106, 12, '#C8B898');
     /* damage numbers rise and fade; a short plaque flash lands the hit */
-    if (state.flash) {
-      t = state.flash.t / state.flash.dur;
-      ctx.globalAlpha = (1 - t > 0 ? 1 - t : 0) * 0.6;
-      ctx.fillStyle = '#FFE8E8';
-      ctx.fillRect(state.flash.x - 6, state.flash.y - 6, 108, 78);
-      ctx.globalAlpha = 1;
-    }
-    for (i = 0; i < state.pops.length; i++) {
-      pp = state.pops[i];
-      t = pp.t / pp.dur;
-      ctx.globalAlpha = 1 - t > 0 ? 1 - t : 0;
-      text(pp.text, pp.x, pp.y - 30 - Math.round(t * 26), 20, '#FF6B6B');
-      ctx.globalAlpha = 1;
+    if (!reduced()) {
+      if (state.flash) {
+        t = state.flash.t / state.flash.dur;
+        ctx.globalAlpha = (1 - t > 0 ? 1 - t : 0) * 0.6;
+        ctx.fillStyle = '#FFE8E8';
+        ctx.fillRect(state.flash.x - 6, state.flash.y - 6, 108, 78);
+        ctx.globalAlpha = 1;
+      }
+      for (i = 0; i < state.pops.length; i++) {
+        pp = state.pops[i];
+        t = pp.t / pp.dur;
+        ctx.globalAlpha = 1 - t > 0 ? 1 - t : 0;
+        text(pp.text, pp.x, pp.y - 30 - Math.round(t * 26), 20, '#FF6B6B');
+        ctx.globalAlpha = 1;
+      }
     }
     if (!reduced()) {
       if (state.clock - state.grainAt >= 400) {
