@@ -1,6 +1,6 @@
 # Status and handoff ledger
 
-Snapshot date: 2026-11-16. Authoritative local branch: `v3/integration` @ `048c20e`.
+Snapshot date: 2026-11-16. Authoritative local branch: `v3/integration` @ `d88fec3`.
 Public `main` / `origin/main`: `d4010ef` (untouched; no push, merge or deploy performed).
 
 ## Current state
@@ -21,7 +21,7 @@ Public `main` / `origin/main`: `d4010ef` (untouched; no push, merge or deploy pe
 | B05–B11 visual batches | LANDED | All A/B/C/D orders through section 12 committed; 244-suite gate green |
 | Real-browser visual evidence | PARTIAL | D7/D8/D9 captured desktop + phone (current-state only, no pixel baseline); 13 other orders still jsdom-only; no visual approval claimed |
 | F order reports | DONE | 31/31 present; 14 reconstructed from commits/suites and marked where captures are absent |
-| V3-100 world graph | LANDED | `js/core/world-graph.js`, `scripts/check-world.mjs`, `plans/neu-v3/WORLD_GRAPH.md`, `fixes569`; feature-disabled by default, legacy go remains authoritative |
+| V3-100 world graph | LANDED | `js/core/world-graph.js`, `scripts/check-world.mjs`, `plans/neu-v3/WORLD_GRAPH.md` (local-only, not in repo), `fixes569`; feature-disabled by default, legacy go remains authoritative |
 | B3-11 world graph tool | PARTIAL | `scripts/worldgraph.mjs` present; 38 rooms / 90 edges after village and exo-hall merges; 2 lock-setter questions (`home_larder`, `home_cellar`) and 2 intentional one-way `x2_arena` edges reported by the validator |
 | Reference board (V3-002) | NOT DONE | `plans/neu-v3/references/INDEX.md`: 23 of 24 image leads preview-only; 20-screenshot review gate not satisfied |
 | Asset redistribution rights | CLEARED (owner, 2026-11-16) | Owner granted permission for all bundled assets. `assets/manifest.v3.json` status `OWNER_AUTHORIZED`, restriction/warning removed, every group `CLEARED` with creator recorded; `img/act4/CREDITS.md` has the creator index |
