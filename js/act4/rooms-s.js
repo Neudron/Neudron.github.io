@@ -72,7 +72,9 @@
   }
   /* Lockdown is a flag, read when the room is entered. chase.js
      swaps the entity list. The exo rooms are not the village. */
+  var villageBuild = false, VDEFS = {};
   function room(id, def) {
+    if (villageBuild) { def.id = id; VDEFS[id] = def; return def; }
     var r = E.register(id, def);
     if (NEU.chase && NEU.chase.bind) NEU.chase.bind(r);
     return r;
@@ -488,12 +490,22 @@
   /* ── s0 the sand ───────────────────────────────────────────────── */
   var trees = [], ti;
   for (ti = 0; ti < 8; ti++) trees.push(prop('acacia', 24 + ti * 40, ti % 2 ? 2 : 7));
+  /* The village is planted hours before you reach it: one landmark every
+     60 columns, and the horizon grows a roof at each one. Data lives here
+     so look-savanna only draws it; there is no second landmark list. */
+  var LANDMARKS = [
+    { x: 60, v: 'deadtree', y: 3 }, { x: 120, v: 'brokensign', y: 6 },
+    { x: 180, v: 'rustcar', y: 3 }, { x: 240, v: 'dunecrest', y: 7 },
+    { x: 300, v: 'roofs', y: 2 }
+  ];
   room('s0_sand', {
     tileset: 'savanna',
     tiles: sandTiles(),
+    landmarks: LANDMARKS,
     spawns: { west: { x: 1, y: 5, face: 'right' }, east: { x: 360, y: 5, face: 'left' } },
     entities: [{ t: 'savannafloor', x: 0, y: 0 }, { t: 'savannafx', x: 1, y: 8, roomSpan: true }]
       .concat(trees)
+      .concat(LANDMARKS.map(function (m) { return prop(m.v, m.x, m.y); }))
       .concat([
         { t: 'exit', x: 0, y: 5, to: 'd2_alley', spawn: 'garage', style: 'door' },
         { t: 'exit', x: 361, y: 5, to: 's1_gate', spawn: 'west', style: 'arch' }
@@ -506,7 +518,11 @@
     }
   });
 
-  /* ── village ───────────────────────────────────────────────────── */
+  /* ── village ─────────────────────────────────────────────────────
+     These fourteen definitions are DATA until mergeVillage() runs: the
+     authored map in .opencode/plans/neu-v3/levels/village.md fixes their
+     offsets and corridors. Old ids become areas and aliases. */
+  villageBuild = true;
   addBox('s1_gate', sp('west', 'east', 'north', 'south'), [
     gate('west', 's0_sand', 'east'),
     gate('east', 's3_market', 'west'),
@@ -708,7 +724,157 @@
     prop('acacia', 7, 3)
   ]);
 
-  NEU.act4RoomsS = ['s0_sand', 's1_gate', 's2_well', 's3_market', 's4_shade', 's5_baobab',
+  villageBuild = false;
+
+  /* The authored map from .opencode/plans/neu-v3/levels/village.md. Room
+     rectangles keep their old ids as areas; corridors are the only new
+     floor, and the two outside doors are the only exits left in data. */
+  var V_ORIGIN = {
+    s10_shells: [4, 6], s13_wind: [20, 6], s4_shade: [4, 20], s7_pool: [20, 20],
+    s9_beads: [36, 20], s12_termite: [52, 20], s1_gate: [4, 34], s3_market: [20, 34],
+    s6_kraal: [36, 34], s2_well: [4, 48], s5_baobab: [20, 48], s11_elder: [36, 48],
+    s8_hearth: [4, 62], s14_station: [36, 62]
+  };
+  var V_LAND = {
+    s1_gate: 'west', s2_well: 'south', s3_market: 'west', s4_shade: 'south',
+    s5_baobab: 'west', s6_kraal: 'west', s7_pool: 'west', s8_hearth: 'west',
+    s9_beads: 'south', s10_shells: 'south', s11_elder: 'north', s12_termite: 'west',
+    s13_wind: 'south', s14_station: 'north'
+  };
+  var V_PATHS = [
+    [[9, 34], [9, 28]], [[9, 20], [9, 14]], [[14, 24], [20, 24]], [[25, 20], [25, 14]],
+    [[30, 24], [31, 24], [31, 18], [51, 18], [51, 24], [52, 24]],
+    [[14, 38], [20, 38]], [[25, 34], [25, 33], [41, 33], [41, 28]],
+    [[30, 38], [36, 38], [36, 37]], [[39, 40], [39, 47], [41, 47], [41, 48]],
+    [[41, 56], [41, 62]], [[9, 42], [9, 43], [11, 43], [11, 53], [7, 53], [7, 52]],
+    [[9, 50], [12, 50], [12, 52], [20, 52]], [[30, 52], [32, 52], [32, 65], [13, 65], [12, 65]],
+    [[3, 38], [1, 38]], [[63, 24], [66, 24]]
+  ];
+  var V_W = 69, V_H = 75;
+  var V_PUZZLES = [
+    { id: 's2_well', plates: [[7, 50]] },
+    { id: 's6_kraal', plates: [[39, 36], [39, 38]] },
+    { id: 's8_hearth', plates: [[7, 65]], flag: 's8_lit' }
+  ];
+  function vGrid() {
+    var rows = [], y;
+    for (y = 0; y < V_H; y++) rows.push(new Array(V_W + 1).join('#'));
+    return rows;
+  }
+  function vCarve(rows, path) {
+    var i, x, y, ax, ay, bx, by, dx, dy, sx, sy, n, k;
+    for (i = 0; i + 1 < path.length || (i === 0 && path.length === 1); i++) {
+      ax = path[i][0]; ay = path[i][1];
+      bx = path[i + 1] ? path[i + 1][0] : ax; by = path[i + 1] ? path[i + 1][1] : ay;
+      dx = bx > ax ? 1 : bx < ax ? -1 : 0;
+      dy = by > ay ? 1 : by < ay ? -1 : 0;
+      n = Math.max(Math.abs(bx - ax), Math.abs(by - ay));
+      for (k = 0; k <= n; k++) {
+        x = ax + dx * k; y = ay + dy * k;
+        if (y < 0 || y >= rows.length || x < 0 || x >= rows[y].length) continue;
+        rows[y] = rows[y].substring(0, x) + ',' + rows[y].substring(x + 1);
+      }
+      if (path.length === 1) break;
+    }
+  }
+  function vStamp(rows, id) {
+    var o = V_ORIGIN[id], src = VDEFS[id].tiles.split('\n'), r, x, row;
+    for (r = 0; r < src.length; r++) {
+      row = rows[o[1] + r];
+      for (x = 0; x < src[r].length; x++)
+        row = row.substring(0, o[0] + x) + src[r].charAt(x) + row.substring(o[0] + x + 1);
+      rows[o[1] + r] = row;
+    }
+  }
+  function villageSolved(c) {
+    var i, j, p, done = 0, covered;
+    for (i = 0; i < V_PUZZLES.length; i++) {
+      p = V_PUZZLES[i];
+      covered = true;
+      for (j = 0; j < p.plates.length; j++)
+        if (!c.entHere(p.plates[j][0], p.plates[j][1], 'block')) covered = false;
+      if (p.flag && !c.flagged(p.flag)) covered = false;
+      if (covered && !c.flagged('solved:' + p.id)) {
+        c.markSolved(p.id);
+        if (NEU.juice && NEU.juice.hit) NEU.juice.hit('small');
+      }
+      /* Cover, not the flag, decides the room's own win: the flag is a
+         sticky reward, and the push-proof harness reads the cover. */
+      if (covered) done++;
+    }
+    return done === V_PUZZLES.length;
+  }
+  /* The elder area carries the chase figure because the merged room id is
+     s_village, not s11_elder; chase.js keeps its own bind and step. */
+  function elderEnter(c) {
+    var prev = VDEFS.s11_elder.onEnter, list, i, x = 41, y = 54;
+    if (prev) prev(c);
+    if (!NEU.save || (NEU.chase && NEU.chase.over)) return;
+    if (!NEU.save.flagged('s_lockdown') && !NEU.save.flagged('draedon_won')) return;
+    list = c.ents();
+    for (i = 0; i < list.length; i++) if (list[i].t === 'figure') return;
+    list.push({ t: 'figure', x: x, y: y, figure: 1 });
+    list.push({ t: 'trigger', x: x, y: y, once: 1,
+      run: function () { if (NEU.chase && NEU.chase.arrive) NEU.chase.arrive(); } });
+  }
+  function mergeVillage() {
+    var rows = vGrid(), ids = Object.keys(V_ORIGIN), i, k, id, o, def, es, e, copy,
+        key, s, map, spawns = {}, areas = [], ents = [], rowsOf;
+    for (i = 0; i < ids.length; i++) vStamp(rows, ids[i]);
+    /* A door in a wall is solid; open the wall cell it used to occupy. */
+    for (i = 0; i < ids.length; i++) {
+      id = ids[i]; o = V_ORIGIN[id]; es = VDEFS[id].entities || [];
+      for (k = 0; k < es.length; k++) {
+        e = es[k];
+        if (e.t !== 'exit' || !V_ORIGIN[e.to]) continue;
+        vCarve(rows, [[o[0] + e.x, o[1] + e.y]]);
+      }
+    }
+    for (i = 0; i < V_PATHS.length; i++) vCarve(rows, V_PATHS[i]);
+    for (i = 0; i < ids.length; i++) {
+      id = ids[i]; o = V_ORIGIN[id]; def = VDEFS[id];
+      for (key in (def.spawns || {})) {
+        s = def.spawns[key];
+        spawns[id + '_' + key] = { x: o[0] + s.x, y: o[1] + s.y, face: s.face };
+      }
+      rowsOf = def.tiles.split('\n').filter(function (r) { return r.length; });
+      areas.push({ id: id, x0: o[0], y0: o[1], x1: o[0] + rowsOf[0].length - 1,
+        y1: o[1] + rowsOf.length - 1, spawn: id + '_' + V_LAND[id],
+        onEnter: id === 's11_elder' ? elderEnter : def.onEnter });
+      map = {};
+      for (key in (def.spawns || {})) map[key] = id + '_' + key;
+      /* Small harnesses boot this file with a tileset/register-only engine
+         stub; the real engine always has alias(). Keep the room data build
+         usable in both instead of crashing before mount() can be tested. */
+      if (typeof E.alias === 'function') E.alias(id, 's_village', map, id);
+      es = def.entities || [];
+      for (k = 0; k < es.length; k++) {
+        e = es[k];
+        if (e.t === 'savannafloor' || e.t === 'savannafx') continue;
+        if (e.t === 'exit' && V_ORIGIN[e.to]) continue;
+        copy = {};
+        for (key in e) copy[key] = e[key];
+        copy.origin = { room: id, x: e.x, y: e.y };
+        copy.x += o[0]; copy.y += o[1];
+        ents.push(copy);
+      }
+    }
+    return {
+      tileset: 'savanna', tiles: rows.join('\n'),
+      stationZones: [{ x0: 36, y0: 62, x1: 46, y1: 70 }],
+      spawns: spawns, areas: areas,
+      entities: [{ t: 'savannafloor', x: 0, y: 0 },
+                 { t: 'savannafx', x: 1, y: 74, roomSpan: true }].concat(ents),
+      solved: villageSolved,
+      onSolved: function (c) {
+        c.markSolved('s_village');
+        if (NEU.juice && NEU.juice.hit) NEU.juice.hit('large');
+      },
+      onReset: function () { hearth = []; if (NEU.save) NEU.save.flag('s8_lit', 0); }
+    };
+  }
+  room('s_village', mergeVillage());
+  NEU.act4RoomsS = ['s0_sand', 's_village', 's1_gate', 's2_well', 's3_market', 's4_shade', 's5_baobab',
     's6_kraal', 's7_pool', 's8_hearth', 's9_beads', 's10_shells', 's11_elder', 's12_termite', 's13_wind',
     's14_station'];
 
@@ -833,21 +999,35 @@
     tick: function (dt) { NEU.house.step(dt); }
   });
 
-  E.register('x0_foyer', {
-    tileset: 'exo',
-    tiles: exoHall(),
-    spawns: sp('west', 'north'),
-    entities: exoDress([
+  /* D8: the foyer and the arena are one hall. Both ids keep their name for
+     saves, reach checks and older suites, but share one definition. */
+  function hallSpawns() {
+    var o = sp('west', 'east', 'north', 'south');
+    o.stair = { x: 5, y: 2, face: 'down' };
+    return o;
+  }
+  function hallEnts() {
+    return exoDress([
       gate('west', 's12_termite', 'east'),
       gate('north', 'x1_spiral', 'south'),
-      { t: 'sign', x: 3, y: 6, lines: ['a stair. the chair at the top has already turned.'] }
-    ]),
-    onEnter: function (c) {
-      if (c.flagged('x0_seen')) return;
-      c.flag('x0_seen', 1);
-      c.say(['steel, and a stair that does not trust you.',
-        'something at the top is already looking down.']);
-    }
+      { t: 'npc', x: 5, y: 4, colour: '#20C8D0',
+        run: function (c) {
+          if (NEU.exo && NEU.exo.open) NEU.exo.open();
+          else c.say(['the arena door is shut.']);
+        } },
+      { t: 'sign', x: 3, y: 6,
+        lines: ['steel, a stair and a door. the chair at the top has already turned.'] }
+    ]);
+  }
+  function hallEnter(c) {
+    if (c.flagged('x0_seen')) return;
+    c.flag('x0_seen', 1);
+    c.say(['steel, and a stair that does not trust you.',
+      'something at the top is already looking down.']);
+  }
+  E.register('x0_foyer', {
+    tileset: 'exo', tiles: exoHall(), spawns: hallSpawns(),
+    entities: hallEnts(), onEnter: hallEnter
   });
   E.register('x1_spiral', {
     tileset: 'exo',
@@ -859,17 +1039,8 @@
     onEnter: function () { if (NEU.house) NEU.house.open(); }
   });
   E.register('x2_arena', {
-    tileset: 'exo',
-    tiles: exoHall(),
-    spawns: { stair: { x: 5, y: 7, face: 'up' }, south: { x: 5, y: 7, face: 'up' } },
-    entities: exoDress([
-      { t: 'npc', x: 5, y: 3, colour: '#20C8D0',
-        run: function (c) {
-          if (NEU.exo && NEU.exo.open) NEU.exo.open();
-          else c.say(['the arena door is shut.']);
-        } },
-      { t: 'exit', x: 5, y: 8, to: 'x0_foyer', spawn: 'north', style: 'hatch' }
-    ])
+    tileset: 'exo', tiles: exoHall(), spawns: hallSpawns(),
+    entities: hallEnts(), onEnter: hallEnter
   });
   NEU.act4RoomsX = ['x0_foyer', 'x1_spiral', 'x2_arena'];
 })();

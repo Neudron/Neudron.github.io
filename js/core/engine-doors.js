@@ -1006,7 +1006,7 @@
     'a_woods>b7_altar': { style: 'tunnel' },           /* "not swept in a long time" */
     'b1_throne>a_woods': { style: 'door' },            /* the castle's front door */
     'b7_altar>a_woods': { style: 'tunnel' },           /* back out to the woods */
-    'b7_altar>b8_arena': { style: 'gate' },
+    'b7_altar>b8_arena': { style: 'hatch', via: 'fall' },
     'b8_arena>b7_altar': { style: 'arch' },
     'd_city>b7_altar': { style: 'portal', tint: '#FF8A3A' },   /* the fire door, from the other side */
     'd_city>h3_trip': { style: 'portal', tint: '#FF6BD6' },    /* "a door painted on the street" */

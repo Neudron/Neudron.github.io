@@ -37,6 +37,8 @@
   var T = 16;
   function LK() { return NEU.engineLook; }
   function still() { var l = LK(); return !l || !!l.reduced; }
+  /* a punch shoves the machine 2px and slides the hanging bag 1px per hit */
+  var KICK = { n: 0, at: -1 };
   function save() { return NEU.save; }
   function flagged(k) { return !!(save() && save().flagged(k)); }
   function hsh(n) { var x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
@@ -225,7 +227,16 @@
     if (!def) return false;
     if (def.hide && def.hide(e)) return true;
     var s = propSprite(tab, e);
-    if (s) blit(g, s, d.sx, d.sy, d.S);
+    if (s) {
+      var kx = 0;
+      if (def === NPCART.vending && !still()) {
+        if (KICK.at < 0 && KICK.n > 0) KICK.at = d.now;
+        var age = d.now - KICK.at;
+        if (age >= 0 && age < 180) kx = (KICK.n & 1 ? 1 : -1) * Math.max(1, Math.round(2 * (1 - age / 180)));
+        else KICK.at = -1;
+      }
+      blit(g, s, d.sx + kx, d.sy, d.S);
+    }
     if (def.anim) def.anim(g, d.sx, d.sy, d.S, d.now, e);
     return true;
   }
@@ -1540,7 +1551,7 @@
   };
   NPCART.vending = {
     w: 32, h: 50, ax: 16, ay: 48, shadow: 22,
-    key: function () { return machineOff() ? 'spent' : 'live'; },
+    key: function () { return machineOff() ? 'spent' : 'live' + KICK.n; },
     light: function () { return machineOff() ? { r: 16, col: '#3A4A3A', glow: 0.05 } : { r: 66, col: '#E0A04A', glow: 0.22 }; },
     paint: function (P) {
       var off = machineOff();
@@ -1562,9 +1573,9 @@
           P.r(x, y, 2, 1, '#C8C0A8');
         }
       }
-      /* the slot's item hangs until the one pick is made; then vendPick
-         drops it and eats it, and the tray is empty */
-      if (!off) { P.r(18, 27, 3, 4, '#6A4A28'); P.r(18, 27, 3, 1, '#C4A06A'); }
+      /* the slot's item hangs until the one pick is made; each punch slides
+         it one pixel toward the tray, then vendPick drops and eats it */
+      if (!off) { var bx = 18 + KICK.n; P.r(bx, 27, 3, 4, '#6A4A28'); P.r(bx, 27, 3, 1, '#C4A06A'); }
       P.line(9, 13, 9, 17, '#D8E8C0'); P.line(9, 17, 13, 22, '#9AA890');
       /* mould bloom on the left stile, rust down the right */
       P.r(2, 28, 2, 12, '#141A10'); P.dith(2, 28, 2, 12, '#4A6B35', 0); P.dith4(2, 30, 2, 8, '#7BA05B', 0);
@@ -1594,7 +1605,12 @@
      eaten; the choice now does the same visibly: the item drops from the
      slot into the tray (600ms, falling), then three bites take it (900ms).
      rooms-g calls NEU.vendDrop(n) at the decision; the trip starts after. */
-  var DROP = { n: -1, t0: -1 }, DROP_MS = 600, EAT_MS = 900;
+  var DROP = { n: -1, t0: -1, cb: null }, DROP_MS = 600, EAT_MS = 900;
+  function finishDrop() {
+    DROP.n = -1;
+    var f = DROP.cb; DROP.cb = null;
+    if (f) f();
+  }
   var MACH = { vend_a: 0, vend_b: 1, vend_c: 2 };   /* the slot index rooms-g passes on */
   /* The three items as 9-wide pixel maps (one char = 1 sprite px = 2 screen
      px at S=2, so a can reads at 18x24): '.' is clear, k the outline. Each
@@ -1618,8 +1634,15 @@
       'kPIIIIpqk', 'kPppppqqk', 'kppppppqk', 'kpPpPpPqk', 'kkkkkkkkk'
     ]
   ];
-  NEU.vendDrop = function (n) { DROP.n = n; DROP.t0 = -1; };
+  NEU.vendPunch = function (n, count) { KICK.n = count; KICK.at = -1; };
+  NEU.vendPunch.state = function () { return { n: KICK.n, at: KICK.at }; };
+  NEU.vendDrop = function (n, cb) {
+    DROP.n = n; DROP.t0 = -1; DROP.cb = cb || null;
+    /* reduced motion draws no eat; the walk still waits for its short cue */
+    if (still()) setTimeout(function () { if (DROP.cb) finishDrop(); }, 300);
+  };
   NEU.vendDrop.state = function () { return { n: DROP.n, t0: DROP.t0 }; };
+  NEU.vendDrop.finish = finishDrop;
   /* sprite px → screen, for the NPCART sprite (anchored at ax, ay) */
   function VP(g, x, y, S, px, py, w, h, c) {
     g.fillStyle = c; g.fillRect(x - 16 * S + px * S, y - 48 * S + py * S, w * S, h * S);
@@ -1641,7 +1664,7 @@
   function vendPick(g, x, y, S, now) {
     if (DROP.t0 < 0) DROP.t0 = now;
     var t = now - DROP.t0, map = PICK[DROP.n], H = map.length, k, px, py, bite, i, a;
-    if (t >= DROP_MS + EAT_MS) { DROP.n = -1; return false; }
+    if (t >= DROP_MS + EAT_MS) { finishDrop(); return false; }
     if (t < DROP_MS) {
       k = t / DROP_MS;                                    /* falls: slot to tray, gaining speed */
       px = 18 - 7 * k; py = 12 + (45 - H - 12) * k * k;

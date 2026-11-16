@@ -1079,7 +1079,7 @@
       if (ay < 0 || ay >= g.length) return false;
       var row = g[ay];
       if (ax < 0 || ax >= row.length) return false;
-      if (row.charAt(ax) !== 'i') return false;
+      if (row.charAt(ax) !== 'i' || room.cracks[ax + ',' + ay]) return false;
       for (var j = 0; j < es.length; j++) {
         var e = es[j];
         if (e.dead || !e.solid) continue;
@@ -1091,6 +1091,22 @@
       x = m.x + cand[i][0]; y = m.y + cand[i][1];
       if (free(x, y)) { m.x = x; m.y = y; return; }
     }
+  }
+
+  function mouseStage(c, n) {
+    var r = c.room, st = r.stages[n], es = c.ents(), i;
+    r.stage = n; r.cracks = {}; r._cell = null; r._steps = 0;
+    r.mouse = { x: st.mouse.x, y: st.mouse.y };
+    r.cheese = { x: st.cheese.x, y: st.cheese.y };
+    r.grid = st.grid || r.stages[0].grid;
+    for (i = es.length - 1; i >= 0; i--) if (es[i].iceTool) es.splice(i, 1);
+    if (st.block) es.push({ t: 'block', x: st.block.x, y: st.block.y, solid: true, push: true, iceTool: true });
+    for (i = 0; i < (st.plates || []).length; i++)
+      es.push({ t: 'decor', skin: 'iceplate', x: st.plates[i].x, y: st.plates[i].y, iceTool: true, crack: st.plates[i].crack });
+    for (i = 0; i < es.length; i++) if (es[i].t === 'sign') es[i].lines = n === 1 ?
+      ['step on the two rim plates to crack their ice cells.', 'the mouse cannot enter a cracked cell. r resets this stage.'] : n === 2 ?
+      ['push the stone across the ice until it stops.', 'it blocks the mouse. r resets this stage.'] : es[i].lines;
+    if (NEU.roomArt) delete NEU.roomArt._paints[r.id];
   }
 
   E.register('b4_ice', {
@@ -1127,6 +1143,16 @@
       Q('sconce', 9, 1), Q('armour', 1, 2, { solid: true }), Q('armour', 18, 10, { solid: true }),
       Q('rubble', 2, 10)
     ]),
+    stage: 0, cracks: {},
+    stages: [
+      { mouse: { x: 4, y: 5 }, cheese: { x: 9, y: 6 } },
+      { mouse: { x: 8, y: 2 }, cheese: { x: 5, y: 4 },
+        grid: ['####################', '####################', '#.....iii..........#', '#...iiii...........#', '#...iii............#', '#....ii............#', '#....iii...........#', '#..................#', '#..................#', '#..................#', '#..................#', '####################'],
+        plates: [{ x: 6, y: 7, crack: { x: 7, y: 6 } }, { x: 4, y: 2, crack: { x: 5, y: 3 } }] },
+      { mouse: { x: 8, y: 2 }, cheese: { x: 9, y: 3 },
+        grid: ['####################', '####################', '#......iiii........#', '#......iii.........#', '#........i.........#', '#..................#', '#..................#', '#..................#', '#..................#', '#..................#', '#..................#', '####################'],
+        block: { x: 10, y: 4 } }
+    ],
     mouse: { x: 4, y: 5 },
     cheese: { x: 9, y: 6 },
     _cell: null, _steps: 0,
@@ -1134,9 +1160,9 @@
     cheeseAt: function () { return { x: this.cheese.x, y: this.cheese.y }; },
     onEnter: function (c) {
       /* Unsolved visits reset; a solved room keeps the mouse at its cheese. */
-      this.mouse.x = c.flagged('solved:b4_ice') ? this.cheese.x : 4;
-      this.mouse.y = c.flagged('solved:b4_ice') ? this.cheese.y : 5;
-      this._cell = null; this._steps = 0;
+      if (!this.stages[0].grid) this.stages[0].grid = this.grid;
+      mouseStage(c, c.flagged('solved:b4_ice') ? 2 : Math.max(0, Math.min(2, Number(NEU.save.flag('b4_stage')) || 0)));
+      if (c.flagged('solved:b4_ice')) { this.mouse.x = this.cheese.x; this.mouse.y = this.cheese.y; }
       if (c.flagged('b4_seen')) return;
       c.flag('b4_seen', 1);
       say(c, ['the middle of the room is a frozen pool, and something small moves under it.',
@@ -1158,14 +1184,23 @@
       if (!this._cell) this._cell = { x: cx, y: cy };
       else if (this._cell.x !== cx || this._cell.y !== cy) {
         this._cell = { x: cx, y: cy };
+        var es = c.ents();
+        for (var i = 0; i < es.length; i++) if (es[i].crack && es[i].x === cx && es[i].y === cy) {
+          this.cracks[es[i].crack.x + ',' + es[i].crack.y] = true; es[i].armed = true;
+        }
         this._steps++;
         if (this._steps >= 2) { this._steps = 0; stepMouse(this, c, cx, cy); }
       }
-      return m.x === ch.x && m.y === ch.y;
+      if (m.x !== ch.x || m.y !== ch.y) return false;
+      if (this.stage < 2) {
+        c.flag('b4_stage', this.stage + 1);
+        mouseStage(c, this.stage + 1);
+        return false;
+      }
+      return true;
     },
     onReset: function () {
-      this.mouse.x = 4; this.mouse.y = 5;
-      this._cell = null; this._steps = 0;
+      if (E.warp) E.warp('b4_ice', 'west');
       resetHint('b4_ice');
     },
     onSolved: function (c) {
@@ -1289,32 +1324,84 @@
      found by touch); the cresset stands on scorched stone in the very
      middle of the cross-corridor. Lit, the room is a different place:
      you see for the first time what you walked past. */
-  var b6carry = false, b6lit = false;
+  /* Six eyes are painted at the pocket mouths along the middle corridor.
+     An eye looks along one grid direction until a wall; a socket is seen
+     when its cell falls on that ray. Exactly one socket is on every open
+     eye's ray, and the last two eyes open only once the torch has been
+     carried past them — so the answer cannot be read from one spot.
+     tests/fixes504.mjs enumerates these cells before the room is built. */
+  var B6_EYES = [
+    { x: 3,  y: 6, dir: 'east', pocket: 'nw', shut: false },
+    { x: 4,  y: 6, dir: 'east', pocket: 'sw', shut: false },
+    { x: 8,  y: 6, dir: 'east', pocket: 'nc', shut: false },
+    { x: 9,  y: 6, dir: 'east', pocket: 'sc', shut: false },
+    { x: 15, y: 6, dir: 'west', pocket: 'ne', shut: true  },
+    { x: 16, y: 6, dir: 'west', pocket: 'se', shut: true  }
+  ];
+  var B6_SOCKETS = [ { x: 5, y: 6, n: 0 }, { x: 10, y: 6, n: 1 }, { x: 17, y: 6, n: 2 } ];
+  var B6_RIGHT = 1;
+  var b6carry = false, b6seated = -1, b6lit = false, b6ents = null;
+
+  function b6TorchEnts() {
+    var out = [], es = b6ents || [];
+    for (var i = 0; i < es.length; i++) if (es[i].torch) out.push(es[i]);
+    return out;
+  }
   function takeTorch(c) {
     if (b6carry) { c.say(['you already have it.'], 'narr'); return; }
-    b6carry = true;
+    if (b6lit) { c.say(['the torch stays in the cresset. it is not yours to carry again.'], 'narr'); return; }
+    var es = c.ents(), i, was = b6seated >= 0;
+    if (was) {
+      for (i = 0; i < es.length; i++)
+        if (es[i].socket && es[i].n === b6seated) { es[i].seated = false; break; }
+      b6seated = -1;
+    }
     /* the torch leaves the wall when it leaves the room with you —
        it was solid so it could be found by touch in the dark */
-    var es = c.ents();
-    for (var i = 0; i < es.length; i++)
-      if (es[i].torch) es[i].dead = true;
+    var ts = b6TorchEnts();
+    for (i = 0; i < ts.length; i++) ts[i].dead = true;
+    b6carry = true;
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
     if (NEU.juice) NEU.juice.hit('small', { colour: '#FF8A3A' });
-    c.say(['you take the torch. the light walks with you.'], 'narr');
+    c.say([was ? 'you lift the torch back out. the light walks with you.'
+               : 'you take the torch. the light walks with you.'], 'narr');
   }
-  function placeTorch(c) {
-    if (c.solved('b6_dark')) { c.say(['the socket is lit. it has been lit since you were last here.'], 'narr'); return; }
-    if (!b6carry) { c.say(['a socket in the wall, empty.', 'it is waiting for a light.'], 'narr'); return; }
-    b6carry = false; b6lit = true;
-    c.markSolved('b6_dark');
-    if (NEU.quest) NEU.quest.bump('a4_rooms', 5);
+  function seatTorch(c, n) {
+    if (b6lit) { c.say(['the socket is lit. it has been lit since you were last here.'], 'narr'); return; }
+    if (b6seated === n) { takeTorch(c); return; }
+    if (!b6carry) {
+      c.say(['a socket in the wall, empty.', 'it is waiting for a light.'], 'narr');
+      return;
+    }
+    b6carry = false; b6seated = n;
+    var es = c.ents();
+    for (var i = 0; i < es.length; i++)
+      if (es[i].socket && es[i].n === n) es[i].seated = true;
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
-    if (NEU.juice) NEU.juice.hit('large', { colour: '#FF8A3A' });
-    c.say(['it fits. light pours back into the room.',
-           'the alcoves were always there. they just did not feel like admitting it.'], 'narr');
+    if (n === B6_RIGHT) {
+      b6lit = true;
+      c.markSolved('b6_dark');
+      if (NEU.quest) NEU.quest.bump('a4_rooms', 5);
+      if (NEU.juice) NEU.juice.hit('large', { colour: '#FF8A3A' });
+      c.say(['it fits. light pours back into the room.',
+             'the alcoves were always there. they just did not feel like admitting it.'], 'narr');
+    } else {
+      if (NEU.juice) NEU.juice.hit('tick');
+      c.say(['the torch sits in the socket. nothing happens.',
+             'you can lift it straight back out.'], 'narr');
+    }
+  }
+  /* the old name stays the entry point for the one correct socket */
+  function placeTorch(c) { seatTorch(c, B6_RIGHT); }
+  function b6Plaque(s) {
+    if (b6carry || b6lit || (s && s.flagged && s.flagged('solved:b6_dark')))
+      return ['a brass plaque by the west door, lit at last:',
+              '"set the light where every open eye can see it."'];
+    return ['a brass plaque by the west door. the lettering is too fine to read without a light.'];
   }
   E.register('b6_dark', {
     tileset: 'castle',
+    eyes: B6_EYES, sockets: B6_SOCKETS,
     tiles: [
       '####################',
       '####################',
@@ -1334,8 +1421,13 @@
     entities: castleLook(12).concat([
       { t: 'npc', x: 2, y: 6, colour: '#E4A64A', solid: true, torch: true, skin: 'walltorch',
         run: function (c) { takeTorch(c); } },
-      { t: 'npc', x: 10, y: 6, colour: '#5A5470', socket: true, skin: 'cresset',
+      { t: 'sign', x: 1, y: 5, plaque: true, skin: 'plaque', lines: b6Plaque },
+      { t: 'npc', x: 5, y: 6, colour: '#5A5470', socket: true, n: 0, skin: 'cresset',
+        run: function (c) { seatTorch(c, 0); } },
+      { t: 'npc', x: 10, y: 6, colour: '#5A5470', socket: true, n: 1, correct: true, skin: 'cresset',
         run: function (c) { placeTorch(c); } },
+      { t: 'npc', x: 17, y: 6, colour: '#5A5470', socket: true, n: 2, skin: 'cresset',
+        run: function (c) { seatTorch(c, 2); } },
       { t: 'exit', x: 19, y: 6, to: 'b7_altar', spawn: 'west', locked: 'solved:b6_dark', style: 'gate',
         lines: ['an iron gate. there is no light on the other side of it either.',
                 'it will not lift for somebody standing in the dark.'] },
@@ -1347,18 +1439,35 @@
       Q('candles', 6, 10, { lightIf: 'solved:b6_dark' }), Q('rubble', 1, 2)
     ]),
     onEnter: function (c) {
-      b6carry = false;
+      b6ents = c.ents();
+      b6carry = false; b6seated = -1;
       b6lit = !!c.flagged('solved:b6_dark');
-      /* the torch went into the socket for good; it does not hang on the wall again */
-      if (b6lit) { var es = c.ents(); for (var i = 0; i < es.length; i++) if (es[i].torch) es[i].dead = true; }
+      /* the torch went into the right socket for good; it does not hang
+         on the wall again. A wrong socket is never remembered. */
+      for (var i = 0; i < b6ents.length; i++) {
+        if (b6ents[i].torch && b6lit) b6ents[i].dead = true;
+        if (b6ents[i].socket) b6ents[i].seated = !!(b6lit && b6ents[i].correct);
+      }
       if (c.flagged('b6_seen')) return;
       c.flag('b6_seen', 1);
       say(c, ['the lights here have been out for some time.',
               'you have done this before.']);
     },
-    dark: function () { return b6lit ? 0 : 108; },
+    /* Raised ambient: walls and pockets read as silhouettes, so the room
+       hides only the information the eyes carry, not its shape. */
+    dark: function () { return b6lit ? 0 : 72; },
     light: function (c) { return b6carry ? { x: c.player.x, y: c.player.y } : null; },
-    onReset: function () { b6carry = false; b6lit = false; resetHint('b6_dark'); }
+    carry: function () { return b6carry; },
+    seated: function () { return b6seated; },
+    onReset: function () {
+      b6carry = false; b6seated = -1; b6lit = false;
+      var es = b6ents || [];
+      for (var i = 0; i < es.length; i++) {
+        if (es[i].torch) es[i].dead = false;
+        if (es[i].socket) es[i].seated = false;
+      }
+      resetHint('b6_dark');
+    }
   });
 
   /* ══ B7 — the altar ══════════════════════════════════════════════
@@ -1378,6 +1487,60 @@
      moment you walk in. The second mushroom grows out of a crack in the
      south-east corner, in plain sight, out of reach of anything you
      have yet. */
+
+  /* ── the altar's trapdoor ─────────────────────────────────────────
+     First visit after solved:b6_dark stages the seal in real time:
+     0-400 glow, 200-1200 twelve embers, 400 rumble + a 2 px kick,
+     900-1300 bars retract, 1300-2100 the two halves slide 14 px apart
+     in four steps, 1300-2300 dust, and at 2300 the centre becomes
+     enterable and trap_open is saved. Reduced motion compresses the
+     whole show into 800 ms and drops the kick. The clock is elapsed
+     real time, not a count of frames. */
+  var TRAP_T = { glow: 400, ember: 200, kick: 400, bars: 900, slide: 1300, done: 2300 };
+  var TRAP_FAST = 800;
+  var trap = null;
+  function trapNow() {
+    return trap ? (Date.now() - trap.t0) * (trap.fast ? TRAP_T.done / TRAP_FAST : 1) : 0;
+  }
+  function trapState() {
+    var open = !!(NEU.save && NEU.save.flagged('trap_open'));
+    if (!trap) return { t: TRAP_T.done, phase: open ? 'open' : 'shut', open: open,
+                        glow: 0, embers: 0, kick: 0, bars: open ? 1 : 0,
+                        halves: open ? 4 : 0, dust: 0 };
+    var t = trapNow();
+    return {
+      t: t,
+      phase: t < TRAP_T.glow ? 'glow' : t < TRAP_T.bars ? 'ember' :
+             t < TRAP_T.slide ? 'bars' : t < TRAP_T.done ? 'slide' : 'open',
+      open: t >= TRAP_T.done,
+      glow: Math.min(1, t / TRAP_T.glow),
+      embers: t < TRAP_T.ember ? 0 : Math.min(1, (t - TRAP_T.ember) / 1000),
+      kick: (!trap.fast && t >= TRAP_T.kick && t < TRAP_T.kick + 120) ? 2 : 0,
+      bars: t < TRAP_T.bars ? 0 : Math.min(1, (t - TRAP_T.bars) / 400),
+      halves: t < TRAP_T.slide ? 0 : Math.min(4, Math.floor((t - TRAP_T.slide) / 200)),
+      dust: t < TRAP_T.slide ? 0 : Math.min(1, (t - TRAP_T.slide) / 1000)
+    };
+  }
+  function trapTick() {
+    if (!trap) return;
+    var t = trapNow();
+    if (t >= TRAP_T.kick && !trap.kicked) {
+      trap.kicked = 1;
+      if (!trap.fast && NEU.juice && NEU.juice.hit) NEU.juice.hit('medium', { colour: '#FF8A3A' });
+    }
+    if (t >= TRAP_T.done) {
+      if (NEU.save) NEU.save.flag('trap_open', 1);
+      trap = null;
+      return;
+    }
+    trap.c.later(trapTick, 16);
+  }
+  function startTrap(c) {
+    if (trap || !c.flagged('solved:b6_dark') || c.flagged('trap_open')) return;
+    trap = { c: c, t0: Date.now(), fast: crackReduced(), kicked: 0 };
+    c.later(trapTick, 16);
+  }
+
   E.register('b7_altar', {
     tileset: 'castle',
     tiles: [
@@ -1397,7 +1560,7 @@
     ].join('\n'),
     shafts: [[2, 70, 12, 0.3, '#CFE0FF'], [20, 70, 12, -0.3, '#CFE0FF']],
     shade: 0.55,
-    spawns: { east: { x: 21, y: 6, face: 'left' }, north: { x: 11, y: 2, face: 'down' },
+    spawns: { east: { x: 21, y: 6, face: 'left' }, north: { x: 13, y: 3, face: 'down' },
               west: { x: 1, y: 6, face: 'right' },
               fire: { x: 11, y: 11, face: 'up' } },
     entities: castleLook(13).concat([
@@ -1412,9 +1575,11 @@
       { t: 'npc', x: 19, y: 10, colour: '#C4705F', mush: 'mush2', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush2'); } },
       { t: 'exit', x: 22, y: 6, to: 'a_woods', spawn: 'altar', style: 'arch', via: 'slide' },
-      { t: 'exit', x: 11, y: 1, to: 'b8_arena', spawn: 'west', locked: 'solved:b6_dark', style: 'stairs',
-        lines: ['stairs going down, and something at the bottom of them with a heartbeat.',
-                'a grate is down across them. it lifts when the dark room is lit.'] },
+      /* The way down is a seal in the floor, not a stair in the wall.
+         It stays shut for the length of its own reveal (see trapState). */
+      { t: 'exit', x: 11, y: 3, to: 'b8_arena', spawn: 'drop', locked: 'trap_open', style: 'hatch',
+        lines: ['a stone seal set into the floor, iron bars across it.',
+                'something under it has a heartbeat.'] },
       { t: 'exit', x: 0, y: 6, to: 'b6_dark', spawn: 'east', locked: 'solved:b6_dark', style: 'door',
         lines: ['a door, barred from the other side.',
                 'whatever is through there, you will come at it the long way first.'] },
@@ -1430,7 +1595,14 @@
       Q('sconce', 8, 1), Q('sconce', 14, 1),
       Q('glow', 2, 4, { r: 40, col: '#BFD3FF' }), Q('glow', 20, 4, { r: 40, col: '#BFD3FF' }),
       Q('bones', 17, 11), Q('urn', 1, 2, { solid: true }), Q('urn', 21, 2, { solid: true })
-    ]).concat(columns([3, 3, 19, 3, 3, 9, 19, 9]))
+    ]).concat(columns([3, 3, 19, 3, 3, 9, 19, 9])),
+    trapState: trapState,
+    onEnter: function (c) {
+      /* later() timers die with a visit, so a fresh arrival restarts an
+         unfinished reveal; a saved trap_open skips the show entirely */
+      trap = null;
+      startTrap(c);
+    }
   });
 
   /* ══ B8 — the door at the back ═══════════════════════════════════
@@ -1463,7 +1635,8 @@
       '#...................#',
       '#####################'
     ].join('\n'),
-    spawns: { west: { x: 1, y: 7, face: 'right' } },
+    spawns: { west: { x: 1, y: 7, face: 'right' },
+              drop: { x: 2, y: 7, face: 'right' } },
     entities: [
       /* the hall itself — floor, walls, sigil, gutters — FIRST: floor
          decals draw in list order, and everything else sits on it */

@@ -187,6 +187,18 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   box-shadow: 10px -12px #EDE7DE, -8px -26px #EDE7DE, 4px -42px #EDE7DE, -12px -56px #EDE7DE, 2px -74px #EDE7DE;
   image-rendering: pixelated; animation: craftSteam 7s steps(8) infinite; }
 @keyframes craftSteam { to { transform: translateX(-50%) translateY(-62px); opacity: 0; } }
+/* A pot rim with rising steam at the TOP of the backdrop. The cauldron's
+   own decor is hidden so it cannot shove the grid off a phone; this one is
+   backdrop-only, behind every control, and purely decorative. */
+.craft__backdrop-rim { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); z-index: -1;
+  width: min(320px, 70vw); height: 16px; border-radius: 50%;
+  background: #5C5C70; box-shadow: 0 4px 0 #22222E; opacity: .5; pointer-events: none; }
+.craft__backdrop-steam { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: -1;
+  width: 160px; height: 48px; opacity: .45; pointer-events: none; }
+.craft__backdrop-steam::after { content: ''; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 100%; height: 100%;
+  box-shadow: 12px -10px #EDE7DE, -10px -22px #EDE7DE, 6px -34px #EDE7DE, -8px -46px #EDE7DE;
+  image-rendering: pixelated; animation: craftRimSteam 5s steps(6) infinite; }
+@keyframes craftRimSteam { from { transform: translateX(-50%) translateY(6px); opacity: .5; } to { transform: translateX(-50%) translateY(-40px); opacity: 0; } }
 
 /* slots: dark stone cells; hover and focus get a lilac 2px outline and a
    small bounce; recipe-needed empty cells ghost a 20% mushroom outline */
@@ -201,6 +213,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .craft__brew::after { animation: none; }
   .craft__steam::after { animation: none; }
+  .craft__backdrop-steam::after { animation: none; }
   .craft__cell:hover { transform: none; transition: none; }
   .craft__cell:focus-visible { transform: none; transition: none; }
 }
@@ -614,10 +627,13 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .inv__kind.k-spell, .inv__kind.k-heal { color: #d49aff; border-color: #d49aff; }
 .inv__kind.k-key, .inv__kind.k-quest { color: #8fe39b; border-color: #8fe39b; }
 .inv__gearstat { flex: none; font-style: normal; color: #888; font-size: 16px; }
-.inv__slot.is-focus { outline: 2px solid #ff0; }
+.inv__slot.is-focus { box-shadow: inset 0 0 0 2px #ff0; }
 .inv__slot.is-focus > .inv__slotbody > b { color: #ff0; }
 .inv__hint { margin: 8px 0 0; color: #aaa; }
+.inv__footer { border-top: 2px solid #fff; padding-top: 8px; min-height: 24px; }
+.inv__footer .inv__hint { margin: 0; color: #aaa; font: 400 16px/1.25 var(--font); }
 .inv__statlines { display: grid; gap: 16px; }
+.inv__statname { color: #ffce69; white-space: normal; overflow-wrap: anywhere; }
 .inv__statlines b { font-weight: normal; }
 .inv__statlines .is-up { color: #5f6; }
 .inv__statlines .is-down { color: #f55; }
@@ -630,6 +646,9 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .inv__list li.is-equipped span::after { content: '  EQUIPPED'; color: #aaa; }
 .inv__icon { flex: none; width: 32px; height: 32px; image-rendering: pixelated; }
 .inv__list .inv__kind { margin-left: auto; }
+/* long names ellipsise in the middle column; the full name is in STATS.
+   min-width:0 lets a flex item shrink below its min-content width. */
+.inv__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Confirm FX: the acted-on row/card flashes once. */
 .inv__list li.is-confirm, .inv__slot.is-confirm, .inv__gear.is-confirm { animation: invConfirm .22s steps(2); }
 @keyframes invConfirm { 0%, 60% { background: rgba(255, 224, 102, .4); } 100% { background: transparent; } }
@@ -718,7 +737,11 @@ html.rm .inv, html.rm .inv *, html.rm .inv *::before, html.rm .inv *::after { an
 }
 .mage__sub { font: 400 16px/1.2 var(--font, monospace); color: #9A86B8; }
 .mage__art {
-  flex: 3 1 60%; min-height: 0; margin: 8px 24px 0;
+  /* PLAN 9.3: keep the canvas at its native 320:192, never letterboxed
+     into a wide flex box. */
+  flex: 3 1 60%; min-height: 0;
+  aspect-ratio: 320 / 192; max-height: 58vh; margin: 8px auto 0;
+  margin-inline: auto;
   border: 4px solid #7A52B8; background: #1C1814;
   box-shadow: 0 0 0 4px #0B0714, 0 0 32px rgba(122, 82, 184, 0.3);
 }

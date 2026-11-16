@@ -3,6 +3,7 @@
   'use strict';
   var NEU = window.NEU = window.NEU || {};
   var kinds = {}, enabled = { woods: 1, castle: 1 }, active = null;
+  var waterAt = { x: 0.5, y: 0.7 };   /* splash point, in screen fractions */
   function kind(name, def) { kinds[name] = def; return def; }
   function get(name) { return kinds[name] || null; }
   function start(name, canvas, dir, reduced, incoming, opts) {
@@ -38,10 +39,42 @@
   }
   function draw(ctx, w, h, scale) {
     if (!active) return;
+    if (active.name === 'portal:water') {
+      /* the inlet: rings open from the splash point, not from a flat wipe */
+      var t = active.t, ox = Math.round(active.wx * w), oy = Math.round(active.wy * h);
+      var rad = Math.ceil(Math.max(w, h) * (0.15 + 0.9 * t));
+      var i, rr;
+      ctx.save(); ctx.imageSmoothingEnabled = false;
+      if (active.canvas) ctx.drawImage(active.canvas, 0, 0, w, h);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(ox, oy, Math.max(1, rad), 0, Math.PI * 2); ctx.clip();
+      if (active.incoming) ctx.drawImage(active.incoming, 0, 0, w, h);
+      ctx.restore();
+      for (i = 0; i < 3; i++) {
+        rr = Math.max(1, rad - i * 26 * (1 - t) - i * 6);
+        ctx.globalAlpha = 0.75 - i * 0.2;
+        ctx.strokeStyle = i === 0 ? '#C8F0FF' : i === 1 ? '#9FE0FF' : '#5EA8D8';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(ox, oy, rr, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1; ctx.restore(); return;
+    }
     if (active.name === 'fall') {
       var t = active.t, oldY = -Math.round(t * h), shaftY = Math.round((1 - t) * h), newY = Math.round((2.5 - 2.5 * t) * h);
       ctx.save(); ctx.imageSmoothingEnabled = false; ctx.fillStyle = active.wall; ctx.fillRect(0, 0, w, h);
-      for (var y = 0; y < h * 1.5; y += 16 * scale) { ctx.fillStyle = (y / (16 * scale) | 0) % 2 ? active.wall : '#201B28'; ctx.fillRect(0, shaftY + y, w, 8 * scale); }
+      /* brick courses, warm at the bottom: the hall below lights the shaft */
+      for (var y = 0; y < h * 1.5; y += 16 * scale) {
+        var row = (y / (16 * scale) | 0) % 2, deep = y / (h * 1.5);
+        ctx.fillStyle = deep > 0.7 ? (row ? '#2E1E18' : '#3A2518')
+                                   : (row ? active.wall : '#201B28');
+        ctx.fillRect(0, shaftY + y, w, 8 * scale);
+      }
+      for (var k = 0; k < 4; k++) {
+        ctx.globalAlpha = 0.04 * (4 - k);
+        ctx.fillStyle = '#FF8A3A';
+        ctx.fillRect(0, shaftY + h * 1.5 - (k + 1) * 16 * scale, w, 16 * scale);
+      }
+      ctx.globalAlpha = 1;
       if (active.canvas) ctx.drawImage(active.canvas, 0, oldY, w, h);
       if (active.incoming) ctx.drawImage(active.incoming, 0, newY, w, h);
       ctx.restore(); return;
@@ -59,11 +92,14 @@
   kind('fall', { ms: 520 });
   kind('mode', { ms: 320 });
   kind('portal:fire', { ms: 380 });
+  kind('portal:lightning', { ms: 400 });
   kind('portal:d_city>b7_altar', { ms: 380 });
   kind('portal:d_city>h3_trip', { ms: 380 });
   kind('portal:recall', { ms: 2850 });
+  kind('portal:water', { ms: 400, cover: function (a) { a.wx = waterAt.x; a.wy = waterAt.y; } });
   kind('cine:rooms-g-trip', { ms: 320 });
   kind('cine:crack-sky', { ms: 320 });
   NEU.engineTrans = { kind: kind, get: get, enabled: enabled, start: start, step: step, draw: draw, motion: motion,
+    setOrigin: function (x, y) { waterAt.x = x; waterAt.y = y; },
     get active() { return active; }, cut: function () { active = null; } };
 })();

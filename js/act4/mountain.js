@@ -57,7 +57,8 @@
       if (NEU.save && NEU.save.flag) NEU.save.flag('mtn_' + n, 1);
       if (n >= 7) { summit(); return; }
       puff();
-      P.open('m' + (n + 1));
+      if (P.slideOpen) P.slideOpen('m' + (n + 1));   /* D4: 400 ms snapshot slide between m levels */
+      else P.open('m' + (n + 1));
     };
   }
   function add(id, rows, spawn, ents, n) {
@@ -77,7 +78,9 @@
     recordings: {},
     active: false,
     mood: '',
-    here: function () { return currentId; }
+    /* D4's slideOpen calls plat.open directly, so currentId can lag the real
+       level. Read the plat kernel when a mountain level is active. */
+    here: function () { return NEU.mountain.active && P.levelId ? P.levelId() : currentId; }
   };
 
   function build(n) {

@@ -202,7 +202,9 @@
     var m = light(L, cx, cy, a.x1 - a.x0, a.y1 - a.y0), W2 = m.cols * 2, H2 = m.rows * 2, img, d, x, y, v, tx, ty, ox, oy, q;
     if (!lc || lc.width !== W2 || lc.height !== H2) { lc = P.mk(W2, H2); lg = lc.getContext && lc.getContext('2d'); }
     if (!lg || !lg.createImageData) return;
-    img = lg.createImageData(W2, H2); d = img.data;
+    img = lg.createImageData(W2, H2);
+    if (!img || !img.data) return;   /* jsdom canvas stubs may define createImageData but return nothing */
+    d = img.data;
     for (y = 0; y < H2; y++) for (x = 0; x < W2; x++) {
       tx = x >> 1; ty = y >> 1; ox = (x & 1) ? 1 : -1; oy = (y & 1) ? 1 : -1;
       v = lightAt(m, tx, ty) * 0.5625 + (lightAt(m, tx + ox, ty) + lightAt(m, tx, ty + oy)) * 0.1875 + lightAt(m, tx + ox, ty + oy) * 0.0625;
@@ -330,9 +332,17 @@
     P.fr(c, gx + [2, 2, 2, 29, 29, 29][k], gy + [12, 22, 32, 12, 22, 32][k], 1, 2, '#B892FF');
     P.glow(c, gx + 16, gy + 24, 28, '#7A52B8', 0.10);
   };
-  kd('bossdoor').draw = function (c, x, y) {
+  kd('bossdoor').draw = function (c, x, y, e) {
     var s = bossSpr(), gx = x - 8, gy = y - 32, has = !!(NEU.save && NEU.save.has && NEU.save.has('boss_key'));
-    c.drawImage(s.cv, gx, gy);
+    var u = (e && e.unlock) || 0;
+    /* the two chain anchors the D3 opening drops from (palette-drawn: IMG-17 has not arrived) */
+    P.fr(c, gx + 11, gy - 6, 2, 6, '#8A7456'); P.fr(c, gx + 19, gy - 6, 2, 6, '#8A7456');
+    if (!u) c.drawImage(s.cv, gx, gy);
+    else {
+      c.drawImage(s.cv, 0, 0, 16, 48, gx - u * 12, gy, 16, 48);
+      c.drawImage(s.cv, 16, 0, 16, 48, gx + 16 + u * 12, gy, 16, 48);
+      P.fr(c, gx + 16 - u * 12, gy, u * 24, 48, '#05030A');
+    }
     P.fr(c, gx + 11, gy + 12, 2, 2, has ? '#FF8AC8' : '#3A2A20'); P.fr(c, gx + 19, gy + 12, 2, 2, has ? '#FF8AC8' : '#3A2A20');
   };
   /* a lift: a dungeon shelf on a chain that runs up out of sight */
@@ -381,8 +391,43 @@
     cut(c, CRACK[L.faction(e.x | 0, e.y | 0)], f[0] * 18, f[1] * 18, T, T, x + (e.cs === 1 && !reducedNow() ? ((((now / 40) | 0) & 1) ? 1 : -1) : 0), y + j);
   };
 
+  /* D3: draw one frame of the bone-door opening over the mode-bridge snapshot.
+     pr = NEU.dungeon.doorProgress(ms). Palette only; no sheet, no new asset. */
+  function drawOpening(g, w, h, snap, pr) {
+    var dx = Math.round(w * 0.5), dy = Math.round(h * 0.62), pan = Math.round(pr.pan * 40), i, n, y, len;
+    g.save(); g.imageSmoothingEnabled = false;
+    g.fillStyle = INK; g.fillRect(0, 0, w, h);
+    if (snap) g.drawImage(snap, 0, -pan, w, h);            /* camera pans down the corridor */
+    /* key turns in the lock */
+    if (pr.key > 0 && pr.key < 1) {
+      g.save(); g.translate(dx, dy - 20); g.rotate(pr.key * Math.PI / 2);
+      P.fr(g, -2, -9, 4, 10, '#E8C85A'); P.fr(g, -6, -11, 12, 3, '#E8C85A');
+      P.fr(g, -2, 1, 4, 3, '#E8C85A'); P.fr(g, 2, -3, 3, 2, '#E8C85A'); g.restore();
+    }
+    /* two chains drop from the lintel */
+    for (i = 0; i < 2; i++) {
+      len = Math.round(pr.chains * (dy - 60));
+      for (y = 0; y < len; y += 6) P.fr(g, dx + (i ? 11 : -11), y + 4, 2, 5, y & 6 ? '#8A7456' : '#C4A882');
+    }
+    /* the bone panels part over 1.2 s */
+    if (pr.open > 0) {
+      var gap = Math.round(pr.open * 48);
+      P.fr(g, dx - gap / 2, dy - 44, gap, 52, '#05030A');
+      P.fr(g, dx - gap / 2, dy - 44, 2, 52, '#E8D2B0'); P.fr(g, dx + gap / 2 - 2, dy - 44, 2, 52, '#C4A882');
+    }
+    /* the fight box grows out of the doorway (obj_growtangle animate-in) */
+    if (pr.box > 0) {
+      var bw = Math.max(2, Math.round(pr.box * w * 0.72)), bh = Math.max(2, Math.round(pr.box * h * 0.6));
+      var bx = dx - bw / 2, by = dy - bh / 2;
+      P.fr(g, bx, by, bw, 2, '#5AE08A'); P.fr(g, bx, by + bh - 2, bw, 2, '#5AE08A');
+      P.fr(g, bx, by, 2, bh, '#5AE08A'); P.fr(g, bx + bw - 2, by, 2, bh, '#5AE08A');
+    }
+    g.restore();
+  }
+
   NEU.dungeonLook = {
     tileset: 'dungeon', frames: FR, centre: CW, frame: frame, sheet: sheet, cut: cut, mag: mag,
-    light: light, lightMap: function () { return map; }, levels: LEVELS, air: AIR, solid: SOLID
+    light: light, lightMap: function () { return map; }, levels: LEVELS, air: AIR, solid: SOLID,
+    drawOpening: drawOpening
   };
 })();

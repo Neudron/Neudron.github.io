@@ -369,31 +369,42 @@
     }
   });
 
-  /* The decision. Each slot says what it costs and then leads to the
-     same trip; the flag vend_pick records which one, and once any slot
-     has been used the others are spent. */
-  var VEND = [
-    ['you take DEEZ NUTZ. the bag drops.',
-     'you eat them, standing up, in a storm. fast, certain, and no bag to keep.'],
-    ['you take the can. it is cold, and then it is not.',
-     'you drink all of it in the rain. no bag, no souvenir, and a faint sense of having been warned.'],
-    ['you take the packet that says HOLD ME. you hold it.',
-     'you open it slowly, which is somehow worse. the trip is the same. only the wait was yours.']
+  /* The verb is punching, six times, and the machine gets more
+     passive-aggressive each go (story bible, Zone H). Six punches share one
+     counter; the sixth drops the bag. vend_pick still records which slot,
+     so old saves and the Z-room hatch agree. */
+  var PUNCH = [
+    'you hit the vending machine. it does not comment.',
+    'you hit it again. it makes a note of this.',
+    'the bag moves about a centimetre. the machine sighs.',
+    'the machine says something in a language of servos.',
+    'it is very nearly over the edge. so is the machine.',
+    'the bag drops. the machine turns its light off, pointedly.'
   ];
+
+  function reduced() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
 
   function vend(c, n) {
     if (NEU.save && NEU.save.flagged('vend_pick')) {
       c.say(['the machines have made their one decision. they are not taking another.'], 'narr');
       return;
     }
-    if (NEU.save) { NEU.save.flag('vend_pick', n + 1); NEU.save.flag('tripping', 1); }
-    if (NEU.quest) { NEU.quest.mark('a4_nutz'); NEU.quest.mark('a4_trip'); }
-    if (NEU.vendDrop) NEU.vendDrop(n);   /* the item drops and is eaten on the machine (look-prize) */
-    c.say(VEND[n], 'narr');
+    var p = NEU.save ? ((NEU.save.flag('punches') || 0) + 1) : 1;
+    if (NEU.save) NEU.save.flag('punches', p);
+    /* 2px kick, 1px bag slide (look-prize owns the drawing) */
+    if (NEU.vendPunch) NEU.vendPunch(n, p);
+    c.say([PUNCH[p - 1]], 'narr');
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     /* SMALL: a hit landed, on a machine */
     if (NEU.juice && NEU.juice.hit) NEU.juice.hit('small');
-    setTimeout(function () { trip(c); }, 2600);
+    if (p < 6) return;
+    /* sixth: commit, drop the bag, and let the EAT call the walk back */
+    if (NEU.save) { NEU.save.flag('vend_pick', n + 1); NEU.save.flag('tripping', 1); }
+    if (NEU.quest) { NEU.quest.mark('a4_nutz'); NEU.quest.mark('a4_trip'); }
+    if (NEU.vendDrop) NEU.vendDrop(n, function () { trip(c); });
+    else trip(c);
   }
 
   /* The Z room's cheat. It writes the same rank state the quiz writes when
@@ -470,18 +481,39 @@
       setTimeout(poll, 150);
     })();
   }
+  /* The water inlet: a hop, a twelve-particle splash, portal rings and the
+     player sinking — then the 400ms portal:water into h3. Nothing here is a
+     flat freeze: each beat is a timer off the previous one's end. */
+  var WSEQ = { phase: 'off', plan: null, origin: { x: 0, y: 0 } };
+  NEU.tripWater = {
+    state: function () { return { phase: WSEQ.phase, origin: WSEQ.origin }; },
+    plan: function () { return WSEQ.plan || { jump: 350, rings: 500, sink: 300 }; }
+  };
   function water(c) {
     if (!NEU.save || !NEU.save.flagged('tripping') || NEU.save.flagged('water_portal')) return;
     NEU.save.flag('water_portal', 1);
     cineOn(c, 'portal');
     CINE.c.drive(0, 0);
     CINE.phase = 'portal';
-    if (NEU.juice) NEU.juice.hit('medium');
+    var plan = reduced() ? { jump: 120, rings: 160, sink: 100 } : { jump: 350, rings: 500, sink: 300 };
+    WSEQ.plan = plan; WSEQ.phase = 'jump';
+    WSEQ.origin = { x: c.player.x, y: c.player.y };
+    if (NEU.engineTrans && NEU.engineTrans.setOrigin) NEU.engineTrans.setOrigin(0.5, 0.68);
+    if (NEU.juice && NEU.juice.hit) NEU.juice.hit('small');
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     setTimeout(function () {
-      if (NEU.engine.room === 'h1_storm') c.go('h3_trip', 'in');
-    }, 1400);
-    setTimeout(cineRelease, 2200);
+      WSEQ.phase = 'splash';
+      if (NEU.juice && NEU.juice.burst) NEU.juice.burst(320, 336, 12, '#9FE0FF', 90);
+      WSEQ.phase = 'rings';
+      setTimeout(function () {
+        WSEQ.phase = 'sink';
+        setTimeout(function () {
+          WSEQ.phase = 'portal';
+          if (NEU.engine.room === 'h1_storm') c.go('h3_trip', 'in', 'portal:water');
+          setTimeout(cineRelease, 700);
+        }, plan.sink);
+      }, plan.rings);
+    }, plan.jump);
   }
 
   function trip(c) {

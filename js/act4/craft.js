@@ -383,6 +383,18 @@
     }
   }
 
+  /* The backdrop's own pot rim and steam. The cauldron decor is hidden so it
+     cannot crowd the grid on a phone; these two sit behind everything, at
+     the top of the backdrop, and are decorative (so reduced motion is fine). */
+  function paintRim() {
+    if (!wrap || wrap.querySelector('.craft__backdrop-rim')) return;
+    var rim = document.createElement('div'), steam = document.createElement('div');
+    rim.className = 'craft__backdrop-rim'; rim.setAttribute('aria-hidden', 'true');
+    steam.className = 'craft__backdrop-steam'; steam.setAttribute('aria-hidden', 'true');
+    wrap.insertBefore(rim, wrap.firstChild);
+    wrap.insertBefore(steam, rim.nextSibling);
+  }
+
   /* The CRAFT button, placed beside the blind output slot. */
   var goEl = null;
   function buildGo() {
@@ -433,6 +445,7 @@
   ensureSoul();
   paintBackground();
   clearDecor();
+  paintRim();
   buildGo();
   /* Clicking the blind slot is a deliberate commit too, never an automatic one. */
   if (outEl) outEl.addEventListener('click', commit);

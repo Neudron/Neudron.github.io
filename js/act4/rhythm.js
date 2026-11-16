@@ -75,10 +75,24 @@
   var MAX_MISS = 5;                  /* five notes in a row missed and the fight is lost */
   var SEC = [0, 26, 52, 78];
   var BREAK_AT = [14, 40, 66, 92];   /* four soul sections, four attack patterns */
+  var WIND_UP = 0.3;                 /* s: the merchant's tell before each throw wave */
+  /* A dodge begins ON a bar line of its section's tempo; the authored seconds
+     stay in BREAK_RAW. The way back is a downbeat too: the box opens and the
+     arrows return on the next bar line after the dodge. */
+  var BREAK_RAW = BREAK_AT.slice();
+  function barOf(s) { return 4 * 60 / BPM[Math.min(s, BPM.length - 1)]; }
+  for (var bs = 0; bs < BREAK_AT.length; bs++) {
+    BREAK_AT[bs] = SEC[bs] + Math.round((BREAK_RAW[bs] - SEC[bs]) / barOf(bs)) * barOf(bs);
+  }
+  var RETURN_AT = [];
+  for (var ri = 0; ri < BREAK_AT.length; ri++) {
+    var rend = BREAK_AT[ri] + DODGE + EASE_OUT;
+    RETURN_AT[ri] = SEC[ri] + Math.ceil((rend - SEC[ri]) / barOf(ri)) * barOf(ri);
+  }
   var PAT_GAP = [0.55, 1.0, 1.4, 1.5];   /* seconds between hazard spawns, per pattern */
   var PAT_NAME = ['COIN VOLLEY', 'LOBS', 'RING', 'THE WALL'];
   var PAT_COL = ['#E04A6B', '#4AC2E0', '#C24AE0', '#FFD34E'];
-  var MAX_GAP = 2.0;                 /* s: the chart never leaves the player waiting longer */
+  var MAX_GAP = 1.78;                /* s: the bar-snapped chart never waits longer than this */
   var ITEMS = [
     [0.55, 1, 'bomb'], [7, 0, 'coin'], [8.2, 2, 'potion'], [9.4, 3, 'axe'],
     [10.6, 0, 'mushroom'], [11.8, 1, 'recall'],
@@ -105,7 +119,8 @@
             blockLane: -1, blockUntil: 0,
             soulx: 0, souly: 0, hazards: [], pattern: 0, spawnN: 0, paused: false, introT: 0,
             drainFrom: 1, drainTo: 1, drainT: 0,
-            mercHit: 9, glare: false, soulA: 1, brkI: -1 };
+            mercHit: 9, glare: false, soulA: 1, brkI: -1,
+            wind: 0, windN: 0, boxA: 0 };
   var pops = [], splashes = [];
   var raf = 0, soulF = null, hazBreak = -1, lastBrk = 0, loopSrc = null;
   var introOn = false, boomed = false, crowdCache = null;
@@ -135,8 +150,8 @@
       b = BREAK_AT[i];
       if (sp >= b - EASE_IN && sp < b) { u = (sp - (b - EASE_IN)) / EASE_IN; return { i: i, name: 'in', u: u }; }
       if (sp >= b && sp < b + DODGE) return { i: i, name: 'dodge', u: 1 };
-      if (sp >= b + DODGE && sp < b + DODGE + EASE_OUT) {
-        u = (sp - (b + DODGE)) / EASE_OUT; return { i: i, name: 'out', u: u };
+      if (sp >= b + DODGE && sp < RETURN_AT[i]) {
+        u = (sp - (b + DODGE)) / (RETURN_AT[i] - (b + DODGE)); return { i: i, name: 'out', u: u };
       }
     }
     return null;
@@ -165,7 +180,7 @@
     var total = Math.floor(span / bl + 1e-6);
     var rel = BREAK_AT[s] - SEC[s];
     var d0 = (rel - EASE_IN - 0.3) / bl;      /* last beat still hittable before the ease-in */
-    var d1 = (rel + DODGE + EASE_OUT + 0.3) / bl;  /* first beat after the arrows return */
+    var d1 = (RETURN_AT[s] - SEC[s] + 0.3) / bl;  /* first beat after the bar-line return */
     var grid = s === 0 ? 1 : 0.5;
     var gapLim = Math.max(grid, Math.floor((MAX_GAP - 0.5) / bl / grid) * grid);
     var sameLim = Math.ceil(0.3 / bl / grid) * grid;
@@ -210,6 +225,18 @@
         notes.push({ t: t, end: t + (n[2] || 0) * bl, lane: n[1], mine: true, hit: false, done: false });
       }
     }
+    /* The box opens on a downbeat and a chart note lands exactly on it: the
+       dodge-to-chart hand-off is on the bar line, never mid-bar. */
+    for (s = 0; s < SECTIONS; s++) {
+      t = RETURN_AT[s];
+      notes.push({ t: t, end: t, lane: (s + 2) % 4, mine: true, hit: false, done: false });
+    }
+    /* A pickup after the dodge keeps the longest wait inside MAX_GAP
+       whatever the bar snapping does. */
+    for (s = 0; s < SECTIONS; s++) {
+      t = BREAK_AT[s] + DODGE + EASE_OUT + 0.5 * 60 / BPM[Math.min(s, 2)];
+      notes.push({ t: t, end: t, lane: (s + 1) % 4, mine: true, hit: false, done: false });
+    }
     for (i = 0; i < ITEMS.length; i++) {
       notes.push({ t: ITEMS[i][0], end: ITEMS[i][0], lane: ITEMS[i][1], mine: true,
         hit: false, done: false, kind: ITEMS[i][2] });
@@ -231,7 +258,7 @@
     for (var i = 0; i < notes.length; i++) if (notes[i].mine && !notes[i].done) ts.push(notes[i].t);
     ts.sort(function (a, b) { return a - b; });
     var wins = [];
-    for (var j = 0; j < BREAK_AT.length; j++) wins.push([BREAK_AT[j] - EASE_IN, BREAK_AT[j] + DODGE + EASE_OUT]);
+    for (var j = 0; j < BREAK_AT.length; j++) wins.push([BREAK_AT[j] - EASE_IN, RETURN_AT[j]]);
     /* gaps are measured on the player's notes: split each pair at the break
        windows and take the longest free segment, not the window-subtracted
        total (which would merge two gaps into one) */
@@ -255,7 +282,7 @@
     return { maxGap: max, count: ts.length, over: over, limit: MAX_GAP };
   }
   function resetFeel() {
-    S.section = 0; S.mode = 'chart'; S.arrowA = 1;
+    S.section = 0; S.mode = 'chart'; S.arrowA = 1; S.boxA = 0; S.wind = 0; S.windN = 0;
     S.sway = 0; S.swayUntil = 0;
     S.blockLane = -1; S.blockUntil = 0; S.soulx = 0; S.souly = 0; S.hazards = [];
     soulF = null; hazBreak = -1; lastBrk = 0;
@@ -576,9 +603,15 @@
   }
   /* the dodge's spawns: each pattern drops its next wave once its gap has passed */
   function spawnHazards(i, tb, g) {
-    if (hazBreak !== i) { hazBreak = i; S.pattern = i; S.spawnN = 0; S.hazards = []; }
-    while (S.spawnN * PAT_GAP[i] <= tb) {
-      S.hazards = S.hazards.concat(spawnAt(i, S.spawnN, g, soulF));
+    if (hazBreak !== i) { hazBreak = i; S.pattern = i; S.spawnN = 0; S.hazards = []; S.wind = 0; S.windN = 0; }
+    var n = S.spawnN, wt = WIND_UP + n * PAT_GAP[i];
+    if (tb >= wt - WIND_UP && tb < wt) {
+      /* he leans back and raises a hand before every wave — the tell is the
+         same length as the arrows' fold, so the player can read it */
+      S.wind = Math.max(0, Math.min(1, (tb - (wt - WIND_UP)) / WIND_UP));
+    } else if (tb >= wt) {
+      S.wind = 0; S.windN++;
+      S.hazards = S.hazards.concat(spawnAt(i, n, g, soulF));
       S.spawnN++;
     }
   }
@@ -593,17 +626,17 @@
     if (!soulF) soulF = { x: g.cx, y: g.strumY, dashI: 0 };
     if (bp.name === 'dodge') spawnHazards(bp.i, sp - BREAK_AT[bp.i], g);
     if (bp.name === 'in') {
-      S.arrowA = 1 - u;
+      S.arrowA = 1 - u; S.boxA = u;
       soulF.x = g.cx + (cx - g.cx) * u;
       soulF.y = g.strumY + (cy - g.strumY) * u - (still() ? 0 : Math.sin(u * Math.PI) * 34);
       S.soulA = u;
     } else if (bp.name === 'out') {
-      S.arrowA = u; S.hazards = [];
+      S.arrowA = u; S.boxA = 1 - u; S.hazards = [];
       soulF.x = cx + (g.cx - cx) * u;
       soulF.y = cy + (g.strumY - cy) * u;
       S.soulA = 1 - u;
     } else {
-      S.arrowA = 0; S.soulA = 1;
+      S.arrowA = 0; S.boxA = 1; S.soulA = 1;
       var mk = {
         left: !!keys[LANES[0]], down: !!keys[LANES[1]],
         up: !!keys[LANES[2]], right: !!keys[LANES[3]], focus: !!keys.focus
@@ -1043,6 +1076,7 @@
       var x = who[side], y = g.stage + 8 + bob + ((sing && pose === 1 && !still()) ? cs : 0);
       if (won && !side) y += 3 * cs;      /* beaten: he slumps */
       if (!side) { x += flinch * cs; y -= hop; }
+      if (!side && S.wind > 0) { x -= Math.round(2 * S.wind * cs); y -= Math.round(4 * S.wind * cs); }
       /* the figure is 9 cells wide and 13 tall, feet at y */
       var x0 = Math.round(x - 4.5 * cs), y0 = y - 13 * cs, shY = y0 + (side ? 7 : 8) * cs;
       if (side) L.drawPlayer(ctx, x, y, 'left', 0, false, cs, performance.now());
@@ -1267,9 +1301,15 @@
     icon(1, split + 6 * is - 4, by + 8, is);
     ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = '#EDE7DE';
-    ctx.fillText('SCORE ' + Math.floor(S.score) + ' · MISSES ' + S.misses + ' · ' +
-                 (S.acc * 100).toFixed(1) + '%' + (g.w < 600 ? '' : ' · ROUND ' +
-                 Math.min(round + 1, CHARTS.length) + '/' + CHARTS.length), g.w / 2 | 0, g.scoreY);
+    ctx.fillText(scoreLine(), g.w / 2 | 0, g.scoreY);
+  }
+
+  /* Only round 0 is ever played, so "ROUND 2/3" was a lie. The changing
+     number is the four-section split of the one song. */
+  function scoreLine() {
+    return 'SCORE ' + Math.floor(S.score) + ' · MISSES ' + S.misses + ' · ' +
+           (S.acc * 100).toFixed(1) + '% · ROUND 1/3 · SECTION ' +
+           (S.section + 1) + '/' + SECTIONS;
   }
 
   /* A hold's tail: a stepped trail of blocks that scrolls with its note. */
@@ -1317,6 +1357,41 @@
       ctx.fillRect(Math.round(cx + Math.cos(an) * r - sz / 2), Math.round(cy + Math.sin(an) * r - sz / 2), sz, sz);
     }
   }
+  /* The one disco ball. The intro drops it; sections 3 and 4 keep it lit so
+     the last half of the song still reads as the same stage. */
+  function discoBall(g, cx, sy, rr, t, d, mv) {
+    var i, ang, cell, gx, gy, ddx, ddy, dist, cellN, sw, gl;
+    ctx.globalAlpha = 0.3 * d;
+    for (i = 0; i < 6; i++) {                       /* rainbow beams fanning from the ball */
+      ang = Math.PI / 2 + (i - 2.5) * 0.22 + (mv ? Math.sin(t) * 0.05 : 0);
+      ctx.fillStyle = RAINBOW[i];
+      ctx.beginPath(); ctx.moveTo(cx, sy);
+      ctx.lineTo(cx + Math.cos(ang - 0.08) * g.h, sy + Math.sin(ang - 0.08) * g.h);
+      ctx.lineTo(cx + Math.cos(ang + 0.08) * g.h, sy + Math.sin(ang + 0.08) * g.h);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    /* a rod from the truss, then an 8px mirror grid clipped to a disc */
+    cell = Math.max(4, (rr / 4) | 0); sw = (Math.floor(t * 3) + 7) % 11;
+    ctx.fillStyle = INKC; ctx.fillRect(cx - 2, 0, 4, Math.max(0, sy - rr));
+    ctx.fillStyle = '#5A5A6A'; ctx.fillRect(cx - 1, 0, 2, Math.max(0, sy - rr));
+    ellP(ctx, cx, sy, rr + 3, rr + 3, INKC, 1);
+    for (gy = -rr; gy < rr; gy += cell) for (gx = -rr; gx < rr; gx += cell) {
+      ddx = gx + cell / 2; ddy = gy + cell / 2; dist = Math.sqrt(ddx * ddx + ddy * ddy);
+      if (dist > rr - 1) continue;
+      cellN = ((gx / cell) | 0) * 7 + ((gy / cell) | 0) * 3;
+      ctx.fillStyle = (cellN + 99) % 11 === sw ? RAINBOW[((cellN + 99) >> 1) % 6]
+                    : (ddx + ddy < -rr * 0.5) ? '#F4F4FF' : dist > rr * 0.7 ? ((ddx + ddy > 0) ? '#5A5A78' : '#8A8AA8') : ((gx / cell + gy / cell) & 1 ? '#C8C8DC' : '#9A9AB8');
+      ctx.fillRect(cx + gx, sy + gy, cell - 1, cell - 1);
+    }
+    ctx.fillStyle = '#FFFFFF';
+    if (Math.floor(t * 4) % 2 === 0) {
+      gl = (rr * 0.55) | 0;
+      ctx.fillRect(cx - gl - 1, sy - gl - 10, 3, 21); ctx.fillRect(cx - gl - 10, sy - gl - 1, 21, 3);
+    }
+  }
+  function ballLit(section) { return section >= 2; }   /* 0-based: sections 3 and 4 */
+
   function introFx(g, el) {
     var mv = still() ? 0 : 1, cx = g.w / 2, cs = peopleCs(g), u = Math.max(7, cs * 0.5 | 0);
     /* the mics meet above the speakers at head height: clear curtain behind them, and on a
@@ -1353,36 +1428,26 @@
     }
     if (el >= 1.2) {                                /* the disco sphere drops, then its light spreads */
       var d = mv ? ease((el - 1.2) / 1.2) : 1, sy = Math.round(-40 + (g.stage * 0.2 + 40) * d), rr = Math.max(24, (cs * 1.6) | 0);
-      var t = el * 3, i;
-      ctx.globalAlpha = 0.3 * d;
-      for (i = 0; i < 6; i++) {                     /* rainbow beams fanning from the ball */
-        var ang = Math.PI / 2 + (i - 2.5) * 0.22 + (mv ? Math.sin(t) * 0.05 : 0);
-        ctx.fillStyle = RAINBOW[i];
-        ctx.beginPath(); ctx.moveTo(cx, sy);
-        ctx.lineTo(cx + Math.cos(ang - 0.08) * g.h, sy + Math.sin(ang - 0.08) * g.h);
-        ctx.lineTo(cx + Math.cos(ang + 0.08) * g.h, sy + Math.sin(ang + 0.08) * g.h);
-        ctx.closePath(); ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      /* the ball: a rod from the truss, then an 8px mirror grid clipped to a disc, lit from the upper left */
-      var cell = Math.max(4, (rr / 4) | 0), gx, gy, sw = (Math.floor(t * 3) + 7) % 11;
-      ctx.fillStyle = INKC; ctx.fillRect(cx - 2, 0, 4, Math.max(0, sy - rr));
-      ctx.fillStyle = '#5A5A6A'; ctx.fillRect(cx - 1, 0, 2, Math.max(0, sy - rr));
-      ellP(ctx, cx, sy, rr + 3, rr + 3, INKC, 1);
-      for (gy = -rr; gy < rr; gy += cell) for (gx = -rr; gx < rr; gx += cell) {
-        var ddx = gx + cell / 2, ddy = gy + cell / 2, dist = Math.sqrt(ddx * ddx + ddy * ddy);
-        if (dist > rr - 1) continue;
-        var cellN = ((gx / cell) | 0) * 7 + ((gy / cell) | 0) * 3;
-        ctx.fillStyle = (cellN + 99) % 11 === sw ? RAINBOW[((cellN + 99) >> 1) % 6]
-                      : (ddx + ddy < -rr * 0.5) ? '#F4F4FF' : dist > rr * 0.7 ? ((ddx + ddy > 0) ? '#5A5A78' : '#8A8AA8') : ((gx / cell + gy / cell) & 1 ? '#C8C8DC' : '#9A9AB8');
-        ctx.fillRect(cx + gx, sy + gy, cell - 1, cell - 1);
-      }
-      ctx.fillStyle = '#FFFFFF';                     /* a four-point glint that turns on and off */
-      if (Math.floor(t * 4) % 2 === 0) {
-        var gl = (rr * 0.55) | 0;
-        ctx.fillRect(cx - gl - 1, sy - gl - 10, 3, 21); ctx.fillRect(cx - gl - 10, sy - gl - 1, 21, 3);
-      }
+      discoBall(g, cx, sy, rr, el * 3, d, mv);
     }
+  }
+
+  /* The arrows fold up (a vertical squash) while four border segments slide
+     in from off-screen to the soul arena. One progress value, u, drives both:
+     the same 0.6s ease the fight already used for the crossfade. */
+  function arrowFold(u) { return 1 - Math.max(0, Math.min(1, u)); }
+  function boxSegments(u, g) {
+    g = g || geom();
+    u = Math.max(0, Math.min(1, u));
+    var w = Math.max(32, g.w - 128), h = Math.max(32, g.h - 128);
+    var top = -40 + (64 + 40) * u, bot = (g.h + 40) + (g.h - 68 - g.h - 40) * u;
+    var left = -40 + (64 + 40) * u, right = (g.w + 40) + (g.w - 68 - g.w - 40) * u;
+    return [
+      { x: 64, y: Math.round(top), w: w, h: 4, outside: u < 0.999 },
+      { x: 64, y: Math.round(bot), w: w, h: 4, outside: u < 0.999 },
+      { x: Math.round(left), y: 64, w: 4, h: h, outside: u < 0.999 },
+      { x: Math.round(right), y: 64, w: 4, h: h, outside: u < 0.999 }
+    ];
   }
 
   function draw(sp) {
@@ -1397,6 +1462,10 @@
     if (hintEl) { var hy = Math.round(g.stage + 56) + 'px'; if (hintEl.style.top !== hy) hintEl.style.top = hy; }
     stage(g, sp);
     people(g, sp, t);
+    if (S.mode !== 'intro' && ballLit(S.section)) {
+      var bcs = peopleCs(g), brr = Math.max(24, (bcs * 1.6) | 0);
+      discoBall(g, g.w / 2, Math.round(g.stage * 0.2), brr, still() ? 0 : sp * 3, 1, still() ? 0 : 1);
+    }
     if (S.mode === 'intro') {
       introFx(g, S.introT);
       ctx.restore();
@@ -1417,7 +1486,12 @@
       for (var l = 0; l < 4; l++) {
         var f = (t - confirmAt[side][l] < 0.15 || held[side][l]) ? 2 : (side && keys[LANES[l]]) ? 1 : 0;
         if (side && l === S.blockLane && sp < S.blockUntil) f = 1;
+        ctx.save();
+        ctx.translate(0, sd.y);
+        ctx.scale(1, Math.max(0.02, arrowFold(S.arrowA)));
+        ctx.translate(0, -sd.y);
         arrow(f, l, sd.x + l * sd.p, sd.y, sd.s);
+        ctx.restore();
       }
     }
     ctx.globalAlpha = 1;
@@ -1496,13 +1570,12 @@
           ctx.globalAlpha = 1;
         }
       }
-      if (S.brk === 'dodge') {
+      if (S.boxA > 0.001) {
         var ba = still() ? 0.35 : 0.3 + 0.15 * Math.sin(sp * 5);
-        ctx.globalAlpha = ba; ctx.fillStyle = PAT_COL[S.pattern];
-        ctx.fillRect(64, 64, Math.max(32, g.w - 128), 4);
-        ctx.fillRect(64, g.h - 68, Math.max(32, g.w - 128), 4);
-        ctx.fillRect(64, 64, 4, Math.max(32, g.h - 128));
-        ctx.fillRect(g.w - 68, 64, 4, Math.max(32, g.h - 128));
+        var segs = boxSegments(S.boxA, g);
+        ctx.globalAlpha = ba;
+        ctx.fillStyle = PAT_COL[S.brkI >= 0 ? S.brkI : 0];
+        for (var si = 0; si < 4; si++) ctx.fillRect(segs[si].x, segs[si].y, segs[si].w, segs[si].h);
         ctx.globalAlpha = 1;
       }
       /* the soul materialises: a shrinking ring while it fades/rises in,
@@ -1522,7 +1595,8 @@
       ctx.globalAlpha = 0.6; ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, g.w, g.h); ctx.globalAlpha = 1;
       text('PAUSED', g.w / 2, g.h / 2 - 16, 48, '#FFFFFF');
       text('ESC to resume', g.w / 2, g.h / 2 + 32, 16, '#EDE7DE');
-      text('X or tap to leave', g.w / 2, g.h / 2 + 56, 16, '#EDE7DE');
+      text('R to restart', g.w / 2, g.h / 2 + 56, 16, '#EDE7DE');
+      text('X or tap to leave', g.w / 2, g.h / 2 + 80, 16, '#EDE7DE');
     }
     ctx.restore();
     if (NEU.juice && NEU.juice.drawParts) NEU.juice.drawParts(ctx, 1 / 60);
@@ -1550,6 +1624,7 @@
       if (performance.now() - winAt > 600) close();
       return;
     }
+    if (S.paused && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); retry(); return; }
     if (S.paused && (e.key === 'x' || e.key === 'X')) { e.preventDefault(); leavePrompt(); return; }
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -1633,14 +1708,14 @@
     if (NEU.save && api.key) NEU.save.flag(api.key('gone', axe), 1);
   }
 
-  /* A win leaves through the black cut: black in, rooms swap behind it, the
-     stall hand-over opens on the black, black out. */
+  /* A win leaves through the stage curtain: it drops over the stage, the
+     stall hand-over opens behind it, and it lifts onto the room. */
   var closing = false;
   function close() {
     if (closing) return;
-    if (!won || !NEU.cut) { leave(); return; }
+    if (!won || !NEU.stageCurtain) { leave(); return; }
     closing = true; running = false;
-    NEU.cut(function () { closing = false; leave(); }, 240);
+    NEU.stageCurtain.through(function () { closing = false; leave(); }, 240);
   }
   function leave() {
     running = false;
@@ -1675,6 +1750,9 @@
                  state: S, pops: pops, geom: geom, noteY: noteY, dirOf: dirOf,
                  charts: CHARTS, bpm: BPM, WINDOW: WINDOW_MS / 1000,
                  sections: SECTIONS, length: SONG, soulHit: soulHit,
-                 stats: chartStats, MAX_GAP: MAX_GAP,
-                 soul: function () { return soulF; } };
+                 stats: chartStats, MAX_GAP: MAX_GAP, breaks: BREAK_AT, breakRaw: BREAK_RAW,
+                 sec: SEC, barOf: barOf, scoreLine: scoreLine, ballLit: ballLit,
+                 soul: function () { return soulF; }, WIND_UP: WIND_UP, returnAt: RETURN_AT,
+                 boxSegments: boxSegments, arrowFold: arrowFold,
+                 hazards: { wave: spawnHazards, wind: function () { return { t: S.wind, n: S.windN }; } } };
 })();

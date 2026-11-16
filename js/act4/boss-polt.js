@@ -48,6 +48,8 @@
     { field: '#14070E', rim: COL.red }];
   var VULN_COL = '#FFC46A';            /* same gold as her VULNERABLE banner */
   var REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  /* PLAN 9.5: the boss reads at 2x so his legs and hooks are legible. */
+  var BOSS_SCALE = 2;
 
   var PLAYER_R = (dm.soul && dm.soul.R) || 3.2, IFRAMES = dm.IFRAMES || 1.1, MAXHP = 6;
   /* the shared fight feel: dash, adrenaline, rage, numbers, the HUD */
@@ -684,6 +686,26 @@
         if (h > 0.95) { R(x + 9 + ((h * 997) & 7), y + 4, 2, 5, w[tone - 1]); R(x + 11 + ((h * 997) & 7), y + 9, 2, 3, w[tone - 1]); }
       }
     }
+    /* PLAN 9.5 — depth behind the fight: a desaturated far wall with
+       blind arches and hanging chains. Baked into the wall, so it is
+       always BEHIND the boss, the bullets and every telegraph. Kept
+       low-contrast on purpose: the player and the warning lines stay
+       the brightest things in the room. */
+    var farH = (H * 0.26) | 0;
+    A(0, 0, W, farH, '#050810', 0.5);
+    for (x = 24; x < W; x += 120) {
+      A(x, farH - 40, 56, 40, '#0B1024', 0.55);
+      ell(g, x + 28, farH - 40, 28, 18, '#0B1024', 0.55);
+      A(x + 4, farH - 36, 48, 36, '#070C1C', 0.45);
+    }
+    A(0, farH - 2, W, 2, w[3], 0.5);
+    for (x = 60; x < W - 20; x += 150) {
+      for (y = 0; y < farH + 28; y += 8) {
+        A(x, y, 2, 5, '#0A0E18', 0.5);
+        A(x + 3, y + 4, 2, 5, '#0A0E18', 0.5);
+      }
+      A(x - 4, farH + 28, 12, 3, '#0A0E18', 0.5);
+    }
     /* a soft light pool behind where the boss hangs: the focal point */
     ell(g, W >> 1, (H * 0.38) | 0, 220, 130, P.lt, 0.035);
     ell(g, W >> 1, (H * 0.38) | 0, 150, 90, P.lt, 0.04);
@@ -775,6 +797,16 @@
       }
     }
   }
+  /* PLAN 9.5: a spectral glow under the boss separates his silhouette
+     from the action plane and anchors his depth. Pure function of the
+     game clock, so a pause holds it and reduced motion freezes it. */
+  function bossAura() {
+    var col = phase === 3 ? COL.red : phase === 2 ? COL.ecto : '#8AB4FF';
+    var tt = REDUCE_MOTION ? 0 : t;
+    var pulse = 0.9 + 0.1 * Math.sin(tt * 2.6);   /* under 3 Hz */
+    ell(ctx, bx, by + 44, 132, 42, col, 0.10 * pulse);
+    ell(ctx, bx, by + 44, 86, 27, PHASE_LOOK[phase] ? PHASE_LOOK[phase].rim : COL.ecto, 0.08 * pulse);
+  }
   function frame() {
     var look = PHASE_LOOK[phase] || PHASE_LOOK[1], a = arenaImg();
     /* the phase field is always painted; the baked wall sits on top of it */
@@ -830,6 +862,7 @@
     var shook = NEU.juice ? NEU.juice.begin(ctx, innerWidth, innerHeight) : false;
     frame();
     liveArena();
+    bossAura();
 
     /* chains first, behind everything */
     drawLegs();
@@ -901,6 +934,9 @@
     things.forEach(function (o) {
       var p = proj(o.x, o.y, o.z);
       var s = Math.max(0.5, p.k);
+      /* PLAN 9.5: only the body and the clone double in size. Hooks stay
+         at their own scale so the tethers and hit radius still read. */
+      var bs = o.kind === 'hook' ? s : s * BOSS_SCALE;
       if (o.kind === 'hook') {
         if (!drawSheet('hook', Math.round(p.x), Math.round(p.y), s * 0.8, null, 0, REDUCE_MOTION ? 0 : undefined)) {
           ctx.fillStyle = COL.ecto;
@@ -914,29 +950,29 @@
          health bar is. The clone is the same body tinted red by an
          extra pass, because it IS the same body. */
       var glows = phase >= 3 ? ['polterG1', 'polterG2'] : phase >= 2 ? ['polterG1'] : null;
-      var w = 90 * s, h = 150 * s, bxp = Math.round(p.x), byp = Math.round(p.y);
+      var w = 90 * bs, h = 150 * bs, bxp = Math.round(p.x), byp = Math.round(p.y);
       var fr = REDUCE_MOTION ? 0 : ((nowMs / 100) | 0) % 12;
       var isBody = o.kind === 'body';
       /* a shadow on the floor under him, then a halo behind him */
       if (isBody) {
         var gy = AY + AH - 30, sh = 1 - Math.min(0.5, Math.abs(gy - byp) / 600);
         ctx.fillStyle = '#000000'; ctx.globalAlpha = 0.16;
-        ctx.fillRect(bxp - ((34 * sh) | 0), gy - 2, (68 * sh) | 0, 8);
-        ctx.fillRect(bxp - ((22 * sh) | 0), gy, (44 * sh) | 0, 4);
+        ctx.fillRect(bxp - ((34 * bs * sh) | 0), gy - 2, (68 * bs * sh) | 0, 8);
+        ctx.fillRect(bxp - ((22 * bs * sh) | 0), gy, (44 * bs * sh) | 0, 4);
         ctx.globalAlpha = 1;
       }
-      if (dm.glow) dm.glow(ctx, bxp, byp, o.kind === 'clone' ? 84 : 96, o.kind === 'clone' ? COL.red : COL.ecto, phase >= 2 ? 0.34 : 0.26);
+      if (dm.glow) dm.glow(ctx, bxp, byp, (o.kind === 'clone' ? 84 : 96) * bs, o.kind === 'clone' ? COL.red : COL.ecto, phase >= 2 ? 0.34 : 0.26);
       /* the punish window: a 2px gold outline of the sprite itself */
-      if (isBody && vuln > 0 && mode !== 'won') outline(tinted('polter', fr, VULN_COL, 1), bxp, byp, s);
+      if (isBody && vuln > 0 && mode !== 'won') outline(tinted('polter', fr, VULN_COL, 1), bxp, byp, bs);
       /* about to charge: the same silhouette in red, fading out */
       if (o.kind === 'body' && glow > 0) {
         ctx.globalAlpha = Math.min(1, glow);
-        outline(tinted('polter', fr, COL.red, 1), bxp, byp, s);
+        outline(tinted('polter', fr, COL.red, 1), bxp, byp, bs);
         ctx.globalAlpha = 1;
       }
-      var drew = drawSheet('polter', bxp, byp, s * 1.0, glows, 0, fr);
+      var drew = drawSheet('polter', bxp, byp, bs * 1.0, glows, 0, fr);
       /* the clone is the same body, flooded red by a baked copy */
-      if (o.kind === 'clone' && drew) putTint(tinted('polter', fr, COL.red, 0.5), bxp, byp, s);
+      if (o.kind === 'clone' && drew) putTint(tinted('polter', fr, COL.red, 0.5), bxp, byp, bs);
       if (drew) return;
       ctx.fillStyle = o.kind === 'clone' ? '#5A2A3E' : '#1E3A44';
       ctx.fillRect((p.x - w / 4) | 0, (p.y - h / 4) | 0, (w / 2) | 0, (h / 2) | 0);
@@ -1100,6 +1136,11 @@
   });
 
   NEU.polt = { open: open, close: close, win: win,
+               /* B4 review surface: boss scale, arena depth and the
+                  reduced-motion gate are observable from tests. */
+               get scale() { return BOSS_SCALE; },
+               get reduced() { return REDUCE_MOTION; },
+               get depth() { return { farWall: true, chains: true, aura: true }; },
                get running() { return running; },
                get phase() { return phase; },
                get hp() { return bossHP; },
