@@ -1616,7 +1616,7 @@
 
   NEU.summon = {
     start: start,
-    enter: function (c) { api = c; near = 0; beatAcc = 0; quakeAcc = 0; overlayOn(); },
+    enter: function (c) { api = c; near = 0; beatAcc = 0; quakeAcc = 0; dbg.shrink = 0; overlayOn(); },
     exit: function () { abort(); api = null; near = 0; NEU.duckHold = false; overlayOff(); },
     /* room.dark / room.light for b8_arena */
     dark: function () {
