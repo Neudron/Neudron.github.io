@@ -2250,6 +2250,19 @@
     platforms: null
   };
 
+  /* The victory box is modal: its confirm key follows the player's bindings
+     through the same router every other dialogue uses (keys.js). */
+  function routedTalkKey(e) {
+    var key = e.key || '';
+    if (NEU.keys && NEU.keys.route) {
+      var r = NEU.keys.route(key, null);
+      /* keep canonical X even when route marks the moved physical key swallowed */
+      if (r.swallow && key.toLowerCase() !== 'x') return '';
+      key = r.swallow ? 'x' : (r.to || key);
+    }
+    return key.length === 1 ? key.toLowerCase() : key;
+  }
+
   addEventListener('keydown', function (e) {
     if (wrap.hidden || !NEU.scal.active || NEU.activeMinigame !== 'scal') return;
     if (e.key === 'F3') { showHitboxes = !showHitboxes; return; }
@@ -2263,10 +2276,11 @@
       } else { close(); }
       return;
     }
-    /* the victory dialogue is modal: Z/X/Enter advance it and nothing
-       else gets through while the box is up */
+    /* the victory dialogue is modal: the bound confirm keys advance it
+       and nothing else gets through while the box is up */
     if (NEU.tboxOpen && NEU.tboxOpen()) {
-      if (e.key === 'z' || e.key === 'Z' || e.key === 'x' || e.key === 'X' || e.key === 'Enter') {
+      var talkKey = routedTalkKey(e);
+      if (talkKey === 'z' || talkKey === 'x' || talkKey === 'Enter') {
         e.preventDefault();
         if (NEU.talk && NEU.talk.ff) NEU.talk.ff();
       }
