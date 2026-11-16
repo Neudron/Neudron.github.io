@@ -106,7 +106,6 @@
     var k = pick();
     if (k !== kit) {
       kit = k; shown = kit ? kit.tp : 0;
-      if (kit && kit.drainTp) kit.drainTp();
       if (kit && !el.hidden) paintChips(kit);
     }
     if (!kit) { if (!el.hidden) el.hidden = true; return; }
