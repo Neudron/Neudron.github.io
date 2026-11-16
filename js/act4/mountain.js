@@ -98,86 +98,143 @@
     here: function () { return NEU.mountain.active && P.levelId ? P.levelId() : currentId; }
   };
 
-  function build(n) {
-    var rows = blank(), id = 'm' + n, ents, spawn;
-    if (n === 0) {
-      fill(rows, 0, 8, 12, '#');
-      fill(rows, 9, 12, 13, '^');
-      fill(rows, 9, 12, 14, '#');
-      fill(rows, 13, 26, 12, '#');
-      fill(rows, 27, 30, 13, '^');
-      fill(rows, 27, 30, 14, '#');
-      fill(rows, 31, 47, 12, '#');
-      spawn = { x: 2, y: 11 };
-      ents = [{ t: 'refill', x: 18, y: 11 }, { t: 'exit', x: 42, y: 11 }];
-    } else if (n === 1) {
-      fill(rows, 0, 15, 14, '#');
-      fill(rows, 16, 18, 15, '^');
-      fill(rows, 16, 18, 16, '#');
-      fill(rows, 17, 42, 12, '#');
-      spawn = { x: 3, y: 13 };
-      ents = [{ t: 'spring', x: 15, y: 13 }, { t: 'exit', x: 36, y: 11 }];
-    } else if (n === 2) {
-      fill(rows, 0, 24, 14, '#');
-      fill(rows, 25, 28, 15, '^');
-      fill(rows, 25, 28, 16, '#');
-      fill(rows, 29, 47, 14, '#');
-      fill(rows, 16, 16, 9, 'v');
-      spawn = { x: 2, y: 13 };
-      ents = [{ t: 'zip', x: 16, y: 13, targetX: 16, targetY: 8 }, { t: 'exit', x: 42, y: 13 }];
-    } else if (n === 3) {
-      fill(rows, 0, 10, 14, '#');
-      fill(rows, 14, 30, 14, '#');
-      fill(rows, 11, 13, 15, '^');
-      fill(rows, 11, 13, 16, '#');
-      spawn = { x: 2, y: 13 };
-      ents = [
-        { t: 'crumble', x: 11, y: 14 }, { t: 'crumble', x: 12, y: 14 }, { t: 'crumble', x: 13, y: 14 },
-        { t: 'exit', x: 26, y: 13 }
-      ];
-    } else if (n === 4) {
-      fill(rows, 0, 47, 14, '#');
-      fill(rows, 18, 18, 12, 'x');
-      fill(rows, 18, 18, 13, 'x');
-      spawn = { x: 2, y: 13 };
-      ents = [{ t: 'exit', x: 40, y: 13 }];
-    } else if (n === 5) {
-      fill(rows, 0, 10, 14, '#');
-      fill(rows, 11, 14, 15, '^');
-      fill(rows, 11, 30, 13, '#');
-      spawn = { x: 4, y: 13 };
-      ents = [{ t: 'pogo', x: 8, y: 13 }, { t: 'exit', x: 24, y: 12 }];
-    } else if (n === 6) {
-      fill(rows, 4, 10, 16, '#');
-      fill(rows, 0, 3, 16, '^');
-      fill(rows, 11, 20, 16, '^');
-      fill(rows, 0, 20, 17, '#');
-      fill(rows, 2, 14, 11, '=');
-      spawn = { x: 6, y: 15 };
-      ents = [{ t: 'refill', x: 8, y: 10 }, { t: 'exit', x: 12, y: 10 }];
-    } else {
-      fill(rows, 0, 15, 14, '#');
-      fill(rows, 16, 18, 15, '^');
-      fill(rows, 16, 18, 16, '#');
-      fill(rows, 17, 26, 12, '#');
-      fill(rows, 27, 30, 13, '^');
-      fill(rows, 27, 30, 14, '#');
-      fill(rows, 31, 46, 12, '#');
-      spawn = { x: 3, y: 13 };
-      ents = [{ t: 'spring', x: 15, y: 13 }, { t: 'exit', x: 42, y: 11 }];
-    }
-    /* one lit lantern per screen: the focal point the eye finds first, standing on the floor it lights */
-    put(rows, LANTERN[n][0], LANTERN[n][1], "l");
-    /* and one trail banner on the same floor, well away from the lantern: the second prop the eye finds */
-    put(rows, BANNER[n][0], BANNER[n][1], "f");
-    add(id, rows, spawn, ents, n);
+  /* M2: eight tall climbing rooms. The guaranteed route is a column of
+     one-way rungs 3 tiles apart (SAFE jump height 2.494 tiles); every listed
+     mechanic is built as a teachable segment beside that route, never as an
+     unavoidable first-contact kill. Same ids, flags, exits and chain as before. */
+  function roomRows(w, h) {
+    var rows = [], y, x, s;
+    for (y = 0; y < h; y++) { s = ''; for (x = 0; x < w; x++) s += '.'; rows.push(s); }
+    return rows;
   }
+  function rput(rows, x, y, ch) {
+    if (y < 0 || y >= rows.length || x < 0 || x >= rows[0].length) return;
+    rows[y] = rows[y].substring(0, x) + ch + rows[y].substring(x + 1);
+  }
+  function rfill(rows, x0, x1, y, ch) {
+    var x;
+    for (x = x0; x <= x1; x++) rput(rows, x, y, ch);
+  }
+  function rungs(rows, x0, x1, yTop, yBottom) {
+    var y;
+    for (y = yBottom; y >= yTop; y -= 3) rfill(rows, x0, x1, y, '=');
+  }
+  function ladderRec(hops) {
+    var rec = [], i;
+    /* hold jump through the apex, release one beat, then jump again */
+    for (i = 0; i < hops; i++) rec.push([1, 'jump'], [26, 'jump'], [2, '']);
+    return rec;
+  }
+  function buildRoom(n, w, h, opts) {
+    var id = 'm' + n, rows = roomRows(w, h), floorY = h - 2, bottom = floorY - 3;
+    var topY = bottom - Math.floor((bottom - 2) / 3) * 3, spawn, ents, midY, def;
+    rfill(rows, 0, w - 1, floorY, '#');
+    rungs(rows, 3, 7, 2, bottom);
+    spawn = { x: 5, y: floorY - 1 };
+    ents = [{ t: 'checkpoint', x: 5, y: floorY - 1 }];
+    /* M3: a second checkpoint at mid height on every room 40 tiles or taller */
+    if (h >= 40) {
+      midY = bottom - Math.round((bottom - Math.floor(h / 2)) / 3) * 3;
+      ents.push({ t: 'checkpoint', x: 5, y: midY - 1 });
+    }
+    if (opts.decor) opts.decor(rows, ents, floorY, w);
+    rput(rows, opts.lantern[0], opts.lantern[1], 'l');
+    rput(rows, opts.banner[0], opts.banner[1], 'f');
+    ents.push({ t: 'exit', x: 5, y: topY - 1 });
+    def = P.level(id, {
+      tiles: rows.join('\n'), spawn: spawn, entities: ents, tileset: 'mountain',
+      chunked: true, resetOnDeath: true, cameraMode: 'mountain', quickRespawn: true,
+      camera: { focusY: 0.52 }, wind: opts.wind || null,
+      stage: opts.stage, altitude: opts.altitude,
+      onExit: makeExit(n)
+    });
+    def.recording = ladderRec(opts.hops);
+    NEU.mountain.recordings[id] = def.recording;
+    return def;
+  }
+  buildRoom(0, 26, 34, {
+    stage: 'foot', altitude: 0, hops: 12, lantern: [16, 30], banner: [23, 30],
+    decor: function (rows, ents, f) {
+      rfill(rows, 11, 13, f, '.'); rfill(rows, 19, 21, f, '.');       /* two pits */
+      rfill(rows, 11, 13, f + 1, '^'); rfill(rows, 19, 21, f + 1, '^');
+      ents.push({ t: 'refill', x: 16, y: f - 1 });
+    }
+  });
+  buildRoom(1, 26, 34, {
+    stage: 'foot', altitude: 120, hops: 12, lantern: [12, 30], banner: [22, 30],
+    decor: function (rows, ents, f) {
+      rfill(rows, 17, 19, f, '.'); rfill(rows, 17, 19, f + 1, '^');   /* second spring over a spike pit */
+      ents.push({ t: 'spring', x: 11, y: f - 1 });                    /* first spring: clear floor */
+      ents.push({ t: 'spring', x: 18, y: f - 1 });
+    }
+  });
+  buildRoom(2, 26, 40, {
+    stage: 'ridge', altitude: 600, hops: 14, lantern: [17, 36], banner: [23, 36],
+    decor: function (rows, ents, f) {
+      var y;
+      for (y = f - 8; y <= f - 1; y++) { rput(rows, 11, y, '#'); rput(rows, 14, y, '#'); } /* chimney */
+      rfill(rows, 18, 20, f + 1, '^');
+      rfill(rows, 12, 16, 12, 'v');
+      ents.push({ t: 'zip', x: 12, y: f - 6, targetX: 12, targetY: 10 });
+    }
+  });
+  buildRoom(3, 26, 40, {
+    stage: 'ridge', altitude: 900, hops: 14, lantern: [20, 36], banner: [8, 36],
+    decor: function (rows, ents, f) {
+      var y;
+      for (y = 9; y <= f - 1; y++) rput(rows, 19, y, '#');            /* climb wall */
+      rfill(rows, 13, 15, f + 1, '^');
+      ents.push({ t: 'crumble', x: 13, y: f - 2 });
+      ents.push({ t: 'crumble', x: 14, y: f - 2 });
+      ents.push({ t: 'crumble', x: 15, y: f - 2 });
+    }
+  });
+  buildRoom(4, 26, 34, {
+    stage: 'ridge', altitude: 1200, hops: 12, lantern: [16, 30], banner: [22, 30],
+    decor: function (rows, ents, f) {
+      rput(rows, 18, f - 2, 'x'); rput(rows, 18, f - 3, 'x');         /* dash barrier, no hazards */
+    }
+  });
+  buildRoom(5, 28, 44, {
+    stage: 'ridge', altitude: 1500, hops: 16, lantern: [18, 40], banner: [25, 40],
+    decor: function (rows, ents, f) {
+      rfill(rows, 15, 17, f + 1, '^');
+      rfill(rows, 12, 16, f - 5, '=');                                /* refill ledge above the spike run */
+      ents.push({ t: 'pogo', x: 10, y: f - 1 });
+      ents.push({ t: 'crumble', x: 12, y: f - 2 });                   /* crumble alone */
+      ents.push({ t: 'zip', x: 20, y: f - 7, targetX: 20, targetY: 12 }); /* zip alone */
+      ents.push({ t: 'crumble', x: 16, y: f - 4 });                   /* one of each together */
+      ents.push({ t: 'zip', x: 17, y: f - 6, targetX: 17, targetY: 10 });
+      ents.push({ t: 'refill', x: 14, y: f - 6 });
+    }
+  });
+  buildRoom(6, 28, 48, {
+    stage: 'summit', altitude: 2100, hops: 18, lantern: [18, 44], banner: [25, 44],
+    wind: { x: 55, y: 0, period: 4.2, duty: 0.65 },                    /* mtest_medium gust */
+    decor: function (rows, ents, f) {
+      rfill(rows, 17, 19, f, '.'); rfill(rows, 17, 19, f + 1, '^');
+      rfill(rows, 12, 16, f - 5, '='); rfill(rows, 20, 24, f - 8, '=');
+      ents.push({ t: 'refill', x: 14, y: f - 6 });
+      ents.push({ t: 'refill', x: 22, y: f - 9 });
+      ents.push({ t: 'refill', x: 18, y: f - 11 });
+    }
+  });
+  buildRoom(7, 28, 60, {
+    stage: 'summit', altitude: 2400, hops: 22, lantern: [18, 56], banner: [25, 56],
+    wind: { x: -88, y: -12, period: 3.6, duty: 0.76 },                 /* mtest_hard gust */
+    decor: function (rows, ents, f) {
+      var y;
+      for (y = f - 12; y <= f - 1; y++) { rput(rows, 11, y, '#'); rput(rows, 14, y, '#'); }
+      rfill(rows, 17, 19, f + 1, '^');
+      rfill(rows, 12, 16, f - 6, '=');
+      ents.push({ t: 'spring', x: 9, y: f - 1 });
+      ents.push({ t: 'crumble', x: 13, y: f - 2 });
+      ents.push({ t: 'zip', x: 16, y: f - 7, targetX: 16, targetY: 14 });
+      ents.push({ t: 'refill', x: 14, y: f - 7 });
+    }
+  });
 
-  var LANTERN = [[22, 11], [8, 13], [20, 13], [24, 13], [24, 13], [20, 12], [6, 10], [22, 11]];
-  var BANNER = [[5, 11], [28, 11], [33, 13], [5, 13], [9, 13], [28, 12], [13, 10], [33, 11]];
   var n;
-  for (n = 0; n <= 7; n++) build(n);
-
   /*
    * Research-gated precision-platforming PROTOTYPES. Deliberately separate
    * from the eight-room story route: none counts toward the promised 60
