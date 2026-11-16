@@ -162,6 +162,10 @@
     props.dadbounce = { w: 2, h: 2, ax: 1, ay: 1, paint: function () {}, light: function () {
       return { r: 150, a: 0.3 };
     } };
+    /* the moon through the window: the bed and the middle of the floor */
+    props.dadmoon = { w: 2, h: 2, ax: 1, ay: 1, paint: function () {}, light: function () {
+      return { r: 72, col: '#9FB6E0', glow: 0.14 };
+    } };
     props.dadclock = { w: 10, h: 12, ax: 5, ay: 10, paint: function (P) {
       P(-4, -10, 8, 10, '#1A120E');
       P(-3, -9, 6, 8, '#3A342C');
@@ -210,6 +214,7 @@
     entities: [
       { t: 'cityfloor', v: 'e5_dad', x: 0, y: 0 },
       { t: 'cityprop', v: 'dadbounce', x: 7, y: 3 },
+      { t: 'cityprop', v: 'dadmoon', x: 8, y: 1 },
       { t: 'cityprop', v: 'dadrobe', x: 1, y: 1 },
       { t: 'cityprop', v: 'daddesk', x: 3, y: 1 },
       { t: 'cityprop', v: 'dadlamp', x: 3, y: 1, dx: 6 },
@@ -274,6 +279,7 @@
     entities: [
       { t: 'cityfloor', v: 'e6_room', x: 0, y: 0 },
       { t: 'cityprop', v: 'dadbounce', x: 7, y: 3 },
+      { t: 'cityprop', v: 'dadmoon', x: 8, y: 1 },
       { t: 'cityprop', v: 'dadrobe', x: 1, y: 1 },
       { t: 'cityprop', v: 'daddesk', x: 3, y: 1 },
       { t: 'cityprop', v: 'dadlamp', x: 3, y: 1, dx: 6 },

@@ -75,42 +75,50 @@
 
   /* ── the recall potion ─────────────────────────────────────────
      One sequence for both ways to drink it — the C menu and the chalk
-     circle in d3_square. The soul raises the flask (engine api.act), a
-     ring opens under it, and the iris carries it home: always e6_room
-     at the bed, never a corridor. busy holds every control until the
-     iris finishes; go() releases it. */
+     circle in d3_square. Its beats are the portal:recall kind in
+     engine-trans.js (ms 2850); busy holds every control until the last:
+       0     850  the soul raises the flask (engine api.act)
+       850  1250  a ring grows from the feet; the room dims 30 %
+       1250 1550  the player dissolves upward, row by row
+       1550 1950  the screen folds shut in six strips
+       1950 2350  e6_room loads under the strips and unfolds
+       2350 2650  the player re-forms by the bed; the ring recedes
+       2850       control returns
+     Always e6_room at the bed, never a corridor. Reduced motion keeps
+     the order and drops the motion: a static ring, then a cut. */
   var recalling = false;
   function reducedMotion() {
     return !!(NEU.motion && NEU.motion.reduced ? NEU.motion.reduced() : window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ||
       !!(NEU.settings && NEU.settings.reduced);
   }
-  function ring() {
-    var still = reducedMotion();
-    var el = document.createElement('div');
-    el.id = 'recallRing';
-    el.setAttribute('aria-hidden', 'true');
-    el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:74;display:flex;align-items:center;justify-content:center';
-    var c = document.createElement('div');
-    c.style.cssText = 'width:140px;height:140px;border-radius:50%;border:4px solid #7FE6FF;' +
-      'box-shadow:0 0 28px rgba(127,230,255,.8),inset 0 0 28px rgba(127,230,255,.5);opacity:0';
-    el.appendChild(c); document.body.appendChild(el);
-    var gone = function () { if (el.parentNode) el.parentNode.removeChild(el); };
-    if (!still && c.animate) {
-      c.animate([{ transform: 'scale(.15)', opacity: 0 },
-                 { transform: 'scale(.15)', opacity: 1, offset: .25 },
-                 { transform: 'scale(1.5)', opacity: 0 }],
-                { duration: 700, easing: 'steps(6)' });
-    } else { c.style.opacity = '.8'; }
-    setTimeout(function () {
-      gone();
-      if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
-      /* enter(), not go(): go() silently no-ops while another iris is
-         still running, which would leave busy held forever. enter()
-         always lands and releases the lock itself. */
-      NEU.engine.enter('e6_room', 'bed', { iris: 0.6 });
-      recalling = false;
-    }, still ? 200 : 700);
+  /* The feet on screen, in CSS px: the engine draws world px at
+     (px - cam) * SCALE, scaled into the canvas box. */
+  function onScreen() {
+    var cv = document.getElementById('engCanvas'), r = cv.getBoundingClientRect(), E = NEU.engine;
+    var k = E.SCALE * r.width / cv.width, p = E.api.player, c = E.debug.cam;
+    return { x: r.left + (p.x - c.x) * k, y: r.top + (p.y - c.y) * k, k: k };
   }
+  /* Overlay blocks sit over the room (z 74); every one is in parts and goes at the end. */
+  var parts = [];
+  function block(css) {
+    var el = document.createElement('div');
+    el.setAttribute('aria-hidden', 'true'); el.className = 'recall-part';
+    el.style.cssText = 'position:fixed;pointer-events:none;z-index:74;' + css;
+    document.body.appendChild(el); parts.push(el);
+    return el;
+  }
+  function ring(f) {
+    var el = block('left:' + (f.x - 60) + 'px;top:' + (f.y - 60) + 'px;width:120px;height:120px;border-radius:50%;' +
+      'border:4px solid #7FE6FF;box-shadow:0 0 28px rgba(127,230,255,.8),inset 0 0 28px rgba(127,230,255,.5)');
+    el.id = 'recallRing';
+    return el;
+  }
+  /* Web Animations where there is one; otherwise the end frame at once. */
+  function tween(el, frames, ms, delay, easing) {
+    if (!el.animate) { var last = frames[frames.length - 1]; for (var k in last) el.style[k] = last[k]; return; }
+    el.animate(frames, { duration: ms, delay: delay || 0, easing: easing || 'ease-out', fill: 'both' });
+  }
+  function drop(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
   function recall() {
     if (recalling || !NEU.engine || !NEU.engine.enter || !NEU.engine.running) return false;
     if (!NEU.save || !NEU.save.has('recall')) return false;
@@ -119,10 +127,60 @@
     NEU.save.take('recall');
     NEU.save.flag('used_recall', 1);
     if (NEU.quest) NEU.quest.mark('a4_home');
-    var api = NEU.engine.api;
+    var api = NEU.engine.api, cv = document.getElementById('engCanvas'), end = NEU.engineTrans && NEU.engineTrans.get('portal:recall');
+    var ringEl = null, strips = [], started = Date.now(), look = NEU.engineLook, drawPlayer = look && look.drawPlayer;
+    if (drawPlayer && !reducedMotion()) look.drawPlayer = function (ctx, x, y, face, walked, moving, scale, now, extra) {
+      var t = Date.now() - started, rows = t < 1250 ? 18 : t < 1550 ? Math.ceil(18 * (1550 - t) / 300) : t < 2350 ? 0 : Math.min(18, Math.floor(18 * (t - 2350) / 300));
+      if (!rows) return;
+      ctx.save(); ctx.beginPath(); ctx.rect(x - 12 * scale, y - 18 * scale, 24 * scale, rows * scale); ctx.clip();
+      drawPlayer(ctx, x, y, face, walked, moving, scale, now, extra); ctx.restore();
+    };
     if (api && api.busy) api.busy(true);
     if (api && api.act) api.act('drink', 0.85);
-    setTimeout(ring, reducedMotion() ? 250 : 850);
+    function at(ms, fn) { setTimeout(fn, ms); }
+    function home(iris) {
+      /* enter(), not go(): go() silently no-ops while another iris is
+         still running, which would leave busy held forever. enter()
+         always lands and releases the lock itself, so busy is re-taken. */
+      NEU.engine.enter('e6_room', 'bed', { iris: iris });
+      if (api && api.busy) api.busy(true);
+    }
+    function finish() {
+      parts.forEach(drop); parts = [];
+      if (look) look.drawPlayer = drawPlayer;
+      if (api && api.busy) api.busy(false);
+      recalling = false;
+    }
+    if (reducedMotion()) {
+      at(250, function () { ring(onScreen()); if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh(); home(0.4); });
+      at(500, finish);
+      return true;
+    }
+    at(850, function () {
+      ringEl = ring(onScreen());
+      tween(ringEl, [{ transform: 'scale(.15)' }, { transform: 'scale(1)' }], 400);
+      cv.style.transition = 'filter 400ms'; cv.style.filter = 'brightness(.7)';
+    });
+    at(1550, function () {
+      var r = cv.getBoundingClientRect(), w = r.width / 6;
+      for (var i = 0; i < 6; i++) {
+        var s = block('left:' + (r.left + i * w) + 'px;top:' + r.top + 'px;width:' + (w + 1) + 'px;height:' + r.height + 'px;background:#16141E;transform-origin:bottom');
+        strips.push(s);
+        tween(s, [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }], 240, i * 32);
+      }
+    });
+    at(1950, function () {
+      cv.style.transition = ''; cv.style.filter = '';
+      home(0.4);
+      var f = onScreen();   /* the ring comes along to the bed */
+      ringEl.style.left = (f.x - 60) + 'px'; ringEl.style.top = (f.y - 60) + 'px';
+      strips.forEach(function (s, i) { tween(s, [{ transform: 'scaleY(1)' }, { transform: 'scaleY(0)' }], 240, i * 32); });
+    });
+    at(2350, function () {
+      tween(ringEl, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(0)', opacity: 0 }], 300);
+    });
+    at(2650, function () { parts.forEach(drop); parts = []; });
+    at(end ? end.ms : 2850, finish);
     return true;
   }
 

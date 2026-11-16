@@ -438,42 +438,6 @@
       if (NEU.act4 && NEU.act4.wake) NEU.act4.wake();
     }, anim ? 800 : 300);
   }
-  /* The row tips, glows and the room flashes cyan while you drink. The item
-     is taken and the teleport runs only when the drink lands (onTake), so a
-     cancelled drink keeps the potion. Reduced motion skips the motion only. */
-  function drinkPotion(item, onTake) {
-    if (drinking) return;
-    drinking = true;
-    var li = list.children[sel], anim = !reduced(), flash = null;
-    if (li) li.classList.add('inv__potion-drink');
-    /* The row itself only glows: rotating the whole row swung its label
-       out of the scrolling list and it read as blank. The potion icon is
-       what tips back. */
-    if (li && anim && li.animate) {
-      li.animate([{ filter: 'none' }, { filter: 'drop-shadow(0 0 8px #8bd6ff)' }, { filter: 'drop-shadow(0 0 16px #8bd6ff)' }],
-                 { duration: 800, easing: 'steps(4)', fill: 'both' });
-    }
-    var icon = li && li.querySelector ? li.querySelector('canvas') : null;
-    if (icon && anim && icon.animate) {
-      icon.style.transformOrigin = 'bottom right';
-      icon.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(-35deg)' }, { transform: 'rotate(-35deg)' }, { transform: 'rotate(0deg)' }],
-                   { duration: 800, easing: 'steps(4)' });
-    }
-    if (anim && document.body.animate) {
-      flash = document.createElement('div');
-      /* z 75: over the room (70), under the menu (76). Over the menu the
-         wash turned the yellow row label into a blue smear mid-drink. */
-      flash.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:#8bd6ff;opacity:0;z-index:75;pointer-events:none';
-      document.body.appendChild(flash);
-      flash.animate([{ opacity: 0 }, { opacity: 0.6 }, { opacity: 0 }], { duration: 800, easing: 'steps(4)' });
-    }
-    setTimeout(function () {
-      if (onTake) onTake();
-      close(); drinking = false;
-      if (flash && flash.parentNode) flash.parentNode.removeChild(flash);
-      if (NEU.talk) NEU.talk(['* you drink the ' + item.name + '. a safe place, briefly.'], 'narr');
-    }, anim ? 800 : 300);
-  }
   function consumeHeal(item) {
     if (drinking) return;
     drinking = true;
@@ -528,12 +492,11 @@
     if (!item) return;
     flashSel();
     if (item.id === 'soup') { drinkSoup(function () { NEU.save.take('soup'); }); return; }
-    /* The recall potion runs the shared sequence: drink, ring, iris,
-       and always the bedroom — never a corridor. */
+    /* The recall potion runs the shared sequence in act4.js: one drink, then
+       the bedroom, never a corridor. Calling it here drinks it once. */
     if (item.fx === 'recall') {
-      drinkPotion(item, function () {
-        if (NEU.act4 && NEU.act4.recall) NEU.act4.recall();
-      });
+      close();
+      if (NEU.act4 && NEU.act4.recall) NEU.act4.recall();
       return;
     }
     if (item.kind === 'heal') { consumeHeal(item); return; }
