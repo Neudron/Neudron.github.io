@@ -84,7 +84,7 @@
      either side of him in the sort). You came out of the fire door in
      the west wall; the alley mouth is the east wall; the painted door
      is on the plum building's front wall, left of the stall. */
-  E.register('d1_street', {
+  var D1 = {
     tileset: 'city',
     tiles: [
       '##########################',
@@ -141,7 +141,7 @@
       say(c, ['the door lets you out somewhere with weather.',
               'there is a stall. there is always a stall.']);
     }
-  });
+  };
 
   /* The shop. Nine pieces of junk and one thing that matters, and the
      only difference is that one of them is lit. */
@@ -246,7 +246,7 @@
      and sprayed again underneath, worse, in teal. Two mushrooms grow
      in the damp corners. In from the street's alley mouth on the west;
      out up the steps on the east. */
-  E.register('d2_alley', {
+  var D2 = {
     tileset: 'city',
     tiles: [
       '####################',
@@ -282,7 +282,7 @@
         style: 'door', label: 'garage',
         lines: ['a garage door, shut.', 'it is waiting on a photograph.'] }
     ]
-  });
+  };
 
   /* ══ D3 — the square ═════════════════════════════════════════════
      The end of the city. An old hall with a clock that keeps the real
@@ -291,7 +291,7 @@
      chalk circle on the same axis below it. The east side is a
      balustrade over the drop, with the rest of the city far below.
      In through the park gate in the west wall. */
-  E.register('d3_square', {
+  var D3 = {
     tileset: 'city',
     tiles: [
       '#########################',
@@ -334,7 +334,72 @@
       say(c, ['the square. it is the end of the city and it does not pretend otherwise.',
               'if you are carrying something that takes you home, this is the place.']);
     }
+  };
+
+  /* ── the city is one street (PLAN 7.1) ───────────────────────────
+     D1, D2 and D3 stay as source rooms. d_city copies their tiles and
+     entities at the offsets PLAN 7.1 gives, drops the exits they shared,
+     and shuts the alley's two side walls except at its seams. Each old
+     id is an alias into d_city with its own area. A copied entity keeps
+     its old room and cell in `origin`, so gone:… flags saved before the
+     merge still match. */
+  var CITY_SRC = [
+    { id: 'd1_street', room: D1, dx: 0, dy: 1, x0: 0, x1: 24 },
+    { id: 'd2_alley', room: D2, dx: 24, dy: 2, x0: 1, x1: 18 },
+    { id: 'd3_square', room: D3, dx: 42, dy: 0, x0: 1, x1: 24 }
+  ];
+  var CITY_IDS = ['d1_street', 'd2_alley', 'd3_square'];
+  function mergeCityTiles() {
+    var rows = [], x, y, i, j, s, g;
+    for (y = 0; y < 14; y++) { rows.push([]); for (x = 0; x < 67; x++) rows[y].push('#'); }
+    for (i = 0; i < CITY_SRC.length; i++) {
+      s = CITY_SRC[i]; g = s.room.tiles.split('\n');
+      for (j = 0; j < g.length; j++)
+        for (x = s.x0; x <= s.x1; x++) rows[j + s.dy][x + s.dx] = g[j].charAt(x);
+    }
+    /* the alley's west and east walls: shut, except at the seams (24,8)-(25,8) and (42,7)-(43,7) */
+    for (y = 0; y < 14; y++) {
+      if (y !== 8) rows[y][25] = '#';
+      if (y !== 7) rows[y][42] = '#';
+    }
+    return rows.map(function (r) { return r.join(''); }).join('\n');
+  }
+  function mergeCityEntities() {
+    var out = [], i, k, s, es, e, copy, key;
+    for (i = 0; i < CITY_SRC.length; i++) {
+      s = CITY_SRC[i]; es = s.room.entities;
+      for (k = 0; k < es.length; k++) {
+        e = es[k];
+        if (e.t === 'cityfloor' || (e.t === 'exit' && CITY_IDS.indexOf(e.to) >= 0)) continue;
+        copy = {};
+        for (key in e) copy[key] = e[key];
+        copy.origin = { room: s.id, x: e.x, y: e.y };
+        copy.x = e.x + s.dx; copy.y = e.y + s.dy;
+        out.push(copy);
+      }
+    }
+    return out;
+  }
+
+  E.register('d_city', {
+    tileset: 'city',
+    tiles: mergeCityTiles(),
+    spawns: {
+      fire: { x: 1, y: 8, face: 'right' }, stall: { x: 10, y: 7, face: 'up' }, portal: { x: 6, y: 4, face: 'down' },
+      alley_west: { x: 25, y: 8, face: 'right' }, garage: { x: 34, y: 5, face: 'up' }, alley_east: { x: 42, y: 7, face: 'left' },
+      square_west: { x: 43, y: 7, face: 'right' }, north: { x: 54, y: 10, face: 'down' }
+    },
+    areas: [
+      { id: 'd1_street', x0: 0, y0: 0, x1: 24, y1: 13, spawn: 'fire', onEnter: D1.onEnter },
+      { id: 'd2_alley', x0: 25, y0: 0, x1: 42, y1: 13, spawn: 'alley_west' },
+      { id: 'd3_square', x0: 43, y0: 0, x1: 66, y1: 13, spawn: 'square_west', onEnter: D3.onEnter }
+    ],
+    entities: [{ t: 'cityfloor', v: 'd_city', x: 0, y: 0 }].concat(mergeCityEntities())
   });
+  /* every spawn an old id declared is listed, as a_woods lists its own */
+  E.alias('d1_street', 'd_city', { fire: 'fire', stall: 'stall', portal: 'portal', east: 'alley_west' }, 'd1_street');
+  E.alias('d2_alley', 'd_city', { west: 'alley_west', east: 'alley_east', garage: 'garage' }, 'd2_alley');
+  E.alias('d3_square', 'd_city', { west: 'square_west', north: 'north' }, 'd3_square');
 
   function drink(c) {
     if (!c.has('recall')) {
@@ -604,7 +669,7 @@
     }
   }
 
-  NEU.act4RoomsD = ['d1_street','d2_alley','d3_square',
+  NEU.act4RoomsD = ['d_city',
                     'e1_hall','e2_hall','e3_hall','e4_corridor',
                     'e7_nook','e8_larder','e9_cellar'];
 })();

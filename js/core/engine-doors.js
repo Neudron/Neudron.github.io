@@ -1008,8 +1008,8 @@
     'b7_altar>a_woods': { style: 'tunnel' },           /* back out to the woods */
     'b7_altar>b8_arena': { style: 'gate' },
     'b8_arena>b7_altar': { style: 'arch' },
-    'd1_street>b7_altar': { style: 'portal', tint: '#FF8A3A' },   /* the fire door, from the other side */
-    'd1_street>h3_trip': { style: 'portal', tint: '#FF6BD6' },    /* "a door painted on the street" */
+    'd_city>b7_altar': { style: 'portal', tint: '#FF8A3A' },   /* the fire door, from the other side */
+    'd_city>h3_trip': { style: 'portal', tint: '#FF6BD6' },    /* "a door painted on the street" */
     'h3_trip>d1_street': { style: 'portal', tint: '#FF6BD6' },
     'g_8>h1_storm': { style: 'stairs' },               /* "a staircase down" */
     'h1_storm>g_8': { style: 'stairs', dir: 'up' },

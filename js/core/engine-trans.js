@@ -59,8 +59,8 @@
   kind('fall', { ms: 520 });
   kind('mode', { ms: 320 });
   kind('portal:fire', { ms: 380 });
-  kind('portal:d1_street>b7_altar', { ms: 380 });
-  kind('portal:d1_street>h3_trip', { ms: 380 });
+  kind('portal:d_city>b7_altar', { ms: 380 });
+  kind('portal:d_city>h3_trip', { ms: 380 });
   kind('cine:rooms-g-trip', { ms: 320 });
   kind('cine:crack-sky', { ms: 320 });
   NEU.engineTrans = { kind: kind, get: get, enabled: enabled, start: start, step: step, draw: draw, motion: motion,

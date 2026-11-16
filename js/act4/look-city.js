@@ -817,10 +817,32 @@
     P(0, 112, W, 4, '#26262E'); P(0, 116, W, 1, '#141418'); P(0, 127, W, 3, '#22222A');
   }
 
+  /* d_city (PLAN 7.1): the three streets painted at their place in the one
+     room. Each keeps only its own columns, so a facade that runs past its
+     seam is cut there and does not paint over the next street. */
+  function clipTo(P, dx, dy, x0, x1) {
+    var Q2 = function (x, y, w, h, col) {
+      var a = Math.round(x) + dx, b = a + Math.round(w);
+      if (a < x0) a = x0;
+      if (b > x1) b = x1;
+      if (b > a) P(a, Math.round(y) + dy, b - a, Math.round(h), col);
+    };
+    Q2.a = P.a;
+    return Q2;
+  }
+  function paintCity(P) {
+    paintD1(clipTo(P, 0, 16, 0, 400));
+    paintD2(clipTo(P, 384, 32, 400, 688));
+    paintD3(clipTo(P, 672, 0, 688, 1072));
+    /* the alley-square seam: three drawn steps on its two cells */
+    var cols = ['#4A4458', '#3A3448', '#2E2A3A'];
+    for (var i = 0; i < 3; i++) P(672 + i * 11, 112 + i * 5, 11, 16 - i * 5, cols[i]);
+    /* the alley's south wall, under its last two rows (the street has its parapet) */
+    P(400, 192, 288, 32, '#0C0C0E');
+  }
+
   var ROOMS = {
-    d1_street: { w: 26, h: 13, paint: paintD1 },
-    d2_alley: { w: 20, h: 10, paint: paintD2 },
-    d3_square: { w: 25, h: 14, paint: paintD3 },
+    d_city: { w: 67, h: 14, paint: paintCity },
     e1_hall: { w: 20, h: 8, paint: function (P) { paintHall(P, 1, 320); } },
     e2_hall: { w: 14, h: 8, paint: function (P) { paintHall(P, 2, 224); } },
     e3_hall: { w: 24, h: 8, paint: function (P) { paintHall(P, 3, 384); } },
@@ -945,6 +967,15 @@
     }
   };
   ANIM.e1_hall = ANIM.e2_hall = ANIM.e3_hall = ANIM.hall;
+  /* d_city: each street's overlays, moved to its place in the room */
+  ANIM.d_city = function (g, now, S, ox, oy) {
+    var parts = [['d1_street', 0, 16], ['d2_alley', 384, 32], ['d3_square', 672, 0]];
+    for (var i = 0; i < parts.length; i++) {
+      var sx = ox + parts[i][1] * S, sy = oy + parts[i][2] * S;
+      qset(g, sx, sy, S);
+      ANIM[parts[i][0]](g, now, S, sx, sy);
+    }
+  };
 
   KK.kind('cityfloor', {
     interactive: function () { return false; },

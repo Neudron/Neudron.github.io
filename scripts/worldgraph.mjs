@@ -10,8 +10,8 @@ const PLAT_FILES = ['mountain.js', 'dungeon.js'];
 const MODE_EDGES = [
   { from: 'p1_tavern', to: 'm0', spawn: null, via: 'mode', mode: 'platform' },
   { from: 'm7', to: 'p1_tavern', spawn: null, via: 'mode', mode: 'platform' },
-  { from: 'd2_alley', to: 'dgn', spawn: null, via: 'mode', mode: 'dungeon' },
-  { from: 'dgn', to: 'd2_alley', spawn: null, via: 'mode', mode: 'dungeon' }
+  { from: 'd_city', to: 'dgn', spawn: null, via: 'mode', mode: 'dungeon' },
+  { from: 'dgn', to: 'd_city', spawn: null, via: 'mode', mode: 'dungeon' }
 ];
 // One-way routes are intentional: d3_square is the park-gate entry to the city end (rooms-d.js:290-294); e1_hall routes there (rooms-d.js:407).
 // The bed exit changes from woods to hall after home is reached (rooms-e.js:298-301).
