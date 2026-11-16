@@ -41,32 +41,47 @@
   function blank() {
     return {
       you: { hp: 15, hand: [], block: 0, parry: false, streak: 0 },
-      mage: { hp: 15, hand: [], block: 0, parry: false },
-      deck: [], mageDeck: [], discard: [],
+      mage: { hp: 15, hand: [], block: 0, parry: false, intent: null },
+      deck: [], mageDeck: [], discard: [], rng: null, turn: 0,
       sel: 0, over: false, result: null, awarded: false,
-      clock: 0, flies: [], slide: null, grain: [], grainAt: -1000
+      clock: 0, flies: [], slide: null, pops: [], flash: null, grain: [], grainAt: -1000
     };
   }
 
   function hurt(p, dmg) {
-    var use;
+    var use, before = p.hp;
     if (p.block > 0) {
       use = p.block > dmg ? dmg : p.block;
       p.block -= use;
       dmg -= use;
     }
     p.hp -= dmg;
+    return before - p.hp;
   }
 
   function drawUp(who) {
     var p = state[who];
     var deck = who === 'you' ? state.deck : state.mageDeck;
     var id;
-    while (p.hand.length < 4 && deck.length) {
+    while (p.hand.length < 4) {
+      if (!deck.length) {
+        if (!state.discard.length) break;
+        /* empty deck: reshuffle the shared discard with the run's seeded RNG */
+        deck = shuffle(state.discard, state.rng || Math.random);
+        state.discard = [];
+        if (who === 'you') state.deck = deck; else state.mageDeck = deck;
+      }
       id = deck.pop();
       p.hand.push(id);
       if (who === 'you' && !reduced()) state.flies.push({ id: id, slot: p.hand.length - 1, t: 0, dur: 350 });
     }
+  }
+
+  /* brief, local number pop + plaque flash on a landed hit */
+  function fxHit(target, amount) {
+    if (reduced() || !(amount > 0)) return;
+    state.pops.push({ x: target === 'you' ? 544 : 48, y: 50, text: '-' + amount, t: 0, dur: 650 });
+    state.flash = { x: target === 'you' ? 528 : 32, y: 10, t: 0, dur: 120 };
   }
 
   function mageIndex() {
@@ -78,6 +93,18 @@
     return h.length ? 0 : -1;
   }
 
+  /* One chooser, public state only. Commit its pick as the telegraph. */
+  function chooseIntent() {
+    var i = mageIndex();
+    state.mage.intent = i >= 0 ? state.mage.hand[i] : null;
+  }
+
+  /* The mage plays the committed card; fall back only if it is gone. */
+  function committedIndex() {
+    var id = state.mage.intent, i = id ? state.mage.hand.indexOf(id) : -1;
+    return i >= 0 ? i : mageIndex();
+  }
+
   function act(who, idx) {
     var p, id, enemy;
     if (!state || state.over) return false;
@@ -87,8 +114,8 @@
     enemy = state[who === 'you' ? 'mage' : 'you'];
     if (id !== 'ATTACK' && enemy.parry) enemy.parry = false;
     if (id === 'ATTACK') {
-      if (enemy.parry) { enemy.parry = false; hurt(p, 3); }
-      else hurt(enemy, 3);
+      if (enemy.parry) { enemy.parry = false; fxHit(who, hurt(p, 3)); }
+      else fxHit(who === 'you' ? 'mage' : 'you', hurt(enemy, 3));
       if (who === 'you') state.you.streak++;
     } else if (id === 'HEAL') {
       p.hp = p.hp + 3;
@@ -125,24 +152,27 @@
     if (NEU.dungeon && NEU.dungeon.toSurface) NEU.dungeon.toSurface();
   }
 
-  /* Both decks and both hands empty, both still up: the duel has nowhere
-     to go. Higher HP wins. A tie is a loss. */
+  /* Hard stall guard only: at 40 turns the higher HP wins, a tie is a loss.
+     Empty decks no longer end the duel — discard is reshuffled back in. */
   function settle() {
     if (!state || state.over) return;
-    drawUp('you');
-    drawUp('mage');
-    if (state.you.hand.length || state.mage.hand.length) return;
-    state.over = true;
-    state.result = state.you.hp > state.mage.hp ? 'win' : 'lose';
+    if (state.turn >= 40) {
+      state.over = true;
+      state.result = state.you.hp > state.mage.hp ? 'win' : 'lose';
+    }
   }
 
   function play(idx) {
     if (!state) return state;
     if (!state.over) {
+      state.you.block = 0;               /* your block decays at your turn start */
       act('you', idx);
+      state.turn++;
       if (!state.over) {
-        var mi = mageIndex();
+        state.mage.block = 0;            /* mage block decays right before it acts */
+        var mi = committedIndex();
         if (mi >= 0) act('mage', mi);
+        chooseIntent();                  /* telegraph the next turn before you choose */
       }
       settle();
     }
@@ -169,10 +199,12 @@
     if (!rng && opts.seed != null && NEU.rand && NEU.rand.seeded) rng = NEU.rand.seeded(opts.seed);
     if (!rng) rng = Math.random;
     state = blank();
+    state.rng = rng;
     state.deck = shuffle(buildDeck(), rng);
     state.mageDeck = shuffle(buildDeck(), rng);
     drawUp('you');
     drawUp('mage');
+    chooseIntent();
     active = true;
     if (wrap) wrap.hidden = false;
     if (canvas) { canvas.width = 640; canvas.height = 480; }
@@ -198,6 +230,14 @@
     for (i = state.flies.length - 1; i >= 0; i--) {
       state.flies[i].t += dt;
       if (state.flies[i].t >= state.flies[i].dur) state.flies.splice(i, 1);
+    }
+    for (i = state.pops.length - 1; i >= 0; i--) {
+      state.pops[i].t += dt;
+      if (state.pops[i].t >= state.pops[i].dur) state.pops.splice(i, 1);
+    }
+    if (state.flash) {
+      state.flash.t += dt;
+      if (state.flash.t >= state.flash.dur) state.flash = null;
     }
     draw();
   }
@@ -501,7 +541,7 @@
   }
 
   function draw() {
-    var w, h, sway, cx, i, n, pos, f, t, x, y, shook, a, sel, k;
+    var w, h, sway, cx, i, n, pos, f, t, x, y, shook, a, sel, k, pp;
     if (!ctx || !state) return;
     w = canvas.width || 640;
     h = canvas.height || 480;
@@ -557,6 +597,26 @@
     text(String(state.you.hp), 544, 50, 32, '#F4EFE4');
     text('MAGE', 48, 70, 16, '#C8B898');
     text('YOU', 544, 70, 16, '#C8B898');
+    /* status: block, parry, streak and the committed mage intent */
+    text('BLK' + state.mage.block + (state.mage.parry ? ' PARRY' : ''), 48, 90, 12, '#C8B898');
+    text('NEXT:' + (state.mage.intent || '-'), 48, 106, 14, '#FFD080');
+    text('BLK' + state.you.block + (state.you.parry ? ' PARRY' : ''), 544, 90, 12, '#C8B898');
+    text('STREAK' + state.you.streak, 544, 106, 12, '#C8B898');
+    /* damage numbers rise and fade; a short plaque flash lands the hit */
+    if (state.flash) {
+      t = state.flash.t / state.flash.dur;
+      ctx.globalAlpha = (1 - t > 0 ? 1 - t : 0) * 0.6;
+      ctx.fillStyle = '#FFE8E8';
+      ctx.fillRect(state.flash.x - 6, state.flash.y - 6, 108, 78);
+      ctx.globalAlpha = 1;
+    }
+    for (i = 0; i < state.pops.length; i++) {
+      pp = state.pops[i];
+      t = pp.t / pp.dur;
+      ctx.globalAlpha = 1 - t > 0 ? 1 - t : 0;
+      text(pp.text, pp.x, pp.y - 30 - Math.round(t * 26), 20, '#FF6B6B');
+      ctx.globalAlpha = 1;
+    }
     if (!reduced()) {
       if (state.clock - state.grainAt >= 400) {
         state.grainAt = state.clock;
@@ -599,7 +659,29 @@
     }
   }
 
+  function onClick(e) {
+    var r, x, y, i, px;
+    if (!active || !state || state.over) return;
+    if (NEU.kernel && NEU.kernel.current && NEU.kernel.current() !== 'cards') return;
+    if (!canvas || !canvas.getBoundingClientRect) return;
+    r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    x = (e.clientX - r.left) * (canvas.width / r.width);
+    y = (e.clientY - r.top) * (canvas.height / r.height);
+    if (y < 344 || y > 464) return;
+    for (i = 0; i < state.you.hand.length; i++) {
+      px = 196 + i * 86;
+      if (x >= px && x <= px + CW) {
+        if (state.sel !== i) { state.sel = i; draw(); }
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+    }
+  }
+
   window.addEventListener('keydown', onKey, true);
+  if (canvas && canvas.addEventListener) canvas.addEventListener('click', onClick, true);
 
   NEU.cards = {
     open: open,
