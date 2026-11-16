@@ -42,7 +42,7 @@
     return {
       you: { hp: 15, hand: [], block: 0, parry: false, streak: 0 },
       mage: { hp: 15, hand: [], block: 0, parry: false, intent: null },
-      deck: [], mageDeck: [], discard: [], rng: null, turn: 0,
+      deck: [], mageDeck: [], discard: [], mageDiscard: [], rng: null, turn: 0,
       sel: 0, over: false, result: null, awarded: false,
       clock: 0, flies: [], slide: null, pops: [], flash: null, grain: [], grainAt: -1000
     };
@@ -62,14 +62,15 @@
   function drawUp(who) {
     var p = state[who];
     var deck = who === 'you' ? state.deck : state.mageDeck;
+    var disc = who === 'you' ? state.discard : state.mageDiscard;
     var id;
     while (p.hand.length < 4) {
       if (!deck.length) {
-        if (!state.discard.length) break;
-        /* empty deck: reshuffle the shared discard with the run's seeded RNG */
-        deck = shuffle(state.discard, state.rng || Math.random);
-        state.discard = [];
-        if (who === 'you') state.deck = deck; else state.mageDeck = deck;
+        if (!disc.length) break;
+        /* empty deck: reshuffle only this side's discard with the seeded RNG */
+        deck = shuffle(disc, state.rng || Math.random);
+        if (who === 'you') { state.deck = deck; state.discard = []; }
+        else { state.mageDeck = deck; state.mageDiscard = []; }
       }
       id = deck.pop();
       p.hand.push(id);
@@ -79,9 +80,11 @@
 
   /* brief, local number pop + plaque flash on a landed hit */
   function fxHit(target, amount) {
+    var calm;
     if (reduced() || !(amount > 0)) return;
     state.pops.push({ x: target === 'you' ? 544 : 48, y: 50, text: '-' + amount, t: 0, dur: 650 });
-    state.flash = { x: target === 'you' ? 528 : 32, y: 10, t: 0, dur: 120 };
+    calm = NEU.motion && NEU.motion.calmFlash && NEU.motion.calmFlash();
+    if (!calm) state.flash = { x: target === 'you' ? 528 : 32, y: 10, t: 0, dur: 120 };
   }
 
   function mageIndex() {
@@ -112,7 +115,6 @@
     if (idx < 0 || idx >= p.hand.length) return false;
     id = p.hand.splice(idx, 1)[0];
     enemy = state[who === 'you' ? 'mage' : 'you'];
-    if (id !== 'ATTACK' && enemy.parry) enemy.parry = false;
     if (id === 'ATTACK') {
       if (enemy.parry) { enemy.parry = false; fxHit(who, hurt(p, 3)); }
       else fxHit(who === 'you' ? 'mage' : 'you', hurt(enemy, 3));
@@ -128,7 +130,7 @@
       p.parry = true;
       if (who === 'you') state.you.streak = 0;
     }
-    state.discard.push(id);
+    if (who === 'you') state.discard.push(id); else state.mageDiscard.push(id);
     if (who === 'you' && !reduced()) state.slide = { id: id, t: 0, dur: 280 };
     if (NEU.juice && NEU.juice.hit) NEU.juice.hit(id === 'ATTACK' ? 'medium' : 'small');
     if (state.mage.hp <= 0) { state.mage.hp = 0; state.over = true; state.result = 'win'; }
@@ -165,13 +167,15 @@
   function play(idx) {
     if (!state) return state;
     if (!state.over) {
-      state.you.block = 0;               /* your block decays at your turn start */
+      state.you.parry = false;           /* your parry expires at your turn start */
       act('you', idx);
       state.turn++;
       if (!state.over) {
         state.mage.block = 0;            /* mage block decays right before it acts */
+        state.mage.parry = false;        /* mage parry decays right before it acts */
         var mi = committedIndex();
         if (mi >= 0) act('mage', mi);
+        state.you.block = 0;             /* your block decays at end of round, after the mage acts */
         chooseIntent();                  /* telegraph the next turn before you choose */
       }
       settle();
@@ -578,7 +582,7 @@
       ctx.fillStyle = '#8A6A20'; ctx.fillRect(x + 18, y + 26, 4, 4);
     }
     for (i = 0; i < state.you.hand.length; i++) {
-      f = flyFor(i);
+      f = reduced() ? null : flyFor(i);
       if (f) {
         t = f.t / f.dur;
         if (t < 0) t = 0;
@@ -589,7 +593,7 @@
         drawFace(f.id, x, y, false);
       } else drawFace(state.you.hand[i], slotPos(i).x, slotPos(i).y, i === state.sel && !state.over);
     }
-    if (state.slide && state.slide.t < state.slide.dur) {
+    if (!reduced() && state.slide && state.slide.t < state.slide.dur) {
       t = state.slide.t / state.slide.dur;
       drawFace(state.slide.id, qbez(300, 320, 284, t), qbez(360, 200, 236, t), false);
     }
@@ -599,9 +603,10 @@
     text('YOU', 544, 70, 16, '#C8B898');
     /* status: block, parry, streak and the committed mage intent */
     text('BLK' + state.mage.block + (state.mage.parry ? ' PARRY' : ''), 48, 90, 12, '#C8B898');
-    text('NEXT:' + (state.mage.intent || '-'), 48, 106, 14, '#FFD080');
+    text('NEXT:' + (state.over ? '-' : (state.mage.intent || '-')), 48, 106, 14, '#FFD080');
     text('BLK' + state.you.block + (state.you.parry ? ' PARRY' : ''), 544, 90, 12, '#C8B898');
     text('STREAK' + state.you.streak, 544, 106, 12, '#C8B898');
+    if (state.over) text(state.result === 'win' ? 'WIN' : state.result === 'lose' ? 'LOSE' : 'TIME', 320, 264, 24, '#FFE080');
     /* damage numbers rise and fade; a short plaque flash lands the hit */
     if (!reduced()) {
       if (state.flash) {
@@ -663,7 +668,8 @@
 
   function onClick(e) {
     var r, x, y, i, px;
-    if (!active || !state || state.over) return;
+    if (!active || !state) return;
+    if (state.over) { close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (NEU.kernel && NEU.kernel.current && NEU.kernel.current() !== 'cards') return;
     if (!canvas || !canvas.getBoundingClientRect) return;
     r = canvas.getBoundingClientRect();
