@@ -7,9 +7,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'acorn';
 import { buildGraph, validate } from './worldgraph.mjs';
-import { loadRooms } from '../tests/reach.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/* tests/ is local-only: fail with a clear, single line instead of a
+   module-resolution stack when the checkout has no reach.mjs. */
+if (!fs.existsSync(path.join(ROOT, 'tests', 'reach.mjs'))) {
+  console.log('BLOCKED: local-only tests/reach.mjs absent');
+  process.exit(2);
+}
+const { loadRooms } = await import('../tests/reach.mjs');
 let pass = 0, fail = 0;
 const check = (name, cond, detail) => {
   if (cond) { pass++; console.log('  ok   ' + name); }

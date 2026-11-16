@@ -2,9 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'acorn';
-import { loadRooms } from '../tests/reach.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/* tests/ is local-only. In the public checkout reach.mjs is absent, so a
+   static import would throw ERR_MODULE_NOT_FOUND before any useful output. */
+if (!fs.existsSync(path.join(ROOT, 'tests', 'reach.mjs'))) {
+  console.log('BLOCKED: local-only tests/reach.mjs absent');
+  process.exit(2);
+}
+const { loadRooms } = await import('../tests/reach.mjs');
 const ROOM_FILES = ['rooms-a.js', 'rooms-d.js', 'rooms-e.js', 'rooms-g.js', 'rooms-p.js', 'rooms-s.js'];
 const PLAT_FILES = ['mountain.js', 'dungeon.js'];
 const MODE_EDGES = [
