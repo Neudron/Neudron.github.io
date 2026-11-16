@@ -5,7 +5,7 @@
   if (!NEU.engine || !NEU.engine.register || !NEU.engineKinds) return;
   var E = NEU.engine, K = NEU.engineKinds;
   var live = false, t = 0, flashes = 0, didFlash = false, audio = false, pending = false, nag = false, shook = false;
-  var sliding = false, flashAt = 0.36, INVERT_MS = 80, THUNDER_MS = 250;
+  var sliding = false, flashAt = 0.36, INVERT_MS = 80, THUNDER_MS = 250, pendingPlat = false;
 
   function reducedNow() {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
@@ -550,7 +550,7 @@
     }
   }
   function finish() {
-    var path, id, kind, old, g, cv, incoming, started;
+    var path, id, kind, old, g, cv, incoming, started, at;
     if (!live || sliding) return;
     path = NEU.save && NEU.save.flag('mtn_path');
     id = path === 'evil' ? 'v0' : 'h0';
@@ -567,8 +567,20 @@
     if (g && g.drawImage && cv) g.drawImage(cv, 0, 0);
     if (NEU.plat.open(id) !== true) { closeBolt(); return; }
     incoming = NEU.kernel && NEU.kernel.bridge ? NEU.kernel.bridge() : null;
+    /* plat opened only for the snapshot: hold it off the stack so bolt stays
+       top and its tick is the one that steps the transition */
+    pendingPlat = false;
+    if (NEU.kernel && NEU.kernel.stack) {
+      at = NEU.kernel.stack.indexOf('plat');
+      if (at >= 0) { NEU.kernel.stack.splice(at, 1); pendingPlat = true; }
+    }
     started = NEU.engineTrans.start('portal:lightning', old, 'up', false, incoming, { ms: kind.ms });
-    if (!started || started.name !== 'portal:lightning') { closeBolt(); return; }
+    if (!started || started.name !== 'portal:lightning') {
+      if (pendingPlat && NEU.kernel) NEU.kernel.push('plat');
+      pendingPlat = false;
+      closeBolt();
+      return;
+    }
     sliding = true;
   }
   function openBolt() {
@@ -582,6 +594,7 @@
     audio = false;
     shook = false;
     sliding = false;
+    pendingPlat = false;
     invertedFrame(false);
     if (NEU.engine && NEU.engine.running && NEU.engine.leave) NEU.engine.leave();
     el = document.getElementById('bolt');
@@ -600,7 +613,11 @@
       cx = cv && cv.getContext ? cv.getContext('2d') : null;
       if (cx && cx.clearRect) cx.clearRect(0, 0, 640, 360);
       if (cx && NEU.engineTrans) NEU.engineTrans.draw(cx, 640, 360, 1);
-      if (NEU.engineTrans && !NEU.engineTrans.step(sec)) closeBolt();
+      if (NEU.engineTrans && !NEU.engineTrans.step(sec)) {
+        closeBolt();
+        if (pendingPlat && NEU.kernel) NEU.kernel.push('plat');
+        pendingPlat = false;
+      }
       return;
     }
     t += sec;
