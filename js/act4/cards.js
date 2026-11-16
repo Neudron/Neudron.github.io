@@ -53,18 +53,34 @@
       sel: 0, over: false, result: null, awarded: false,
       clock: 0, flies: [], slide: null, grain: [], grainAt: -1000,
       disp: { you: 15, mage: 15 }, fx: [], intent: null,
+      pops: [], flash: null,
       exiting: false, exitT: 0, returned: false, endT: 0
     };
   }
 
   function hurt(p, dmg) {
-    var use;
+    var use, before = p.hp;
     if (p.block > 0) {
       use = p.block > dmg ? dmg : p.block;
       p.block -= use;
       dmg -= use;
     }
     p.hp -= dmg;
+    return before - p.hp;
+  }
+
+  /* Feedback only: a rising number over the struck/Healed plate and a short
+     plaque flash. Reduced motion drops both — juice owns the shake. */
+  function fxHit(target, amount, heal) {
+    var calm;
+    if (reduced() || !(amount > 0)) return;
+    state.pops.push({ x: target === 'you' ? 544 : 48, y: 50,
+      text: (heal ? '+' : '-') + amount, t: 0, dur: 650, heal: !!heal });
+    if (state.pops.length > 6) state.pops.shift();
+    if (heal) return;
+    calm = (NEU.motion && NEU.motion.calmFlash && NEU.motion.calmFlash()) ||
+      (NEU.juice && NEU.juice.noFlash);
+    if (!calm) state.flash = { x: target === 'you' ? 528 : 32, y: 10, t: 0, dur: 120 };
   }
 
   function drawUp(who) {
@@ -125,12 +141,14 @@
     enemy = state[who === 'you' ? 'mage' : 'you'];
     if (id !== 'ATTACK' && enemy.parry) enemy.parry = false;
     if (id === 'ATTACK') {
-      if (enemy.parry) { enemy.parry = false; hurt(p, 3); }
-      else hurt(enemy, 3);
+      if (enemy.parry) { enemy.parry = false; fxHit(who, hurt(p, 3)); }
+      else fxHit(who === 'you' ? 'mage' : 'you', hurt(enemy, 3));
       if (who === 'you') state.you.streak++;
     } else if (id === 'HEAL') {
+      var before = p.hp;
       p.hp = p.hp + 3;
       if (p.hp > 15) p.hp = 15;
+      fxHit(who, p.hp - before, true);
       if (who === 'you') state.you.streak = 0;
     } else if (id === 'DEFEND') {
       p.block = 3;
@@ -272,6 +290,14 @@
     if (state.slide) {
       state.slide.t += dt;
       if (state.slide.t >= state.slide.dur) state.slide = null;
+    }
+    for (i = state.pops.length - 1; i >= 0; i--) {
+      state.pops[i].t += dt;
+      if (state.pops[i].t >= state.pops[i].dur) state.pops.splice(i, 1);
+    }
+    if (state.flash) {
+      state.flash.t += dt;
+      if (state.flash.t >= state.flash.dur) state.flash = null;
     }
     for (i = state.fx.length - 1; i >= 0; i--) {
       state.fx[i].t += dt;
@@ -620,7 +646,17 @@
   }
 
   function drawEnd() {
-    var e = state.endT | 0, i, x, y;
+    var e = reduced() ? 0 : state.endT | 0, i, x, y, win;
+    win = state.result === 'win';
+    /* one readable board on either result; the win keeps its little parade */
+    ctx.globalAlpha = 0.78;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(120, 186, 400, 148);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = win ? '#C8A040' : '#6A3A4A';
+    ctx.fillRect(120, 186, 400, 4);
+    text(win ? 'YOU WIN' : 'THE LAMP GOES OUT', 160, 210, 32, win ? '#FFE080' : '#C8B898');
+    text(win ? 'WIN' : 'LOSE', 288, 258, 32, win ? '#FFE080' : '#D07070');
     if (state.result === 'win') {
       /* hat tips, cards scatter, and the key + spell slide across */
       for (i = 0; i < 4; i++) {
@@ -629,18 +665,13 @@
         drawFace(state.mageDeck.length ? state.mageDeck[i % state.mageDeck.length] : 'ATTACK', x, y, false);
       }
       x = Math.min(320, 120 + e);
-      ctx.fillStyle = '#C8A040'; ctx.fillRect(x, 250, 22, 8);
-      ctx.fillStyle = '#B892FF'; ctx.fillRect(x + 28, 250, 14, 8);
-      text('YOU WIN', 250, 210, 32, '#FFE080');
-    } else if (state.result === 'lose') {
-      ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.85, e / 700) + ')';
-      ctx.fillRect(0, 0, 640, 480);
-      text('THE LAMP GOES OUT', 180, 220, 32, '#C8B898');
+      ctx.fillStyle = '#C8A040'; ctx.fillRect(x, 300, 22, 8);
+      ctx.fillStyle = '#B892FF'; ctx.fillRect(x + 28, 300, 14, 8);
     }
   }
 
   function draw() {
-    var w, h, sway, cx, i, n, pos, f, t, x, y, shook, a, sel, k;
+    var w, h, sway, cx, i, n, pos, f, t, x, y, shook, a, sel, k, pp, ft;
     if (!ctx || !state) return;
     w = canvas.width || 640;
     h = canvas.height || 480;
@@ -708,6 +739,23 @@
     text(String(Math.round(state.disp.you)), 544, 50, 32, '#F4EFE4');
     text('MAGE', 48, 70, 16, '#C8B898');
     text('YOU', 544, 70, 16, '#C8B898');
+    /* status icons sit just under each HP plate */
+    if (state.mage.block > 0) {
+      icon(ctx, ICON.DEFEND, { '1': '#C8A040' }, 48, 84);
+      text('BLK' + state.mage.block, 68, 94, 16, '#C8A040');
+    }
+    if (state.mage.parry) {
+      icon(ctx, ICON.PARRY, { '1': '#4A82C0' }, 48, 84);
+      text('PARRY', 68, 94, 16, '#4A82C0');
+    }
+    if (state.you.block > 0) {
+      icon(ctx, ICON.DEFEND, { '1': '#C8A040' }, 544, 84);
+      text('BLK' + state.you.block, 564, 94, 16, '#C8A040');
+    }
+    if (state.you.parry) {
+      icon(ctx, ICON.PARRY, { '1': '#4A82C0' }, 544, 84);
+      text('PARRY', 564, 94, 16, '#4A82C0');
+    }
     if (!reduced()) {
       if (state.clock - state.grainAt >= 400) {
         state.grainAt = state.clock;
@@ -715,6 +763,22 @@
       }
       ctx.fillStyle = '#C8C0B4';
       for (i = 0; i < state.grain.length; i++) ctx.fillRect(state.grain[i].x, state.grain[i].y, 1, 1);
+    }
+    if (!reduced()) {
+      if (state.flash) {
+        ft = state.flash.t / state.flash.dur;
+        ctx.globalAlpha = (1 - ft > 0 ? 1 - ft : 0) * 0.6;
+        ctx.fillStyle = '#FFE8E8';
+        ctx.fillRect(state.flash.x - 6, state.flash.y - 6, 108, 78);
+        ctx.globalAlpha = 1;
+      }
+      for (i = 0; i < state.pops.length; i++) {
+        pp = state.pops[i];
+        ft = pp.t / pp.dur;
+        ctx.globalAlpha = 1 - ft > 0 ? 1 - ft : 0;
+        text(pp.text, pp.x, pp.y - 30 - Math.round(ft * 26), 16, pp.heal ? '#4AB880' : '#FF6B6B');
+        ctx.globalAlpha = 1;
+      }
     }
     if (NEU.juice && NEU.juice.end) NEU.juice.end(ctx, shook);
     if (NEU.juice && NEU.juice.overlay) NEU.juice.overlay(ctx, w, h);
@@ -757,7 +821,36 @@
     }
   }
 
+  /* Tap selects; a second tap on the same card plays it. Mouse and touch
+     share the click path; the canvas may be letterboxed by object-fit. */
+  function onClick(e) {
+    var r, s, ox, oy, x, y, i, px;
+    if (!active || !state) return;
+    if (NEU.kernel && NEU.kernel.current && NEU.kernel.current() !== 'cards') return;
+    if (state.over) { close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (!canvas || !canvas.getBoundingClientRect) return;
+    r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    s = Math.min(r.width / canvas.width, r.height / canvas.height);
+    ox = (r.width - canvas.width * s) / 2;
+    oy = (r.height - canvas.height * s) / 2;
+    x = (e.clientX - r.left - ox) / s;
+    y = (e.clientY - r.top - oy) / s;
+    if (y < 344 || y > 464) return;
+    for (i = 0; i < state.you.hand.length; i++) {
+      px = 196 + i * 86;
+      if (x >= px && x <= px + CW) {
+        if (state.sel !== i) { state.sel = i; draw(); }
+        else play(i);
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+    }
+  }
+
   window.addEventListener('keydown', onKey, true);
+  if (canvas && canvas.addEventListener) canvas.addEventListener('click', onClick, true);
 
   NEU.cards = {
     open: open,
