@@ -16,7 +16,8 @@
     t: { s: 'dgBonesR', ai: 'fighter', hp: 3, v: 80, big: 1 },
     h: { s: 'dgBonesH', ai: 'fighter', hp: 3, v: 100, big: 1 },
     j: { s: 'dgBoneLee', ai: 'fighter', hp: 6, v: 220, leap: 1, big: 1 },
-    E: { s: 'dgPaladin', ai: 'fighter', hp: 25, v: 50, hammer: 1, big: 1, stiff: 1 },
+    /* D3: axe-only TTK (fixes600.mjs, 1 dmg per ~0.227 s swing) measured 14.63 s at hp 62. */
+    E: { s: 'dgPaladin', ai: 'fighter', hp: 62, v: 50, hammer: 1, big: 1, stiff: 1 },
     y: { s: 'dgSniper', ai: 'ranged', hp: 3, v: 59, gun: 'sniper', big: 1 },
     T: { s: 'dgTactic', ai: 'ranged', hp: 3, v: 70, gun: 'shotgun', big: 1 },
     C: { s: 'dgCommando', ai: 'ranged', hp: 3, v: 70, gun: 'rocket', big: 1 },
@@ -39,6 +40,9 @@
   var SPELL = { beam: { first: 1.67, next: 0.83, per: 5, cycle: 7.5, hitTp: 0.5 }, souls: { first: 1.67, next: 1, per: 3, cycle: 9, hitTp: 0 },
     inferno: { first: 1.67, next: 1.67, per: 3, cycle: 6.67, hitTp: 1 } };
   var PHANTOM = ['* Wails echo through the dilapidated dungeon halls...', '* Long-dead prisoners seek their zealous revenge...'];
+  /* D8: seconds each attack shows its shape before its hit can land. Single source of truth for
+     the windups below and for fixes601.mjs, which asserts every lead >= 0.4 s. */
+  var TELEGRAPH = { hammer: 0.6, ranged: 1.5, beam: 0.5, souls: 0.5, inferno: 1.67, lunge: 0.4, flame: 0.4, ghost: 0.4 };
   var foes = [], shots = [], pops = [], fxs = [], kit = null, F = { x: 0, y: 0, fx: 1, fy: 0 }, box = { AX: 0, AY: 0, AW: 640, AH: 360 }, lastDir = 0;
 
   function sheet(k) { return NEU.dgSheets && NEU.dgSheets[k]; }
@@ -126,11 +130,11 @@
     if (Math.abs(f.vx) < 8) f.stall = (f.stall || 0) + dt; else f.stall = 0;
     if (f.stall > 2) { f.turn = 2; f.face = -f.face; f.stall = 0; }
     if (d.leap && f.ground && (f.cd -= dt) <= 0 && Math.abs(dx) < 96 && Math.abs(hy() - f.y) < 40) { f.vx = sgn(dx) * 360; f.vy = -300; f.cd = 2; }
-    if (d.hammer && (f.cd -= dt) <= 0 && Math.abs(dx) < 25 * T && onScreen(f.x, f.y, 0) && seeLine(f.x, f.y, hx(), hy())) { f.st = 1; f.t = 0.6; f.aim = { x: hx(), y: hy() }; }
+    if (d.hammer && (f.cd -= dt) <= 0 && Math.abs(dx) < 25 * T && onScreen(f.x, f.y, 2 * T) && seeLine(f.x, f.y, hx(), hy())) { f.st = 1; f.t = TELEGRAPH.hammer; f.aim = { x: hx(), y: hy() }; }
   }
   function throwHammer(f) { var a = Math.atan2(f.aim.y - f.y, f.aim.x - f.x); shoot({ k: 'hammer', x: f.x, y: f.y - 8, vx: Math.cos(a) * 360, vy: Math.sin(a) * 360, r: 12, life: 2.2, back: 0.9, home: f, ghost: 1 }); }
   function ranged(f, dt) {
-    var g = GUN[f.d.gun], dx = hx() - f.x, d = Math.sqrt(dx * dx + (hy() - f.y) * (hy() - f.y)), see = d < g.range && onScreen(f.x, f.y, 0) && seeLine(f.x, f.y - 6, hx(), hy());
+    var g = GUN[f.d.gun], dx = hx() - f.x, d = Math.sqrt(dx * dx + (hy() - f.y) * (hy() - f.y)), see = d < g.range && onScreen(f.x, f.y, 2 * T) && seeLine(f.x, f.y - 6, hx(), hy());
     if (see && f.ground) {
       f.vx *= 0.7; f.face = sgn(dx) || f.face; body(f, dt);
       if (f.t < 0) f.t = g.first;
@@ -160,7 +164,7 @@
       ok = P.cell(x, y - 1) !== ' ';
       for (a = -1; a <= 1 && ok; a++) for (b = 1; b <= 4 && ok; b++) if (P.solid(x + a, y - b)) ok = false;
       if (ok && i < 60 && ((x * T < c.x || x * T > c.x + v.w || y * T < c.y || y * T > c.y + v.h))) continue;
-      if (ok) return { x: (x + 0.5) * T, y: y * T - f.h / 2, t: 0.5 };
+      if (ok) return zoneClamp(f, { x: (x + 0.5) * T, y: y * T - f.h / 2, t: 0.5 });
     }
     return null;
   }
@@ -170,10 +174,10 @@
     if (f.tp) { f.tp.t -= dt; if (f.tp.t <= 0) { f.x = f.tp.x; f.y = f.tp.y; f.tp = null; f.n = 0; f.t = sp.first; f.mute = false; f.cyc = sp.cycle; } return; }
     f.cyc -= dt;
     if (f.cyc <= 0 || f.n >= sp.per * (f.d.spell === 'souls' ? 3 : 1)) { f.tp = spot(f); if (!f.tp) { f.n = 0; f.cyc = sp.cycle; } return; }
-    if (f.mute || !onScreen(f.x, f.y, 0)) return;
+    if (f.mute || !onScreen(f.x, f.y, 2 * T)) return;
     f.t -= dt;
     if (f.d.spell === 'beam') {
-      if (f.t < 0.5 && !f.path) f.path = beamPath(f.x, f.y - 8, Math.atan2(hy() - f.y + 8, hx() - f.x) + (rnd() - 0.5) * 0.1);
+      if (f.t < TELEGRAPH.beam && !f.path) f.path = beamPath(f.x, f.y - 8, Math.atan2(hy() - f.y + 8, hx() - f.x) + (rnd() - 0.5) * 0.1);
       if (f.t <= 0) { shoot({ k: 'beam', x: f.x, y: f.y, vx: 0, vy: 0, life: 0.15, path: f.path, hit: 1 }); f.path = null; f.n++; f.t = sp.next; }
     } else if (f.d.spell === 'souls') {
       if (f.t <= 0) { var o = aimAt(f, 120); shoot({ k: 'soul', x: f.x, y: f.y - 10, vx: o.vx, vy: o.vy, life: 2.5, home: 1, ghost: 1 }); f.n++; f.t = f.n % 3 ? 0.33 : sp.next; }
@@ -200,8 +204,8 @@
       w = Math.sin(f.t * 4) * 30;
       f.vx = Math.cos(a) * f.v - Math.sin(a) * w; f.vy = Math.sin(a) * f.v + Math.cos(a) * w;
       if (f.t > 4) { f.st = 1; f.t = 0; }
-      if (f.d.flame && (f.cd -= dt) <= 0) { f.cd = 2; if ((!solidAt(f.x, f.y) || f.angry) && onScreen(f.x, f.y, 0)) f.glow = 0.4; }
-    } else if (f.st === 1) { f.vx *= 0.9; f.vy *= 0.9; if (f.t > 0.4) { f.st = 2; f.t = 0; f.lx = Math.cos(a) * 240; f.ly = Math.sin(a) * 240; } }
+      if (f.d.flame && (f.cd -= dt) <= 0) { f.cd = 2; if ((!solidAt(f.x, f.y) || f.angry) && onScreen(f.x, f.y, 2 * T)) f.glow = TELEGRAPH.flame; }
+    } else if (f.st === 1) { f.vx *= 0.9; f.vy *= 0.9; if (f.t > TELEGRAPH.lunge) { f.st = 2; f.t = 0; f.lx = Math.cos(a) * 240; f.ly = Math.sin(a) * 240; } }
     else { f.vx = f.lx; f.vy = f.ly; if (f.t > 0.6) { f.st = 0; f.t = 0; } }
     if (f.glow > 0 && (f.glow -= dt) <= 0) { var o = aimAt(f, 360); shoot({ k: 'flame', x: f.x, y: f.y, vx: o.vx, vy: o.vy, life: 3, ghost: 1 }); }
     f.x += f.vx * dt; f.y += f.vy * dt;
@@ -210,7 +214,13 @@
   function spirit(f, dt) {
     var dx = hx() - f.x, dy = hy() - f.y, d = Math.sqrt(dx * dx + dy * dy) || 1, k = 1 - Math.pow(100 / 101, dt * 60);
     f.vx += (dx / d * f.v - f.vx) * k; f.vy += (dy / d * f.v - f.vy) * k; f.x += f.vx * dt; f.y += f.vy * dt; f.face = sgn(f.vx) || f.face;
-    if (f.shoots && (f.t += dt) >= 2.5 && onScreen(f.x, f.y, 0)) { f.t = 0; var o = aimAt(f, 600); shoot({ k: 'ghost', x: f.x, y: f.y, vx: o.vx, vy: o.vy, life: 2, ghost: 1 }); }
+    if (f.shoots) {
+      /* REVIEW: a windup may only build while the ring is on screen, so the 0.4 s tell is always seen. */
+      if (!onScreen(f.x, f.y, 2 * T)) { f.warn = false; return; }
+      f.t += dt;
+      f.warn = f.t >= 2.5 - TELEGRAPH.ghost;
+      if (f.t >= 2.5) { f.t = 0; f.warn = false; var o = aimAt(f, 600); shoot({ k: 'ghost', x: f.x, y: f.y, vx: o.vx, vy: o.vy, life: 2, ghost: 1 }); }
+    }
   }
   /* Renegade Warlock: a fighter (Chaos Elemental AIType) that blinks next to you when it cannot reach you */
   function warlock(f, dt) {
@@ -220,7 +230,7 @@
     f.lost = (Math.abs(hy() - f.y) > 4 * T || f.stall > 1.2) ? (f.lost || 0) + dt : 0;
     if (f.lost > 1.5) {
       c = Math.floor(h.x / T); y = Math.floor(h.y / T);
-      for (i = 0; i < 20 && !f.tp; i++) { x = c + (rnd() < 0.5 ? -1 : 1) * (3 + ((rnd() * 4) | 0)); if (P.solid(x, y) && !P.solid(x, y - 1) && !P.solid(x, y - 2) && !P.solid(x, y - 3)) f.tp = { x: (x + 0.5) * T, y: y * T - f.h / 2, t: 0.5 }; else if (!P.solid(x, y) && P.solid(x, y + 1) && !P.solid(x, y - 1) && !P.solid(x, y - 2)) f.tp = { x: (x + 0.5) * T, y: (y + 1) * T - f.h / 2, t: 0.5 }; }
+      for (i = 0; i < 20 && !f.tp; i++) { x = c + (rnd() < 0.5 ? -1 : 1) * (3 + ((rnd() * 4) | 0)); if (P.solid(x, y) && !P.solid(x, y - 1) && !P.solid(x, y - 2) && !P.solid(x, y - 3)) f.tp = zoneClamp(f, { x: (x + 0.5) * T, y: y * T - f.h / 2, t: 0.5 }); else if (!P.solid(x, y) && P.solid(x, y + 1) && !P.solid(x, y - 1) && !P.solid(x, y - 2)) f.tp = zoneClamp(f, { x: (x + 0.5) * T, y: (y + 1) * T - f.h / 2, t: 0.5 }); }
       f.lost = 0;
     }
   }
@@ -291,15 +301,51 @@
   /* ── the level hooks ──────────────────────────────────────────────── */
   function active(f) { var v = P.view(); return Math.abs(f.x - hx()) < v.w * 1.5 && Math.abs(f.y - hy()) < v.h * 1.5; }
   function onScreen(x, y, m) { var v = P.view(), c = P.cam(); return x > c.x - m && x < c.x + v.w + m && y > c.y - m && y < c.y + v.h + m; }
+  /* D7: a foe belongs to the zone it spawned in; it never wanders into its neighbour. */
+  function zoneOf(f) {
+    var zs = def.zones, i;
+    if (!f.sp || !zs) return null;
+    for (i = 0; i < zs.length; i++) if (zs[i].id === f.sp.zone) return zs[i];
+    return null;
+  }
+  function zoneClamp(f, p) {
+    var z = zoneOf(f);
+    if (!z || !p) return p;
+    p.x = Math.max((z.x + 0.5) * T, Math.min((z.x + 39.5) * T, p.x));
+    p.y = Math.max((z.y + 0.5) * T, Math.min((z.y + 23.5) * T, p.y));
+    return p;
+  }
+  function leash(f) {
+    var z = zoneOf(f);
+    if (!z) return;
+    f.x = Math.max((z.x + 0.5) * T, Math.min((z.x + 39.5) * T, f.x));
+    f.y = Math.max((z.y + 0.5) * T, Math.min((z.y + 23.5) * T, f.y));
+  }
+  /* D7: a chasing foe stuck on geometry for 2 s drops its target and picks a fresh one. */
+  function chaseRetarget(f, dt) {
+    var a = f.d.ai;
+    if (a !== 'fighter' && a !== 'ranged' && a !== 'warlock' && a !== 'skull' && a !== 'spirit') return;
+    if (f.rx === undefined) { f.rx = f.x; f.ry = f.y; f.rt = 0; f.retarget = 0; }
+    f.rt += dt;
+    if (f.rt < 2) return;
+    if (Math.abs(f.x - f.rx) + Math.abs(f.y - f.ry) < 4) {
+      f.retarget++;
+      if (a === 'ranged' || a === 'fighter' || a === 'warlock') { f.turn = 1; f.face = -f.face; f.vx = f.face * f.v; f.vy = HOP; }
+      else { f.vx += (rnd() - 0.5) * 120; f.vy += (rnd() - 0.5) * 120; }
+    }
+    f.rt = 0; f.rx = f.x; f.ry = f.y;
+  }
   function tick(dt) {
     var i, f, s, sp, sps = def.spawners, h = hero(), dx, dy, d;
     F.x = h.x; F.y = h.y - P.hh / 2; F.fx = h.face; F.fy = 0;
     if (kit) { kit.hp = h.hp; kit.tick(dt); }
     if (P.replaying()) return;
     for (i = 0; i < foes.length; i++) {
-      f = foes[i]; if (f.dead || !active(f)) continue;
+      f = foes[i]; if (f.dead) continue;
+      if (!active(f)) { leash(f); continue; }
       if (f.flash > 0) f.flash -= dt; if (f.said > 0) f.said -= dt;
       AI[f.d.ai](f, dt);
+      leash(f); chaseRetarget(f, dt);
       if (!f.dead && touchHero(f)) hurtHero(1, sgn(h.x - f.x));
     }
     for (i = shots.length - 1; i >= 0; i--) {
@@ -390,7 +436,8 @@
       if (f.mark) ring(c, f.mark.x, f.mark.y, 28, f.t < 0.5 ? '#FF6A3A' : 'rgba(255,106,58,0.5)');
       if (f.tp) { ring(c, f.tp.x, f.tp.y, 6 + (still ? 0 : (f.tp.t * 20) | 0), '#E8D8FF'); P.fr(c, f.tp.x - 1, f.tp.y - 1, 2, 2, '#FFFFFF'); }
       if (f.glow > 0 || f.st === 1 && f.d.ai === 'skull') ring(c, f.x, f.y, f.r + 4, '#FF4040');
-      if (f.d.ai === 'caster' && f.d.spell === 'souls' && f.t < 0.5 && !f.tp && !f.mute) P.fr(c, (f.x + f.face * 10 - 2) | 0, (f.y - 12) | 0, 4, 4, '#9AF0FF');
+      if (f.d.ai === 'caster' && f.d.spell === 'souls' && f.t < TELEGRAPH.souls && !f.tp && !f.mute) P.fr(c, (f.x + f.face * 10 - 2) | 0, (f.y - 12) | 0, 4, 4, '#9AF0FF');
+      if (f.warn && f.d.ai === 'spirit') ring(c, f.x, f.y, f.r + 6, '#7FE3C4');
     }
     for (i = 0; i < shots.length; i++) {
       s = shots[i];
@@ -448,5 +495,5 @@
   def.tp = function () { return kit ? kit.tp : 0; };
   def.onClose = function () { shots.length = 0; };
   NEU.dgnFoes = { kinds: KIND, foes: foes, shots: shots, pops: pops, spawn: spawn, hit: hitFoe, axe: axe, kit: function () { return kit; },
-    gun: GUN, spell: SPELL, moods: MOODS, beamPath: beamPath, spot: spot };
+    gun: GUN, spell: SPELL, moods: MOODS, beamPath: beamPath, spot: spot, telegraph: TELEGRAPH };
 })();
