@@ -544,7 +544,10 @@
     sliding = false;
     invertedFrame(false);
     hideBolt();
-    if (NEU.kernel && NEU.kernel.current() === 'bolt') NEU.kernel.pop();
+    if (NEU.kernel && NEU.kernel.stack) {
+      var at = NEU.kernel.stack.indexOf('bolt');
+      if (at >= 0) NEU.kernel.stack.splice(at, 1);
+    }
   }
   function finish() {
     var path, id, kind, old, g, cv, incoming, started;
