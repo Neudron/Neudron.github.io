@@ -694,6 +694,22 @@
       Q('candles', 4, 12, { solid: true, seed: 2 }), Q('candles', 18, 12, { solid: true, seed: 3 })
     ]).concat(columns([2, 3, 2, 5, 2, 7, 2, 9, 2, 11, 20, 3, 20, 5, 20, 7, 20, 9, 20, 11])),
     castFx: function () { return castState(); },
+    /* the east door while the cast runs: shut with its padlock to 1700,
+       shaken to 2000, then open in three steps (the flag lands at 2500) */
+    doorCtx: function (d, e) {
+      d.padlockOff = false; d.jx = 0; d.step = undefined;
+      if (!cast || e.locked !== 'witch_met') return;
+      var t = castNow();
+      if (t < CAST_T.hit) return;
+      d.padlockOff = true;
+      if (t < CAST_T.open) {
+        d.open = false;
+        if (!cast.fast && t < 2000) d.jx = Math.floor(t / 50) % 2 ? 1 : -1;
+      } else {
+        d.open = true;
+        d.step = Math.min(2, Math.floor((t - CAST_T.open) / 150));
+      }
+    },
     onEnter: function (c) {
       cast = null;
       if (c.flagged('witch_met')) return;
@@ -714,31 +730,55 @@
      door opened because a dialogue box closed. Now the talk only gets
      her started: she raises her hands (the witchcast skin draws the
      wind-up), a hex bolt crosses the nave, and witch_met lands where it
-     hits the door — about 2.4 s of api.later ticks. castFx() feeds the
+     hits the door — about 2.7 s of real time. castFx() feeds the
      castlefx layer; the sigil on the floor is the lock she breaks. */
   var cast = null;
-  var CAST_T = { fly: 700, hit: 1700, done: 2400 };
+  /* beats in ms of real time from the cast's start (Date.now, not timers):
+     0 busy, 300 rings + rising tone, 1000 thrust, 1700 impact, 2100 door
+     steps open, 2500 witch_met, 2700 busy off. Reduced motion: the same
+     beats in 800 ms, no pan, no shake. */
+  var CAST_T = { fly: 1000, hit: 1700, open: 2100, met: 2500, done: 2700 };
+  var CAST_FAST = 800;
+
+  function castNow() {
+    return (Date.now() - cast.t0) * (cast.fast ? CAST_T.done / CAST_FAST : 1);
+  }
 
   function castState() {
     if (!cast) return null;
-    var t = cast.t;
-    return { t: t, phase: t < CAST_T.fly ? 'wind' : t < CAST_T.hit ? 'fly' : t < CAST_T.done ? 'hit' : 'done' };
+    var t = castNow();
+    return { t: t, phase: t < CAST_T.fly ? 'wind' : t < CAST_T.hit ? 'fly' : t < CAST_T.met ? 'hit' : 'done' };
   }
+
+  /* the bolt's target: the east door's padlock, in world px */
+  var BOLT_TO = { x: 22 * 16 - 4, y: 8 * 16 + 8 };
 
   function castTick() {
     if (!cast) return;
-    var c = cast.c;
-    cast.t += 16;
-    var t = cast.t;
-    if (t >= CAST_T.fly && !cast.whooshed) {
-      cast.whooshed = 1;
+    var c = cast.c, t = castNow();
+    if (t >= 300 && !cast.rose) {
+      cast.rose = 1;
+      if (NEU.sfx && NEU.sfx.rise) NEU.sfx.rise(700);
+    }
+    if (t >= CAST_T.fly && !cast.thrust) {
+      cast.thrust = 1;
       if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
+      if (!cast.fast) {
+        /* the camera leads 40 px toward the bolt */
+        var p = c.playerAt(), dx = BOLT_TO.x - p.x, dy = BOLT_TO.y - p.y, n = Math.sqrt(dx * dx + dy * dy) || 1;
+        c.cam.to(p.x + dx / n * 40, p.y + dy / n * 40, 500);
+      }
     }
     if (t >= CAST_T.hit && !cast.struck) {
       cast.struck = 1;
       if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(2);
       if (NEU.juice && NEU.juice.hit) NEU.juice.hit('medium');
+    }
+    if (t >= CAST_T.met && !cast.met) {
+      cast.met = 1;
       c.flag('witch_met', 1);
+      if (NEU.quest) NEU.quest.mark('a4_witch');
+      c.cam.release();
     }
     if (t >= CAST_T.done) {
       cast = null;
@@ -751,11 +791,17 @@
 
   function startCast(c) {
     if (cast || c.flagged('witch_met')) return;
-    cast = { c: c, t: 0, whooshed: 0, struck: 0 };
+    cast = { c: c, t0: Date.now(), fast: crackReduced(), rose: 0, thrust: 0, struck: 0, met: 0 };
     c.busy(true);
-    if (NEU.talk && NEU.talk.close) NEU.talk.close();
-    if (NEU.sfx && NEU.sfx.rise) NEU.sfx.rise(1000);
     c.later(castTick, 16);
+  }
+
+  /* the fifth line stays up until it is dismissed; then the show starts */
+  function startAfterBox(c) {
+    var tries = 0, poll = setInterval(function () {
+      tries++;
+      if (!NEU.tboxOpen || !NEU.tboxOpen() || tries > 120) { clearInterval(poll); startCast(c); }
+    }, 50);
   }
 
   function witchTalk(c) {
@@ -769,10 +815,7 @@
     }
     c.say([witchLines[n][0]], 'witch');
     if (NEU.save) NEU.save.flag('witch_talks', n + 1);
-    if (n + 1 >= witchLines.length) {
-      if (NEU.quest) NEU.quest.mark('a4_witch');
-      startCast(c);
-    }
+    if (n + 1 >= witchLines.length) startAfterBox(c);
   }
 
   /* ══ B2 — the riddle and stone lanes ══════════════════════════════

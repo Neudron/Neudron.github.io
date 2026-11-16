@@ -536,6 +536,7 @@
   /* The context the door art gets (see engine-kinds.js, kind 'exit'). */
   function doorCtx(d, e) {
     d.open = !e.locked || !!(NEU.save && NEU.save.flagged(e.locked));
+    if (room.doorCtx) room.doorCtx(d, e);   /* a room may stage its own door (b1 cast) */
     d.side = exitSide(e);
     d.near = e.__transitionNear === undefined ? exitNear(e) : e.__transitionNear;
     d.tileset = room.tileset;
@@ -1552,6 +1553,7 @@
     has: function (i) { return NEU.save ? NEU.save.has(i) : false; },
     go: go, leave: leave,
     busy: function (on) { busy = !!on; },
+    playerAt: function () { return { x: px, y: py }; },
     /* Hold a named pose on the player for secs (engine-look draws it).
        'drink' is the recall potion's. */
     act: function (name, secs) { playerAct = name ? { name: name, t: secs || 0, max: secs || 0 } : null; },
