@@ -798,9 +798,8 @@
 
   /* the fifth line stays up until it is dismissed; then the show starts */
   function startAfterBox(c) {
-    var tries = 0, poll = setInterval(function () {
-      tries++;
-      if (!NEU.tboxOpen || !NEU.tboxOpen() || tries > 120) { clearInterval(poll); startCast(c); }
+    var poll = setInterval(function () {
+      if (!NEU.tboxOpen || !NEU.tboxOpen()) { clearInterval(poll); startCast(c); }
     }, 50);
   }
 

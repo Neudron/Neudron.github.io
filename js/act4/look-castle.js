@@ -999,13 +999,16 @@
     width: function () { var L = Lk(); return L ? L.propWidth('witch') : 9; },
     draw: function (g, e, d) {
       var room = roomOf(d), fx = room && room.castFx ? room.castFx() : null;
-      var casting = !!(fx && fx.t < 2500);
-      Lk().drawProp(g, 'witch', e.colour, d.sx, d.sy, d.S, d.now, e.x * 7 + e.y);
+      var casting = !!(fx && fx.t < 2500), t = fx ? fx.t : 0;
+      /* 0-300 ms she turns east: a mirror, the nearest a front-on sprite gets */
+      Lk().drawProp(g, 'witch', e.colour, d.sx, d.sy, d.S, d.now, e.x * 7 + e.y, t >= 150);
       if (!casting) return;
-      var S = d.S, t = fx.t;
+      var S = d.S;
+      /* 300-1000 ms the hands rise 4 px, eased */
+      var rp = Math.min(1, Math.max(0, (t - 300) / 700)), rise = Math.round(4 * S * rp * rp * (3 - 2 * rp));
       g.fillStyle = e.colour || '#C2405F';
-      g.fillRect(d.sx - 7 * S, d.sy - 14 * S, 2 * S, 3 * S);
-      g.fillRect(d.sx + 5 * S, d.sy - 14 * S, 2 * S, 3 * S);
+      g.fillRect(d.sx - 7 * S, d.sy - 14 * S - rise, 2 * S, 3 * S);
+      g.fillRect(d.sx + 5 * S, d.sy - 14 * S - rise, 2 * S, 3 * S);
       var r = (3 + (Math.min(t, 700) / 700) * 3) * S, cx = d.sx, cy = d.sy - 17 * S;
       var pulse = still() ? 0.7 : 0.55 + 0.45 * Math.sin(t / 80);
       g.globalAlpha = pulse * 0.5; g.fillStyle = '#6A2A9E'; g.fillRect(Math.round(cx - r), Math.round(cy - r), Math.round(r * 2), Math.round(r * 2));

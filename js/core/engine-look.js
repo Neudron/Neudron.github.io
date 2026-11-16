@@ -797,11 +797,11 @@
   var LIVING = { figure: 1, witch: 1, merchant: 1, sans: 1 };
 
   var palMemo = {};      /* tintPal() per prop+tint: stable identity keeps stamp()'s sprite cache hot */
-  function drawProp(ctx, name, tint, cx, cy, s, now, seed) {
+  function drawProp(ctx, name, tint, cx, cy, s, now, seed, flip) {
     var pr = PROPS[name] || PROPS.figure;
     var bob = (LIVING[name] && !reduced) ? ((((now || 0) + seed * 700) % 1400) < 700 ? 0 : -1) : 0;
     var pk = name + '|' + (tint || ''), pal = palMemo[pk] || (palMemo[pk] = tintPal(pr.pal, tint));
-    stamp(ctx, pr.rows, pal, cx, cy, s * (pr.scale || 1), { dy: bob });
+    stamp(ctx, pr.rows, pal, cx, cy, s * (pr.scale || 1), { dy: bob, flip: !!flip });
     return pr;
   }
   function propWidth(name) { var pr = PROPS[name] || PROPS.figure; return pr.rows[0].length * (pr.scale || 1); }
