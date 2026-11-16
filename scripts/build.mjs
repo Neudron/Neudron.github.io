@@ -150,6 +150,8 @@ async function main() {
     const list = execFileSync('git', ['ls-files', '-z', '--', d], { cwd: ROOT, encoding: 'utf8' });
     for (const f of list.split('\0')) {
       if (!f) continue;
+      /* notes stay on GitHub, never in dist (AGENTS.md) */
+      if (/\.md$/i.test(f)) continue;
       await fs.mkdir(path.dirname(path.join(DIST, f)), { recursive: true });
       await fs.cp(path.join(ROOT, f), path.join(DIST, f));
     }
