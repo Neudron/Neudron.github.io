@@ -348,6 +348,7 @@
   function step(dt, raw) {
     var input = parseInput(raw), prev = player.prev, mx, my, i, e;
     if (!current || current.exited) return getState();
+    if (NEU.inv && NEU.inv.isOpen()) { keys = {}; player.prev = {}; return getState(); }
     dt = clamp(Number(dt) || STEP, 0, 0.1);
     prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y;
     /* melee hit-stop: a short sim freeze in game time (unlike juice's real-clock freeze,
