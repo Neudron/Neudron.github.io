@@ -212,10 +212,14 @@
       mageCard = intent ? intent.id : null;
       act('you', idx);
       if (!state.over) {
+        /* his last block guarded your turn; it expires as his turn starts */
+        state.mage.block = 0;
         mi = intent && intent.index < state.mage.hand.length &&
              state.mage.hand[intent.index] === intent.id ? intent.index : mageIndex();
         if (mi >= 0) { mageCard = state.mage.hand[mi]; act('mage', mi); }
         else mageCard = null;
+        /* your block guarded his turn; it expires as your next turn starts */
+        state.you.block = 0;
       } else mageCard = null;
       settle();
       queueFx(youCard, 'you');
