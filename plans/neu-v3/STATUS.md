@@ -1,6 +1,6 @@
 # Status and handoff ledger
 
-Snapshot date: 2026-11-16. Authoritative local branch: `v3/integration` @ `a0cd22f`.
+Snapshot date: 2026-11-16. Authoritative local branch: `v3/integration` @ `d0c9f7c`.
 Public `main` / `origin/main`: `d4010ef` (untouched; no push, merge or deploy performed).
 
 ## Current state
