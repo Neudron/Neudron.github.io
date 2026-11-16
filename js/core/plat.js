@@ -10,14 +10,17 @@
     dash: 480, endDash: 320, endUp: 0.75, dashTime: 0.15, dashCd: 0.2, refillCd: 0.1, dashCorner: 8, dashAttack: 0.3, jtNudge: 12,
     stamina: 110, climbUp: 45.45, climbStill: 10, climbJump: 27.5, climbUpV: -90, climbDownV: 160, climbSlip: 60, climbAccel: 1800,
     grabY: 0.2, hopY: -240, hopX: 200, hopForce: 0.2, boostTime: 0.2, climbNoMove: 0.1, buffer: 0.08, spring: -370, springVar: 0.2,
-    duckX: 1.25, duckY: 0.5, slideMult: 1.2, pogo: -280, swing: 0.15, hurtInv: 0.67, kbX: 270, kbY: -210, dashI: 0.25 };
+    duckX: 1.25, duckY: 0.5, slideMult: 1.2, pogo: -280, swing: 0.15, hurtInv: 0.67, kbX: 270, kbY: -210, dashI: 0.25,
+    meleeCharge: 0.4, meleeFull: 1.0 };
   var levels = {}, kinds = {}, current = null, live = false, paused = false, replaying = false;
   var canvas = document.getElementById('platCanvas'), overlay = document.getElementById('plat');
   var ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
-  var keys = {}, accumulator = 0, simClock = 0, camera = { x: 0, y: 0 }, baked = null, afterimages = [], bakeCache = {};
+  var keys = {}, accumulator = 0, simClock = 0, camera = { x: 0, y: 0 }, prevX = 0, prevY = 0, prevCamX = 0, prevCamY = 0, baked = null, afterimages = [], bakeCache = {};
   var reduced = redNow(), view = { w: 640, h: 360, scale: 1 }, area = { x0: 0, y0: 0, x1: 640, y1: 360 };
   var painters = [], padB = {}, sprCache = {}, lastDraw = 0, chunks = {}, chunkOrder = [], CHUNK = 32, LRU = 12;
+  var levelSlide = null;   /* D4: a 400 ms snapshot slide between mountain levels; holds the hero in place */
   function redNow() {
+    if (NEU.motion && NEU.motion.reduced) return NEU.motion.reduced();
     try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
   }
   var player = fresh();
@@ -27,7 +30,8 @@
       stamina: C.stamina, dead: 0, wipe: 0, coyote: 0, jumpBuf: 0, dashBuf: 0, meleeBuf: 0, varJump: 0, varSpeed: 0,
       maxFall: C.maxFall, dashTime: 0, dashCd: 0, refillCd: 0, dashAttack: 0, dashX: 0, dashY: 0, duck: false,
       wallSlide: C.slideTime, slideDir: 0, wallBoost: 0, boostDir: 0, forceX: 0, forceDir: 0, climbNoMove: 0, lastClimb: 0,
-      swing: 0, pogo: false, squash: 0, stretch: 0, walked: 0, hp: 0, inv: 0, hopWait: 0 };
+      swing: 0, pogo: false, squash: 0, stretch: 0, walked: 0, hp: 0, inv: 0, hopWait: 0,
+      meleeHold: 0, charging: false, chargeK: 0, swingPow: 1, swingDown: false, hitStop: 0 };
   }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function sign(v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
@@ -41,7 +45,7 @@
       var v = {}, k;
       for (k in e) if (Object.prototype.hasOwnProperty.call(e, k)) v[k] = e[k];
       v.id = v.id || id + ':' + v.t + ':' + v.x + ',' + v.y + ':' + i;
-      v.t0 = 0; v.dead = false; v.solid = v.t === 'zip' || v.t === 'crumble';
+      v.t0 = 0; v.dead = false; v.solid = !!e.solid || v.t === 'zip' || v.t === 'crumble';
       return v;
     });
     levels[id] = def; return def;
@@ -322,6 +326,19 @@
     if (player.dashY <= 0) { player.vx = player.dashX * C.endDash; player.vy = player.dashY * C.endDash; }
     if (player.vy < 0) player.vy *= C.endUp;
   }
+  /* one swing entry point: armed timer + level hook + juice/sfx. charged = the full-hold payoff */
+  function doSwing(down, charged) {
+    var hits;
+    player.swing = C.swing; player.swingPow = charged ? 2 : 1; player.swingDown = !!down;
+    hits = current && current.swing ? current.swing(player, down, charged) : 0;
+    if (NEU.sfx && !replaying) { if (charged && NEU.sfx.snap) NEU.sfx.snap(); else if (NEU.sfx.whoosh) NEU.sfx.whoosh(); }
+    if (hits > 0 && !replaying) {
+      player.hitStop = (charged ? 0.09 : 0.045) * (reduced ? 0.33 : 1);
+      if (NEU.juice && NEU.juice.hit) NEU.juice.hit(charged ? 'medium' : 'small', { dx: player.face, dy: 0 });
+      if (NEU.juice && NEU.juice.burst) NEU.juice.burst(player.x + player.face * 22, player.y - 12, charged ? 16 : 8, charged ? '#FFD36A' : '#FFF0A6', charged ? 180 : 120);
+      if (NEU.sfx && NEU.sfx.hit) NEU.sfx.hit(charged ? 0.9 : 0.45);
+    }
+  }
   function breakBlocks() {
     var x0 = Math.floor((player.x + player.vx * STEP - HW) / TILE), x1 = Math.floor((player.x + player.vx * STEP + HW) / TILE);
     var y0 = Math.floor((player.y + player.vy * STEP - HH) / TILE), y1 = Math.floor((player.y + player.vy * STEP - 1) / TILE), tx, ty, broke = false;
@@ -332,7 +349,18 @@
   function step(dt, raw) {
     var input = parseInput(raw), prev = player.prev, mx, my, i, e;
     if (!current || current.exited) return getState();
+    /* D4: during the level slide the hero is held in place — a Celeste-style
+       screen change, not a physics step with the new room already live. */
+    if (levelSlide) {
+      if (!NEU.engineTrans || !NEU.engineTrans.active) levelSlide = null;
+      else { player.vx = 0; player.vy = 0; keys = {}; return getState(); }
+    }
+    if (NEU.inv && NEU.inv.isOpen()) { keys = {}; player.prev = {}; return getState(); }
     dt = clamp(Number(dt) || STEP, 0, 0.1);
+    prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y;
+    /* melee hit-stop: a short sim freeze in game time (unlike juice's real-clock freeze,
+       this stays deterministic for fixed-step tests and replays) */
+    if (player.hitStop > 0) { prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y; player.hitStop = Math.max(0, player.hitStop - dt); return getState(); }
     simClock += dt;
     player.prev = input;
     if (player.wipe > 0) player.wipe = Math.max(0, player.wipe - dt);
@@ -358,7 +386,14 @@
       player.wallBoost -= dt;
       if (mx && mx === player.boostDir) { player.vx = C.wallH * mx; player.stamina += C.climbJump; player.wallBoost = 0; }
     }
-    if (player.meleeBuf > 0 && player.swing <= 0) { player.meleeBuf = 0; player.swing = C.swing; if (current.swing) current.swing(player, my === 1); }
+    /* melee charge: a held melee key builds toward a charged release swing */
+    var meleeUp = prev.melee && !input.melee, wasHold = player.meleeHold;
+    if (input.melee && current.swing) { if (!prev.melee) player.meleeHold = 0; player.meleeHold += dt; }
+    else player.meleeHold = 0;
+    player.charging = !!current.swing && player.meleeHold > C.meleeCharge;
+    player.chargeK = player.charging ? clamp((player.meleeHold - C.meleeCharge) / (C.meleeFull - C.meleeCharge), 0, 1) : 0;
+    if (meleeUp && wasHold >= C.meleeFull && current.swing) doSwing(my === 1, true);
+    if (player.meleeBuf > 0 && player.swing <= 0) { player.meleeBuf = 0; doSwing(my === 1, false); }
     if (player.st === 1) climb(dt, input, mx, my);
     else if (player.st === 2) dashing(dt, input, mx);
     else normal(dt, input, mx, my);
@@ -375,11 +410,12 @@
     player.squash = Math.max(0, player.squash - dt); player.stretch = Math.max(0, player.stretch - dt);
     if (player.onGround && Math.abs(player.vx) > 8) player.walked += Math.abs(player.vx) * dt;
     for (i = afterimages.length - 1; i >= 0; i--) { afterimages[i].t -= dt; if (afterimages[i].t <= 0) afterimages.splice(i, 1); }
+    placeCamera(reduced ? -1 : dt);
     return getState();
   }
   function getState() { return { x: player.x, y: player.y, vx: player.vx, vy: player.vy, face: player.face, st: player.st,
     dashes: player.dashes, onGround: player.onGround, stamina: player.stamina, dead: player.dead > 0, hp: player.hp, inv: player.inv > 0,
-    swing: player.swing > 0 }; }
+    swing: player.swing > 0, charging: !!player.charging, chargeK: player.chargeK }; }
   /* Only opted-in rooms reset interactive entities. Other acts retain their
      original death behavior (including coin/quest state), avoiding regressions. */
   function respawn() {
@@ -555,8 +591,9 @@
     ox = Math.round((w - view.w * view.scale) / 2); oy = Math.round((h - view.h * view.scale) / 2);
     area.x0 = Math.floor(-ox / view.scale) - 1; area.y0 = Math.floor(-oy / view.scale) - 1;
     area.x1 = Math.ceil((w - ox) / view.scale) + 1; area.y1 = Math.ceil((h - oy) / view.scale) + 1;
-    placeCamera(reduced ? -1 : dtf);
-    cx = Math.round(camera.x); cy = Math.round(camera.y);
+    cx = Math.round(prevCamX + (camera.x - prevCamX) * (reduced ? 1 : Math.min(1, accumulator / STEP))); cy = Math.round(prevCamY + (camera.y - prevCamY) * (reduced ? 1 : Math.min(1, accumulator / STEP)));
+    var drawX = reduced ? player.x : prevX + (player.x - prevX) * Math.min(1, accumulator / STEP);
+    var drawY = reduced ? player.y : prevY + (player.y - prevY) * Math.min(1, accumulator / STEP);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (!api.backdrop) { ctx.fillStyle = '#0b0a12'; ctx.fillRect(0, 0, w, h); }
     ctx.setTransform(view.scale, 0, 0, view.scale, ox, oy); ctx.imageSmoothingEnabled = false;
@@ -581,20 +618,17 @@
     if (player.dead <= 0) {
       if (player.onGround) {
         ctx.globalAlpha = 0.4; ctx.fillStyle = '#000000';
-        ctx.fillRect((player.x - cx - 10) | 0, (player.y - cy) | 0, 20, 1);
-        ctx.fillRect((player.x - cx - 7) | 0, (player.y - cy + 1) | 0, 14, 1);
+        ctx.fillRect((drawX - cx - 10) | 0, (drawY - cy) | 0, 20, 1);
+        ctx.fillRect((drawX - cx - 7) | 0, (drawY - cy + 1) | 0, 14, 1);
         ctx.globalAlpha = 1;
       }
       if (player.inv > 0) ctx.globalAlpha = reduced ? 0.6 : ((((now / 170) | 0) & 1) ? 0.35 : 1); /* 340 ms period: under the 3 Hz flash cap */
-      drawHero(ctx, player.x - cx, player.y - cy, player.face, player.onGround);
+      drawHero(ctx, drawX - cx, drawY - cy, player.face, player.onGround);
       ctx.globalAlpha = 1;
-    } else deathRing(ctx, player.x - cx, player.y - cy - HH / 2, 1 - player.dead / (current.quickRespawn ? 0.18 : DEATH));
-    if (player.dead <= 0 && player.swing > 0) {
-      ctx.fillStyle = '#fff0a6'; ctx.globalAlpha = Math.min(1, player.swing / C.swing);
-      ctx.fillRect(player.x - cx + player.face * 10, player.y - cy - 20, player.face * 12, 3);
-      ctx.fillRect(player.x - cx + player.face * 15, player.y - cy - 14, player.face * 3, 8);
-      ctx.globalAlpha = 1;
-    }
+    } else deathRing(ctx, drawX - cx, drawY - cy - HH / 2, 1 - player.dead / (current.quickRespawn ? 0.18 : DEATH));
+    if (player.dead <= 0 && player.swing > 0)
+      meleeArc(ctx, drawX - cx, drawY - cy, player.face, player.swingDown, player.swingPow === 2, 1 - player.swing / C.swing);
+    if (player.dead <= 0 && player.charging) chargeArc(ctx, drawX - cx, drawY - cy, player.face, player.chargeK);
     if (J && J.drawParts) { ctx.save(); ctx.translate(-cx, -cy); J.drawParts(ctx, dtf || 0.016); ctx.restore(); }
     if (api.foreground) api.foreground(ctx, cx, cy, L, now, area);
     if (J && J.end) J.end(ctx, shook);
@@ -607,6 +641,11 @@
       ctx.setTransform(view.scale, 0, 0, view.scale, ox, oy);
     }
     wipe(ctx);
+    if (levelSlide && NEU.engineTrans && NEU.engineTrans.active) {
+      /* the snapshots are device-pixel canvases; draw them in device-pixel space */
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      NEU.engineTrans.draw(ctx, w, h, view.scale);
+    }
   }
   /* Celeste DeathEffect: eight orbs fly out on a ring and shrink, then a wipe covers the screen */
   function deathRing(c, x, y, t) {
@@ -792,6 +831,32 @@
     c.fillStyle = '#FF00FF';
     c.fillRect(px, py, 16, 16);
   }
+  /* melee swing trail: a short arc that sweeps with the swing and mirrors on facing.
+     charged swings are wider, gold and longer. p runs 0 -> 1 across the swing. */
+  function meleeArc(c, x, y, face, down, charged, p) {
+    var r = charged ? 32 : 22, n = charged ? 10 : 7, i, a, sx, sy, head;
+    var cx0 = x | 0, cy0 = (y - (down ? 4 : 12)) | 0;
+    head = down ? 0.3 + p * 1.1 : -2.1 + p * 2.5;
+    for (i = 0; i < n; i++) {
+      a = head - i * (charged ? 0.16 : 0.13);
+      sx = cx0 + Math.round(Math.cos(a) * r * face);
+      sy = cy0 + Math.round(Math.sin(a) * r);
+      c.fillStyle = charged ? (i < 3 ? '#FFFFFF' : i < 7 ? '#FFD36A' : '#FF9E30') : (i < 2 ? '#FFFFFF' : i < 5 ? '#FFF0A6' : '#30AFFF');
+      c.fillRect(sx - (charged ? 2 : 1), sy - (charged ? 2 : 1), charged ? 5 : 3, charged ? 5 : 3);
+    }
+  }
+  /* hold-Z charge: an arc centred on the facing that fills blue -> gold -> white */
+  function chargeArc(c, x, y, face, k) {
+    var cx0 = x | 0, cy0 = (y - 12) | 0, r = 26, n = 14, i, a, sx, sy, on;
+    for (i = 0; i < n; i++) {
+      on = (i + 0.5) / n <= k;
+      a = (face > 0 ? 0 : Math.PI) - 1.2 + (i / (n - 1)) * 2.4;
+      sx = cx0 + Math.round(Math.cos(a) * r);
+      sy = cy0 + Math.round(Math.sin(a) * r);
+      c.fillStyle = !on ? '#1A3058' : k >= 1 ? '#FFFFFF' : (i % 4 === 0 ? '#FFD36A' : '#30AFFF');
+      c.fillRect(sx - 1, sy - 1, 3, 3);
+    }
+  }
   function drawHero(c, wx, wy, face, moving) {
     var look = NEU.engineLook;
     if (look && look.drawPlayer) {
@@ -804,6 +869,7 @@
   function open(id, opts) {
     var i, carry;
     if (!levels[id]) return false;
+    levelSlide = null;
     opts = opts || {};
     carry = live && opts.carry ? { vx: player.vx, vy: player.vy, dashes: player.dashes, face: player.face } : null;
     if (live) close();
@@ -823,9 +889,28 @@
     sizeView(Math.round((window.innerWidth || 640) * (window.devicePixelRatio || 1)), Math.round((window.innerHeight || 360) * (window.devicePixelRatio || 1)));
     placeCamera(-1);
     if (current.onOpen) current.onOpen(opts);
+    prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y;
     draw();
     NEU.activeMinigame = 'plat';
     if (NEU.kernel && NEU.kernel.current() !== 'plat') NEU.kernel.push('plat'); return true;
+  }
+  /* D4: change level with the shared snapshot slide. Same engineTrans 'slide'
+     used by the engine rooms, but driven from the platformer's own draw/tick so
+     the incoming mountain frame is the outgoing picture's neighbour. */
+  function slideOpen(id, opts) {
+    opts = opts || {};
+    if (!levels[id]) return false;
+    var ms = opts.ms == null ? 400 : opts.ms;
+    if (reduced || !NEU.engineTrans || !document.createElement || !canvas || !ctx) return open(id, opts);
+    var before = mk(canvas.width, canvas.height), c = before.getContext('2d');
+    if (c) c.drawImage(canvas, 0, 0);
+    levelSlide = null;
+    if (!open(id, opts)) return false;
+    var after = mk(canvas.width, canvas.height), c2 = after.getContext('2d');
+    if (c2) c2.drawImage(canvas, 0, 0);
+    NEU.engineTrans.start('slide', before, opts.dir || 'right', false, after, { ms: ms });
+    levelSlide = { ms: ms };
+    return true;
   }
   function cloneLevel(src) {
     var out = {}, k;
@@ -835,6 +920,7 @@
   }
   function close() {
     if (!live) return;
+    levelSlide = null;
     live = false;
     if (overlay) overlay.hidden = true;
     if (current && current.onClose) current.onClose();
@@ -847,6 +933,7 @@
     accumulator += Math.min(0.25, Math.max(0, dt) / 1000) * (current.slow ? current.slow() : 1);
     var n = 0;
     while (accumulator >= STEP && n++ < MAX_STEPS && live) { step(STEP, keys); accumulator -= STEP; }
+    if (levelSlide && NEU.engineTrans && NEU.engineTrans.active) NEU.engineTrans.step(dt / 1000);
     draw();
   }
   function replay(id, recording, opts) {
@@ -942,7 +1029,7 @@
   kinds.door = { touch: function (e, input, melee) { if (!melee) return; var ok = !e.locked || (NEU.save && (NEU.save.flagged(e.locked) || NEU.save.has(e.locked))); if (ok) { e.dead = true; } else if (NEU.talk) NEU.talk([e.waits || ('It waits for ' + e.locked + '.')], 'narr'); } };
   kinds.barrier = { touch: function () {} };
 
-  var api = { level: level, open: open, close: close, running: function () { return live; },
+  var api = { level: level, open: open, slideOpen: slideOpen, close: close, running: function () { return live; },
     painters: painters, pad: padB, spr: spr, rows: rowsOf, ell: ell, mod: mod, spike: spikeShape, glow: glow, fr: fr, steel: STEEL,
     mk: mk, C: C, TILE: TILE, hw: HW, hh: HH,
     hash: function (x, y, z) {
@@ -963,10 +1050,21 @@
       if (levels[id] && !bakeCache[id] && !levels[id].chunked) { current = cloneLevel(levels[id]); current.solids = []; bake(); bakeCache[id] = baked; }
       current = keepLevel; baked = keepBaked;
     },
+    /* PLAN 9.1: CSS px where a terraria level's spawn stands once opened at this window size (same camera and rounding as placeCamera and draw) */
+    spawnScreen: function (id) {
+      var L = levels[id], dpr = window.devicePixelRatio || 1, w = Math.round(window.innerWidth * dpr), h = Math.round(window.innerHeight * dpr), s, vw, vh, px, py, cx, cy;
+      if (!L || L.view !== 'terraria') return null;
+      s = Math.max(1, Math.round(h / 540)); vw = Math.ceil(w / s); vh = Math.ceil(h / s);
+      px = (L.spawn.x + 0.5) * TILE; py = (L.spawn.y + 1) * TILE;
+      cx = Math.round(clamp(px + 24 - vw / 2, 0, Math.max(0, L.w * TILE - vw)));
+      cy = Math.round(clamp(py - HH - vh / 2, 0, Math.max(0, L.h * TILE - vh)));
+      return { x: (Math.round((w - vw * s) / 2) + (px - cx) * s) / dpr, y: (Math.round((h - vh * s) / 2) + (py - cy) * s) / dpr };
+    },
     view: function () { return { w: view.w, h: view.h, scale: view.scale }; },
     backdrop: null, live: null, foreground: null, hud: null, skin: null,
     get state() { return getStateSafe(); }, step: step, replay: replay, tick: tick,
     hurt: hurt, die: die, heal: function (n) { if (current && current.hp) player.hp = Math.min(current.hp, player.hp + n); },
+    grantInvuln: function (s) { if (player) player.inv = Math.max(player.inv || 0, s || 0); },
     hero: function () { return player; }, level0: function () { return current; },
     wind: windNow, time: function () { return simClock; },
     restartRoom: function () { if (!current) return false; respawn(); return true; },
@@ -977,7 +1075,7 @@
     get levels() { return levels; }, _kinds: kinds,
     cam: function () { return { x: camera.x, y: camera.y }; } };
   NEU.plat = api;
-  if (NEU.kernel) NEU.kernel.register('plat', { tick: tick, open: open, close: close, running: function () { return live; } });
+  if (NEU.kernel) NEU.kernel.register('plat', { canvas: canvas, tick: tick, open: open, close: close, running: function () { return live; } });
   document.addEventListener('keydown', function (e) {
     var k;
     if (!live || !onTop()) return;

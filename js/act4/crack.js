@@ -403,8 +403,11 @@
      JS only scaffolds the overlay and stamps the hero sprite once. */
   var SKY_CAP = 'you fall out of a sky crack.', SKY_DONE = 2650, SKY_LAND = 1900;
   function skyCine(done) {
-    var rm = reducedMotion(), box = document.createElement('div'), cap = document.createElement('div'), cv, c;
+    var rm = reducedMotion(), box = document.createElement('div'), cap = document.createElement('div'), cv, c, at;
     box.className = 'crack-sky' + (rm ? ' is-rm' : '');
+    /* the horizon and the landing are the d0 spawn's screen point at this window size (PLAN 9.1) */
+    at = NEU.plat && NEU.plat.spawnScreen ? NEU.plat.spawnScreen('d0') : null;
+    if (at) { box.style.setProperty('--fx', at.x + 'px'); box.style.setProperty('--fy', at.y + 'px'); }
     box.setAttribute('aria-hidden', 'true');
     box.innerHTML = '<i class="crack-sky__stars"></i><i class="crack-sky__ridge"></i><i class="crack-sky__ground"></i>' +
       '<svg class="crack-sky__crack" viewBox="0 0 100 60" aria-hidden="true">' +

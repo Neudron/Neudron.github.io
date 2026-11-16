@@ -157,15 +157,24 @@
     box.id = 'inv'; box.className = 'inv'; box.hidden = true;
     box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
     box.setAttribute('aria-label', 'Items and equipment'); box.tabIndex = -1;
-    box.innerHTML = '<div class="inv__top"><div class="inv__tabs" role="tablist"><button type="button" class="inv__tab" data-tab="0">ITEMS</button><button type="button" class="inv__tab" data-tab="1">EQUIP</button></div><span class="inv__coins"></span></div>'
+    box.innerHTML = '<div class="inv__top"><div class="inv__soul" aria-hidden="true"></div><div class="inv__tabs" role="tablist"><button type="button" class="inv__tab" data-tab="0">ITEMS</button><button type="button" class="inv__tab" data-tab="1">EQUIP</button></div><span class="inv__coins"></span></div>'
+      + '<div class="inv__loadout" aria-label="Equipped gear"></div>'
       + '<div class="inv__body">'
       + '<section class="inv__equipped"><h2>CATEGORIES</h2><div class="inv__slots"></div></section>'
-      + '<section class="inv__inventory"><h2 class="inv__heading">ITEMS</h2><ul class="inv__list" role="listbox" aria-label="Items"></ul><p class="inv__hint" hidden></p></section>'
+      + '<section class="inv__inventory"><h2 class="inv__heading">ITEMS</h2><ul class="inv__list" role="listbox" aria-label="Items"></ul></section>'
       + '<section class="inv__stats"><h2>STATS</h2><div class="inv__statlines"></div></section></div>'
-      + '<section class="inv__preview"><h2>IN COMBAT</h2><div class="inv__stage"><canvas class="inv__fight" width="160" height="40" aria-hidden="true"></canvas><div class="inv__fight-text"></div></div></section>'
+      + '<footer class="inv__footer"><p class="inv__hint" hidden></p></footer>'
+       + '<section class="inv__preview"><h2>IN COMBAT</h2><div class="inv__stage"><canvas class="inv__fight" width="160" height="40" aria-hidden="true"></canvas><div class="inv__fight-text"></div></div></section>'
       + '<div class="inv__desc" aria-live="polite"></div>';
     document.body.appendChild(box);
     list = box.querySelector('.inv__list'); detail = box.querySelector('.inv__desc');
+    /* Hover is a real selection: the row under the pointer becomes sel. */
+    list.addEventListener('mouseover', function (e) {
+      var li = e.target && e.target.closest ? e.target.closest('li') : null, idx;
+      if (!li || li.parentNode !== list) return;
+      idx = Array.prototype.indexOf.call(list.children, li);
+      if (idx >= 0 && idx !== sel) { sel = idx; render(); }
+    });
   }
 
   function live(text) { var node = document.getElementById('bhLive'); if (node) node.textContent = text; }
@@ -209,6 +218,26 @@
     return parts.join('') || '<div>—</div>';
   }
   function itemLabel(item) { return item.name + (item._count > 1 ? ' ×' + item._count : ''); }
+  var KIND_LABEL = { melee: 'MELEE', ranged: 'RANGED', spell: 'SPELL', heal: 'HEAL', key: 'KEY', quest: 'QUEST' };
+  var LOADOUT = [['melee', ''], ['ranged', ''], ['spell1', 'I: '], ['spell2', 'II: ']];
+  /* The one-line stat read on a gear card: what combat actually uses. */
+  function gearStat(item) {
+    if (!item) return '';
+    var st = item.stats || {}, p = [];
+    if (item.kind === 'melee' || item.kind === 'ranged') {
+      p.push('DMG ' + (st.dmg || 0));
+      if (st.cd !== undefined) p.push('CD ' + st.cd + 's');
+      if (st.r) p.push('RNG ' + st.r);
+      if (st.n) p.push('×' + st.n);
+      if (st.hold !== undefined) p.push('HOLD ' + st.hold + 's');
+    } else if (item.kind === 'spell') {
+      if (st.tp) p.push('TP ' + st.tp + '%');
+      if (st.dmg) p.push('DMG ' + st.dmg);
+      if (st.n) p.push('×' + st.n);
+      if (st.heal) p.push('HEAL ' + st.heal);
+    } else p.push(KIND_LABEL[item.kind] || String(item.kind || '').toUpperCase());
+    return p.join(' · ');
+  }
 
   /* The fight preview paints what kit.js paints in combat: the same arc,
      shot, beam and ring colours, and the same stats kit.js reads. */
@@ -303,22 +332,46 @@
     }
     var equip = tab === 1, cats = box.querySelector('.inv__equipped'), stats = box.querySelector('.inv__stats'),
         prev = box.querySelector('.inv__preview'), hint = box.querySelector('.inv__hint');
-    box.className = 'inv' + (equip ? ' is-equip' : '');
+    var anim = (box.classList.contains('is-opening') ? ' is-opening' : '') +
+      (box.classList.contains('is-closing') ? ' is-closing' : '');
+    box.className = 'inv' + (equip ? ' is-equip' : '') + anim;
     cats.hidden = stats.hidden = prev.hidden = !equip;
     box.querySelector('.inv__heading').textContent = equip ? (opened ? CATS[cat].label : 'CATEGORY') : 'ITEMS';
     if (equip) {
       html = '';
       for (i = 0; i < CATS.length; i++) {
         c = CATS[i];
-        html += '<div class="inv__slot' + (cat === i ? ' is-focus' : '') + '"><span class="inv__sym ' + c.icon + '"></span><b>' + c.label + '</b>';
+        html += '<div class="inv__slot' + (cat === i ? ' is-focus' : '') + '"><span class="inv__sym ' + c.icon + '"></span><div class="inv__slotbody"><b>' + c.label + '</b>';
         for (j = 0; j < c.slots.length; j++) {
           it = equippedItem(c.slots[j]);
           focus = cat === i && opened && spell === j;
-          html += '<span class="inv__spell' + (focus ? ' is-focus' : '') + '">' + (c.slots.length > 1 ? SPELL_NAMES[j] : '') + (it ? it.name : '—') + '</span>';
+          html += '<span class="inv__gear' + (c.slots.length > 1 ? ' inv__spell' : '') + (focus ? ' is-focus' : '') + '">'
+            + '<canvas class="inv__gearicon" width="16" height="16" data-item="' + (it ? it.id : '') + '"></canvas>'
+            + '<span class="inv__gearname">' + (c.slots.length > 1 ? SPELL_NAMES[j] : '') + (it ? it.name : '—') + '</span> '
+            + '<i class="inv__kind k-' + (it ? it.kind : 'none') + '">' + (it ? (KIND_LABEL[it.kind] || it.kind) : '') + '</i> '
+            + '<em class="inv__gearstat">' + (it ? gearStat(it) : '') + '</em></span>';
         }
-        html += '</div>';
+        html += '</div></div>';
       }
       cats.querySelector('.inv__slots').innerHTML = html;
+      var gicons = cats.querySelectorAll('.inv__gearicon');
+      for (i = 0; i < gicons.length; i++) {
+        var gid = gicons[i].getAttribute('data-item'), gdef = gid && NEU.items && NEU.items.get ? NEU.items.get(gid) : null;
+        if (gdef) drawIcon(gicons[i], gdef);
+      }
+    }
+    /* The loadout strip: the four live equipment slots, always visible. */
+    var lo = box.querySelector('.inv__loadout');
+    lo.innerHTML = '';
+    for (i = 0; i < LOADOUT.length; i++) {
+      var slotId = LOADOUT[i][0], lit = equippedItem(slotId);
+      var chip = document.createElement('span'); chip.className = 'inv__chip'; chip.setAttribute('data-slot', slotId);
+      var ic = document.createElement('canvas'); ic.className = 'inv__chipicon'; ic.width = 16; ic.height = 16;
+      var nm = document.createElement('b'); nm.textContent = lit ? LOADOUT[i][1] + lit.name : '—';
+      chip.appendChild(ic); chip.appendChild(nm);
+      chip.title = lit ? lit.name + (lit.desc ? ' — ' + lit.desc : '') : '';
+      if (lit) drawIcon(ic, lit);
+      lo.appendChild(chip);
     }
     rows = !equip ? ownedItems() : (opened ? equipmentItems() : []);
     if (sel < 0 || sel >= rows.length) {
@@ -329,8 +382,14 @@
     list.innerHTML = '';
     for (i = 0; i < rows.length; i++) {
       var li = document.createElement('li'), icon = document.createElement('canvas'), span = document.createElement('span');
+      span.className = 'inv__name';
       icon.width = 16; icon.height = 16; icon.className = 'inv__icon'; icon.style.width = icon.style.height = '32px'; drawIcon(icon, rows[i]);
       li.appendChild(icon); li.appendChild(span); span.textContent = itemLabel(rows[i]);
+      var kindEl = document.createElement('i');
+      kindEl.className = 'inv__kind k-' + (rows[i].kind || 'none');
+      kindEl.textContent = KIND_LABEL[rows[i].kind] || String(rows[i].kind || '').toUpperCase();
+      li.appendChild(document.createTextNode(' '));
+      li.appendChild(kindEl);
       if (equipped && rows[i].id === equipped.id) li.className = 'is-equipped';
       li.setAttribute('role', 'option'); li.setAttribute('aria-selected', i === sel ? 'true' : 'false');
       if (i === sel) li.className += ' is-sel';
@@ -342,7 +401,10 @@
     if (!rows.length && !(equip && !opened)) list.innerHTML = '<li>(nothing)</li>';
     current = equip ? equipped : null; chosen = selectedItem();
     shown = equip ? (opened && chosen ? chosen : current) : chosen;
-    box.querySelector('.inv__statlines').innerHTML = equip ? statText(shown, current) : '';
+    /* Full name lives here, never in the narrow list column. */
+    var statHtml = equip ? statText(shown, current) : '';
+    if (equip) statHtml = '<div class="inv__statname">' + (shown ? itemLabel(shown) : (current ? current.name : '')) + '</div>' + statHtml;
+    box.querySelector('.inv__statlines').innerHTML = statHtml;
     if (equip) {
       drawFight(box.querySelector('.inv__fight'), shown);
       box.querySelector('.inv__fight-text').textContent = fightText(shown);
@@ -381,42 +443,6 @@
       if (NEU.act4 && NEU.act4.wake) NEU.act4.wake();
     }, anim ? 800 : 300);
   }
-  /* The row tips, glows and the room flashes cyan while you drink. The item
-     is taken and the teleport runs only when the drink lands (onTake), so a
-     cancelled drink keeps the potion. Reduced motion skips the motion only. */
-  function drinkPotion(item, onTake) {
-    if (drinking) return;
-    drinking = true;
-    var li = list.children[sel], anim = !reduced(), flash = null;
-    if (li) li.classList.add('inv__potion-drink');
-    /* The row itself only glows: rotating the whole row swung its label
-       out of the scrolling list and it read as blank. The potion icon is
-       what tips back. */
-    if (li && anim && li.animate) {
-      li.animate([{ filter: 'none' }, { filter: 'drop-shadow(0 0 8px #8bd6ff)' }, { filter: 'drop-shadow(0 0 16px #8bd6ff)' }],
-                 { duration: 800, easing: 'steps(4)', fill: 'both' });
-    }
-    var icon = li && li.querySelector ? li.querySelector('canvas') : null;
-    if (icon && anim && icon.animate) {
-      icon.style.transformOrigin = 'bottom right';
-      icon.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(-35deg)' }, { transform: 'rotate(-35deg)' }, { transform: 'rotate(0deg)' }],
-                   { duration: 800, easing: 'steps(4)' });
-    }
-    if (anim && document.body.animate) {
-      flash = document.createElement('div');
-      /* z 75: over the room (70), under the menu (76). Over the menu the
-         wash turned the yellow row label into a blue smear mid-drink. */
-      flash.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:#8bd6ff;opacity:0;z-index:75;pointer-events:none';
-      document.body.appendChild(flash);
-      flash.animate([{ opacity: 0 }, { opacity: 0.6 }, { opacity: 0 }], { duration: 800, easing: 'steps(4)' });
-    }
-    setTimeout(function () {
-      if (onTake) onTake();
-      close(); drinking = false;
-      if (flash && flash.parentNode) flash.parentNode.removeChild(flash);
-      if (NEU.talk) NEU.talk(['* you drink the ' + item.name + '. a safe place, briefly.'], 'narr');
-    }, anim ? 800 : 300);
-  }
   function consumeHeal(item) {
     if (drinking) return;
     drinking = true;
@@ -427,15 +453,37 @@
       if (NEU.talk) NEU.talk(['* ' + item.name + '. ' + (item.desc || '')], 'narr');
     }, 800);
   }
+  function still() {
+    return document.documentElement.classList.contains('rm') ||
+      (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
   function open() {
     if (!box) build();
-    before = document.activeElement; box.hidden = false; tab = 0; sel = 0; cat = 0; spell = 0; opened = false;
+    before = document.activeElement;
+    box.hidden = false;
+    box.classList.remove('is-closing'); box.classList.add('is-opening');
+    setTimeout(function () { box.classList.remove('is-opening'); }, 260);
+    tab = 0; sel = 0; cat = 0; spell = 0; opened = false;
     render(); try { box.focus(); } catch (e) {}
   }
   function close() {
     if (!box) return;
+    /* hidden goes up synchronously; .is-closing keeps the panel painted
+       for the close beat via CSS ([hidden] alone would display:none). */
     box.hidden = true; live('');
+    box.classList.remove('is-opening'); box.classList.add('is-closing');
+    setTimeout(function () { box.classList.remove('is-closing'); }, still() ? 0 : 200);
     if (before && before.focus && document.contains(before)) { try { before.focus(); } catch (e) {} }
+  }
+  /* Confirm FX: the acted-on row and the focused category card flash. */
+  function flashSel() {
+    var li = list && list.children[sel], card = box && box.querySelector('.inv__equipped .is-focus'), t;
+    if (li) { li.classList.add('is-confirm'); t = li; }
+    if (card) { card.classList.add('is-confirm'); }
+    setTimeout(function () {
+      if (t) t.classList.remove('is-confirm');
+      if (card) card.classList.remove('is-confirm');
+    }, 240);
   }
   function activate() {
     /* EQUIP: Z opens the category (its items appear), then Z equips one. */
@@ -443,17 +491,17 @@
       if (!opened) { opened = true; sel = -1; render(); return; }
       var pickedEquip = selectedItem();
       if (pickedEquip && pickedEquip.kind === CATS[cat].kind) NEU.save.equip(curSlot(), pickedEquip.id);
-      render(); return;
+      render(); flashSel(); return;
     }
     var item = selectedItem();
     if (!item) return;
+    flashSel();
     if (item.id === 'soup') { drinkSoup(function () { NEU.save.take('soup'); }); return; }
-    /* The recall potion runs the shared sequence: drink, ring, iris,
-       and always the bedroom — never a corridor. */
+    /* The recall potion runs the shared sequence in act4.js: one drink, then
+       the bedroom, never a corridor. Calling it here drinks it once. */
     if (item.fx === 'recall') {
-      drinkPotion(item, function () {
-        if (NEU.act4 && NEU.act4.recall) NEU.act4.recall();
-      });
+      close();
+      if (NEU.act4 && NEU.act4.recall) NEU.act4.recall();
       return;
     }
     if (item.kind === 'heal') { consumeHeal(item); return; }
@@ -486,4 +534,5 @@
     else if (k === 'x' || k === 'X') { if (tab === 1 && opened) { opened = false; sel = -1; render(); } else close(); }
     else if (/^(Escape|c|C)$/.test(k)) close();
   }, true);
+  NEU.inv = { open: open, close: close, isOpen: function () { return !!(box && !box.hidden); } };
 })();

@@ -104,7 +104,6 @@
   <button class="sans__btn" id="sansBtn" aria-label="Talk to sans">
     <img src="img/act123/sans-idle.png" alt="" width="23" height="30" draggable="false">
   </button>
-  <button class="sans__secret" id="sansSecret" type="button" aria-label="Inspect the little star">✦</button>
   <!-- the totem pops here, over his head. src is set in js with a
        cache-buster so the animation restarts from frame one. -->
   <div class="pop" id="sansPop" aria-hidden="true"><img id="sansPopImg" alt="" width="52" height="52"></div>
@@ -142,7 +141,7 @@
   <h2 class="panel__h">inside</h2>
   <p>It's darker in here than the outside suggested, and something at the
      far end is already aiming.</p>
-  <p>Twenty seconds. That's the whole ask.</p>
+  <p>Thirty seconds. That's the whole ask.</p>
   <p><button class="btn" id="bhStart">step in</button></p>
   <p class="panel__note">arrows or <kbd data-k="w,a,s,d">wasd</kbd> &middot; <kbd data-k="x">x</kbd> to dash &middot; <kbd data-k="Shift">shift</kbd> to focus &middot;
      three hits and you're out</p>
@@ -166,7 +165,7 @@
 <div class="bh" id="bh" hidden>
   <canvas id="bhCanvas"></canvas>
   <div class="bh__msg" id="bhMsg" hidden></div>
-  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &middot; <kbd data-k="x">x</kbd> dash &middot; <kbd data-k="Shift">shift</kbd> focus &middot; survive 20s</p>
+  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &middot; <kbd data-k="x">x</kbd> dash &middot; <kbd data-k="Shift">shift</kbd> focus &middot; survive <span id="bhDuration">20</span>s</p>
 </div>
 <!-- The HP is drawn on the canvas, which a screen reader cannot read.
      This line carries the same number as text, and only the bullet-hell
@@ -284,6 +283,14 @@
 
 <!-- ═══ the mage ═════════════════════════════════════════════════════ -->
 <div class="mage" id="mage" hidden aria-label="mage">
+  <div class="mage__warn" id="mageWarn" role="alert" hidden>
+    <p class="mage__warnBig">THE CARDS</p>
+    <p class="mage__warnSub">a spell cast at the mage is answered in cards</p>
+  </div>
+  <div class="mage__head">
+    <span class="mage__name">THE MAGE</span>
+    <span class="mage__sub">a stone shop, and the cards</span>
+  </div>
   <div class="mage__art">
     <canvas id="mageCanvas" width="320" height="192"></canvas>
   </div>
@@ -291,6 +298,7 @@
     <div class="mage__menu" id="mageMenu" role="listbox" aria-label="shop menu"></div>
     <div class="mage__box">
       <p class="mage__say" id="mageSay"></p>
+      <p class="mage__keys">arrows move &middot; <kbd data-k="z">z</kbd> choose &middot; <kbd data-k="x">x</kbd> back &middot; <kbd data-k="c">c</kbd> cast brimstone</p>
     </div>
   </div>
 </div>
@@ -564,7 +572,9 @@
 <script src="js/data/sheets.js"></script>
 <script src="js/core/engine-look.js"></script>
 <script src="js/core/engine-doors.js"></script>
+<script src="js/core/world-graph.js"></script>
 <script src="js/core/engine-kinds.js"></script>
+<script src="js/core/engine-trans.js"></script>
 <script src="js/core/engine.js"></script>
 <script src="js/core/plat.js"></script>
 <script src="js/act4/look-dungeon.js"></script>
@@ -620,6 +630,7 @@
 <script src="js/act4/cart.js"></script>
 <script src="js/act4/elevator.js"></script>
 <script src="js/act4/inventory.js"></script>
+<script src="js/core/tphud.js"></script>
 <script src="js/game/deck.js"></script>
 <!-- after every scene, before settings: like touch.js it polls the
      scenes to decide what to play, and settings.js reads its volume

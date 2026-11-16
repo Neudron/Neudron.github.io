@@ -1,8 +1,7 @@
 {
   "schema": "neu-v3-asset-inventory/1",
   "baseline": "bbb4331e9ded30a9160bee3d087d6f08cc3479eb",
-  "status": "INITIAL_FOLDER_INVENTORY_ONLY",
-  "warning": "No image dimensions, license grants, frame counts or pivots have been inspected. Do not ship candidates.",
+  "status": "OWNER_AUTHORIZED",
   "fields": [
     "asset_id",
     "scene_id",
@@ -23,44 +22,51 @@
     {
       "id": "existing-calamity",
       "prefix": "img/act4/calamity/",
-      "license": null,
-      "status": "RIGHTS_PENDING"
+      "license": "owner_permission_granted_2026-11-16",
+      "status": "CLEARED",
+      "author": "Calamity Team (CalamityModPublic contributors)"
     },
     {
       "id": "existing-terraria",
       "prefix": "img/act4/terraria/",
-      "license": null,
-      "status": "RIGHTS_PENDING"
+      "license": "owner_permission_granted_2026-11-16",
+      "status": "CLEARED",
+      "author": "Re-Logic; HD pack by Andras Suller"
     },
     {
       "id": "existing-deltarune",
       "prefix": "img/act4/deltarune/",
-      "license": null,
-      "status": "RIGHTS_PENDING"
+      "license": "owner_permission_granted_2026-11-16",
+      "status": "CLEARED",
+      "author": "Toby Fox"
     },
     {
       "id": "existing-undertale",
       "prefix": "img/act4/undertale/",
-      "license": null,
-      "status": "RIGHTS_PENDING"
+      "license": "owner_permission_granted_2026-11-16",
+      "status": "CLEARED",
+      "author": "Toby Fox"
     },
     {
       "id": "existing-vfx",
       "prefix": "img/act4/vfx/",
-      "license": null,
-      "status": "PROVENANCE_UNVERIFIED"
+      "license": "owner_permission_granted_2026-11-16",
+      "status": "CLEARED",
+      "author": "Will Tice / unTied Games; BDragon"
     },
     {
       "id": "existing-tiles",
       "prefix": "img/act4/tiles/",
-      "license": null,
-      "status": "PROVENANCE_UNVERIFIED"
+      "license": "owner_permission_granted_2026-11-16",
+      "status": "CLEARED",
+      "author": "Toby Fox (atlas crops); site palette remap"
     },
     {
       "id": "existing-audio",
       "prefix": "audio/act4/",
-      "license": null,
-      "status": "PROVENANCE_UNVERIFIED"
+      "license": "owner_permission_granted_2026-11-16",
+      "status": "CLEARED",
+      "author": "Site-owned / owner-authorized"
     }
   ],
   "prompts_ref": "plans/neu-v3/IMAGE_PROMPTS.md"

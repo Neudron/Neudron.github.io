@@ -27,7 +27,7 @@
     { id: 'sans',    text: 'find someone at the end of the page' },
     { id: 'break',   text: 'break the sword' },
     { id: 'door',    text: 'open the door in the cube' },
-    { id: 'survive', text: 'last twenty seconds' },
+    { id: 'survive', text: 'last thirty seconds' },
     { id: 'dog',     text: 'feed the dog' },
     { id: 'hammer',  text: 'get whatever the dog is chewing' },
     { id: 'smash',   text: 'break the cosmolight' },

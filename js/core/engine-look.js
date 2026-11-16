@@ -123,10 +123,100 @@
     city:   { floor: 'cobble',  ambient: 0.78, night: '#04050C', weather: 'drizzle', warm: '#FFB45E' },
     home:   { floor: 'plank',   ambient: 0.86, night: '#050506', weather: 'dust',    warm: '#F3D2A8' },
     prize:  { floor: 'checker', ambient: 0.84, night: '#06040D', weather: 'sparkle', warm: '#D9B8FF' },
-    storm:  { floor: 'wet',     ambient: 0.62, night: '#02030B', weather: 'storm',   warm: '#BFD3FF' }
+    storm:  { floor: 'wet',     ambient: 0.62, night: '#02030B', weather: 'storm',   warm: '#BFD3FF' },
+    savanna:{ floor: 'sand',    ambient: 0.82, night: '#08070A', weather: null,      warm: '#FFE2A0' },
+    exo:    { floor: 'metal',   ambient: 0.72, night: '#05060C', weather: null,      warm: '#BFD3FF' }
   };
   var DEFAULT_ZONE = { floor: 'flag', ambient: 0.8, night: '#05050A', weather: null, warm: '#FFE2A0' };
   function zone(name) { return ZONES[name] || DEFAULT_ZONE; }
+
+  /* Cached 64px surrounds; woods may replace its tile with the canopy art. */
+  var surroundTiles = {}, surroundPatterns = [];
+  var SURROUND = {
+    woods: ['#05080B', '#0A1216', '#101C20'], castle: ['#38313D', '#524653', '#756477'],
+    city: ['#343440', '#4C4A58', '#77717B'], home: ['#493A36', '#6B514A', '#9A7667'],
+    savanna: ['#59452D', '#84643A', '#B58A4B'], exo: ['#26303C', '#3F4C5C', '#647487']
+  };
+  function surroundTile(name, level) {
+    var key = name + ':' + level, tile = surroundTiles[key], colors = SURROUND[name] || SURROUND.castle;
+    if (tile) return tile;
+    if (name === 'woods' && NEU.roomArt && NEU.roomArt.woodsCanopy) {
+      tile = NEU.roomArt.woodsCanopy(level);
+      if (tile) { surroundTiles[key] = tile; return tile; }
+    }
+    tile = mkCanvas(64, 64); var g = tile.getContext && tile.getContext('2d');
+    if (!g) return tile;
+    function r(x, y, w, h, c) { g.fillStyle = shade(c, level); g.fillRect(x, y, w, h); }
+    r(0, 0, 64, 64, colors[0]);
+    if (name === 'woods') {
+      r(0, 0, 64, 64, colors[0]);
+      r(0, 0, 18, 18, colors[1]); r(5, 0, 26, 15, colors[1]); r(37, 0, 23, 18, colors[1]);
+      r(0, 15, 25, 13, colors[1]); r(29, 13, 24, 14, colors[1]); r(49, 16, 15, 12, colors[1]);
+      r(3, 5, 10, 6, colors[2]); r(18, 9, 8, 4, colors[2]); r(40, 5, 14, 7, colors[2]);
+      r(9, 38, 4, 10, '#1E1820'); r(10, 38, 1, 10, '#3E3036');
+      r(42, 31, 5, 13, '#1E1820'); r(43, 31, 1, 13, '#3E3036');
+    } else if (name === 'castle' || name === 'exo') {
+      r(0, 0, 64, 2, colors[2]); r(0, 30, 64, 2, colors[2]);
+      r(30, 0, 2, 32, colors[1]); r(8, 8, 4, 4, colors[1]); r(52, 8, 4, 4, colors[1]);
+      r(8, 40, 4, 4, colors[1]); r(52, 40, 4, 4, colors[1]);
+    } else if (name === 'city') {
+      r(4, 8, 24, 16, colors[1]); r(36, 36, 24, 20, colors[1]);
+      r(8, 4, 16, 4, colors[2]); r(40, 32, 16, 4, colors[2]);
+    } else if (name === 'home') {
+      r(0, 12, 64, 2, colors[1]); r(0, 44, 64, 2, colors[1]);
+      r(12, 0, 2, 64, colors[2]); r(44, 0, 2, 64, colors[2]);
+    } else {
+      r(0, 36, 64, 8, colors[1]); r(0, 48, 64, 4, colors[2]);
+      r(0, 16, 24, 4, colors[2]); r(40, 8, 24, 4, colors[1]);
+    }
+    surroundTiles[key] = tile;
+    return tile;
+  }
+  function surround(ctx, name, x, y, rw, rh, w, h, S) {
+    if (!SURROUND[name] || !ctx.createPattern) return false;
+    var i, key, tile, cache, p0, p1, p2, p3;
+    if (x <= -24 && y <= -24 && x + rw >= w + 24 && y + rh >= h + 24) return true;
+    for (i = 0; i < surroundPatterns.length; i++) if (surroundPatterns[i].ctx === ctx) { cache = surroundPatterns[i].tiles; break; }
+    if (!cache) { cache = {}; surroundPatterns.push({ ctx: ctx, tiles: cache }); }
+    key = name + ':0.6'; tile = surroundTile(name, 0.6); p0 = cache[key] || (cache[key] = ctx.createPattern(tile, 'repeat'));
+    key = name + ':0.7'; tile = surroundTile(name, 0.7); p1 = cache[key] || (cache[key] = ctx.createPattern(tile, 'repeat'));
+    key = name + ':0.8'; tile = surroundTile(name, 0.8); p2 = cache[key] || (cache[key] = ctx.createPattern(tile, 'repeat'));
+    key = name + ':1'; tile = surroundTile(name, 1); p3 = cache[key] || (cache[key] = ctx.createPattern(tile, 'repeat'));
+    if (!p0 || !p1 || !p2 || !p3) return false;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(S, S);
+    if (!ctx.clip || !ctx.beginPath || !ctx.rect) {
+      ctx.fillStyle = p0; ctx.fillRect(-x / S, -y / S, w / S, h / S);
+      ctx.fillStyle = p1; ctx.fillRect(-32, -32, rw / S + 64, rh / S + 64);
+      ctx.fillStyle = p2; ctx.fillRect(-16, -16, rw / S + 32, rh / S + 32);
+      ctx.fillStyle = p3; ctx.fillRect(0, 0, rw / S, rh / S);
+      ctx.restore();
+      return true;
+    }
+    var left = -x / S, top = -y / S, right = left + w / S, bottom = top + h / S,
+        roomW = rw / S, roomH = rh / S, outerL = -32, outerT = -32,
+        outerR = roomW + 32, outerB = roomH + 32, innerL = -16,
+        innerT = -16, innerR = roomW + 16, innerB = roomH + 16;
+    ctx.fillStyle = p0;
+    ctx.fillRect(left, top, right - left, Math.max(0, Math.min(bottom, outerT) - top));
+    ctx.fillRect(left, Math.max(top, outerB), right - left, Math.max(0, bottom - Math.max(top, outerB)));
+    ctx.fillRect(left, Math.max(top, outerT), Math.max(0, Math.min(right, outerL) - left), Math.max(0, Math.min(bottom, outerB) - Math.max(top, outerT)));
+    ctx.fillRect(Math.max(left, outerR), Math.max(top, outerT), Math.max(0, right - Math.max(left, outerR)), Math.max(0, Math.min(bottom, outerB) - Math.max(top, outerT)));
+    ctx.fillStyle = p1;
+    ctx.fillRect(outerL, outerT, outerR - outerL, innerT - outerT);
+    ctx.fillRect(outerL, innerB, outerR - outerL, outerB - innerB);
+    ctx.fillRect(outerL, innerT, innerL - outerL, innerB - innerT);
+    ctx.fillRect(innerR, innerT, outerR - innerR, innerB - innerT);
+    ctx.fillStyle = p2;
+    ctx.fillRect(innerL, innerT, innerR - innerL, -innerT);
+    ctx.fillRect(innerL, 0, innerR - innerL, 16);
+    ctx.fillRect(innerL, roomH, innerR - innerL, 16);
+    ctx.fillRect(innerL, 0, -innerL, roomH);
+    ctx.fillRect(roomW, 0, 16, roomH);
+    ctx.restore();
+    return true;
+  }
 
   /* What each tile character IS, independent of its colour. Solid
      characters come from the tileset; these are the walkable specials. */
@@ -514,6 +604,13 @@
   var LEGS = [['..c...c..', '..b...b..', '..b...b..'],   /* stand   */
               ['...c.c...', '...b.b...', '..b...b..'],   /* stride A */
               ['..c...c..', '..bb.bb..', '..b...b..']];  /* stride B */
+  /* Seated (api.sit): the 'down' torso with the legs folded forward —
+     two wide rows instead of three stray ones. Always faces the room. */
+  var SIT = ['..hhhhh..', '.hHhhhHh.', '.hsssssh.', '.hsesesh.', '.hsssssh.',
+             '..sssss..', '.cCcccCc.', 'scccccccs', '.cdcccdc.',
+             '..cccccc..', '..bbbbbb..'];
+  /* Crouch (api.sit's middle frame, act 'crouch'): the standing torso on bent knees, SIT's 11 rows. */
+  var CROUCH = BODY.down.slice(0, 8).concat(['..cccccc..', '.cccccccc.', '..bbbbbb..']);
 
   var rowsMemo = {};   /* one rows array per pose, so stamp() can cache the baked sprite on it */
   function playerRows(face, phase, blink) {
@@ -549,6 +646,12 @@
         var raised = p >= 0.35;
         stamp(ctx, FLASK_ROWS, FLASK_PAL, sx + side * (raised ? 3 : 6) * s, sy - (raised ? 9 : 6) * s, s, {});
       }
+      return;
+    }
+    if (act === 'crouch') { stamp(ctx, CROUCH, PAL, sx, sy, s, { flip: face === 'right' }); return; }
+    if (extra && extra.sit) {
+      /* seated on a throne: short pose, feet on the seat's edge */
+      stamp(ctx, SIT, PAL, sx, sy, s, { flip: face === 'right', squash: extra.settle && !reduced });
       return;
     }
     var phase = walkPhase(walked, moving);
@@ -694,11 +797,11 @@
   var LIVING = { figure: 1, witch: 1, merchant: 1, sans: 1 };
 
   var palMemo = {};      /* tintPal() per prop+tint: stable identity keeps stamp()'s sprite cache hot */
-  function drawProp(ctx, name, tint, cx, cy, s, now, seed) {
+  function drawProp(ctx, name, tint, cx, cy, s, now, seed, flip) {
     var pr = PROPS[name] || PROPS.figure;
     var bob = (LIVING[name] && !reduced) ? ((((now || 0) + seed * 700) % 1400) < 700 ? 0 : -1) : 0;
     var pk = name + '|' + (tint || ''), pal = palMemo[pk] || (palMemo[pk] = tintPal(pr.pal, tint));
-    stamp(ctx, pr.rows, pal, cx, cy, s * (pr.scale || 1), { dy: bob });
+    stamp(ctx, pr.rows, pal, cx, cy, s * (pr.scale || 1), { dy: bob, flip: !!flip });
     return pr;
   }
   function propWidth(name) { var pr = PROPS[name] || PROPS.figure; return pr.rows[0].length * (pr.scale || 1); }
@@ -963,6 +1066,7 @@
   NEU.engineLook = {
     zone: zone, palette: palette, material: material, bakeRoom: bakeRoom,
     drawAnimated: drawAnimated, stamp: stamp, shadow: shadow,
+    surround: surround, surroundTiles: surroundTiles,
     drawPlayer: drawPlayer, playerRows: function (f, p, b) { return playerRows(f, p, b).slice(); }, walkPhase: walkPhase,
     lookFor: lookFor, drawProp: drawProp, propWidth: propWidth, props: PROPS, living: LIVING,
     drawLight: drawLight, glow: glow,

@@ -2,7 +2,7 @@
    ───────────────────────────────────────────────────────────────────
    Ctrl + Shift + `  (backquote)
 
-   Everything past the contact section is gated behind a nine-swing
+   Everything past the contact section is gated behind a three-swing
    errand, and re-walking it to test the room behind the door is a
    minute of scrolling per attempt. This exists so it doesn't have to
    be.
@@ -38,9 +38,10 @@
      and is never set on its own. */
   NEU.cheat = { god: false, dmgMul: 1, startFrac: 0 };
 
-  /* The story Console is post-Polterghast progression (brief §0): no dev
-     command may grant or unlock it — its steps, flags and item are refused. */
-  var CONSOLE = { sleep: 1, console: 1, console_charge: 1, charge: 1, docked: 1, deck: 1 };
+  /* The deck stays locked between the soup wake and Polterghast. Refuse
+     direct shortcuts; `skip end` remains the deliberate full-chain dev path. */
+  var CONSOLE = { sleep: 1, console: 1, console_charge: 1, charge: 1, docked: 1, deck: 1,
+    tv_fixed: 1, tv_restored: 1, polt_dead: 1 };
   function consoleRefuse(v) { log('the story Console is post-Polterghast — dev console will not ' + v + ' it.'); }
 
   /* One ordered table, in the order the objectives tab reads it. Each
@@ -163,7 +164,8 @@
       log('sw     stand on the switch (the way out)');
       log('sleep  skip to the sleeping scene');
       log('con    make the console appear');
-      log('take   pocket the console, fully charged');
+      log('pocket  pocket the console, fully charged');
+      log('take <item> remove an inventory item');
       log('chg    fill the charge to 100%');
       log('deck   open the console menu');
       log('set    open the settings panel');
@@ -234,7 +236,7 @@
     },
     sleep: function () { if (NEU.devSleep) { NEU.devSleep(); log('lights out for them.'); } },
     con:   function () { if (NEU.devSwitch) { NEU.devSwitch(); log('console is there.'); } },
-    take:  function () {
+    pocket: function () {
       if (NEU.devTake) { NEU.devTake(); log('pocketed and charged. go dock it.'); }
       else log('nope');
     },
@@ -242,8 +244,11 @@
       if (NEU.devCharge) log('charge: ' + NEU.devCharge(100) + '%');
       else log('bullet.js not loaded');
     },
-    deck:  function () { if (NEU.deck) { hide(); NEU.deck.open(); log('booting.'); }
-                         else log('deck.js not loaded'); },
+    deck:  function () {
+      if (!NEU.deck) { log('deck.js not loaded'); return; }
+      if (NEU.deck.open() === false) return;
+      hide(); log('booting.');
+    },
     set:   function () {
       if (NEU.settings) { hide(); NEU.settings.open(); log('settings.'); }
       else log('settings.js not loaded');

@@ -11,6 +11,8 @@
     var adapter = opts.adapter || {};
     var tp = 0, shield = false, stripOpen = false, stripSel = 0;
     var charge = false, chargeT = 0, meleeCd = 0, rangedCd = 0, healCd = 0;
+    /* hold Z this long and the release also swings a charged melee arc */
+    var CHARGE_FULL = 1.0;
     var shots = [], swings = [], beam = null, dash = null, hp = 6, casts = [];
     var grazePts = 8 / 250, grazePad = 8, playerR = 4;
     var GRAZE_TEXT = 'GRAZE';
@@ -22,6 +24,11 @@
     }
     function targets() { return adapter.targets ? adapter.targets() || [] : []; }
     function sfx(name) { if (adapter.sfx) adapter.sfx(name); }
+    function swingSound(charged) {
+      var name = charged ? 'snap' : 'whoosh';
+      if (NEU.sfx && NEU.sfx[name]) NEU.sfx[name]();
+      else sfx(name);
+    }
     function distance(x, y) { return Math.sqrt(x * x + y * y); }
     function facing() {
       var x = F.fx || 0, y = F.fy || 0;
@@ -37,7 +44,14 @@
       return best;
     }
     function damage(t, n, kind) { if (adapter.damage) adapter.damage(t, n, kind); }
-    function addTp(n) { tp = Math.max(0, Math.min(1, tp + n)); return tp; }
+    var tpEvents = [];
+    function addTp(n) {
+      var before = tp;
+      tp = Math.max(0, Math.min(1, tp + n));
+      if (tp !== before) tpEvents.push(tp - before);
+      return tp;
+    }
+    function drainTp() { var e = tpEvents; tpEvents = []; return e; }
     function heal(n) { hp = Math.min(6, hp + n); }
     function melee() {
       if (meleeCd > 0 || opts.noMelee) return;
@@ -52,7 +66,21 @@
         damage(tg, st.dmg || 0, 'melee'); addTp(0.01);
       }
       swings.push({ x: F.x, y: F.y, ang: a, t: 0, dur: 0.15, r: st.r || 56 });
-      sfx('tick');
+      swingSound(false);
+    }
+    /* the full-charge payoff: a wider, longer arc that hits everything in it for double damage */
+    function chargedMelee() {
+      if (meleeCd > 0 || opts.noMelee) return;
+      var it = item(equipped('melee'));
+      if (!it) return;
+      var st = it.stats || {}, r = (st.r || 56) * 1.5, list = targets(), i, d, dx, dy, a = facing();
+      meleeCd = Math.max(meleeCd, (st.cd || 0.3) * 1.5);
+      swings.push({ x: F.x, y: F.y, ang: facing(), t: 0, dur: 0.24, r: r, charged: true });
+      for (i = 0; i < list.length; i++) {
+        dx = list[i].x - F.x; dy = list[i].y - F.y; d = distance(dx, dy);
+        if (d <= r + (list[i].r || 0) && dx * Math.cos(a) + dy * Math.sin(a) >= d * 0.2675 - (list[i].r || 0)) { damage(list[i], (st.dmg || 0) * 2, 'melee'); addTp(0.02); }
+      }
+      swingSound(true);
     }
     function fireRanged() {
       if (rangedCd > 0) return;
@@ -74,7 +102,9 @@
       if (!charge) return;
       charge = false;
       var it = item(equipped('ranged')), threshold = it && it.stats && it.stats.hold !== undefined ? it.stats.hold : 0.45;
+      var full = chargeT >= CHARGE_FULL;
       if (chargeT < threshold) melee(); else fireRanged();
+      if (full) chargedMelee();
       chargeT = 0;
     }
     function stripItems() {
@@ -101,7 +131,9 @@
       st = def.stats || {}; fx = def.fx; cost = (st.tp || 0) / 100;
       if (tp + 0.00001 < cost) return;
       if (fx === 'shield' && shield) return;
+      var tpBefore = tp;
       tp = Math.max(0, tp - cost);
+      if (tp !== tpBefore) tpEvents.push(tp - tpBefore);
       if (fx === 'beam') {
         var tg = nearest();
         beam = { x: F.x, y: F.y, ang: tg ? Math.atan2(tg.y - F.y, tg.x - F.x) : facing(), charge: 0, fire: 0, ticks: 0 };
@@ -111,7 +143,7 @@
         for (i = 0; i < n; i++) { a = i * Math.PI * 2 / n; shots.push({ kind: 'nova', x: F.x, y: F.y,
           vx: Math.cos(a) * 220, vy: Math.sin(a) * 220, r: 6, dmg: st.dmg || 1, age: 0, life: 2, hit: [], pierce: false }); }
       } else if (fx === 'heal') heal(st.heal === 'full' ? 6 : Number(st.heal) || 0);
-      else { tp += cost; return; }
+      else { var rb = tp; tp += cost; if (tp !== rb) tpEvents.push(tp - rb); return; }
       var CF = { beam: 'fxGigBrim', shield: 'fxGigWard', nova: 'fxGigNova', heal: 'fxGigMend' };
       if (CF[fx]) casts.push({ x: F.x, y: F.y - 8, t: 0.45, d: 0.45, k: CF[fx] });
       if (row.kind === 'consumable' && NEU.save) NEU.save.take(def.id);
@@ -222,12 +254,25 @@
       }
       for (i = 0; i < swings.length; i++) {
         sw = swings[i];
-        for (j = 0; j < 8; j++) {
-          a = sw.ang - 1.15 + j * 0.16 + Math.min(1, sw.t / sw.dur) * 0.4;
-          radius = sw.r * (0.78 + j * 0.018);
+        var sn = sw.charged ? 12 : 8;
+        for (j = 0; j < sn; j++) {
+          a = sw.ang - 1.15 + j * (sw.charged ? 0.22 : 0.16) + Math.min(1, sw.t / sw.dur) * (sw.charged ? 0.6 : 0.4);
+          radius = sw.r * (sw.charged ? 1.45 : 1) * (0.78 + j * (sw.charged ? 0.02 : 0.018));
           x = (sw.x + Math.cos(a) * radius) | 0; y = (sw.y + Math.sin(a) * radius) | 0;
-          ctx.fillStyle = j < 3 ? '#30AFFF' : '#7FE6FF'; ctx.fillRect(x - 2, y - 2, 4, 4);
-          if (j > 4) { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x - 1, y - 1, 2, 2); }
+          ctx.fillStyle = sw.charged ? (j < 4 ? '#FFD36A' : j < 8 ? '#FF9E30' : '#FFFFFF') : (j < 3 ? '#30AFFF' : '#7FE6FF');
+          ctx.fillRect(x - 2, y - 2, 4, 4);
+          if (j > sn - 3) { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x - 1, y - 1, 2, 2); }
+        }
+      }
+      /* the hold-Z charge: an arc centred on the facing that fills to white at full charge */
+      if (charge) {
+        var ck = Math.min(1, chargeT / CHARGE_FULL), cn = 12;
+        for (j = 0; j < cn; j++) {
+          a = facing() - 1.1 + (j / (cn - 1)) * 2.2;
+          x = (F.x + Math.cos(a) * 20) | 0; y = (F.y + Math.sin(a) * 20) | 0;
+          var on = (j + 0.5) / cn <= ck;
+          ctx.fillStyle = !on ? 'rgba(48,175,255,0.22)' : ck >= 1 ? '#FFFFFF' : (j % 4 === 0 ? '#FFD36A' : '#30AFFF');
+          ctx.fillRect(x - 1, y - 1, 3, 3);
         }
       }
       if (beam) {
@@ -263,18 +308,33 @@
       return false;
     }
 
-    return {
+    function cdFrac(cd, max) { return max > 0 ? Math.max(0, Math.min(1, cd / max)) : 0; }
+    /* Remaining cooldown as a 0..1 fraction for the TP bar's chips. */
+    function cooldowns() {
+      var m = item(equipped('melee')), r = item(equipped('ranged'));
+      var ms = (m && m.stats && m.stats.cd) || 0.3, rs = (r && r.stats && r.stats.cd) || 1;
+      return { melee: cdFrac(meleeCd, ms), ranged: cdFrac(rangedCd, rs), heal: cdFrac(healCd, 30) };
+    }
+
+    var api = {
       keydown: keydown, keyup: keyup, tick: tick, draw: draw,
-      addTp: addTp, graze: graze, hit: hit,
+      addTp: addTp, graze: graze, hit: hit, cooldowns: cooldowns, drainTp: drainTp,
       get tp() { return tp; },
       get stripOpen() { return stripOpen; },
       get slow() { return stripOpen ? 0.2 : 1; },
-      shots: shots, casts: casts,
+      get noMelee() { return !!opts.noMelee; },
+      shots: shots, casts: casts, swings: swings,
       get beam() { return beam; },
+      /* 0..1 charge progress while Z is held, 0 otherwise */
+      get charge() { return charge ? Math.min(1, chargeT / CHARGE_FULL) : 0; },
       get hp() { return hp; },
       /* a host that owns the HP (the dungeon) writes it in so HEAL and the strip read true */
       set hp(v) { hp = Math.max(0, Math.min(6, Number(v) || 0)); }
     };
+    /* The TP bar shows the newest kit while its fight (or the dungeon) is live. */
+    api._mini = NEU.activeMinigame || '';
+    NEU.kitLive = api;
+    return api;
   }
 
   /* ponytail: Scal keeps its inline copy until its gzip budget allows the later merge. */

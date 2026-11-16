@@ -5,6 +5,7 @@
   if (!NEU.engine || !NEU.engine.register || !NEU.engineKinds) return;
   var E = NEU.engine, K = NEU.engineKinds;
   var live = false, t = 0, flashes = 0, didFlash = false, audio = false, pending = false, nag = false, shook = false;
+  var sliding = false, flashAt = 0.36, INVERT_MS = 80, THUNDER_MS = 250, pendingPlat = false;
 
   function reducedNow() {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
@@ -470,9 +471,22 @@
         var fk = forks(pts), i;
         strike(g, pts, 6, 2, true);
         for (i = 0; i < fk.length; i++) strike(g, fk[i], 4, 1, false);
+      }),
+      /* the storm is seen through the tavern window: heavy frame and mullions */
+      window: bbake(640, 360, function (g) {
+        var i;
+        rr(g, 0, 0, 640, 16, '#7A4A2C'); rr(g, 0, 344, 640, 16, '#7A4A2C');
+        rr(g, 0, 0, 16, 360, '#7A4A2C'); rr(g, 624, 0, 16, 360, '#7A4A2C');
+        rr(g, 0, 16, 640, 2, '#3A2416'); rr(g, 0, 342, 640, 2, '#3A2416');
+        for (i = 210; i <= 430; i += 220) { rr(g, i, 16, 12, 328, '#7A4A2C'); rr(g, i + 12, 16, 2, 328, '#3A2416'); }
+        rr(g, 16, 168, 608, 12, '#7A4A2C'); rr(g, 16, 180, 608, 2, '#3A2416');
       })
     };
     return bart;
+  }
+  function invertedFrame(on) {
+    var el = document.getElementById('bolt');
+    if (el && el.style) el.style.filter = on ? 'invert(1)' : '';
   }
   function drawBolt() {
     var cv = document.getElementById('boltCanvas');
@@ -491,6 +505,7 @@
       lit = !reduce && t >= 0.36 && t < 0.48;
       if (lit ? a.lit : a.clouds) ctx.drawImage(lit ? a.lit : a.clouds, 0, 0);
       if (a.bolt) ctx.drawImage(a.bolt, 0, 0);
+      if (a.window) ctx.drawImage(a.window, 0, 0);
     } else {
       /* no offscreen blits: the bolt still has to read */
       strike(ctx, boltPts(), 6, 2, true);
@@ -510,27 +525,63 @@
       ctx.globalAlpha = 1;
       return;
     }
-    if (!didFlash && t >= 0.36) {
+    if (!didFlash && t >= flashAt) {
       didFlash = true;
       flashes += 1;
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, w, h);
     }
+    invertedFrame(!reduce && t >= flashAt && t < flashAt + INVERT_MS / 1000);
     if (!shook && t >= 0.5 && NEU.juice && NEU.juice.hit) { shook = true; NEU.juice.hit('medium'); }
   }
   function hideBolt() {
     var el = document.getElementById('bolt');
     if (el) el.hidden = true;
   }
-  function finish() {
-    var path, id;
-    if (!live) return;
+  function closeBolt() {
     live = false;
+    if (sliding && NEU.engineTrans) NEU.engineTrans.cut();
+    sliding = false;
+    invertedFrame(false);
     hideBolt();
-    if (NEU.kernel && NEU.kernel.current() === 'bolt') NEU.kernel.pop();
+    if (NEU.kernel && NEU.kernel.stack) {
+      var at = NEU.kernel.stack.indexOf('bolt');
+      if (at >= 0) NEU.kernel.stack.splice(at, 1);
+    }
+  }
+  function finish() {
+    var path, id, kind, old, g, cv, incoming, started, at;
+    if (!live || sliding) return;
     path = NEU.save && NEU.save.flag('mtn_path');
     id = path === 'evil' ? 'v0' : 'h0';
-    if (NEU.plat && NEU.plat.open) NEU.plat.open(id);
+    kind = reducedNow() ? null : (NEU.engineTrans && NEU.engineTrans.get('portal:lightning'));
+    if (!kind || !NEU.plat || !NEU.plat.open) {
+      closeBolt();
+      if (NEU.plat && NEU.plat.open) NEU.plat.open(id);
+      return;
+    }
+    old = document.createElement('canvas');
+    old.width = 640; old.height = 360;
+    g = old.getContext && old.getContext('2d');
+    cv = document.getElementById('boltCanvas');
+    if (g && g.drawImage && cv) g.drawImage(cv, 0, 0);
+    if (NEU.plat.open(id) !== true) { closeBolt(); return; }
+    incoming = NEU.kernel && NEU.kernel.bridge ? NEU.kernel.bridge() : null;
+    /* plat opened only for the snapshot: hold it off the stack so bolt stays
+       top and its tick is the one that steps the transition */
+    pendingPlat = false;
+    if (NEU.kernel && NEU.kernel.stack) {
+      at = NEU.kernel.stack.indexOf('plat');
+      if (at >= 0) { NEU.kernel.stack.splice(at, 1); pendingPlat = true; }
+    }
+    started = NEU.engineTrans.start('portal:lightning', old, 'up', false, incoming, { ms: kind.ms });
+    if (!started || started.name !== 'portal:lightning') {
+      if (pendingPlat && NEU.kernel) NEU.kernel.push('plat');
+      pendingPlat = false;
+      closeBolt();
+      return;
+    }
+    sliding = true;
   }
   function openBolt() {
     var el;
@@ -542,22 +593,37 @@
     flashes = 0;
     audio = false;
     shook = false;
+    sliding = false;
+    pendingPlat = false;
+    invertedFrame(false);
     if (NEU.engine && NEU.engine.running && NEU.engine.leave) NEU.engine.leave();
     el = document.getElementById('bolt');
     if (el) el.hidden = false;
     if (NEU.kernel) NEU.kernel.push('bolt');
-    rumble();
     drawBolt();
   }
   function tick(dt) {
-    var sec = dt, reduce, limit;
+    var sec = dt, reduce, limit, cv, cx;
     if (!live) return;
     if (sec > 2) sec = sec / 1000;
     if (sec > 0.05) sec = 0.05;
     if (sec < 0) sec = 0;
+    if (sliding) {
+      cv = document.getElementById('boltCanvas');
+      cx = cv && cv.getContext ? cv.getContext('2d') : null;
+      if (cx && cx.clearRect) cx.clearRect(0, 0, 640, 360);
+      if (cx && NEU.engineTrans) NEU.engineTrans.draw(cx, 640, 360, 1);
+      if (NEU.engineTrans && !NEU.engineTrans.step(sec)) {
+        closeBolt();
+        if (pendingPlat && NEU.kernel) NEU.kernel.push('plat');
+        pendingPlat = false;
+      }
+      return;
+    }
     t += sec;
-    drawBolt();
     reduce = reducedNow();
+    if (!reduce && !audio && t >= flashAt + THUNDER_MS / 1000) { audio = true; rumble(); }
+    drawBolt();
     limit = reduce ? 0.48 : 1.15;
     if (t >= limit) finish();
   }

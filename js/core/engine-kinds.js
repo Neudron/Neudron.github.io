@@ -215,10 +215,10 @@
          dialog ESC gives every minigame. Walking into it and pressing Z both
          land here, so the question cannot be skipped by either. */
       if (e.confirm && NEU.engine && NEU.engine.confirmExit) {
-        NEU.engine.confirmExit(e.confirm, function () { sys.go(e.to, e.spawn); }, e.confirmNote);
+        NEU.engine.confirmExit(e.confirm, function () { sys.go(e.to, e.spawn, e.via, e); }, e.confirmNote);
         return;
       }
-      sys.go(e.to, e.spawn);
+      sys.go(e.to, e.spawn, e.via, e);
     },
     /* An exit carrying a `sheet` is a THING (b7_altar's fire door); a
        labelled one takes a plate. Every bare exit still draws a small
@@ -268,7 +268,7 @@
       /* Taken stays taken even after the item is spent somewhere else.
          v1 read "taken" off the inventory alone, so a pickup came back
          the moment its item went into an altar. */
-      if (NEU.save && sys.room()) NEU.save.flag('p:' + sys.room().id + ':' + e.x + ',' + e.y, 1);
+      if (NEU.save && sys.room()) NEU.save.flag(sys.key('p', e), 1);
       sys.say(e.lines || ['you take it.'], e.who || 'narr');
       sfx('snap');
       /* SMALL. A pickup must register without competing with a boss
@@ -340,7 +340,7 @@
       /* E while THIS dialogue is showing is a no-op. */
       if (tboxOpen()) return;
       var room = sys.room();
-      var dk = 'd:' + room.id + ':' + e.x + ',' + e.y;
+      var dk = sys.key('d', e);
       var at = NEU.save ? (NEU.save.flag(dk) || 0) : 0;
       /* lines may be a function of (save, quest): resolved here, at talk
          time, so an npc can say what the player has already done. Give

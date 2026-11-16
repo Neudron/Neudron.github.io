@@ -84,7 +84,7 @@
      either side of him in the sort). You came out of the fire door in
      the west wall; the alley mouth is the east wall; the painted door
      is on the plum building's front wall, left of the stall. */
-  E.register('d1_street', {
+  var D1 = {
     tileset: 'city',
     tiles: [
       '##########################',
@@ -141,7 +141,7 @@
       say(c, ['the door lets you out somewhere with weather.',
               'there is a stall. there is always a stall.']);
     }
-  });
+  };
 
   /* The shop. Nine pieces of junk and one thing that matters, and the
      only difference is that one of them is lit. */
@@ -192,21 +192,63 @@
       setTimeout(function () { el.style.pointerEvents = 'none'; }, d);
     }, d);
   };
+  /* The stage's own curtain, shared with the rhythm fight's exit. Red cloth
+     drops over the outgoing room and lifts on the incoming stage; the reverse
+     plays on the way out. z 96, below the dialogue box at 96/96 — it never
+     covers a textbox that is still closing. */
+  var stageCurtain = null;
+  function curtainFx() {
+    if (!stageCurtain) {
+      stageCurtain = document.createElement('div');
+      stageCurtain.id = 'stageCurtain';
+      stageCurtain.setAttribute('aria-hidden', 'true');
+      stageCurtain.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:96;pointer-events:none;overflow:hidden;' +
+        'transform:translateY(-100%);transition:transform 500ms linear;' +
+        'background:repeating-linear-gradient(90deg,#5A1024 0 24px,#7A1830 24px 48px);' +
+        'box-shadow:inset 0 -24px 0 #3A0A18;';
+      document.body.appendChild(stageCurtain);
+    }
+    return stageCurtain;
+  }
+  function curtainStill() {
+    return !!(NEU.motion && NEU.motion.reduced ? NEU.motion.reduced() :
+      window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ||
+      !!(NEU.settings && NEU.settings.reduced);
+  }
+  NEU.stageCurtain = {
+    el: curtainFx,
+    still: curtainStill,
+    /* drop the cloth, run mid() behind it, then lift it again */
+    through: function (mid, ms, cb) {
+      var el = curtainFx(), d = curtainStill() ? 0 : (ms || 500);
+      el.style.transitionDuration = d + 'ms';
+      el.style.transform = 'translateY(0)';
+      el.style.pointerEvents = 'auto';
+      setTimeout(function () {
+        mid();
+        el.style.transform = 'translateY(-100%)';
+        setTimeout(function () {
+          el.style.pointerEvents = 'none';
+          if (cb) cb();
+        }, d);
+      }, d);
+    }
+  };
   function toCombat(c, start) {
-    cutFx();
-    var reduced = !!(NEU.motion && NEU.motion.reduced ? NEU.motion.reduced() : window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    curtainFx();
+    var reduced = curtainStill();
     var shut = reduced ? 0 : 500, hold = reduced ? 0 : 450, lift = reduced ? 0 : 600;
     function waitShut() {
       if (NEU.tboxOpen && NEU.tboxOpen()) { setTimeout(waitShut, 120); return; }
-      cutEl.style.transitionDuration = shut + 'ms';
-      cutEl.style.pointerEvents = 'auto';
-      cutEl.style.opacity = '1';
+      stageCurtain.style.transitionDuration = shut + 'ms';
+      stageCurtain.style.pointerEvents = 'auto';
+      stageCurtain.style.transform = 'translateY(0)';
       setTimeout(function () {
         c.leave();
         start();
-        cutEl.style.transitionDuration = lift + 'ms';
-        cutEl.style.opacity = '0';
-        setTimeout(function () { cutEl.style.pointerEvents = 'none'; }, lift);
+        stageCurtain.style.transitionDuration = lift + 'ms';
+        stageCurtain.style.transform = 'translateY(-100%)';
+        setTimeout(function () { stageCurtain.style.pointerEvents = 'none'; }, lift);
       }, shut + hold);
     }
     setTimeout(waitShut, 120);
@@ -246,7 +288,7 @@
      and sprayed again underneath, worse, in teal. Two mushrooms grow
      in the damp corners. In from the street's alley mouth on the west;
      out up the steps on the east. */
-  E.register('d2_alley', {
+  var D2 = {
     tileset: 'city',
     tiles: [
       '####################',
@@ -282,7 +324,7 @@
         style: 'door', label: 'garage',
         lines: ['a garage door, shut.', 'it is waiting on a photograph.'] }
     ]
-  });
+  };
 
   /* ══ D3 — the square ═════════════════════════════════════════════
      The end of the city. An old hall with a clock that keeps the real
@@ -291,7 +333,7 @@
      chalk circle on the same axis below it. The east side is a
      balustrade over the drop, with the rest of the city far below.
      In through the park gate in the west wall. */
-  E.register('d3_square', {
+  var D3 = {
     tileset: 'city',
     tiles: [
       '#########################',
@@ -334,7 +376,72 @@
       say(c, ['the square. it is the end of the city and it does not pretend otherwise.',
               'if you are carrying something that takes you home, this is the place.']);
     }
+  };
+
+  /* ── the city is one street (PLAN 7.1) ───────────────────────────
+     D1, D2 and D3 stay as source rooms. d_city copies their tiles and
+     entities at the offsets PLAN 7.1 gives, drops the exits they shared,
+     and shuts the alley's two side walls except at its seams. Each old
+     id is an alias into d_city with its own area. A copied entity keeps
+     its old room and cell in `origin`, so gone:… flags saved before the
+     merge still match. */
+  var CITY_SRC = [
+    { id: 'd1_street', room: D1, dx: 0, dy: 1, x0: 0, x1: 24 },
+    { id: 'd2_alley', room: D2, dx: 24, dy: 2, x0: 1, x1: 18 },
+    { id: 'd3_square', room: D3, dx: 42, dy: 0, x0: 1, x1: 24 }
+  ];
+  var CITY_IDS = ['d1_street', 'd2_alley', 'd3_square'];
+  function mergeCityTiles() {
+    var rows = [], x, y, i, j, s, g;
+    for (y = 0; y < 14; y++) { rows.push([]); for (x = 0; x < 67; x++) rows[y].push('#'); }
+    for (i = 0; i < CITY_SRC.length; i++) {
+      s = CITY_SRC[i]; g = s.room.tiles.split('\n');
+      for (j = 0; j < g.length; j++)
+        for (x = s.x0; x <= s.x1; x++) rows[j + s.dy][x + s.dx] = g[j].charAt(x);
+    }
+    /* the alley's west and east walls: shut, except at the seams (24,8)-(25,8) and (42,7)-(43,7) */
+    for (y = 0; y < 14; y++) {
+      if (y !== 8) rows[y][25] = '#';
+      if (y !== 7) rows[y][42] = '#';
+    }
+    return rows.map(function (r) { return r.join(''); }).join('\n');
+  }
+  function mergeCityEntities() {
+    var out = [], i, k, s, es, e, copy, key;
+    for (i = 0; i < CITY_SRC.length; i++) {
+      s = CITY_SRC[i]; es = s.room.entities;
+      for (k = 0; k < es.length; k++) {
+        e = es[k];
+        if (e.t === 'cityfloor' || (e.t === 'exit' && CITY_IDS.indexOf(e.to) >= 0)) continue;
+        copy = {};
+        for (key in e) copy[key] = e[key];
+        copy.origin = { room: s.id, x: e.x, y: e.y };
+        copy.x = e.x + s.dx; copy.y = e.y + s.dy;
+        out.push(copy);
+      }
+    }
+    return out;
+  }
+
+  E.register('d_city', {
+    tileset: 'city',
+    tiles: mergeCityTiles(),
+    spawns: {
+      fire: { x: 1, y: 8, face: 'right' }, stall: { x: 10, y: 7, face: 'up' }, portal: { x: 6, y: 4, face: 'down' },
+      alley_west: { x: 25, y: 8, face: 'right' }, garage: { x: 34, y: 5, face: 'up' }, alley_east: { x: 42, y: 7, face: 'left' },
+      square_west: { x: 43, y: 7, face: 'right' }, north: { x: 54, y: 10, face: 'down' }
+    },
+    areas: [
+      { id: 'd1_street', x0: 0, y0: 0, x1: 24, y1: 13, spawn: 'fire', onEnter: D1.onEnter },
+      { id: 'd2_alley', x0: 25, y0: 0, x1: 42, y1: 13, spawn: 'alley_west' },
+      { id: 'd3_square', x0: 43, y0: 0, x1: 66, y1: 13, spawn: 'square_west', onEnter: D3.onEnter }
+    ],
+    entities: [{ t: 'cityfloor', v: 'd_city', x: 0, y: 0 }].concat(mergeCityEntities())
   });
+  /* every spawn an old id declared is listed, as a_woods lists its own */
+  E.alias('d1_street', 'd_city', { fire: 'fire', stall: 'stall', portal: 'portal', east: 'alley_west' }, 'd1_street');
+  E.alias('d2_alley', 'd_city', { west: 'alley_west', east: 'alley_east', garage: 'garage' }, 'd2_alley');
+  E.alias('d3_square', 'd_city', { west: 'square_west', north: 'north' }, 'd3_square');
 
   function drink(c) {
     if (!c.has('recall')) {
@@ -362,36 +469,39 @@
        e2  a half moon; the clock runs backwards; a mended vase, a chair
        e3  a full moon; the clock has no hands; the wallpaper has eyes;
            a door you have no key for, with light under it          */
-  var HALL = [
-    '########################',
-    '########################',
-    '#......................#',
-    '#......................#',
-    '#......................#',
-    '#......................#',
-    '#......................#',
-    '########################'
-  ];
-  function grid(solids) {
-    var rows = HALL.slice();
-    for (var i = 0; i < solids.length; i += 2) {
-      var x = solids[i], y = solids[i + 1], r = rows[y];
-      rows[y] = r.substr(0, x) + 'o' + r.substr(x + 1);
+  /* W18: the walk home is shorter and it is not the same room four
+     times. e1 is a 20-tile entry hall, e2 a 14-tile squeeze with a door
+     into the nook you outgrew, e3 the 24-tile hub (dad's door, and now
+     a locked cellar door), e4 a 16-tile last corridor. Two more rooms
+     exist behind doors that never open — the larder and the cellar —
+     and they say so when you bump them. */
+  function hallGrid(w, solids) {
+    var rows = [], x, y, i, h, r;
+    for (y = 0; y < 8; y++) {
+      if (y < 2 || y === 7) { h = ''; for (x = 0; x < w; x++) h += '#'; }
+      else { h = '#'; for (x = 1; x < w - 1; x++) h += '.'; h += '#'; }
+      rows.push(h);
+    }
+    for (i = 0; i < solids.length; i += 2) {
+      var sx = solids[i], sy = solids[i + 1]; r = rows[sy];
+      rows[sy] = r.substr(0, sx) + 'o' + r.substr(sx + 1);
     }
     return rows.join('\n');
   }
-  function corridor(id, next, prev, styles, solids, odd) {
-    var spawns = { south: { x: 1, y: 4, face: 'right' }, north: { x: 22, y: 4, face: 'left' } };
+  function corridor(id, w, next, prev, styles, solids, odd, xspawns) {
+    var spawns = { south: { x: 1, y: 4, face: 'right' }, north: { x: w - 2, y: 4, face: 'left' } };
     if (id === 'e3_hall') spawns.dad = { x: 12, y: 2, face: 'down' };
+    if (xspawns) for (var k in xspawns) spawns[k] = xspawns[k];
     E.register(id, {
       tileset: 'home',
-      tiles: grid(solids),
+      tiles: hallGrid(w, solids),
       spawns: spawns,
       entities: [
         { t: 'cityfloor', v: id, x: 0, y: 0 },
-        P('moon', 5, 1), P('moon', 19, 1),
-        P('sconce', 6, 1), P('sconce', 10, 1), P('sconce', 14, 1, { flick: id === 'e3_hall' }),
-        { t: 'exit', x: 23, y: 4, to: next, spawn: 'south', style: styles[1] },
+        P('moon', Math.round(w * 0.2), 1), P('moon', Math.round(w * 0.8), 1),
+        P('sconce', Math.round(w * 0.25), 1), P('sconce', Math.round(w * 0.42), 1),
+        P('sconce', Math.round(w * 0.58), 1, { flick: id === 'e3_hall' }),
+        { t: 'exit', x: w - 1, y: 4, to: next, spawn: 'south', style: styles[1] },
         { t: 'exit', x: 0, y: 4, to: prev, spawn: 'north', style: styles[0] }
       ].concat(odd),
       onEnter: function (c) {
@@ -401,25 +511,134 @@
     });
   }
 
-  corridor('e1_hall', 'e2_hall', 'd3_square', ['door', 'arch'], [2, 2, 21, 2], [
-    P('none', 12, 1, { lines: ['a picture frame with nothing in it.', 'the nail is still in the wall.'] }),
-    P('coatstand', 2, 2), P('gclock', 21, 2, { n: 1 })
+  corridor('e1_hall', 20, 'e2_hall', 'd3_square', ['door', 'arch'], [2, 2, 17, 2], [
+    { t: 'exit', x: 12, y: 1, to: 'e8_larder', spawn: 'door', style: 'door',
+      locked: 'home_larder', label: 'larder',
+      lines: ['a door with a towel rolled along the bottom.',
+              'it is locked from this side. it has opinions about you.',
+              'it is waiting for a key nobody in this house ever cut.'] },
+    P('none', 7, 1, { lines: ['a picture frame with nothing in it.',
+                              'the nail is still in the wall.'] }),
+    P('coatstand', 2, 2, { lines: ['a coat on a stand.',
+                                   'it is not yours. it is everyone\'s.'] }),
+    P('gclock', 17, 2, { n: 1, lines: ['the clock says ten past three.',
+                                      'it has said ten past three since you got here.'] })
   ]);
-  corridor('e2_hall', 'e3_hall', 'e1_hall', ['arch', 'door'], [2, 2, 12, 2, 17, 2, 21, 2], [
-    P('vasetable', 12, 2, { lines: function (s) {
+  corridor('e2_hall', 14, 'e3_hall', 'e1_hall', ['arch', 'door'], [4, 2, 9, 2, 11, 2], [
+    { t: 'exit', x: 7, y: 1, to: 'e7_nook', spawn: 'door', style: 'door' },
+    P('vasetable', 9, 2, { lines: function (s) {
       return s && s.flagged('tv_breakable')
         ? ['a vase. it has been swept up and put back together at least once.',
            'there is a new crack in the glaze. you know the feeling.']
         : ['a vase. it has been swept up and put back together at least once.'];
     } }),
-    P('coatstand', 2, 2), P('chair', 17, 2), P('gclock', 21, 2, { n: 2 })
-  ]);
-  corridor('e3_hall', 'e4_corridor', 'e2_hall', ['door', 'curtain'], [12, 6, 21, 2], [
+    P('chair', 4, 2, { lines: ['a chair, facing the wall.',
+                              'you could sit in it. you won\'t.'] }),
+    P('gclock', 11, 2, { n: 2, lines: ['the clock runs backwards.',
+                                      'it is in a hurry to be earlier.'] })
+  ], { nook: { x: 7, y: 3, face: 'down' } });
+  corridor('e3_hall', 24, 'e4_corridor', 'e2_hall', ['door', 'curtain'], [12, 6, 21, 2], [
     { t: 'exit', x: 12, y: 1, to: 'e5_dad', spawn: 'door', style: 'door', locked: 'dad_door',
       label: 'dad',
       lines: ['a door you do not have a key for.', 'it wants a card.'] },
-    P('pot', 12, 6), P('gclock', 21, 2, { n: 3 })
+    { t: 'exit', x: 8, y: 1, to: 'e9_cellar', spawn: 'door', style: 'door',
+      locked: 'home_cellar', label: 'cellar',
+      lines: ['a door with a towel rolled along the bottom.',
+              'it is locked from this side. it has opinions about you.',
+              'it is waiting for a key that was never cut for this house.'] },
+    P('pot', 12, 6, { lines: ['a plant. it has been here longer than you have.',
+                            'it does not seem to mind the wallpaper watching.'] }),
+    P('none', 18, 1, { lines: ['a scuff mark at shoulder height.',
+                               'something wide was carried through here. recently.'] }),
+    P('gclock', 21, 2, { n: 3, lines: ['the clock has no hands.',
+      'it does not want to tell you the time. it wants you to know that.'] })
   ]);
+
+  /* The nook you outgrew: a music box that still plays its five notes,
+     and a floorboard that was never about what was under it. */
+  var boxCtx = null;
+  function jingle() {
+    if (NEU.settings && NEU.settings.muted) return;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      boxCtx = boxCtx || new AC();
+      if (boxCtx.state === 'suspended' && boxCtx.resume) boxCtx.resume();
+      var notes = [659.25, 783.99, 880, 783.99, 659.25], i;
+      for (i = 0; i < notes.length; i++) (function (f, d) {
+        var t = boxCtx.currentTime + d, o = boxCtx.createOscillator(), g = boxCtx.createGain();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(f, t);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.035, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+        o.connect(g); g.connect(boxCtx.destination);
+        o.start(t); o.stop(t + 0.55);
+      })(notes[i], i * 0.16);
+    } catch (err) {}
+  }
+  function windBox(c) {
+    if (!NEU.save.flagged('nook_wind')) {
+      NEU.save.flag('nook_wind', 1);
+      c.say(['a music box. you wound it as a kid.',
+             'it plays the same five notes it always played.'], 'narr');
+    } else {
+      c.say(['the same five notes it always played.',
+             'you never did learn the song.'], 'narr');
+    }
+    jingle();
+  }
+  function boardPeek(c) {
+    if (!NEU.save.flagged('nook_board')) {
+      NEU.save.flag('nook_board', 1);
+      c.say(['one floorboard is loose.',
+             'under it: nothing but dust, and a smell of rain on hot pavement.'], 'narr');
+    } else {
+      c.say(['the loose board again. still nothing under it.',
+             'it was never about what was under it.'], 'narr');
+    }
+  }
+
+  E.register('e7_nook', {
+    tileset: 'home',
+    tiles: hallGrid(12, [8, 2]),
+    spawns: { door: { x: 6, y: 5, face: 'up' }, default: { x: 6, y: 5, face: 'up' } },
+    entities: [
+      { t: 'cityfloor', v: 'e7_nook', x: 0, y: 0 },
+      P('moon', 6, 1), P('sconce', 3, 1), P('sconce', 9, 1),
+      P('musicbox', 8, 2, { run: function (c) { windBox(c); } }),
+      P('none', 3, 5, { run: function (c) { boardPeek(c); } }),
+      { t: 'exit', x: 6, y: 6, to: 'e2_hall', spawn: 'nook', style: 'door' }
+    ],
+    onEnter: function (c) {
+      if (c.flagged('nook_seen')) return;
+      c.flag('nook_seen', 1);
+      say(c, ['a room you outgrew.',
+              'it kept your things anyway.']);
+    }
+  });
+
+  /* The two doors that never open. They are real rooms — the engine
+     draws them shut, the bump gives them a line — but no flag in the
+     game ever satisfies their locks. */
+  E.register('e8_larder', {
+    tileset: 'home',
+    tiles: hallGrid(10, [4, 2]),
+    spawns: { door: { x: 5, y: 4, face: 'up' }, default: { x: 5, y: 4, face: 'up' } },
+    entities: [
+      { t: 'cityfloor', v: 'e8_larder', x: 0, y: 0 },
+      { t: 'exit', x: 5, y: 6, to: 'e1_hall', spawn: 'north', style: 'door' }
+    ]
+  });
+  E.register('e9_cellar', {
+    tileset: 'home',
+    tiles: hallGrid(10, [4, 2]),
+    spawns: { door: { x: 5, y: 4, face: 'up' }, default: { x: 5, y: 4, face: 'up' } },
+    entities: [
+      { t: 'cityfloor', v: 'e9_cellar', x: 0, y: 0 },
+      { t: 'exit', x: 5, y: 6, to: 'e3_hall', spawn: 'north', style: 'door' }
+    ]
+  });
 
   function homeIn(c) {
     if (c.flagged('home_seen')) return;
@@ -438,25 +657,29 @@
   E.register('e4_corridor', {
     tileset: 'home',
     tiles: [
-      '########################',
-      '########################',
-      '#o....................o#',
-      '#......................#',
-      '#......................#',
-      '#......................#',
-      '#.....................o#',
-      '########################'
+      '################',
+      '################',
+      '#o............o#',
+      '#..............#',
+      '#..............#',
+      '#..............#',
+      '#.............o#',
+      '################'
     ].join('\n'),
     spawns: { south: { x: 1, y: 4, face: 'right' } },
     entities: [
       { t: 'cityfloor', v: 'e4_corridor', x: 0, y: 0 },
       { t: 'save', x: 3, y: 6 },
-      P('goldlight', 6, 3), P('goldlight', 11, 3), P('goldlight', 15, 3),
-      P('pot', 1, 2), P('pot', 22, 2), P('pot', 22, 6),
-      { t: 'npc', x: 19, y: 4, colour: '#EDE7DE', look: 'sans', run: function (c) { lastTalk(c); } },
+      P('goldlight', 5, 3), P('goldlight', 9, 3), P('goldlight', 13, 3),
+      P('pot', 1, 2), P('pot', 14, 2), P('pot', 14, 6),
+      P('none', 8, 1, { lines: ['a photograph of this hallway.',
+                                'the date on the back is tomorrow.'] }),
+      { t: 'npc', x: 13, y: 4, colour: '#EDE7DE', look: 'sans', run: function (c) { lastTalk(c); } },
       { t: 'exit', x: 0, y: 4, to: 'e3_hall', spawn: 'north', style: 'curtain' }
     ],
     onEnter: function (c) {
+      if (c.flagged('e4_seen')) return;
+      c.flag('e4_seen', 1);
       say(c, ['golden light from nowhere in particular.',
               'somebody is standing at the far end, not blocking it.']);
     }
@@ -485,13 +708,18 @@
          page — an object two acts old gains a new verb. */
       c.flag('tv_breakable', 1);
       if (NEU.quest) NEU.quest.mark('a4_told');
-      setTimeout(function () {
+      c.later(function () {
+        if (NEU.engine && NEU.engine.room !== 'e4_corridor') return;
         c.say(['the corridor lets you out. you are back on the page.'], 'narr');
-        setTimeout(function () { c.leave(); }, 1800);
+        c.later(function () {
+          if (NEU.engine && NEU.engine.room !== 'e4_corridor') return;
+          c.leave();
+        }, 1800);
       }, 2600);
     }
   }
 
-  NEU.act4RoomsD = ['d1_street','d2_alley','d3_square',
-                    'e1_hall','e2_hall','e3_hall','e4_corridor'];
+  NEU.act4RoomsD = ['d_city',
+                    'e1_hall','e2_hall','e3_hall','e4_corridor',
+                    'e7_nook','e8_larder','e9_cellar'];
 })();

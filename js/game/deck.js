@@ -135,7 +135,7 @@
        run bounded when reached through the chain — same modules, a
        flag. A console library whose games stop after twenty seconds
        is not a library, and there would be no reason to come back. */
-    { id: 'twenty', title: 'twenty seconds',
+    { id: 'twenty', title: 'thirty seconds',
       meta: 'survival · endless',
       a: '#B892FF', b: '#2A1E44', ink: '#F0E6FF', hi: '#FF6B8A',
       run: function () { return NEU.bullet && NEU.bullet.open({ endless: true }); } },
@@ -308,6 +308,10 @@
   /* ── open / close ───────────────────────────────────────────────*/
   function open() {
     if (open_) return;
+    if (NEU.save && NEU.save.flagged('tv_fixed') && !NEU.save.flagged('tv_restored')) {
+      if (NEU.talk) NEU.talk(['the television has nothing new for you yet.'], 'tv');
+      return false;
+    }
     open_ = true;
     if (NEU.kernel) NEU.kernel.push('deck');
     wrap.hidden = false;

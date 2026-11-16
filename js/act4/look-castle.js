@@ -327,6 +327,28 @@
           if (fy < 3 * T) break;
           g2.globalAlpha = 0.5; R2(fx + 18 - s * 2, fy, 2, 3, '#1A1622'); g2.globalAlpha = 1;
         }
+        /* the runner flares to five carpets below the dais steps: repaint
+           the whole band so the '_' borders don't stripe it */
+        for (var wx = 9; wx <= 13; wx++) for (var wy = 5; wy <= 12; wy++) {
+          if (c.at(wx, wy) === '#') continue;
+          var X = wx * T, Y = wy * T;
+          R2(X, Y, T, T, C.k0);
+          if (((wx + wy) & 1) === 0) { R2(X + 6, Y + 5, 4, 6, C.k1); R2(X + 5, Y + 7, 6, 2, C.k1); R2(X + 7, Y + 7, 2, 2, C.goldHi); }
+          else { R2(X + 7, Y + 2, 2, 2, C.kD); R2(X + 7, Y + 12, 2, 2, C.kD); }
+          if (wx === 9) { R2(X, Y, 2, T, C.gold); R2(X + 2, Y, 1, T, C.kD); R2(X, Y + ((wy & 1) * 8) + 3, 2, 2, C.goldHi); }
+          if (wx === 13) { R2(X + T - 2, Y, 2, T, C.gold); R2(X + T - 3, Y, 1, T, C.kD); }
+          if (wy === 12) { R2(X, Y + T - 2, T, 2, C.gold); for (var fi = 1; fi < 16; fi += 3) R2(X + fi, Y + T, 1, 2, C.gold); }
+        }
+        /* the lock's mark: a faint sigil inlaid in the floor before the
+           east door — the thing her bolt breaks (FX.b1_throne wakes it) */
+        var sgx = 19 * T + 8, sgy = 7 * T + 10;
+        ringPaint(R2, sgx, sgy, 30, 17, '#332A4E');
+        ringPaint(R2, sgx, sgy, 22, 12, '#2A2040');
+        for (var a = 0; a < 8; a++) {
+          var ang = a / 8 * Math.PI * 2;
+          for (var rr = 10; rr <= 20; rr += 3)
+            R2(Math.round(sgx + Math.cos(ang) * rr * 1.7), Math.round(sgy + Math.sin(ang) * rr), 2, 2, '#3A2E55');
+        }
         cobweb(R2, g2, 1 * T, 2 * T, false); cobweb(R2, g2, 22 * T, 2 * T, true);
       } });
     },
@@ -401,9 +423,14 @@
         }
         snow(R2, g2, 2 * T + 2, 2 * T + 6, 14, 6); snow(R2, g2, 18 * T + 6, 2 * T + 6, 12, 5);
         snow(R2, g2, 2 * T, 10 * T + 10, 12, 5); snow(R2, g2, 18 * T + 8, 10 * T + 10, 13, 5);
-        /* plate rings: where the slides must die */
-        var pl = [[13, 3], [13, 8], [5, 8]];
-        for (var i = 0; i < pl.length; i++) ringPaint(R2, pl[i][0] * T + 8, pl[i][1] * T + 9, 10, 6, '#E8F8FF');
+        /* the pool's rim: a pale edge where the ice meets the flagstones */
+        for (var ry = 3; ry <= 8; ry++) for (var rx = 3; rx <= 16; rx++) {
+          if (c.at(rx, ry) !== 'i') continue;
+          if (c.at(rx, ry - 1) !== 'i') R2(rx * T, ry * T, T, 1, '#B8E0F4');
+          if (c.at(rx, ry + 1) !== 'i') R2(rx * T, ry * T + T - 1, T, 1, '#B8E0F4');
+          if (c.at(rx - 1, ry) !== 'i') R2(rx * T, ry * T, 1, T, '#B8E0F4');
+          if (c.at(rx + 1, ry) !== 'i') R2(rx * T + T - 1, ry * T, 1, T, '#B8E0F4');
+        }
       } });
     },
     b5_two: function (R, g, room, c) {
@@ -479,6 +506,21 @@
         }
         /* the crack the mushroom grows out of */
         R2(19 * T + 2, 10 * T + 12, 8, 1, '#0C0A12'); R2(19 * T + 9, 10 * T + 13, 5, 1, '#0C0A12'); R2(19 * T + 4, 10 * T + 13, 3, 1, '#26342E');
+        /* the trapdoor seal in the north ash: a round stone-and-iron
+           disc 44 px across, ash worked into its grooves, four bars.
+           Painted from the castle palette until IMG-04 arrives. */
+        var tx = 11 * T + 8, ty = 3 * T + 8;
+        ringPaint(R2, tx, ty, 22, 22, '#6A6470');
+        ringPaint(R2, tx, ty, 19, 19, '#2E2838');
+        ringPaint(R2, tx, ty, 15, 15, '#4A4450');
+        for (var q = 0; q < 4; q++) {
+          var qx = tx + (q < 2 ? -1 : 1) * 13, qy = ty + (q % 2 ? -1 : 1) * 13;
+          R2(qx - 2, qy - 2, 4, 4, '#1A1620'); R2(qx - 1, qy - 1, 2, 2, '#8A8278');
+        }
+        for (var ai = 0; ai < 18; ai++) {
+          var aa = ai / 18 * Math.PI * 2;
+          R2(Math.round(tx + Math.cos(aa) * 20), Math.round(ty + Math.sin(aa) * 20), 1, 1, '#9A9488');
+        }
       } });
     }
   };
@@ -505,15 +547,50 @@
       }
     },
     b4_ice: function (g, o, S, d, c) {
-      var w = c.ice;
-      if (!w || still()) return;
-      var t = d.now / 1000;
-      for (var i = 0; i < w.length; i += 2) {
-        var x = w[i], y = w[i + 1], ph = (t * 0.45 + (x + y) * 0.13) % 1.4;
-        if (ph > 1) continue;
-        W(g, o, S, x * T + ((ph * 16) | 0), y * T + 2, 1, 12, '#F4FCFF');
-        W(g, o, S, x * T + ((ph * 16) | 0) + 2, y * T + 4, 1, 8, '#C8E8FA');
+      var room = roomOf(d), m = null, ch = null;
+      if (room && room.mouseAt) { m = room.mouseAt(); ch = room.cheeseAt(); }
+      var w = c.ice, t = d.now / 1000, i;
+      /* the glints that crawl across the ice */
+      if (w && !still()) {
+        for (i = 0; i < w.length; i += 2) {
+          var x = w[i], y = w[i + 1], ph = (t * 0.45 + (x + y) * 0.13) % 1.4;
+          if (ph > 1) continue;
+          W(g, o, S, x * T + ((ph * 16) | 0), y * T + 2, 1, 12, '#F4FCFF');
+          W(g, o, S, x * T + ((ph * 16) | 0) + 2, y * T + 4, 1, 8, '#C8E8FA');
+        }
       }
+      if (room && room.cracks) for (var key in room.cracks) if (Object.prototype.hasOwnProperty.call(room.cracks, key)) {
+        var cell = key.split(','), xx = Number(cell[0]) * T, yy = Number(cell[1]) * T;
+        W(g, o, S, xx + 7, yy + 1, 2, 6, '#30283A');
+        W(g, o, S, xx + 5, yy + 6, 2, 4, '#30283A');
+        W(g, o, S, xx + 7, yy + 9, 2, 6, '#30283A');
+      }
+      if (!m || !ch) return;
+      /* the cheese: a wedge under the ice, seen through it */
+      var cx = ch.x * T + 8, cy = ch.y * T + 9;
+      g.globalAlpha = 0.85;
+      W(g, o, S, cx - 4, cy - 2, 8, 5, '#F0CC72');
+      W(g, o, S, cx - 2, cy - 3, 5, 2, '#FCE8A0');
+      W(g, o, S, cx - 2, cy, 1, 1, '#C8A04A');
+      W(g, o, S, cx + 1, cy + 1, 1, 1, '#C8A04A');
+      g.globalAlpha = 1;
+      /* the mouse: a dark shape under the ice, tail, body, head, ear.
+         A thin pane of ice is laid over it so it reads as submerged,
+         but it stays dark enough to track. */
+      var mx = m.x * T + 8, my = m.y * T + 9;
+      var bob = still() ? 0 : (Math.sin(t * 5) > 0 ? 1 : 0);
+      g.globalAlpha = 0.9;
+      W(g, o, S, mx - 8, my + 1 + bob, 4, 1, '#30283A');
+      W(g, o, S, mx - 8, my - 1 + bob, 1, 2, '#30283A');
+      W(g, o, S, mx - 5, my - 3 + bob, 9, 6, '#30283A');
+      W(g, o, S, mx - 3, my - 4 + bob, 5, 1, '#30283A');
+      W(g, o, S, mx + 3, my - 4 + bob, 4, 5, '#30283A');
+      W(g, o, S, mx + 2, my - 7 + bob, 3, 3, '#30283A');
+      W(g, o, S, mx + 3, my - 6 + bob, 1, 1, '#E1A9B6');
+      W(g, o, S, mx + 5, my - 3 + bob, 1, 1, '#F4EDF2');
+      g.globalAlpha = 0.18;
+      W(g, o, S, mx - 6, my - 7 + bob, 13, 11, '#82B4D4');    /* the ice over it */
+      g.globalAlpha = 1;
     },
     b5_two: function (g, o, S, d, c) {
       /* the mirror's gaze: a dotted beam to the plate it holds, and on
@@ -531,7 +608,60 @@
       W(g, o, S, tx - 10, ty - 1, 20, 3, '#9FB8D8');
       g.globalAlpha = 1;
     },
+    b6_dark: function (g, o, S, d, c) {
+      /* Painted eyes live at the six pocket mouths. They are ink on the
+         wall, so they only read inside the carried torch radius; two of
+         them stay shut until the torch has been carried past them. */
+      var room = roomOf(d), eyes = room && room.eyes;
+      if (!eyes || !eyes.length) return;
+      var solved = flagged('solved:b6_dark');
+      var lt = room.light && d.api ? room.light(d.api) : null;
+      if (!lt && !solved) return;
+      var px = lt ? (lt.x + 0.5) * T : 0, py = lt ? (lt.y + 0.5) * T : 0;
+      var rad = solved ? 100000 : ((room.dark && room.dark(d.api)) || 72) * 0.7 + 12;
+      for (var i = 0; i < eyes.length; i++) {
+        var e = eyes[i];
+        if (e.shut && !solved && (!lt || lt.x <= e.x)) continue;
+        var ex = e.x * T + 8, ey = e.y * T + 8;
+        if (!solved && (Math.abs(ex - px) > rad || Math.abs(ey - py) > rad)) continue;
+        var ox = e.dir === 'west' ? -2 : e.dir === 'east' ? 2 : 0;
+        var oy = e.dir === 'north' ? -2 : e.dir === 'south' ? 2 : 0;
+        W(g, o, S, ex - 4, ey - 2, 9, 5, '#7A6A4A');
+        W(g, o, S, ex - 3, ey - 1, 7, 3, '#E8DCC8');
+        W(g, o, S, ex - 1 + ox, ey - 1 + oy, 3, 3, '#1A1420');
+        if (!still()) W(g, o, S, ex + ox, ey - 1 + oy, 1, 1, '#FFFFFF');
+      }
+    },
     b7_altar: function (g, o, S, d, c) {
+      var room = roomOf(d), st = room && room.trapState ? room.trapState() : null;
+      var tx = 11 * T + 8, ty = 3 * T + 8, k;
+      if (st) {
+        /* four locking bars, drawn retracting over 900-1300 ms */
+        for (k = 0; k < 4; k++) {
+          var bx = tx + (k < 2 ? -1 : 1) * (10 - st.bars * 4);
+          var by = ty + (k % 2 ? -1 : 1) * 13;
+          if (st.bars < 1) W(g, o, S, bx - 1, by - 1, 3, 3, '#3A3440');
+        }
+        /* the orange seam flickers at 0.5 Hz while the seal is shut */
+        var flick = still() ? 0.5 : 0.5 + 0.5 * Math.sin(d.now / 1000 * Math.PI);
+        if (!st.halves) W(g, o, S, tx - 1, ty - 18, 2, 36, flick > 0.6 ? '#FF8A3A' : '#8A2A10');
+        /* the two halves slide 14 px apart in four steps: black, orange light */
+        if (st.halves > 0) {
+          var off = st.halves * 3.5;
+          W(g, o, S, tx - 18 - off, ty - 9, 16, 18, '#08060C');
+          W(g, o, S, tx + 2 + off, ty - 9, 16, 18, '#08060C');
+          W(g, o, S, tx - 4 - off, ty - 8, 3, 16, flick > 0.5 ? '#FF8A3A' : '#8A2A10');
+          W(g, o, S, tx + 1 + off, ty - 8, 3, 16, flick > 0.5 ? '#FFB347' : '#8A2A10');
+        }
+        /* twelve embers rise 200-1200, then dust with the halves 1300-2300 */
+        var rise = st.embers > 0 ? st.embers : st.dust;
+        if (st.kick && !still()) W(g, o, S, tx - 20, ty - 11, 40, 1, '#FFB347');
+        if (rise > 0) for (k = 0; k < 12; k++) {
+          var ex = tx + ((hash(k, 1, 71) * 40) | 0) - 20;
+          var ey = ty + 12 - ((rise * (18 + ((hash(k, 2, 72) * 14) | 0))) | 0);
+          W(g, o, S, ex, ey, 1, 1, k & 1 ? '#FF8A3A' : '#E8C47A');
+        }
+      }
       /* once the ashes are in, the circle smoulders */
       if (!flagged('firedoor') || still()) return;
       var cx = 11 * T + 8, cy = 7 * T + 2, now = d.now;
@@ -733,8 +863,123 @@
     }
     return out;
   }
+  /* the padlock the bolt breaks, painted in world px (the engine's door
+     art skips its own padlock while the cast runs: d.padlockOff) */
+  var PAD_ROWS = ['.sss.', 's...s', 's...s', 'kkkkk', 'kGGGk', 'kGkGk', 'kgggk', 'kkkkk'];
+  var PAD_COL = { s: '#7A7A8A', k: '#1A1410', G: '#8A7A4A', g: '#5E5440' };
+  function padlockWorld(g, O, S, x, y, cracked) {
+    for (var r = 0; r < PAD_ROWS.length; r++) for (var k = 0; k < 5; k++) {
+      var ch = PAD_ROWS[r].charAt(k);
+      if (ch !== '.') W(g, O, S, x + k, Math.round(y) + r, 1, 1, PAD_COL[ch]);
+    }
+    if (cracked) { W(g, O, S, x + 2, Math.round(y) + 4, 1, 1, '#1A1410'); W(g, O, S, x + 3, Math.round(y) + 5, 1, 1, '#1A1410'); }
+  }
   /* live things that sit ABOVE the shade */
   var FX = {
+    /* b1_throne: dust motes adrift in the moonlight, and the spell
+       Calamitas casts at the east door. World coords in, screen out via
+       W(g, O, S, …); the room hands us castFx() while a cast runs. */
+    b1_throne: function (g, e, d) {
+      var room = roomOf(d);
+      if (!room || !room.grid) return;
+      var S = d.S, now = d.now;
+      var O = { x: d.sx - (e.x + 0.5) * T * S, y: d.sy - (e.y + 1) * T * S };
+      /* motes drifting down the three shafts */
+      if (!still()) {
+        var SX = [4, 18, 11], SL = [90, 90, 110], SS = [0.32, -0.32, 0];
+        for (var i = 0; i < 15; i++) {
+          var k = i % 3, len = SL[k];
+          var yy = ((now / 14 + i * 53) % (len + 60)) - 30;
+          var xx = SX[k] * T + 8 + yy * SS[k] + Math.sin(now / 1100 + i * 2.2) * 2.5;
+          var fade = 1 - yy / (len + 60);
+          if (fade <= 0) continue;
+          g.globalAlpha = 0.26 * fade;
+          W(g, O, S, xx, T + 8 + yy, 1, 1, i % 4 ? '#C8D8FF' : '#FFFFFF');
+        }
+        g.globalAlpha = 1;
+      }
+      var fx = room.castFx && room.castFx();
+      if (!fx) return;
+      /* the lock's sigil: four rings, each lit 175 ms after the last from 300 ms */
+      var sgx = 19 * T + 8, sgy = 7 * T + 10;
+      for (var rg = 0; rg < 4; rg++) {
+        var lit = fx.t >= 300 + rg * 175, n = 16 + rg * 4, rx = 8 + rg * 6, ry = 5 + rg * 3.5;
+        g.globalAlpha = lit ? (fx.t >= 1700 ? 0.55 : 0.4) : 0.08;
+        for (var b = 0; b < n; b++) {
+          var ba = b / n * Math.PI * 2;
+          W(g, O, S, Math.round(sgx + Math.cos(ba) * rx), Math.round(sgy + Math.sin(ba) * ry), 1, 1,
+            b % 3 ? '#7A5AE0' : '#C9A0FF');
+        }
+      }
+      g.globalAlpha = 1;
+      /* witch's hands → the door */
+      var x0 = 9 * T + 8, y0 = 3 * T - 2, x1 = 22 * T - 4, y1 = 8 * T + 8;
+      if (fx.phase === 'wind') {
+        /* motes drawn up into her hands */
+        for (var m = 0; m < 6; m++) {
+          var my = y0 - ((now / 12 + m * 9) % 26);
+          var mx = x0 + Math.sin(now / 300 + m) * 4;
+          g.globalAlpha = still() ? 0.5 : 0.35 + 0.3 * Math.sin(now / 120 + m);
+          W(g, O, S, mx, my, 1, 1, '#C9A0FF');
+        }
+        g.globalAlpha = 1;
+      } else if (fx.phase === 'fly') {
+        var p = Math.min(1, (fx.t - 1000) / 700);
+        var e2 = p * p * (3 - 2 * p);
+        for (var tr = 1; tr <= 4; tr++) {
+          var tp = Math.max(0, e2 - tr * 0.06);
+          g.globalAlpha = 0.3 / tr;
+          W(g, O, S, x0 + (x1 - x0) * tp, y0 + (y1 - y0) * tp - Math.sin(tp * Math.PI) * 22, 2, 2, '#8A5AE0');
+        }
+        var bx = x0 + (x1 - x0) * e2, by = y0 + (y1 - y0) * e2 - Math.sin(p * Math.PI) * 22;
+        g.globalAlpha = 1;
+        W(g, O, S, bx - 4, by - 4, 8, 8, '#6A2A9E');
+        W(g, O, S, bx - 2, by - 2, 5, 5, '#C9A0FF');
+        W(g, O, S, bx - 1, by - 1, 2, 2, '#FFFFFF');
+      } else if (fx.phase === 'hit') {
+        var hp = Math.min(1, (fx.t - 1700) / 700);
+        for (var r2 = 0; r2 < 3; r2++) {
+          var rr = 4 + hp * 26 + r2 * 6;
+          g.globalAlpha = (1 - hp) * 0.5 / (r2 + 1);
+          for (var a2 = 0; a2 < 16; a2++) {
+            var ang = a2 / 16 * Math.PI * 2;
+            W(g, O, S, Math.round(x1 + Math.cos(ang) * rr), Math.round(y1 - 6 + Math.sin(ang) * rr * 0.6), 1, 1,
+              r2 ? '#8A5AE0' : '#EDE7FF');
+          }
+        }
+        g.globalAlpha = (1 - hp) * 0.6;
+        W(g, O, S, x1 - 5, y1 - 5, 10, 10, '#FFFFFF');
+        g.globalAlpha = 1;
+      }
+      /* the door's own beats: the flash, light through the seams, the
+         padlock cracking then dropping, and dust from the lintel */
+      var DX = 22 * T + 8, DY = 9 * T;
+      if (fx.t >= 1700 && fx.t < 1780) {
+        g.globalAlpha = 0.25; W(g, O, S, 0, 0, room.w * T, room.h * T, '#FFFFFF'); g.globalAlpha = 1;
+      }
+      if (fx.t >= 1700 && fx.t < 2100) {
+        g.globalAlpha = 0.85 * Math.min(1, (fx.t - 1700) / 200);
+        W(g, O, S, DX - 3, DY - 20, 1, 18, '#FFE7A0');
+        W(g, O, S, DX, DY - 20, 1, 18, '#FFE7A0');
+        W(g, O, S, DX + 3, DY - 20, 1, 18, '#FFE7A0');
+        g.globalAlpha = 1;
+      }
+      if (fx.t >= 1700 && fx.t < 2300) {
+        var fall = fx.t > 2100 ? Math.pow((fx.t - 2100) / 200, 2) * 22 : 0;
+        g.globalAlpha = fx.t > 2100 ? Math.max(0, 1 - (fx.t - 2100) / 200) : 1;
+        padlockWorld(g, O, S, DX - 2, DY - 15 + fall, fx.t < 2100);
+        g.globalAlpha = 1;
+      }
+      if (fx.t >= 2100 && fx.t < 2500) {
+        for (var dm = 0; dm < 6; dm++) {
+          var dp = (fx.t - 2100 - dm * 60) / 400;
+          if (dp < 0 || dp > 1) continue;
+          g.globalAlpha = 0.6 * (1 - dp);
+          W(g, O, S, DX - 5 + dm * 2, DY - 22 + dp * 24, 1, 1, '#E8E0FF');
+        }
+        g.globalAlpha = 1;
+      }
+    },
     b5_two: function (g, e, d) {
       /* stand where the mirror looks, and your reflection holds the other plate */
       var room = roomOf(d), f = room && room.mirrorFace ? room.mirrorFace() : 0;
@@ -820,6 +1065,34 @@
         R(-9, -6, 2, 6, '#1E121E'); R(7, -6, 2, 6, '#1E121E');
         gg.globalAlpha = 0.5; R(-9, -31, 18, 1, '#8A8290'); R(-8, -14, 16, 1, '#8A8290'); gg.globalAlpha = 1;   /* dust */
       }), d);
+    }
+  };
+  /* the witch while she casts the door open: her own sprite, hands
+     raised, a gathering orb between them, and a violet spill of light */
+  skins.witchcast = {
+    width: function () { var L = Lk(); return L ? L.propWidth('witch') : 9; },
+    draw: function (g, e, d) {
+      var room = roomOf(d), fx = room && room.castFx ? room.castFx() : null;
+      var casting = !!(fx && fx.t < 2500), t = fx ? fx.t : 0;
+      /* 0-300 ms she turns east: a mirror, the nearest a front-on sprite gets */
+      Lk().drawProp(g, 'witch', e.colour, d.sx, d.sy, d.S, d.now, e.x * 7 + e.y, t >= 150);
+      if (!casting) return;
+      var S = d.S;
+      /* 300-1000 ms the hands rise 4 px, eased */
+      var rp = Math.min(1, Math.max(0, (t - 300) / 700)), rise = Math.round(4 * S * rp * rp * (3 - 2 * rp));
+      g.fillStyle = e.colour || '#C2405F';
+      g.fillRect(d.sx - 7 * S, d.sy - 14 * S - rise, 2 * S, 3 * S);
+      g.fillRect(d.sx + 5 * S, d.sy - 14 * S - rise, 2 * S, 3 * S);
+      var r = (3 + (Math.min(t, 700) / 700) * 3) * S, cx = d.sx, cy = d.sy - 17 * S;
+      var pulse = still() ? 0.7 : 0.55 + 0.45 * Math.sin(t / 80);
+      g.globalAlpha = pulse * 0.5; g.fillStyle = '#6A2A9E'; g.fillRect(Math.round(cx - r), Math.round(cy - r), Math.round(r * 2), Math.round(r * 2));
+      g.globalAlpha = pulse; g.fillStyle = '#B46AE0'; g.fillRect(Math.round(cx - r * 0.6), Math.round(cy - r * 0.6), Math.round(r * 1.2), Math.round(r * 1.2));
+      g.fillStyle = '#F0DCFF'; g.fillRect(cx - S, cy - S, 2 * S, 2 * S);
+      g.globalAlpha = 1;
+    },
+    light: function (e, d) {
+      var room = d && roomOf(d), fx = room && room.castFx ? room.castFx() : null;
+      return (fx && fx.t < 2500) ? { r: 46, col: '#B46AE0', glow: 0.3, flicker: true } : null;
     }
   };
   /* the riddle, read where it is carved: the engine npc sits on the wall
@@ -980,7 +1253,9 @@
   skins.cresset = {
     width: 0,
     draw: function (g, e, d) {
-      var lit = d.api && d.api.solved && d.api.solved(roomOf(d).id);
+      /* A seated torch burns even in a wrong socket; the room solves only
+         when the one socket every open eye can see holds it. */
+      var lit = !!e.seated || !!(e.correct && d.api && d.api.solved && d.api.solved(roomOf(d).id));
       blit(g, sprite('cresset', 26, 36, 13, 33, function (R, gg) {
         shadowOval(R, gg, 0, 0, 9, 2, 0.5);
         R(-6, -4, 12, 4, '#2A2232'); R(-6, -4, 12, 1, '#4A4058');

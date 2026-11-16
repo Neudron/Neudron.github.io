@@ -338,6 +338,7 @@
     }
     g[HUT.wall1 - 1][HUT.x0] = ' '; g[HUT.wall1][HUT.x0] = ' ';   /* the door */
     ents.push({ t: 'bed', x: 18, y: HUT.wall1 });
+    ents.push({ t: 'tdoor', x: 31, y: HUT.wall1 });   /* W20: the door to the tutorial room t0 */
     decor.push({ k: 'L', x: 26, y: HUT.wall0, f: 'B' });
     /* d0 holds the three lift heads, in order, for the lifts of d3, d6 and d9 */
     n = 0;
@@ -414,8 +415,20 @@
   kd('bossdoor', { touch: function (e, input, melee) {
     if (!melee || e.dead || P.replaying()) return;
     if (NEU.save && NEU.save.has && NEU.save.has('boss_key')) {
+      var snap = null, cv, g;
+      /* D3: keep the kept contract instant (bossOpen / close / polt.open), but take a
+         mode-bridge snapshot first so the opening can play over the incoming fight. */
+      try { snap = NEU.kernel && NEU.kernel.bridge && NEU.kernel.bridge(); } catch (sErr) { snap = null; }
+      if (!snap) {
+        cv = document.getElementById('platCanvas');
+        if (cv && cv.getContext) {
+          snap = document.createElement('canvas'); snap.width = cv.width || 640; snap.height = cv.height || 360;
+          g = snap.getContext('2d'); if (g && g.drawImage) g.drawImage(cv, 0, 0);
+        }
+      }
       e.dead = true; NEU.dungeon.bossOpen = true; P.close();
       if (NEU.polt && NEU.polt.open) NEU.polt.open();
+      playDoorOpening(snap, e);
     } else { NEU.dungeon.bossOpen = false; NEU.dungeon.bossLine = '* a bone lock. it wants a key.'; talk([NEU.dungeon.bossLine]); }
   } });
   kd('painting', { touch: function (e, input, melee) {
@@ -477,9 +490,190 @@
     return origReplay('dgn', rec, { spawn: zones[n].spawn, zone: id, goal: n < 10 ? 'd' + (n + 1) : 'door' });
   };
 
+  /* t0, the tutorial room (W20): 60x20 tiles behind the hut door (tdoor), no enemies, six stations left to right.
+     Each station is a sign plus an obstacle that needs exactly one verb: jump, dash, melee twice, charged melee,
+     a soul shot across a pit, a spell on a barrier (TP from the crystal), melee to open the chest. The door back
+     (tleave) is always open. Death respawns at the last station checkpoint (tcp). Per-open state lives on the level. */
+  var TW = 60, TH = 20, TPIT = [[11, 12], [18, 23], [39, 47]];
+  /* D2r supersedes the original station notes: seven listed stations, C opens existing equipment;
+     a six-tile dash corridor has a 32px clearance, so jump-only fails without changing player physics. */
+  function tpit(x) { var i; for (i = 0; i < TPIT.length; i++) if (x >= TPIT[i][0] && x <= TPIT[i][1]) return true; return false; }
+  function tRows() {
+    var g = [], x, y, s;
+    for (y = 0; y < TH; y++) {
+      s = '';
+      for (x = 0; x < TW; x++) s += (y === 0 || x === TW - 1 || (x === 0 && y !== 15) || (y <= 13 && x >= 13 && x <= 27)) ? '#' : y === 15 && x === 9 ? '^' : y < 16 ? '.' : tpit(x) ? ' ' : '#';
+      g.push(s);
+    }
+    return g;
+  }
+  function kn(def) { return String(NEU.keys && NEU.keys.get ? NEU.keys.get(def) : def).toUpperCase(); }
+  var TSIGN = {
+    jump: function () { return '* ' + kn(' ') + ' jumps the gap.'; },
+    dash: function () { return '* ' + kn('x') + ' dashes the wide gap. the low ceiling blocks a jump.'; },
+    crate: function () { return '* ' + kn('z') + ' twice breaks a crate. the wall is two crates high.'; },
+    armour: function () { return '* hold ' + kn('z') + ' for a full swing. it breaks armour.'; },
+    shot: function () { return '* hold ' + kn('z') + ', then let go: a soul shot. hit the far target.'; },
+    spell: function () { return '* the crystal gives TP. ' + kn('c') + ' opens the strip. ' + kn('ArrowDown') + ' picks SPELL I, ' + kn('z') + ' casts it.'; },
+    chest: function () { return '* ' + kn('c') + ' opens the chest and equipment. choose EQUIP to practise.'; }
+  };
+  /* pit widths are measured (tests/fixes561.mjs): jump alone clears 8 tiles at best and never 9; a ground dash
+     clears up to 6; a dash in the air clears 9. So the wide gap is 9 wide and the shot pit 9 wide too. */
+  /* checkpoints sit two tiles past each pit: a fall touches none of them, only the landing does */
+  var TENTS = [
+    { t: 'tleave', x: 0, y: 15 }, { t: 'sign', x: 5, y: 15, key: 'jump' },
+    { t: 'tcp', x: 14, y: 15 }, { t: 'sign', x: 14, y: 15, key: 'dash' },
+    { t: 'tcp', x: 28, y: 15 }, { t: 'sign', x: 28, y: 15, key: 'crate' },
+    { t: 'tcrate', x: 30, y: 15, solid: true, hp: 2 }, { t: 'tcrate', x: 30, y: 14, solid: true, hp: 2 },
+    { t: 'tcp', x: 32, y: 15 }, { t: 'sign', x: 32, y: 15, key: 'armour' }, { t: 'tarm', x: 34, y: 15, solid: true },
+    { t: 'tcp', x: 36, y: 15 }, { t: 'sign', x: 36, y: 15, key: 'shot' },
+    { t: 'tbridge', x: 39, y: 16, solid: true }, { t: 'tbridge', x: 40, y: 16, solid: true }, { t: 'tbridge', x: 41, y: 16, solid: true },
+    { t: 'tbridge', x: 42, y: 16, solid: true }, { t: 'tbridge', x: 43, y: 16, solid: true }, { t: 'tbridge', x: 44, y: 16, solid: true },
+    { t: 'tbridge', x: 45, y: 16, solid: true }, { t: 'tbridge', x: 46, y: 16, solid: true }, { t: 'tbridge', x: 47, y: 16, solid: true },
+    { t: 'tcp', x: 49, y: 15 }, { t: 'sign', x: 49, y: 15, key: 'spell' }, { t: 'ttgt', x: 50, y: 13 },
+    { t: 'tcry', x: 51, y: 15 }, { t: 'tbar', x: 53, y: 14, solid: true }, { t: 'tbar', x: 53, y: 15, solid: true },
+    { t: 'sign', x: 54, y: 15, key: 'chest' }, { t: 'tchest', x: 55, y: 15 },
+    { t: 'tgate', x: 57, y: 14, solid: true }, { t: 'tgate', x: 57, y: 15, solid: true }
+  ];
+  function tk() { var L = P.level0(); return L ? L.kit : null; }
+  function tTargets() {
+    var L = P.level0(), out = [], i, e, s = L.ts;
+    for (i = 0; i < L.entities.length; i++) {
+      e = L.entities[i];
+      if ((e.t === 'ttgt' && !s.hit) || (e.t === 'tbar' && !s.bar)) out.push({ x: (e.x + 0.5) * T, y: (e.y + 0.5) * T, r: 8, e: e });
+    }
+    return out;
+  }
+  function tDamage(t, n, kind) {
+    var s = P.level0().ts;
+    if (!t || !t.e || kind === 'melee') return;
+    if (t.e.t === 'ttgt') s.hit = true;
+    else if (t.e.t === 'tbar' && kind === 'spell') s.bar = true;
+  }
+  function tOpen() {
+    var L = P.level0(), F = { x: 0, y: 0, fx: 1, fy: 0 }, i, e;
+    L.ts = { hit: false, bar: false, gate: false }; L.kitF = F;
+    L.kit = NEU.kit ? NEU.kit.create({ F: F, box: { AX: 0, AY: 0, AW: TW * T, AH: TH * T }, noMelee: true, adapter: {
+      targets: tTargets, damage: tDamage, hurtPlayer: function (n) { P.hurt(n); } } }) : null;
+    for (i = 0; i < L.entities.length; i++) { e = L.entities[i]; if (e.t === 'sign') e.lines = [TSIGN[e.key]()]; }
+  }
+  function tTick(dt) {
+    var L = P.level0(), h = P.hero(), f = L.kitF;
+    /* the pits open to a solid floor below the map: feet past the floor line (y 256) means a fall, so wake at the checkpoint */
+    /* D2r correction: pits are open below the map; the actual fall threshold is y 272. */
+    if (h.y > 17 * T) { P.die(); return; }
+    if (!L.kit) return;
+    f.x = h.x; f.y = h.y - P.hh / 2; f.fx = h.face; f.fy = 0;
+    L.kit.hp = h.hp; L.kit.tick(dt);
+  }
+  function tKey(k, down) {
+    var lk = String(k).toLowerCase(), h = P.hero(), kt = tk(), L = P.level0(), i, e;
+    if (!kt) return false;
+    if (down && lk === 'c' && !kt.stripOpen && NEU.inv) {
+      for (i = 0; i < L.entities.length; i++) {
+        e = L.entities[i];
+        if (e.t === 'tchest' && Math.abs(h.x - (e.x + 0.5) * T) <= 22 && Math.abs(h.y - (e.y + 1) * T) < 24) {
+          e.opened = true; L.ts.gate = true; NEU.inv.open(); return true;
+        }
+      }
+    }
+    if (down && kt.stripOpen) { kt.hp = h.hp; kt.keydown(k); h.hp = Math.max(h.hp, kt.hp); return true; }
+    if (down && lk === 'c') { kt.keydown('c'); return true; }
+    if (lk === 'z') { if (down) kt.keydown('z'); else kt.keyup('z'); }
+    return false;
+  }
+  function tLights(list) { var h = P.hero(); list.push(h.x / T, (h.y - 11) / T, 0.8); }
+  function tDraw(c, cx, cy) { var kt = tk(); if (!kt) return; c.save(); c.translate(-cx, -cy); kt.draw(c); c.restore(); }
+  P.level('t0', {
+    rows: tRows(), spawn: { x: 2, y: 15 }, entities: TENTS, tileset: 'dungeon', view: 'terraria', chunked: true, hp: 6, solid: '#',
+    faction: function () { return 'B'; }, zoneAt: function () { return null; }, cracks: {},
+    decor: [{ k: 'w', x: 5, y: 15, f: 'B' }, { k: 'w', x: 16, y: 15, f: 'B' }, { k: 'w', x: 28, y: 15, f: 'B' }, { k: 'w', x: 36, y: 15, f: 'B' }, { k: 'w', x: 49, y: 15, f: 'B' }, { k: 'w', x: 55, y: 15, f: 'B' }],
+    onOpen: tOpen, tick: tTick, key: tKey, draw: tDraw, lights: tLights, swing: function () { return 0; }   /* a hook: plat charges melee only when the level has one */
+  });
+  kd('tdoor', { touch: function (e, input, melee) { if (melee && !P.replaying()) origOpen('t0', {}); } });
+  kd('tleave', { touch: function () { if (!P.replaying()) origOpen('dgn', { spawn: { x: 29, y: HUT.wall1 }, zone: 'd0' }); } });
+  kd('tcp', { touch: function (e) { var L = P.level0(); if (L && (L.spawn.x !== e.x || L.spawn.y !== e.y)) L.spawn = { x: e.x, y: e.y }; } });
+  kd('tcrate', { touch: function (e, input, melee) { if (!melee || e.dead) return; e.hp -= 1; if (e.hp <= 0) e.dead = true; } });
+  kd('tarm', { touch: function (e, input, melee) {
+    if (!melee || e.dead) return;
+    if (P.hero().swingPow === 2) { e.dead = true; return; }
+    if (!e.said && !P.replaying()) { e.said = true; talk(['* the armour holds. hold ' + kn('z') + ' for a full swing.']); }
+  } });
+  kd('tbridge', { tick: function (e) { e.dead = !P.level0().ts.hit; } });
+  kd('tbar', { tick: function (e) { e.dead = !!P.level0().ts.bar; } });
+  kd('tgate', { tick: function (e) { e.dead = !!P.level0().ts.gate; } });
+  kd('tcry', { touch: function (e) { var kt = tk(); if (e.used) return; e.used = true; if (kt && !P.replaying()) kt.addTp(0.6); } });
+  kd('tchest', { touch: function (e, input, melee) {
+    if (melee && !e.opened) talk(['* press ' + kn('c') + ' to open the chest and equipment.']);
+  } });
+
+  /* ── D3: the bone door opening ─────────────────────────────────────────
+     The fight switch stays instant (fixes201/161 keep their contract). What is
+     new is a mode-bridge snapshot of the dungeon laid over the incoming fight:
+     key turn -> two chains drop -> the panels open over 1.2 s, the view pans
+     down the corridor, then a Deltarune-style fight box grows from the doorway
+     (obj_growtangle: growcon 1 animate-in, growth 0..1). */
+  var DOOR_T = { key: [0, 200], chains: [200, 500], open: [500, 1700], pan: [900, 1700], box: [1500, 1900] };
+  var doorFx = { active: false, reduced: false, done: false, snap: null, canvas: null, elapsed: 0, timeline: DOOR_T };
+  function seg(ms, r) { return Math.max(0, Math.min(1, (ms - r[0]) / (r[1] - r[0]))); }
+  function doorProgress(ms) {
+    return { key: seg(ms, DOOR_T.key), chains: seg(ms, DOOR_T.chains), open: seg(ms, DOOR_T.open),
+      pan: seg(ms, DOOR_T.pan), box: seg(ms, DOOR_T.box) };
+  }
+  function finishDoorFx() {
+    doorFx.active = false; doorFx.done = true;
+    var cv = doorFx.canvas;
+    if (cv && cv.parentNode) cv.parentNode.removeChild(cv);
+    doorFx.canvas = null;
+  }
+  function playDoorOpening(snap, e) {
+    doorFx.snap = snap; doorFx.elapsed = 0; doorFx.done = false;
+    doorFx.reduced = !!(P.reduced && P.reduced());
+    doorFx.active = !doorFx.reduced;
+    if (doorFx.reduced) { doorFx.done = true; return; }
+    var cv = document.createElement('canvas');
+    cv.id = 'boneDoorFx';
+    cv.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:79;image-rendering:pixelated;';
+    document.body.appendChild(cv);
+    doorFx.canvas = cv;
+    var g = cv.getContext('2d');
+    var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    function frame(now) {
+      if (!doorFx.active) return;
+      var ms = Math.max(0, Math.min(DOOR_T.box[1], now - t0)), pr = doorProgress(ms);
+      doorFx.elapsed = ms;
+      if (e) e.unlock = pr.open;
+      if (g && NEU.dungeonLook && NEU.dungeonLook.drawOpening) {
+        cv.width = window.innerWidth || 640; cv.height = window.innerHeight || 360;
+        NEU.dungeonLook.drawOpening(g, cv.width, cv.height, snap, pr);
+      }
+      if (ms >= DOOR_T.box[1]) { finishDoorFx(); return; }
+      if (window.requestAnimationFrame) window.requestAnimationFrame(frame);
+      else setTimeout(function () { frame(t0 + ms + 16); }, 16);
+    }
+    if (window.requestAnimationFrame) window.requestAnimationFrame(frame);
+    else setTimeout(function () { frame(t0); }, 16);
+  }
+
   NEU.dungeon = {
     recordings: REC, bossOpen: false, bossLine: '', mageSign: '', sign: '', lastDeath: null,
+    /* B3: a won mage duel hands the dungeon back safely. calmUntil is the
+       foe-stun window; the shared plat hook grants player i-frames. */
+    calmUntil: 0,
+    calm: function (invSec, stunSec) {
+      var fs, i, f, n;
+      if (P.grantInvuln) P.grantInvuln(invSec || 1.5);
+      n = stunSec || 1;
+      NEU.dungeon.calmUntil = Date.now() + n * 1000;
+      fs = NEU.dgnFoes && NEU.dgnFoes.foes;
+      if (fs) for (i = 0; i < fs.length; i++) {
+        f = fs[i];
+        f.vx = 0; f.vy = 0;
+        if (typeof f.cd === 'number') f.cd = Math.max(f.cd, n);
+      }
+    },
     zones: zones, lifts: lifts, zoneAt: zoneAt,
+    doorFx: doorFx, doorProgress: doorProgress, finishDoorFx: finishDoorFx,
     here: function () { return P.running() && P.levelId() === 'dgn' ? here : ''; },
     spawnPx: function (id) { var n = dN(id); return n < 0 ? null : px(zones[n].spawn); },
     savePx: function () { return px(save); },

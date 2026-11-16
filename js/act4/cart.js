@@ -4,6 +4,7 @@
   'use strict';
   var NEU = window.NEU = window.NEU || {};
   var STEP = 1 / 60, RIDE = 4500, MID = 2250, HOLE = 48, HIT = 18, TELE = 30, AIR = 36, RAIL = 27;
+  var GAP_LEAD = 48; /* 0.8 s floor: gaps must be painted before impact at full speed */
   var EV = [], CLEAR, overlay, canvas, ctx;
   var live = false, reduced = false;
   var spk = [], leanX = 0;
@@ -328,9 +329,9 @@
     }
   }
   function drawHole(ev) {
-    var t = frames - (ev.f - 40), u, s, y, h, x0, x1, i;
+    var t = frames - (ev.f - GAP_LEAD), u, s, y, h, x0, x1, i;
     if (t < 0 || frames > ev.f + HIT) return;
-    u = qu(Math.min(1, t / 58));
+    u = qu(Math.min(1, t / (GAP_LEAD + 22)));
     s = 0.12 + 0.88 * u;
     y = Math.round(64 + 176 * u * u * 0.98 + 14 * u);
     h = Math.max(3, Math.round(34 * s));

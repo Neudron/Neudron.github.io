@@ -88,6 +88,10 @@
   overflow-wrap: anywhere;
 }
 .tbox__txt::before { content: '*'; position: absolute; left: 0; top: 0; }
+/* boss victory cine (boss-scal.js): the fight keeps playing behind the
+   box — a translucent ground keeps the scene visible while the white
+   frame and text stay readable over it. Still top of the z-ladder. */
+.tbox.tbox--cine { background: rgba(2, 0, 8, 0.72); }
 /* Sans: a real 23x30 crop at integer scale. */
 .sans__btn img { width: 69px; height: auto; image-rendering: pixelated; }
 @media (max-width: 600px) {
@@ -119,6 +123,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   .sleep__shelf { left: -52px; width: 52px; }
   .sleep__lamp  { left: -4px; }
 }
+@media (max-width: 900px) { .sleep__rug { left: -52px; } }
 
 /* The deck (js/game/deck.js), Deltarune style: the selected game's
    panel is the black two-step box, the selected caption is yellow, and
@@ -182,6 +187,18 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   box-shadow: 10px -12px #EDE7DE, -8px -26px #EDE7DE, 4px -42px #EDE7DE, -12px -56px #EDE7DE, 2px -74px #EDE7DE;
   image-rendering: pixelated; animation: craftSteam 7s steps(8) infinite; }
 @keyframes craftSteam { to { transform: translateX(-50%) translateY(-62px); opacity: 0; } }
+/* A pot rim with rising steam at the TOP of the backdrop. The cauldron's
+   own decor is hidden so it cannot shove the grid off a phone; this one is
+   backdrop-only, behind every control, and purely decorative. */
+.craft__backdrop-rim { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); z-index: -1;
+  width: min(320px, 70vw); height: 16px; border-radius: 50%;
+  background: #5C5C70; box-shadow: 0 4px 0 #22222E; opacity: .5; pointer-events: none; }
+.craft__backdrop-steam { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: -1;
+  width: 160px; height: 48px; opacity: .45; pointer-events: none; }
+.craft__backdrop-steam::after { content: ''; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 100%; height: 100%;
+  box-shadow: 12px -10px #EDE7DE, -10px -22px #EDE7DE, 6px -34px #EDE7DE, -8px -46px #EDE7DE;
+  image-rendering: pixelated; animation: craftRimSteam 5s steps(6) infinite; }
+@keyframes craftRimSteam { from { transform: translateX(-50%) translateY(6px); opacity: .5; } to { transform: translateX(-50%) translateY(-40px); opacity: 0; } }
 
 /* slots: dark stone cells; hover and focus get a lilac 2px outline and a
    small bounce; recipe-needed empty cells ghost a 20% mushroom outline */
@@ -196,6 +213,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .craft__brew::after { animation: none; }
   .craft__steam::after { animation: none; }
+  .craft__backdrop-steam::after { animation: none; }
   .craft__cell:hover { transform: none; transition: none; }
   .craft__cell:focus-visible { transform: none; transition: none; }
 }
@@ -554,53 +572,86 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   }
 }
 
-/* C menu: ITEMS / EQUIP (W2.2). Keep the frame under .tbox at z 76. */
+/* C menu: ITEMS / EQUIP — Deltarune-style gear screen (W21). z 76, under .tbox. */
+.inv[hidden].is-closing { display: block; }
+.inv.is-opening { animation: invOpen .18s steps(4) both; }
+.inv.is-closing { animation: invClose .14s steps(2) both; }
+@keyframes invOpen { from { opacity: 0; scale: .9; } to { opacity: 1; scale: 1; } }
+@keyframes invClose { from { opacity: 1; scale: 1; } to { opacity: 0; scale: .94; } }
 .inv {
   top: 50%; width: min(1152px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
   transform: translate(-50%, -50%); overflow: auto; padding: 16px;
   border: 2px solid #fff; box-shadow: inset 0 0 0 2px #000, inset 0 0 0 4px #fff;
-  font: 400 16px/1.25 var(--font);
+  background: rgba(4, 4, 10, .92); font: 400 16px/1.25 var(--font);
 }
-.inv__top { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; border-bottom: 2px solid #fff; }
-.inv__tabs { display: flex; align-items: stretch; gap: 16px; }
+.inv__top { display: flex; align-items: center; gap: 16px; min-height: 48px; border-bottom: 2px solid #fff; }
+.inv__soul { flex: none; width: 48px; height: 48px; background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100% no-repeat; image-rendering: pixelated; }
+.inv__tabs { display: flex; align-items: stretch; gap: 16px; margin-left: auto; }
 .inv__tab { display: inline-flex; align-items: center; gap: 8px; border: 0; padding: 8px 16px; color: #fff; background: transparent; font: inherit; cursor: pointer; }
 .inv__tab canvas { width: 16px; height: 16px; image-rendering: pixelated; }
 .inv__tab.is-sel { color: #ff0; outline: 2px solid #ff0; outline-offset: -2px; }
+.inv__tab:focus-visible { outline: 2px solid #8bd6ff; outline-offset: -2px; }
 .inv__coins { white-space: nowrap; color: #fff; }
+/* Loadout strip: the four live equipment slots, always on top. */
+.inv__loadout { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; }
+.inv__chip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 8px; border: 2px solid #555; background: #0a0a0f; }
+.inv__chipicon { flex: none; width: 32px; height: 32px; image-rendering: pixelated; }
+.inv__chip b { font-weight: normal; color: #ddd; }
 .inv__body { display: grid; grid-template-columns: 1fr; gap: 16px; padding: 16px 0; }
 /* EQUIP: categories top-left, the item list in the middle, CHAR and STATS
    down the right edge. Stats are never in the centre column. */
-.inv.is-equip .inv__body { grid-template-columns: 232px minmax(0, 1fr) 216px; align-items: stretch; }
+.inv.is-equip .inv__body { grid-template-columns: 240px minmax(0, 1fr) 232px; align-items: stretch; }
 .inv.is-equip .inv__equipped { grid-column: 1; grid-row: 1; }
 .inv.is-equip .inv__inventory { grid-column: 2; grid-row: 1; }
 .inv.is-equip .inv__stats { grid-column: 3; grid-row: 1; }
 .inv.is-equip .inv__list { max-height: 200px; }
 .inv__body section { min-width: 0; border: 2px solid #fff; padding: 8px; }
-.inv__body h2 { margin: 0 0 8px; color: #fff; font: inherit; }
+.inv__body h2 { margin: 0 0 8px; color: #ffce69; font: inherit; }
 .inv__char { text-align: center; }
 .inv__slots { display: grid; gap: 8px; }
-.inv__slot { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 4px 8px; min-height: 48px; }
+.inv__slot { display: flex; align-items: flex-start; gap: 8px; padding: 4px 8px; min-height: 48px; }
 /* Category icons: the 48x16 Deltarune strip (sword, arrow, star) shown at 2x. */
 .inv__sym { flex: none; width: 32px; height: 32px; background: url(../img/act4/deltarune/equip-icons.png) 0 0 / 96px 32px no-repeat; image-rendering: pixelated; }
 .inv__sym.sym-ranged { background-position: -32px 0; }
 .inv__sym.sym-spell { background-position: -64px 0; }
+.inv__slotbody { flex: 1; min-width: 0; display: grid; gap: 4px; }
 .inv__slot b { font-weight: normal; color: #bbb; }
-.inv__spell { flex: 0 0 100%; padding-left: 40px; color: #ddd; }
-.inv__spell.is-focus { color: #ff0; }
-.inv__slot.is-focus { outline: 2px solid #ff0; }
-.inv__slot.is-focus > b { color: #ff0; }
+/* An equipped slot row: sprite, name, kind chip, stat line. */
+.inv__gear { display: flex; align-items: center; gap: 8px; padding: 4px 6px; color: #ddd; }
+.inv__gear.is-focus { color: #ff0; box-shadow: inset 0 0 0 2px #ff0; }
+.inv__gearicon { flex: none; width: 32px; height: 32px; image-rendering: pixelated; }
+.inv__gearname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inv__kind { flex: none; font-style: normal; font-size: 16px; line-height: 1; padding: 2px 4px; border: 1px solid #555; color: #aaa; }
+.inv__kind.k-melee { color: #e9d9a6; border-color: #e9d9a6; }
+.inv__kind.k-ranged { color: #8bd6ff; border-color: #8bd6ff; }
+.inv__kind.k-spell, .inv__kind.k-heal { color: #d49aff; border-color: #d49aff; }
+.inv__kind.k-key, .inv__kind.k-quest { color: #8fe39b; border-color: #8fe39b; }
+.inv__gearstat { flex: none; font-style: normal; color: #888; font-size: 16px; }
+.inv__slot.is-focus { box-shadow: inset 0 0 0 2px #ff0; }
+.inv__slot.is-focus > .inv__slotbody > b { color: #ff0; }
 .inv__hint { margin: 8px 0 0; color: #aaa; }
+.inv__footer { border-top: 2px solid #fff; padding-top: 8px; min-height: 24px; }
+.inv__footer .inv__hint { margin: 0; color: #aaa; font: 400 16px/1.25 var(--font); }
 .inv__statlines { display: grid; gap: 16px; }
+.inv__statname { color: #ffce69; white-space: normal; overflow-wrap: anywhere; }
 .inv__statlines b { font-weight: normal; }
 .inv__statlines .is-up { color: #5f6; }
 .inv__statlines .is-down { color: #f55; }
 .inv__statlines .is-fx { color: #fa4; }
 .inv__inventory { grid-column: 1 / -1; }
 .inv__list { max-height: 240px; overflow: auto; }
-.inv__list li { min-height: 40px; padding: 4px 4px 4px 40px; gap: 8px; }
+.inv__list li { min-height: 40px; padding: 4px 4px 4px 40px; gap: 8px; cursor: pointer; }
+.inv__list li:hover { color: #ff0; }
 .inv__list li.is-sel { box-shadow: inset 0 0 0 2px #ff0; }
 .inv__list li.is-equipped span::after { content: '  EQUIPPED'; color: #aaa; }
 .inv__icon { flex: none; width: 32px; height: 32px; image-rendering: pixelated; }
+.inv__list .inv__kind { margin-left: auto; }
+/* long names ellipsise in the middle column; the full name is in STATS.
+   min-width:0 lets a flex item shrink below its min-content width. */
+.inv__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Confirm FX: the acted-on row/card flashes once. */
+.inv__list li.is-confirm, .inv__slot.is-confirm, .inv__gear.is-confirm { animation: invConfirm .22s steps(2); }
+@keyframes invConfirm { 0%, 60% { background: rgba(255, 224, 102, .4); } 100% { background: transparent; } }
 .inv__desc { min-height: 48px; margin-top: 16px; border: 2px solid #fff; padding: 8px; }
 /* The bottom fight preview: the combat HUD look, one target, the soul. */
 .inv__preview { margin-top: 16px; border: 2px solid #fff; padding: 8px; }
@@ -611,6 +662,28 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .inv__fight-text { flex: 1 1 240px; color: #fff; white-space: pre-line; line-height: 2; }
 .inv__fight-text::first-line { color: #ff0; }
 .inv__body[hidden], .inv__body section[hidden] { display: none; }
+/* TP bar (js/core/tphud.js): bottom-centre, over fight canvases, under .tbox. */
+.tphud { position: fixed; z-index: 90; left: 50%; bottom: 24px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 16px; padding: 8px 16px;
+  background: #000; color: #fff; border: 4px solid #fff;
+  box-shadow: inset 0 0 0 4px #000, inset 0 0 0 6px #fff;
+  font: 400 16px/1.25 var(--font); pointer-events: none; }
+.tphud[hidden] { display: none; }
+.tphud__tp { display: flex; align-items: center; gap: 8px; }
+.tphud__label { color: #FF9E30; }
+.tphud__bar { width: 160px; height: 16px; border: 2px solid #fff; background: #1a1024; }
+.tphud__fill { display: block; height: 100%; width: 0%; background: #FF9E30; }
+.tphud.is-gain .tphud__fill { background: #8fe39b; }
+.tphud.is-spend .tphud__fill { background: #ff5a4a; }
+.tphud__num { min-width: 48px; }
+.tphud.is-gain .tphud__num { color: #8fe39b; }
+.tphud.is-spend .tphud__num { color: #ff8a7a; }
+.tphud__acts { display: flex; gap: 8px; }
+.tphud__chip { position: relative; width: 48px; height: 56px; background: #0d0d12; border: 2px solid #444; }
+.tphud__chip.is-off { opacity: .45; }
+.tphud__icon { position: absolute; left: 6px; top: 4px; width: 32px; height: 32px; image-rendering: pixelated; }
+.tphud__cd { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: rgba(0, 0, 0, .78); }
+.tphud__cost { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; text-align: center; color: #d49aff; font-style: normal; }
 /* Phone: one column, the stats as a row, a shorter list, so the whole menu
    including the description fits the phone screen without a scroll. */
 @media (max-width: 800px) {
@@ -623,10 +696,14 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   .inv.is-equip .inv__preview { margin-top: 0; padding: 6px 8px; }
   .inv.is-equip .inv__preview h2 { margin-bottom: 4px; }
   .inv.is-equip .inv__desc { margin-top: 0; min-height: 0; }
+  .tphud { gap: 8px; padding: 4px 8px; bottom: 8px; }
+  .tphud__bar { width: 96px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
+  .inv, .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
+  .tphud__fill { transition: none !important; }
 }
+html.rm .inv, html.rm .inv *, html.rm .inv *::before, html.rm .inv *::after { animation: none !important; transition: none !important; }
 
 .kernel-play { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .kernel-play canvas { display: block; width: min(100vw, 166.67vh); height: auto; aspect-ratio: 5 / 3; image-rendering: pixelated; }
@@ -636,41 +713,95 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .cards { position: fixed; inset: 0; z-index: 80; background: #000; }
 .cards canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; image-rendering: pixelated; }
 
-/* Mage shop (js/act4/mage.js). Undertale split: art, menu, dialogue. z 76, under .tbox. */
+/* Mage shop (js/act4/mage.js). Undertale split: header, art, menu,
+   dialogue. Deep violet and ember — the room is dark stone, the mage is
+   violet pin and gold trim, the warning is blood red. z 76, under .tbox. */
 .mage {
   position: fixed; inset: 0; z-index: 76;
   display: flex; flex-direction: column;
-  background: #000; color: #fff;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #1B1030 0%, #0D0818 55%, #07040D 100%);
+  color: #F0E8FF;
   font: 400 16px/1.25 var(--font, monospace);
+  animation: mageIn 160ms steps(4) both;
 }
+@keyframes mageIn { from { opacity: 0; } to { opacity: 1; } }
 .mage[hidden] { display: none !important; }
-.mage__art { flex: 3 1 60%; min-height: 0; margin: 16px 16px 0; border: 4px solid #fff; background: #1C1814; }
+.mage__head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; padding: 16px 24px 8px; flex: none;
+}
+.mage__name {
+  font: 700 32px/1.2 var(--font, monospace); letter-spacing: 3px;
+  color: #E8C878; text-shadow: 0 0 12px rgba(232, 200, 120, 0.4), 0 2px 0 #2A1248;
+}
+.mage__sub { font: 400 16px/1.2 var(--font, monospace); color: #9A86B8; }
+.mage__art {
+  /* PLAN 9.3: keep the canvas at its native 320:192, never letterboxed
+     into a wide flex box. */
+  flex: 3 1 60%; min-height: 0;
+  aspect-ratio: 320 / 192; max-height: 58vh; margin: 8px auto 0;
+  margin-inline: auto;
+  border: 4px solid #7A52B8; background: #1C1814;
+  box-shadow: 0 0 0 4px #0B0714, 0 0 32px rgba(122, 82, 184, 0.3);
+}
 .mage__art canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; image-rendering: pixelated; }
-.mage__dock { flex: 2 1 40%; display: flex; gap: 16px; padding: 16px; min-height: 0; }
+.mage__dock { flex: 2 1 40%; display: flex; gap: 16px; padding: 16px 24px 24px; min-height: 0; }
 .mage__menu, .mage__box {
-  border: 4px solid #fff; padding: 16px; min-width: 0; overflow: auto; background: #000;
+  border: 4px solid #4B2A78; padding: 16px; min-width: 0; overflow: auto;
+  background: #140B20;
+  box-shadow: inset 0 0 0 2px #1E0F33, 0 4px 0 rgba(0, 0, 0, 0.45);
 }
 .mage__menu { flex: 2 1 40%; }
-.mage__box { flex: 3 1 60%; }
-.mage__say { margin: 0; font: 400 16px/1.35 var(--font, monospace); color: #fff; }
+.mage__box { flex: 3 1 60%; display: flex; flex-direction: column; }
+.mage__say { margin: 0; font: 400 16px/1.4 var(--font, monospace); color: #F0E8FF; flex: 1 1 auto; }
+.mage__keys {
+  margin: 16px 0 0; padding-top: 8px; flex: none;
+  border-top: 2px solid #3A2414; color: #9A86B8;
+  font: 400 16px/1.4 var(--font, monospace);
+}
+.mage__keys kbd { color: #E8C878; }
 .mage__row {
   position: relative; display: block; width: 100%;
   margin: 0; padding: 0 0 0 32px; min-height: 32px;
-  text-align: left; color: #fff; background: transparent;
+  text-align: left; color: #C8B8E0; background: transparent;
   border: 0; font: 400 16px/2 var(--font, monospace); cursor: pointer;
+  transition: background-color 120ms steps(3), color 120ms steps(3);
 }
-.mage__row.is-sel { color: #ff0; }
+.mage__row:hover { color: #F0E8FF; background: rgba(122, 82, 184, 0.12); }
+.mage__row.is-sel { color: #FFE080; background: rgba(122, 82, 184, 0.2); }
 .mage__row.is-sel::before {
   content: '\2665'; position: absolute; left: 0; top: 0;
-  color: #f00; font-size: 16px;
+  color: #FF6A6A; font-size: 16px;
 }
-.mage__p { float: right; color: #fff; }
-.mage__gold { margin-top: 16px; padding-top: 8px; border-top: 4px solid #fff; color: #E4C46A; }
+.mage__p { float: right; color: #E8C878; }
+.mage__gold {
+  margin-top: 16px; padding-top: 8px; border-top: 4px solid #4B2A78;
+  color: #E4C46A; font: 700 16px/1.4 var(--font, monospace);
+}
+/* The warning before the card battle: impossible to mistake for talk. */
+.mage__warn {
+  position: absolute; inset: 0; z-index: 3;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; padding: 16px; box-sizing: border-box; text-align: center;
+  background: rgba(30, 0, 4, 0.88);
+  border: 8px solid #FF2A1A; outline: 4px solid #5A0008;
+}
+.mage__warn[hidden] { display: none !important; }
+.mage__warnBig {
+  margin: 0; font: 700 64px/1.1 var(--font, monospace);
+  letter-spacing: 6px; color: #FF2A1A;
+  text-shadow: 0 0 16px rgba(255, 42, 26, 0.9), 0 0 48px rgba(255, 42, 26, 0.5), 0 4px 0 #4A0008;
+}
+.mage__warnSub { margin: 0; font: 400 16px/1.4 var(--font, monospace); color: #FFB0A0; }
 @media (max-width: 640px) {
+  .mage__head { padding: 8px 8px 0; flex-direction: column; gap: 0; }
+  .mage__name { font-size: 32px; }
   .mage__art { flex: 0 0 auto; aspect-ratio: 320 / 192; margin: 8px 8px 0; }
   .mage__dock { flex: 1 1 auto; flex-direction: column; gap: 8px; padding: 8px; }
   .mage__box { order: -1; flex: 0 0 auto; min-height: 96px; padding: 8px; }
   .mage__menu { flex: 1 1 auto; padding: 8px; }
+  .mage__warnBig { font-size: 48px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mage, .mage * { animation: none !important; transition: none !important; }
@@ -1028,3 +1159,28 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .crack-sky__cap { transition: none; }
 }
+/* D1 hand-off: --fx/--fy are the d0 spawn's screen point (hero feet), set by crack.js from NEU.plat.spawnScreen; feet sit at (40, 88) in the 80x96 hero box */
+.crack-sky { --fx: calc(50vw - 24px); --fy: 240px; }
+.crack-sky__ground { top: var(--fy); }
+.crack-sky__ridge { top: auto; bottom: calc(100% - var(--fy)); }
+.crack-sky__hero { animation: skyFallD0 1.9s cubic-bezier(.5, .05, .75, .4) forwards; }
+.crack-sky__hero.is-landed { animation: skySettleD0 .6s ease-out forwards; }
+@keyframes skyFallD0 {
+  0%   { transform: translate(calc(var(--fx) - 40px), 4vh) rotate(-160deg); }
+  45%  { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 142px)) rotate(170deg); }
+  75%  { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 104px)) rotate(340deg); }
+  100% { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 88px)) rotate(360deg); }
+}
+@keyframes skySettleD0 {
+  0%   { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 88px)) rotate(360deg) scaleY(1); }
+  30%  { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 88px)) rotate(360deg) scaleY(.6); }
+  100% { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 88px)) rotate(360deg) scaleY(1); }
+}
+
+/* The broken screen splits once, then a static burst before the stage expands. */
+.tv.is-cracking::after { content: ''; position: absolute; left: 8px; top: 7px; width: 68px; height: 48px; pointer-events: none; background: linear-gradient(35deg, transparent 47%, #dce8ff 48%, #dce8ff 50%, transparent 51%), linear-gradient(135deg, transparent 47%, #dce8ff 48%, #dce8ff 50%, transparent 51%); transform-origin: center; animation: tv-crack 1.7s steps(6, end) both; }
+.tv.is-static::after { background: repeating-linear-gradient(0deg, #dce8ff 0 2px, #111321 2px 4px); opacity: .65; }
+@keyframes tv-crack { from { transform: scale(.1); } to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .tv.is-cracking::after { animation: none; } }
+
+.tv.is-cracking img { transform: none; }

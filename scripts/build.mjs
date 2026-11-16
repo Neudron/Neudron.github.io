@@ -23,7 +23,7 @@ const SHELL = [
 const GAME = [
   'js/data/items.js', 'js/core/danmaku.js', 'js/core/kit.js',
   'js/data/sheets.js', 'js/core/engine-look.js', 'js/core/engine-doors.js',
-  'js/core/engine-kinds.js', 'js/core/engine.js', 'js/core/plat.js',
+  'js/core/world-graph.js', 'js/core/engine-kinds.js', 'js/core/engine-trans.js', 'js/core/engine.js', 'js/core/plat.js',
   'js/act4/look-dungeon.js', 'js/act4/dungeon.js', 'js/act4/dgn-foes.js', 'js/act4/look-mountain.js',
   'js/act4/mountain.js', 'js/act4/rooms-p.js', 'js/game/bullet.js',
   'js/game/dark.js', 'js/act4/act4.js', 'js/act4/look-woods.js',
@@ -40,7 +40,7 @@ const GAME = [
   'js/act4/exo-combos.js', 'js/act4/boss-exo.js', 'js/act4/boss-draedon.js',
   'js/act4/exo-ares.js', 'js/act4/exo-twins.js', 'js/act4/crack.js',
   'js/act4/cart.js', 'js/act4/elevator.js', 'js/act4/inventory.js',
-  'js/game/deck.js'
+  'js/core/tphud.js', 'js/game/deck.js'
 ];
 const FILES = [
   '404.html', 'CNAME', '.nojekyll', 'og.png', 'robots.txt', 'sitemap.xml',
@@ -150,6 +150,8 @@ async function main() {
     const list = execFileSync('git', ['ls-files', '-z', '--', d], { cwd: ROOT, encoding: 'utf8' });
     for (const f of list.split('\0')) {
       if (!f) continue;
+      /* notes stay on GitHub, never in dist (AGENTS.md) */
+      if (/\.md$/i.test(f)) continue;
       await fs.mkdir(path.dirname(path.join(DIST, f)), { recursive: true });
       await fs.cp(path.join(ROOT, f), path.join(DIST, f));
     }

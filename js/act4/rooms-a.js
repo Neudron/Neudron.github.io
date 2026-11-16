@@ -139,10 +139,10 @@
       ['start from the brazier the plaque says comes before another.',
        'the fourth one hangs off the first. the rest falls in around them.']],
     b4_ice: [
-      ['every slide ends on ice. the ice decides where you stop, not you.',
-       'a plate only locks when a slide dies on it.'],
-      ['the ring runs both ways. the last plate is the one you have not stood beside.',
-       'walk round the south band before you step onto the ice.']],
+      ['the mouse is slow: it takes one step for every two of yours.',
+       'it scurries straight away from you, and it runs along whatever is in the way.'],
+      ['stand on the far side of the mouse from the cheese, and walk towards it.',
+       'it cannot leave the ice. drive it through the channels at the top and the bottom.']],
     b5_two: [
       ['the mirror holds a plate. you hold the other one.',
        'press e on the mirror until it looks at a plate, then stand on the opposite plate.'],
@@ -176,7 +176,7 @@
     return e;
   }
   function woodsLook(h) {
-    return [{ t: 'woodsfloor', x: 0, y: 0 }, { t: 'woodsfx', x: 0, y: h - 1 }];
+    return [{ t: 'woodsfloor', x: 0, y: 0 }, { t: 'woodsfx', x: 0, y: h - 1, roomSpan: true }];
   }
 
   /* The crack back to the dungeon. It is a picture (kind `crack`) plus
@@ -290,7 +290,7 @@
       { t: 'exit', x: 23, y: 7, to: 'a2_path', spawn: 'west', style: 'tunnel' },
       P('moon', 10, 7),
       P('campfire', 13, 4, { solid: true }),
-      P('lantern', 12, 6, { solid: true }), P('lantern', 16, 8, { solid: true }), P('lantern', 20, 6),
+      P('lantern', 12, 6, { solid: true }), P('lantern', 16, 8, { solid: true }), P('lantern', 20, 5),
       P('oak', 4, 3), P('oak', 16, 2, { big: 1 }), P('pine', 7, 2, { h: 70 }), P('pine', 19, 4),
       P('dead', 21, 9), P('oak', 3, 9), P('pine', 18, 10, { h: 56 }), P('oak', 6, 11),
       P('stump', 4, 7, { solid: true }), P('rock', 15, 9, { solid: true }), P('ferns', 7, 9),
@@ -369,7 +369,7 @@
   if (NEU.roomArt && NEU.roomArt.skins) {
     NEU.roomArt.skins.hood = { width: 0, draw: hoodDraw };
   }
-  E.register('a1_clearing', {
+  var A1 = {
     tileset: 'woods',
     tiles: [
       '########################',
@@ -399,7 +399,7 @@
               'somebody has lit a path. that was thoughtful of them.',
               'it only goes one way.']);
     }
-  });
+  };
 
   /* ══ A2 — the long walk ══════════════════════════════════════════
      The first mushroom. You cannot take it and the game says why in
@@ -422,7 +422,7 @@
      turn costs no aiming. The mushroom sits in a mossy hollow on the
      south bank under a patch of moonlight, so it is seen from the top
      path across the water long before you can reach it. */
-  E.register('a2_path', {
+  var A2 = {
     tileset: 'woods',
     tiles: [
       '##########################',
@@ -442,7 +442,7 @@
     spawns: { west: { x: 1, y: 3, face: 'right' }, east: { x: 24, y: 7, face: 'left' } },
     entities: woodsLook(11).concat([
       { t: 'npc', x: 8, y: 6, colour: '#C4705F', mush: 'mush1', sheet: 'mushroom',
-        run: function (c) { NEU.chop && NEU.chop(c, 'mush1'); } },
+        run: function (c) { NEU.chop && NEU.chop({ room: { id: 'a_woods' }, ents: c.ents, say: c.say, key: c.key }, 'mush1'); } },
       { t: 'npc', x: 18, y: 2, colour: '#4A4560', skin: 'barktree', look: 'tree',
         lines: ['the trees here have no bark on the north side.',
                 'there is no north here.'] },
@@ -450,14 +450,14 @@
       { t: 'exit', x: 0, y: 3, to: 'a1_clearing', spawn: 'east', style: 'tunnel' },
       P('moon', 8, 6, { r: 40 }), P('moon', 18, 2, { r: 36 }),
       P('lantern', 4, 2, { solid: true }), P('lantern', 11, 4, { solid: true }), P('lantern', 19, 4, { solid: true }),
-      P('lantern', 5, 8, { solid: true }), P('lantern', 15, 8, { solid: true }), P('lantern', 22, 6),
+      P('lantern', 5, 8, { solid: true }), P('lantern', 15, 8, { solid: true }), P('lantern', 21, 6),
       P('pine', 2, 1, { h: 60 }), P('oak', 7, 1), P('pine', 13, 1, { h: 72 }), P('oak', 22, 1, { big: 1 }),
       P('pine', 3, 9, { h: 46 }), P('oak', 10, 10, { h: 34, rx: 22, ry: 14 }), P('oak', 18, 10, { h: 36, rx: 24, ry: 15 }), P('pine', 23, 9, { h: 44 }),
       P('dead', 15, 4), P('log', 13, 5), P('rock', 3, 4, { solid: true }), P('rock', 21, 2, { solid: true }),
       P('stump', 12, 2, { solid: true }), P('shrooms', 10, 6), P('shrooms', 17, 6, { seed: 2 }),
       P('ferns', 5, 6), P('ferns', 20, 6), P('ferns', 8, 2), P('bush', 24, 2), P('ferns', 14, 8)
     ])
-  });
+  };
 
   /* ══ A3 — the fork ═══════════════════════════════════════════════
      Left is the castle. Right is the altar room you cannot open yet,
@@ -473,7 +473,7 @@
      track under fallen leaves, past the oldest tree in the wood, to an
      overgrown arch in the east edge (b7). Read at a glance: lit means
      expected, moss means "not swept in a long time". */
-  E.register('a3_fork', {
+  var A3 = {
     tileset: 'woods',
     tiles: [
       '########################',
@@ -496,7 +496,7 @@
               altar: { x: 22, y: 7, face: 'left' } },
     entities: woodsLook(12).concat([
       { t: 'save', x: 5, y: 6 },
-      { t: 'exit', x: 10, y: 1, to: 'b1_throne', spawn: 'south', style: 'gate' },
+      { t: 'exit', x: 10, y: 1, to: 'b1_throne', spawn: 'south', style: 'stairs', dir: 'up' },
       { t: 'exit', x: 23, y: 7, to: 'b7_altar', spawn: 'east', style: 'arch' },
       { t: 'exit', x: 0, y: 7, to: 'a2_path', spawn: 'east', style: 'path' },
       { t: 'npc', x: 11, y: 6, colour: '#8A8598', look: 'signpost', skin: 'signfork',
@@ -522,7 +522,81 @@
       say(c, ['the path splits.',
               'one way is lit and looks expected of you.']);
     }
+  };
+
+  function mergeWoods() {
+    var rows = [], source = [
+      { room: A1, x: 0, y: 0, x0: 0, x1: 22 },
+      { room: A2, x: 22, y: 4, x0: 1, x1: 24 },
+      { room: A3, x: 46, y: 4, x0: 1, x1: 23 }
+    ];
+    var y, i, j, grid, start, end;
+    for (y = 0; y < 16; y++) rows[y] = Array(70 + 1).join('#');
+    for (i = 0; i < source.length; i++) {
+      grid = source[i].room.tiles.split('\n');
+      for (j = 0; j < grid.length; j++) {
+        y = source[i].y + j;
+        if (y >= rows.length) continue;
+        start = source[i].x + source[i].x0;
+        end = start + source[i].x1 - source[i].x0 + 1;
+        rows[y] = rows[y].substring(0, start) + grid[j].substring(source[i].x0, source[i].x1 + 1) + rows[y].substring(end);
+      }
+    }
+    var seam = [46, 47, 48, 46, 45, 47, 48, 46, 47, 45, 46, 48], chars;
+    for (y = 4; y <= 15; y++) {
+      chars = rows[y].split('');
+      for (i = 45; i <= 50; i++) if (chars[i] === '.' && i <= seam[y - 4]) chars[i] = '~';
+      rows[y] = chars.join('');
+    }
+    return rows.join('\n');
+  }
+  function mergeWoodsEntities(room, id, dx, dy) {
+    var entities = room.entities || [], out = [], i, e, copy;
+    for (i = 0; i < entities.length; i++) {
+      e = entities[i];
+      if (e.t === 'woodsfloor' || e.t === 'woodsfx' ||
+          (e.t === 'exit' && (e.to === 'a1_clearing' || e.to === 'a2_path' || e.to === 'a3_fork'))) continue;
+      copy = {};
+      for (var k in e) copy[k] = e[k];
+      copy.origin = { room: id, x: e.x, y: e.y };
+      copy.x += dx; copy.y += dy;
+      out.push(copy);
+    }
+    return out;
+  }
+  function mergeBeams(room, dx, dy) {
+    return room.beams.map(function (b) { return [b[0] + dx, b[1] + dy, b[2], b[3]]; });
+  }
+  function mergeMist(room, dx, dy, x0, x1) {
+    return room.mist.map(function (y) { return { y: dy + y, x0: dx + x0, x1: dx + x1 }; });
+  }
+  E.register('a_woods', {
+    tileset: 'woods', tiles: mergeWoods(),
+    beams: mergeBeams(A1, 0, 0).concat(mergeBeams(A2, 22, 4), mergeBeams(A3, 46, 4)),
+    mist: mergeMist(A1, 0, 0, 0, 22).concat(mergeMist(A2, 22, 4, 1, 24), mergeMist(A3, 46, 4, 1, 23)),
+    spawns: {
+      a1_default: { x: 10, y: 7, face: 'right' }, a1_north: { x: 10, y: 3, face: 'down' }, a1_east: { x: 22, y: 7, face: 'left' },
+      a2_west: { x: 23, y: 7, face: 'right' }, a2_east: { x: 46, y: 11, face: 'left' },
+      a3_west: { x: 47, y: 11, face: 'right' }, castle: { x: 56, y: 6, face: 'down' }, altar: { x: 68, y: 11, face: 'left' }
+    },
+    areas: [
+      { id: 'a1_clearing', x0: 0, y0: 0, x1: 22, y1: 12, spawn: 'a1_default', onEnter: A1.onEnter },
+      { id: 'a2_path', x0: 23, y0: 4, x1: 46, y1: 14, spawn: 'a2_west' },
+      { id: 'a3_fork', x0: 47, y0: 4, x1: 69, y1: 15, spawn: 'a3_west', onEnter: A3.onEnter }
+    ],
+    get entities() {
+      var out = woodsLook(16)
+        .concat(mergeWoodsEntities(A1, 'a1_clearing', 0, 0), mergeWoodsEntities(A2, 'a2_path', 22, 4), mergeWoodsEntities(A3, 'a3_fork', 46, 4));
+      out.push(P('oak', 20, 6, { big: 1, rx: 18, solid: true }), P('oak', 25, 8, { big: 1, rx: 18, solid: true }), P('oak', 44, 10, { big: 1, rx: 18, solid: true }), P('oak', 47, 6, { big: 1, solid: true }), P('oak', 49, 12, { big: 1, rx: 18, solid: true }));
+      if (NEU.save && (NEU.save.has('mush1') || NEU.save.flagged('gone:a2_path:mush1'))) {
+        return out.filter(function (e) { return e.mush !== 'mush1'; });
+      }
+      return out;
+    }
   });
+  E.alias('a1_clearing', 'a_woods', { default: 'a1_default', north: 'a1_north', east: 'a1_east' }, 'a1_clearing');
+  E.alias('a2_path', 'a_woods', { west: 'a2_west', east: 'a2_east' }, 'a2_path');
+  E.alias('a3_fork', 'a_woods', { west: 'a3_west', castle: 'castle', altar: 'altar' }, 'a3_fork');
 
   /* ── the castle's look ─────────────────────────────────────────────
      Same contract as the woods: one `castlefloor` (js/act4/look-castle.js
@@ -538,7 +612,7 @@
     return e;
   }
   function castleLook(h) {
-    return [{ t: 'castlefloor', x: 0, y: 0 }, { t: 'castlefx', x: 0, y: h - 1 }];
+    return [{ t: 'castlefloor', x: 0, y: 0 }, { t: 'castlefx', x: 0, y: h - 1, roomSpan: true }];
   }
   function columns(xy, extra) {
     var out = [];
@@ -581,9 +655,10 @@
     shade: 0.55,
     spawns: { south: { x: 11, y: 12, face: 'up' }, north: { x: 21, y: 8, face: 'left' } },
     entities: castleLook(14).concat([
-      { t: 'exit', x: 11, y: 13, to: 'a3_fork', spawn: 'castle', style: 'arch' },
+      { t: 'exit', x: 11, y: 13, to: 'a_woods', spawn: 'castle', style: 'arch' },
       Q('throne', 9, 2),
-      /* the second throne. never pointed at. */
+      /* the second throne. never pointed at — but it is a seat:
+         interact sits, any move key stands. */
       { t: 'npc', x: 13, y: 2, colour: '#3A2140', look: 'throne', skin: 'throne2',
         lines: function (s) {
           return s.flagged('witch_met')
@@ -591,11 +666,19 @@
                'the cushion has not been plumped since.']
             : ['a second throne, beside the first.',
                'the dust on it has been disturbed recently.'];
+        },
+        run: function (c) {
+          var es = c.ents(), self = null, i;
+          for (i = 0; i < es.length; i++)
+            if (es[i].t === 'npc' && es[i].x === 13 && es[i].y === 2) self = es[i];
+          if (!self || !c.sit(self)) return;      /* already seated: stands up */
+          if (!c.flagged('throne2_sit')) c.say(self.lines(c), 'narr');
+          if (NEU.save) NEU.save.flag('throne2_sit', 1);
         } },
-      { t: 'npc', x: 9, y: 3, colour: '#C2405F', key: 'witch',
+      { t: 'npc', x: 9, y: 3, colour: '#C2405F', key: 'witch', skin: 'witchcast',
         lines: ['...'],
         run: function (c) { witchTalk(c); } },
-      { t: 'exit', x: 22, y: 8, to: 'b2_blocks', spawn: 'west', locked: 'witch_met', style: 'door',
+      { t: 'exit', x: 22, y: 8, to: 'b2_blocks', spawn: 'west', locked: 'witch_met', style: 'door', via: 'door',
         lines: ['a heavy door, and it is locked from her side.',
                 'she has not told you about it yet. go and be told.'] },
       Q('candelabra', 6, 3, { solid: true }), Q('candelabra', 16, 3, { solid: true }),
@@ -603,9 +686,32 @@
       Q('armour', 1, 12, { solid: true }), Q('armour', 21, 12, { solid: true }),
       Q('glow', 4, 5, { r: 50 }), Q('glow', 18, 5, { r: 50 }), Q('glow', 11, 7, { r: 64 }),
       Q('glow', 11, 3, { r: 54, col: '#FFC873', g: 0.08 }), Q('glow', 11, 10, { r: 50, col: '#FFC873', g: 0.05 }),
-      Q('candles', 7, 12, { solid: true }), Q('candles', 15, 12, { solid: true, seed: 1 })
+      Q('glow', 19, 7, { r: 46, col: '#9A7AE0', g: 0.07 }),
+      Q('statue', 5, 4, { solid: true }), Q('statue', 17, 4, { solid: true }),
+      Q('urn', 4, 11, { solid: true }), Q('urn', 18, 11, { solid: true }),
+      Q('bones', 3, 10), Q('rubble', 20, 10),
+      Q('candles', 7, 12, { solid: true }), Q('candles', 15, 12, { solid: true, seed: 1 }),
+      Q('candles', 4, 12, { solid: true, seed: 2 }), Q('candles', 18, 12, { solid: true, seed: 3 })
     ]).concat(columns([2, 3, 2, 5, 2, 7, 2, 9, 2, 11, 20, 3, 20, 5, 20, 7, 20, 9, 20, 11])),
+    castFx: function () { return castState(); },
+    /* the east door while the cast runs: shut with its padlock to 1700,
+       shaken to 2000, then open in three steps (the flag lands at 2500) */
+    doorCtx: function (d, e) {
+      d.padlockOff = false; d.jx = 0; d.step = undefined;
+      if (!cast || e.locked !== 'witch_met') return;
+      var t = castNow();
+      if (t < CAST_T.hit) return;
+      d.padlockOff = true;
+      if (t < CAST_T.open) {
+        d.open = false;
+        if (!cast.fast && t < 2000) d.jx = Math.floor(t / 50) % 2 ? 1 : -1;
+      } else {
+        d.open = true;
+        d.step = Math.min(2, Math.floor((t - CAST_T.open) / 150));
+      }
+    },
     onEnter: function (c) {
+      cast = null;
       if (c.flagged('witch_met')) return;
       say(c, ['the room is much too big for one person.']);
     }
@@ -619,18 +725,96 @@
     ["solve them and i will deal with the rest. go on.", 'witch']
   ];
 
+  /* ── the door she opens herself ──────────────────────────────────
+     Her last line used to flip witch_met the same frame, so the east
+     door opened because a dialogue box closed. Now the talk only gets
+     her started: she raises her hands (the witchcast skin draws the
+     wind-up), a hex bolt crosses the nave, and witch_met lands where it
+     hits the door — about 2.7 s of real time. castFx() feeds the
+     castlefx layer; the sigil on the floor is the lock she breaks. */
+  var cast = null;
+  /* beats in ms of real time from the cast's start (Date.now, not timers):
+     0 busy, 300 rings + rising tone, 1000 thrust, 1700 impact, 2100 door
+     steps open, 2500 witch_met, 2700 busy off. Reduced motion: the same
+     beats in 800 ms, no pan, no shake. */
+  var CAST_T = { fly: 1000, hit: 1700, open: 2100, met: 2500, done: 2700 };
+  var CAST_FAST = 800;
+
+  function castNow() {
+    return (Date.now() - cast.t0) * (cast.fast ? CAST_T.done / CAST_FAST : 1);
+  }
+
+  function castState() {
+    if (!cast) return null;
+    var t = castNow();
+    return { t: t, phase: t < CAST_T.fly ? 'wind' : t < CAST_T.hit ? 'fly' : t < CAST_T.met ? 'hit' : 'done' };
+  }
+
+  /* the bolt's target: the east door's padlock, in world px */
+  var BOLT_TO = { x: 22 * 16 - 4, y: 8 * 16 + 8 };
+
+  function castTick() {
+    if (!cast) return;
+    var c = cast.c, t = castNow();
+    if (t >= 300 && !cast.rose) {
+      cast.rose = 1;
+      if (NEU.sfx && NEU.sfx.rise) NEU.sfx.rise(700);
+    }
+    if (t >= CAST_T.fly && !cast.thrust) {
+      cast.thrust = 1;
+      if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
+      if (!cast.fast) {
+        /* the camera leads 40 px toward the bolt */
+        var p = c.playerAt(), dx = BOLT_TO.x - p.x, dy = BOLT_TO.y - p.y, n = Math.sqrt(dx * dx + dy * dy) || 1;
+        c.cam.to(p.x + dx / n * 40, p.y + dy / n * 40, 500);
+      }
+    }
+    if (t >= CAST_T.hit && !cast.struck) {
+      cast.struck = 1;
+      if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(2);
+      if (NEU.juice && NEU.juice.hit) NEU.juice.hit('medium');
+    }
+    if (t >= CAST_T.met && !cast.met) {
+      cast.met = 1;
+      c.flag('witch_met', 1);
+      if (NEU.quest) NEU.quest.mark('a4_witch');
+      c.cam.release();
+    }
+    if (t >= CAST_T.done) {
+      cast = null;
+      c.busy(false);
+      c.say(['the door is open.', 'it only ever needed asking.'], 'narr');
+      return;
+    }
+    c.later(castTick, 16);
+  }
+
+  function startCast(c) {
+    if (cast || c.flagged('witch_met')) return;
+    cast = { c: c, t0: Date.now(), fast: crackReduced(), rose: 0, thrust: 0, struck: 0, met: 0 };
+    c.busy(true);
+    c.later(castTick, 16);
+  }
+
+  /* the fifth line stays up until it is dismissed; then the show starts */
+  function startAfterBox(c) {
+    var poll = setInterval(function () {
+      if (!NEU.tboxOpen || !NEU.tboxOpen()) { clearInterval(poll); startCast(c); }
+    }, 50);
+  }
+
   function witchTalk(c) {
     var n = NEU.save ? (NEU.save.flag('witch_talks') || 0) : 0;
     if (n >= witchLines.length) {
+      /* she has said her piece; if the door is somehow still shut she
+         simply casts again */
+      if (!c.flagged('witch_met')) { startCast(c); return; }
       c.say(["it is through there. i will wait here.", "i am very good at waiting."], 'witch');
       return;
     }
     c.say([witchLines[n][0]], 'witch');
     if (NEU.save) NEU.save.flag('witch_talks', n + 1);
-    if (n + 1 >= witchLines.length) {
-      c.flag('witch_met', 1);
-      if (NEU.quest) NEU.quest.mark('a4_witch');
-    }
+    if (n + 1 >= witchLines.length) startAfterBox(c);
   }
 
   /* ══ B2 — the riddle and stone lanes ══════════════════════════════
@@ -713,7 +897,7 @@
       { t: 'exit', x: 20, y: 6, to: 'b3_braziers', spawn: 'west', locked: 'solved:b2_blocks', style: 'door',
         lines: ['a door with no handle, set flush in the wall.',
                 'it opens when both pale plates hold a stone.'] },
-      { t: 'exit', x: 0, y: 6, to: 'b1_throne', spawn: 'north', style: 'arch' },
+      { t: 'exit', x: 0, y: 6, to: 'b1_throne', spawn: 'north', style: 'arch', via: 'door' },
       Q('urn', 4, 2, { solid: true }), Q('urn', 16, 2, { solid: true }),
       Q('candelabra', 4, 9, { solid: true }), Q('candelabra', 16, 9, { solid: true }),
       Q('books', 1, 10, { solid: true }), Q('books', 19, 10, { solid: true }),
@@ -848,53 +1032,95 @@
     }
   }
 
-  /* ══ B4 — the ice ring ═══════════════════════════════════════════
-     The floor teaches the slide: step onto ice and you commit to that
-     line of travel until the ice runs out — no turning, no stopping,
-     no walking across a corner. Three plates sit on the last ice cell
-     of three different slide lines, and a plate only locks when a
-     slide dies on it (slideOnly). Walking up to one is the wrong move
-     by design; the whole room is about reading the lines the ice
-     gives you.
+  /* ══ B4 — the mouse under the ice ════════════════════════════════
+     The slide is gone. What replaces it is a living thing: a mouse
+     under the frozen pool, and a cheese under the ice on the far side
+     of it. The mouse is afraid of you and it is slow — it takes one
+     step for every two of yours — and it scurries straight away from
+     you; if something is in the way it runs along it. You cannot
+     touch it through the ice. You herd it.
 
-     Four plates on the four ends of the ring, so the three-slide lap
-     the room teaches you is not enough: it ends on (5,8) with three
-     locks and a shut door. The fourth end is (5,3), and the only way
-     to die there is to walk round to the south band and step UP onto
-     (5,8) — the ring runs both ways, which is the whole lesson. The
-     naive lap plus the walk round is the minimum (BFS-checked over
-     position × armed-mask, see tests/fixes54.mjs):
-       1. walk up to (4,3), step east onto (5,3) → slide east along the
-          top row, which dies on its last ice cell (13,3) → plate locks.
-       2. step south: the ice underfoot commits you again → slide down
-          the east column, dying on (13,8) → plate locks.
-       3. step west → slide along the bottom row, dying on (5,8)
-          → plate locks.
-       4. walk down to (5,9), step up onto the bottom-left corner → the
-          column carries you the other way, dying on (5,3) → opens.
-     The puzzle is not "find the plates", it is "understand that the
-     ice decides where you stop, in every direction". The old version
-     was a block-push with the block born on the ice; that read as a
-     physics quirk and was retired with the rest of the castle's blocks.
+     LAYOUT. The pool is three chambers joined at the top and bottom
+     by a channel. The mouse is born in the west chamber, the cheese
+     sits in the middle one, and a knight frozen solid stands beside
+     it. The player walks the flagstones round the pool (stepping onto
+     the ice still slides, which is a hazard here, not a tool). Every
+     second step the player takes, the mouse takes one.
 
-     LAYOUT. A frozen cloister: the ring is the same shape it always
-     was, moved one cell in and down to sit under a two-row north wall
-     hung with icicles and two frosted windows. A knight frozen solid
-     stands on the pillar in the middle of the ring. Each plate is a
-     frost rune inside a pale ring painted where its slide dies, so the
-     three "destinations" are visible from the door. */
+     The rule is deliberately slow: the player walks at six cells a
+     second and the mouse at three, so you can get round it, head it
+     off, and drive it. That is the whole puzzle — observation (which
+     way does it go), positioning (stand where you want it to flee),
+     and the patience to walk behind it. R resets the room. */
+
+  /* The mouse. One step for every two the player takes, straight away
+     from the player; if that cell is not open ice it runs along the
+     obstruction, preferring the direction that still increases the
+     distance. It never leaves the ice and it never crosses a block. */
+  function stepMouse(room, c, px, py) {
+    var m = room.mouse, g = room.grid, es = c.ents(), i, x, y;
+    var dx = m.x - px, dy = m.y - py;
+    var cand = [], seen = {};
+    function sgn(v) { return v > 0 ? 1 : (v < 0 ? -1 : 0); }
+    function push(ax, ay) {
+      if (!ax && !ay) return;
+      var k = ax + ',' + ay;
+      if (seen[k]) return;
+      seen[k] = 1; cand.push([ax, ay]);
+    }
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      var vy = dy === 0 ? 1 : sgn(dy);
+      push(sgn(dx), 0); push(0, vy); push(0, -vy); push(-sgn(dx), 0);
+    } else {
+      var hx = dx === 0 ? 1 : sgn(dx);
+      push(0, sgn(dy)); push(hx, 0); push(-hx, 0); push(0, -sgn(dy));
+    }
+    function free(ax, ay) {
+      if (ay < 0 || ay >= g.length) return false;
+      var row = g[ay];
+      if (ax < 0 || ax >= row.length) return false;
+      if (row.charAt(ax) !== 'i' || room.cracks[ax + ',' + ay]) return false;
+      for (var j = 0; j < es.length; j++) {
+        var e = es[j];
+        if (e.dead || !e.solid) continue;
+        if (e.x === ax && e.y === ay) return false;
+      }
+      return true;
+    }
+    for (i = 0; i < cand.length; i++) {
+      x = m.x + cand[i][0]; y = m.y + cand[i][1];
+      if (free(x, y)) { m.x = x; m.y = y; return; }
+    }
+  }
+
+  function mouseStage(c, n) {
+    var r = c.room, st = r.stages[n], es = c.ents(), i;
+    r.stage = n; r.cracks = {}; r._cell = null; r._steps = 0;
+    r.mouse = { x: st.mouse.x, y: st.mouse.y };
+    r.cheese = { x: st.cheese.x, y: st.cheese.y };
+    r.grid = st.grid || r.stages[0].grid;
+    for (i = es.length - 1; i >= 0; i--) if (es[i].iceTool) es.splice(i, 1);
+    if (st.block) es.push({ t: 'block', x: st.block.x, y: st.block.y, solid: true, push: true, iceTool: true });
+    for (i = 0; i < (st.plates || []).length; i++)
+      es.push({ t: 'decor', skin: 'iceplate', x: st.plates[i].x, y: st.plates[i].y, iceTool: true, crack: st.plates[i].crack });
+    for (i = 0; i < es.length; i++) if (es[i].t === 'sign') es[i].lines = n === 1 ?
+      ['step on the two rim plates to crack their ice cells.', 'the mouse cannot enter a cracked cell. r resets this stage.'] : n === 2 ?
+      ['push the stone across the ice until it stops.', 'it blocks the mouse. r resets this stage.'] : es[i].lines;
+    if (NEU.roomArt) delete NEU.roomArt._paints[r.id];
+  }
+
   E.register('b4_ice', {
     tileset: 'castle',
     tiles: [
       '####################',
       '####################',
       '#..................#',
-      '#....iiiiiiiii.....#',
-      '#....i.......i.....#',
-      '#....i...|...i.....#',
-      '#....i.......i,,,,,#',
-      '#....i.......i.....#',
-      '#....iiiiiiiii.....#',
+      '#..iiiiiiiiiiiiii..#',
+      '#..iii|iiii|iiiii..#',
+      '#..iii|iiii|iiiii..#',
+      '#..iii|iiii|iiiii..#',
+      '#..iii|iiii|iiiii..#',
+      '#..iiiiiiiiiiiiii..#',
       '#..................#',
       '#..................#',
       '####################'
@@ -903,43 +1129,84 @@
     shade: 0.35,
     spawns: { west: { x: 1, y: 6, face: 'right' }, east: { x: 18, y: 6, face: 'left' } },
     entities: castleLook(12).concat([
-      { t: 'plate', x: 13, y: 3, slideOnly: true, skin: 'iceplate' },
-      { t: 'plate', x: 13, y: 8, slideOnly: true, skin: 'iceplate' },
-      { t: 'plate', x: 5, y: 8, slideOnly: true, skin: 'iceplate' },
-      { t: 'plate', x: 5, y: 3, slideOnly: true, skin: 'iceplate' },
-      { t: 'sign', x: 16, y: 3, skin: 'lectern',
-        lines: ['step onto the ice and you will not stop until it runs out.',
-                'every corner of the ring is a dead end.'] },
+      { t: 'sign', x: 2, y: 2, skin: 'lectern',
+        lines: ['something small moves under the ice.',
+                'it is afraid of you, and it is slow: it takes one step for every two of yours.',
+                'it scurries straight away from you. if something is in the way, it runs along it.',
+                'the cheese is under the ice too. you cannot touch it. you herd it.'] },
       { t: 'exit', x: 19, y: 6, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice', style: 'door',
         lines: ['the door is frozen into its frame.',
-                'it opens when a slide has landed on every plate on the ice.'] },
-      { t: 'exit', x: 0, y: 6, to: 'b3_braziers', spawn: 'east', style: 'arch' },
-      Q('statue', 9, 5, { frozen: true }),
+                'it opens when the mouse reaches the cheese.'] },
+      { t: 'exit', x: 0, y: 6, to: 'b3_braziers', spawn: 'east', style: 'arch', via: 'door' },
+      Q('statue', 9, 5, { frozen: true, solid: true }),
       Q('glow', 3, 4, { r: 46, col: '#BFE0FF' }), Q('glow', 16, 4, { r: 46, col: '#BFE0FF' }),
       Q('sconce', 9, 1), Q('armour', 1, 2, { solid: true }), Q('armour', 18, 10, { solid: true }),
       Q('rubble', 2, 10)
     ]),
+    stage: 0, cracks: {},
+    stages: [
+      { mouse: { x: 4, y: 5 }, cheese: { x: 9, y: 6 } },
+      { mouse: { x: 8, y: 2 }, cheese: { x: 5, y: 4 },
+        grid: ['####################', '####################', '#.....iii..........#', '#...iiii...........#', '#...iii............#', '#....ii............#', '#....iii...........#', '#..................#', '#..................#', '#..................#', '#..................#', '####################'],
+        plates: [{ x: 6, y: 7, crack: { x: 7, y: 6 } }, { x: 4, y: 2, crack: { x: 5, y: 3 } }] },
+      { mouse: { x: 8, y: 2 }, cheese: { x: 9, y: 3 },
+        grid: ['####################', '####################', '#......iiii........#', '#......iii.........#', '#........i.........#', '#..................#', '#..................#', '#..................#', '#..................#', '#..................#', '#..................#', '####################'],
+        block: { x: 10, y: 4 } }
+    ],
+    mouse: { x: 4, y: 5 },
+    cheese: { x: 9, y: 6 },
+    _cell: null, _steps: 0,
+    mouseAt: function () { return { x: this.mouse.x, y: this.mouse.y }; },
+    cheeseAt: function () { return { x: this.cheese.x, y: this.cheese.y }; },
     onEnter: function (c) {
+      /* Unsolved visits reset; a solved room keeps the mouse at its cheese. */
+      if (!this.stages[0].grid) this.stages[0].grid = this.grid;
+      mouseStage(c, c.flagged('solved:b4_ice') ? 2 : Math.max(0, Math.min(2, Number(NEU.save.flag('b4_stage')) || 0)));
+      if (c.flagged('solved:b4_ice')) { this.mouse.x = this.cheese.x; this.mouse.y = this.cheese.y; }
       if (c.flagged('b4_seen')) return;
       c.flag('b4_seen', 1);
-      say(c, ['the middle of the room is polished to a mirror.',
-              'step onto the ice and you will not stop until the ice runs out.',
-              'every plate on the ice has to feel a slide land on it.']);
+      say(c, ['the middle of the room is a frozen pool, and something small moves under it.',
+              'it is afraid of you, and it is slow: it takes one step for every two of yours.',
+              'it scurries straight away from you. if something is in the way, it runs along it.',
+              'there is cheese under the ice. you cannot touch it. you herd it.']);
     },
     /* The engine's default "every plate has a block" rule cannot know
-       about slides, so this room owns its win condition: every
-       slide-only plate must be armed. */
+       about a mouse, so this room owns its win condition — and the
+       mouse itself is driven from here, once per cell the player
+       crosses, so it moves at exactly half their pace. */
     solved: function (c) {
-      var es = c.ents(), any = false;
-      for (var i = 0; i < es.length; i++)
-        if (es[i].t === 'plate') { any = true; if (!es[i].armed) return false; }
-      return any;
+      var m = this.mouse, ch = this.cheese;
+      var p = c.player;
+      var cx = Math.floor(p.x / 16), cy = Math.floor((p.y - 1) / 16);
+      /* The first call only records where you are standing: the engine
+         asks every tick while you move, and the mouse must count
+         cells crossed, not frames. */
+      if (!this._cell) this._cell = { x: cx, y: cy };
+      else if (this._cell.x !== cx || this._cell.y !== cy) {
+        this._cell = { x: cx, y: cy };
+        var es = c.ents();
+        for (var i = 0; i < es.length; i++) if (es[i].crack && es[i].x === cx && es[i].y === cy) {
+          this.cracks[es[i].crack.x + ',' + es[i].crack.y] = true; es[i].armed = true;
+        }
+        this._steps++;
+        if (this._steps >= 2) { this._steps = 0; stepMouse(this, c, cx, cy); }
+      }
+      if (m.x !== ch.x || m.y !== ch.y) return false;
+      if (this.stage < 2) {
+        c.flag('b4_stage', this.stage + 1);
+        mouseStage(c, this.stage + 1);
+        return false;
+      }
+      return true;
     },
-    onReset: function () { resetHint('b4_ice'); },
+    onReset: function () {
+      if (E.warp) E.warp('b4_ice', 'west');
+      resetHint('b4_ice');
+    },
     onSolved: function (c) {
       c.markSolved('b4_ice');
       if (NEU.quest) NEU.quest.bump('a4_rooms', 3);
-      say(c, ['the last plate locks with a heavy clunk.',
+      say(c, ['the mouse reaches the cheese and stops, perfectly still.',
               'the east wall slides open.']);
     }
   });
@@ -1057,32 +1324,84 @@
      found by touch); the cresset stands on scorched stone in the very
      middle of the cross-corridor. Lit, the room is a different place:
      you see for the first time what you walked past. */
-  var b6carry = false, b6lit = false;
+  /* Six eyes are painted at the pocket mouths along the middle corridor.
+     An eye looks along one grid direction until a wall; a socket is seen
+     when its cell falls on that ray. Exactly one socket is on every open
+     eye's ray, and the last two eyes open only once the torch has been
+     carried past them — so the answer cannot be read from one spot.
+     tests/fixes504.mjs enumerates these cells before the room is built. */
+  var B6_EYES = [
+    { x: 3,  y: 6, dir: 'east', pocket: 'nw', shut: false },
+    { x: 4,  y: 6, dir: 'east', pocket: 'sw', shut: false },
+    { x: 8,  y: 6, dir: 'east', pocket: 'nc', shut: false },
+    { x: 9,  y: 6, dir: 'east', pocket: 'sc', shut: false },
+    { x: 15, y: 6, dir: 'west', pocket: 'ne', shut: true  },
+    { x: 16, y: 6, dir: 'west', pocket: 'se', shut: true  }
+  ];
+  var B6_SOCKETS = [ { x: 5, y: 6, n: 0 }, { x: 10, y: 6, n: 1 }, { x: 17, y: 6, n: 2 } ];
+  var B6_RIGHT = 1;
+  var b6carry = false, b6seated = -1, b6lit = false, b6ents = null;
+
+  function b6TorchEnts() {
+    var out = [], es = b6ents || [];
+    for (var i = 0; i < es.length; i++) if (es[i].torch) out.push(es[i]);
+    return out;
+  }
   function takeTorch(c) {
     if (b6carry) { c.say(['you already have it.'], 'narr'); return; }
-    b6carry = true;
+    if (b6lit) { c.say(['the torch stays in the cresset. it is not yours to carry again.'], 'narr'); return; }
+    var es = c.ents(), i, was = b6seated >= 0;
+    if (was) {
+      for (i = 0; i < es.length; i++)
+        if (es[i].socket && es[i].n === b6seated) { es[i].seated = false; break; }
+      b6seated = -1;
+    }
     /* the torch leaves the wall when it leaves the room with you —
        it was solid so it could be found by touch in the dark */
-    var es = c.ents();
-    for (var i = 0; i < es.length; i++)
-      if (es[i].torch) es[i].dead = true;
+    var ts = b6TorchEnts();
+    for (i = 0; i < ts.length; i++) ts[i].dead = true;
+    b6carry = true;
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
     if (NEU.juice) NEU.juice.hit('small', { colour: '#FF8A3A' });
-    c.say(['you take the torch. the light walks with you.'], 'narr');
+    c.say([was ? 'you lift the torch back out. the light walks with you.'
+               : 'you take the torch. the light walks with you.'], 'narr');
   }
-  function placeTorch(c) {
-    if (c.solved('b6_dark')) { c.say(['the socket is lit. it has been lit since you were last here.'], 'narr'); return; }
-    if (!b6carry) { c.say(['a socket in the wall, empty.', 'it is waiting for a light.'], 'narr'); return; }
-    b6carry = false; b6lit = true;
-    c.markSolved('b6_dark');
-    if (NEU.quest) NEU.quest.bump('a4_rooms', 5);
+  function seatTorch(c, n) {
+    if (b6lit) { c.say(['the socket is lit. it has been lit since you were last here.'], 'narr'); return; }
+    if (b6seated === n) { takeTorch(c); return; }
+    if (!b6carry) {
+      c.say(['a socket in the wall, empty.', 'it is waiting for a light.'], 'narr');
+      return;
+    }
+    b6carry = false; b6seated = n;
+    var es = c.ents();
+    for (var i = 0; i < es.length; i++)
+      if (es[i].socket && es[i].n === n) es[i].seated = true;
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
-    if (NEU.juice) NEU.juice.hit('large', { colour: '#FF8A3A' });
-    c.say(['it fits. light pours back into the room.',
-           'the alcoves were always there. they just did not feel like admitting it.'], 'narr');
+    if (n === B6_RIGHT) {
+      b6lit = true;
+      c.markSolved('b6_dark');
+      if (NEU.quest) NEU.quest.bump('a4_rooms', 5);
+      if (NEU.juice) NEU.juice.hit('large', { colour: '#FF8A3A' });
+      c.say(['it fits. light pours back into the room.',
+             'the alcoves were always there. they just did not feel like admitting it.'], 'narr');
+    } else {
+      if (NEU.juice) NEU.juice.hit('tick');
+      c.say(['the torch sits in the socket. nothing happens.',
+             'you can lift it straight back out.'], 'narr');
+    }
+  }
+  /* the old name stays the entry point for the one correct socket */
+  function placeTorch(c) { seatTorch(c, B6_RIGHT); }
+  function b6Plaque(s) {
+    if (b6carry || b6lit || (s && s.flagged && s.flagged('solved:b6_dark')))
+      return ['a brass plaque by the west door, lit at last:',
+              '"set the light where every open eye can see it."'];
+    return ['a brass plaque by the west door. the lettering is too fine to read without a light.'];
   }
   E.register('b6_dark', {
     tileset: 'castle',
+    eyes: B6_EYES, sockets: B6_SOCKETS,
     tiles: [
       '####################',
       '####################',
@@ -1102,12 +1421,17 @@
     entities: castleLook(12).concat([
       { t: 'npc', x: 2, y: 6, colour: '#E4A64A', solid: true, torch: true, skin: 'walltorch',
         run: function (c) { takeTorch(c); } },
-      { t: 'npc', x: 10, y: 6, colour: '#5A5470', socket: true, skin: 'cresset',
+      { t: 'sign', x: 1, y: 5, plaque: true, skin: 'plaque', lines: b6Plaque },
+      { t: 'npc', x: 5, y: 6, colour: '#5A5470', socket: true, n: 0, skin: 'cresset',
+        run: function (c) { seatTorch(c, 0); } },
+      { t: 'npc', x: 10, y: 6, colour: '#5A5470', socket: true, n: 1, correct: true, skin: 'cresset',
         run: function (c) { placeTorch(c); } },
+      { t: 'npc', x: 17, y: 6, colour: '#5A5470', socket: true, n: 2, skin: 'cresset',
+        run: function (c) { seatTorch(c, 2); } },
       { t: 'exit', x: 19, y: 6, to: 'b7_altar', spawn: 'west', locked: 'solved:b6_dark', style: 'gate',
         lines: ['an iron gate. there is no light on the other side of it either.',
                 'it will not lift for somebody standing in the dark.'] },
-      { t: 'exit', x: 0, y: 6, to: 'b5_two', spawn: 'east', style: 'arch' },
+      { t: 'exit', x: 0, y: 6, to: 'b5_two', spawn: 'east', style: 'arch', via: 'door' },
       /* no wall torches here: the dark is the puzzle */
       Q('bones', 6, 2), Q('bones', 13, 10, { seed: 1 }), Q('rubble', 18, 2), Q('bones', 1, 10),
       /* nothing solid in the corridors: they are one cell wide and the
@@ -1115,18 +1439,35 @@
       Q('candles', 6, 10, { lightIf: 'solved:b6_dark' }), Q('rubble', 1, 2)
     ]),
     onEnter: function (c) {
-      b6carry = false;
+      b6ents = c.ents();
+      b6carry = false; b6seated = -1;
       b6lit = !!c.flagged('solved:b6_dark');
-      /* the torch went into the socket for good; it does not hang on the wall again */
-      if (b6lit) { var es = c.ents(); for (var i = 0; i < es.length; i++) if (es[i].torch) es[i].dead = true; }
+      /* the torch went into the right socket for good; it does not hang
+         on the wall again. A wrong socket is never remembered. */
+      for (var i = 0; i < b6ents.length; i++) {
+        if (b6ents[i].torch && b6lit) b6ents[i].dead = true;
+        if (b6ents[i].socket) b6ents[i].seated = !!(b6lit && b6ents[i].correct);
+      }
       if (c.flagged('b6_seen')) return;
       c.flag('b6_seen', 1);
       say(c, ['the lights here have been out for some time.',
               'you have done this before.']);
     },
-    dark: function () { return b6lit ? 0 : 108; },
+    /* Raised ambient: walls and pockets read as silhouettes, so the room
+       hides only the information the eyes carry, not its shape. */
+    dark: function () { return b6lit ? 0 : 72; },
     light: function (c) { return b6carry ? { x: c.player.x, y: c.player.y } : null; },
-    onReset: function () { b6carry = false; b6lit = false; resetHint('b6_dark'); }
+    carry: function () { return b6carry; },
+    seated: function () { return b6seated; },
+    onReset: function () {
+      b6carry = false; b6seated = -1; b6lit = false;
+      var es = b6ents || [];
+      for (var i = 0; i < es.length; i++) {
+        if (es[i].torch) es[i].dead = false;
+        if (es[i].socket) es[i].seated = false;
+      }
+      resetHint('b6_dark');
+    }
   });
 
   /* ══ B7 — the altar ══════════════════════════════════════════════
@@ -1146,6 +1487,60 @@
      moment you walk in. The second mushroom grows out of a crack in the
      south-east corner, in plain sight, out of reach of anything you
      have yet. */
+
+  /* ── the altar's trapdoor ─────────────────────────────────────────
+     First visit after solved:b6_dark stages the seal in real time:
+     0-400 glow, 200-1200 twelve embers, 400 rumble + a 2 px kick,
+     900-1300 bars retract, 1300-2100 the two halves slide 14 px apart
+     in four steps, 1300-2300 dust, and at 2300 the centre becomes
+     enterable and trap_open is saved. Reduced motion compresses the
+     whole show into 800 ms and drops the kick. The clock is elapsed
+     real time, not a count of frames. */
+  var TRAP_T = { glow: 400, ember: 200, kick: 400, bars: 900, slide: 1300, done: 2300 };
+  var TRAP_FAST = 800;
+  var trap = null;
+  function trapNow() {
+    return trap ? (Date.now() - trap.t0) * (trap.fast ? TRAP_T.done / TRAP_FAST : 1) : 0;
+  }
+  function trapState() {
+    var open = !!(NEU.save && NEU.save.flagged('trap_open'));
+    if (!trap) return { t: TRAP_T.done, phase: open ? 'open' : 'shut', open: open,
+                        glow: 0, embers: 0, kick: 0, bars: open ? 1 : 0,
+                        halves: open ? 4 : 0, dust: 0 };
+    var t = trapNow();
+    return {
+      t: t,
+      phase: t < TRAP_T.glow ? 'glow' : t < TRAP_T.bars ? 'ember' :
+             t < TRAP_T.slide ? 'bars' : t < TRAP_T.done ? 'slide' : 'open',
+      open: t >= TRAP_T.done,
+      glow: Math.min(1, t / TRAP_T.glow),
+      embers: t < TRAP_T.ember ? 0 : Math.min(1, (t - TRAP_T.ember) / 1000),
+      kick: (!trap.fast && t >= TRAP_T.kick && t < TRAP_T.kick + 120) ? 2 : 0,
+      bars: t < TRAP_T.bars ? 0 : Math.min(1, (t - TRAP_T.bars) / 400),
+      halves: t < TRAP_T.slide ? 0 : Math.min(4, Math.floor((t - TRAP_T.slide) / 200)),
+      dust: t < TRAP_T.slide ? 0 : Math.min(1, (t - TRAP_T.slide) / 1000)
+    };
+  }
+  function trapTick() {
+    if (!trap) return;
+    var t = trapNow();
+    if (t >= TRAP_T.kick && !trap.kicked) {
+      trap.kicked = 1;
+      if (!trap.fast && NEU.juice && NEU.juice.hit) NEU.juice.hit('medium', { colour: '#FF8A3A' });
+    }
+    if (t >= TRAP_T.done) {
+      if (NEU.save) NEU.save.flag('trap_open', 1);
+      trap = null;
+      return;
+    }
+    trap.c.later(trapTick, 16);
+  }
+  function startTrap(c) {
+    if (trap || !c.flagged('solved:b6_dark') || c.flagged('trap_open')) return;
+    trap = { c: c, t0: Date.now(), fast: crackReduced(), kicked: 0 };
+    c.later(trapTick, 16);
+  }
+
   E.register('b7_altar', {
     tileset: 'castle',
     tiles: [
@@ -1165,7 +1560,7 @@
     ].join('\n'),
     shafts: [[2, 70, 12, 0.3, '#CFE0FF'], [20, 70, 12, -0.3, '#CFE0FF']],
     shade: 0.55,
-    spawns: { east: { x: 21, y: 6, face: 'left' }, north: { x: 11, y: 2, face: 'down' },
+    spawns: { east: { x: 21, y: 6, face: 'left' }, north: { x: 13, y: 3, face: 'down' },
               west: { x: 1, y: 6, face: 'right' },
               fire: { x: 11, y: 11, face: 'up' } },
     entities: castleLook(13).concat([
@@ -1179,10 +1574,12 @@
                 'a door opens in the south wall. it is on fire. it does not seem bothered.'] },
       { t: 'npc', x: 19, y: 10, colour: '#C4705F', mush: 'mush2', sheet: 'mushroom',
         run: function (c) { NEU.chop && NEU.chop(c, 'mush2'); } },
-      { t: 'exit', x: 22, y: 6, to: 'a3_fork', spawn: 'altar', style: 'arch' },
-      { t: 'exit', x: 11, y: 1, to: 'b8_arena', spawn: 'west', locked: 'solved:b6_dark', style: 'stairs',
-        lines: ['stairs going down, and something at the bottom of them with a heartbeat.',
-                'a grate is down across them. it lifts when the dark room is lit.'] },
+      { t: 'exit', x: 22, y: 6, to: 'a_woods', spawn: 'altar', style: 'arch', via: 'slide' },
+      /* The way down is a seal in the floor, not a stair in the wall.
+         It stays shut for the length of its own reveal (see trapState). */
+      { t: 'exit', x: 11, y: 3, to: 'b8_arena', spawn: 'drop', locked: 'trap_open', style: 'hatch',
+        lines: ['a stone seal set into the floor, iron bars across it.',
+                'something under it has a heartbeat.'] },
       { t: 'exit', x: 0, y: 6, to: 'b6_dark', spawn: 'east', locked: 'solved:b6_dark', style: 'door',
         lines: ['a door, barred from the other side.',
                 'whatever is through there, you will come at it the long way first.'] },
@@ -1190,7 +1587,7 @@
          is drawn burning so it cannot be mistaken for the other
          exits in a room that already has three. */
       { t: 'exit', x: 11, y: 12, to: 'd1_street', spawn: 'fire', locked: 'firedoor',
-        sheet: 'firedoor', style: 'portal',
+        sheet: 'firedoor', style: 'portal', via: 'portal:fire',
         lines: ['the south wall is a wall.'] },
       Q('candles', 9, 5, { solid: true }), Q('candles', 13, 5, { solid: true, seed: 1 }),
       Q('candles', 9, 8, { solid: true, seed: 1 }), Q('candles', 13, 8, { solid: true }),
@@ -1198,7 +1595,14 @@
       Q('sconce', 8, 1), Q('sconce', 14, 1),
       Q('glow', 2, 4, { r: 40, col: '#BFD3FF' }), Q('glow', 20, 4, { r: 40, col: '#BFD3FF' }),
       Q('bones', 17, 11), Q('urn', 1, 2, { solid: true }), Q('urn', 21, 2, { solid: true })
-    ]).concat(columns([3, 3, 19, 3, 3, 9, 19, 9]))
+    ]).concat(columns([3, 3, 19, 3, 3, 9, 19, 9])),
+    trapState: trapState,
+    onEnter: function (c) {
+      /* later() timers die with a visit, so a fresh arrival restarts an
+         unfinished reveal; a saved trap_open skips the show entirely */
+      trap = null;
+      startTrap(c);
+    }
   });
 
   /* ══ B8 — the door at the back ═══════════════════════════════════
@@ -1231,7 +1635,8 @@
       '#...................#',
       '#####################'
     ].join('\n'),
-    spawns: { west: { x: 1, y: 7, face: 'right' } },
+    spawns: { west: { x: 1, y: 7, face: 'right' },
+              drop: { x: 2, y: 7, face: 'right' } },
     entities: [
       /* the hall itself — floor, walls, sigil, gutters — FIRST: floor
          decals draw in list order, and everything else sits on it */

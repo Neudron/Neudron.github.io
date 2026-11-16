@@ -109,7 +109,7 @@
   /* ── the painter ──────────────────────────────────────────────────────
      R() paints world px into the bake canvas, mirrored for a west-facing
      ('w') piece so every edge-on drawing is written once. */
-  var P = { g: null, S: 1, fl: false };
+  var P = { g: null, S: 1, fl: false, nolock: false };
   function R(c, x, y, w, h) {
     if (w <= 0 || h <= 0) return;
     if (P.fl) x = -x - w;
@@ -134,9 +134,10 @@
   }
 
   var PADLOCK = ['.sss.', 's...s', 's...s', 'kkkkk', 'kGGGk', 'kGkGk', 'kgggk', 'kkkkk'];
-  function padlock(x, y) { stamp(PADLOCK, { s: IRON[3], k: OUT, G: DULL[3], g: DULL[2] }, x, y); }
+  function padlock(x, y) { if (P.nolock) return; stamp(PADLOCK, { s: IRON[3], k: OUT, G: DULL[3], g: DULL[2] }, x, y); }
   /* a chain on a slope from (x0,y0) to (x1,y1), links alternating */
   function chain(x0, y0, x1, y1) {
+    if (P.nolock) return;   /* the lock is gone: so is its chain (the cast's padlockOff) */
     var n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
     for (var i = 0; i <= n; i += 2) {
       var x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n);
@@ -1001,14 +1002,14 @@
      By the passage it leads to first (some exits are a story beat), then
      by zone and wall. Keyed `room>to`. */
   var BY_EXIT = {
-    'a3_fork>b1_throne': { style: 'stairs' },          /* up to the castle */
-    'a3_fork>b7_altar': { style: 'tunnel' },           /* "not swept in a long time" */
-    'b1_throne>a3_fork': { style: 'door' },            /* the castle's front door */
-    'b7_altar>a3_fork': { style: 'tunnel' },           /* back out to the woods */
-    'b7_altar>b8_arena': { style: 'gate' },
+    'a_woods>b1_throne': { style: 'stairs' },          /* up to the castle */
+    'a_woods>b7_altar': { style: 'tunnel' },           /* "not swept in a long time" */
+    'b1_throne>a_woods': { style: 'door' },            /* the castle's front door */
+    'b7_altar>a_woods': { style: 'tunnel' },           /* back out to the woods */
+    'b7_altar>b8_arena': { style: 'hatch', via: 'fall' },
     'b8_arena>b7_altar': { style: 'arch' },
-    'd1_street>b7_altar': { style: 'portal', tint: '#FF8A3A' },   /* the fire door, from the other side */
-    'd1_street>h3_trip': { style: 'portal', tint: '#FF6BD6' },    /* "a door painted on the street" */
+    'd_city>b7_altar': { style: 'portal', tint: '#FF8A3A' },   /* the fire door, from the other side */
+    'd_city>h3_trip': { style: 'portal', tint: '#FF6BD6' },    /* "a door painted on the street" */
     'h3_trip>d1_street': { style: 'portal', tint: '#FF6BD6' },
     'g_8>h1_storm': { style: 'stairs' },               /* "a staircase down" */
     'h1_storm>g_8': { style: 'stairs', dir: 'up' },
@@ -1094,8 +1095,8 @@
   }
   var bakeCache = {};
   var bakes = 0;
-  function bake(r, open, nl, S) {
-    var key = r.name + '|' + r.o + '|' + (r.fl ? 1 : 0) + '|' + (open ? 1 : 0) + '|' + nl + '|' + S + '|' + r.ts + '|' + (r.tint || '') + '|' + (r.variant || '') + '|' + (r.label || '');
+  function bake(r, open, nl, S, nolock) {
+    var key = r.name + '|' + r.o + '|' + (r.fl ? 1 : 0) + '|' + (open ? 1 : 0) + '|' + (nolock ? 1 : 0) + '|' + nl + '|' + S + '|' + r.ts + '|' + (r.tint || '') + '|' + (r.variant || '') + '|' + (r.label || '');
     if (bakeCache[key]) return bakeCache[key];
     var C = colours(r.ts, r.name === 'portal' || r.name === 'rift' || r.name === 'frame' ? null : r.tint,
                     r.name === 'portal' || r.name === 'rift' || r.name === 'frame' ? r.tint : null);
@@ -1105,7 +1106,9 @@
     var out = { base: base, glow: null };
     if (!g) { bakeCache[key] = out; return out; }
     P.g = g; P.S = S; P.fl = r.fl;
+    P.nolock = !!nolock;
     r.st.draw(r.o, open, nl, C, r.variant);
+    P.nolock = false;
     if (r.label) labelPlate(r.label, r.o, open);
     g.globalAlpha = 1;
     var gg = glow.getContext('2d');
@@ -1268,11 +1271,11 @@
     if (!e || e.sheet || !g || !g.drawImage) return false;
     var r = state(e, d), S = d.S | 0 || 1;
     var open = d.open !== undefined ? !!d.open : (!e.locked || !!(NEU.save && NEU.save.flagged(e.locked)));
-    var near = d.near || 0, nl = open ? nearStep(near) : 0;
-    if (r.S !== S) { r.S = S; r.slots = [null, null, null, null, null, null]; }
-    var si = (open ? 3 : 0) + nl, b = r.slots[si];
-    if (!b) b = r.slots[si] = bake(r, open, nl, S);
-    var x0 = d.sx + r.dx * S, y0 = d.sy + r.dy * S;
+    var near = d.near || 0, nl = open ? (d.step !== undefined ? d.step : nearStep(near)) : 0;
+    if (r.S !== S) { r.S = S; r.slots = [null, null, null, null, null, null, null]; }
+    var si = open ? 3 + nl : d.padlockOff ? 6 : 0, b = r.slots[si];
+    if (!b) b = r.slots[si] = bake(r, open, nl, S, !!d.padlockOff);
+    var x0 = d.sx + r.dx * S + (d.jx || 0) * S, y0 = d.sy + r.dy * S;
     var still = reduced(), t = (d.now || 0) / 1000;
     g.drawImage(b.base, x0 - AX * S, y0 - AY * S);
     if (b.glow) {
@@ -1308,7 +1311,7 @@
     d = d || {};
     var r = state(e, d);
     var open = d.open !== undefined ? !!d.open : (!e.locked || !!(NEU.save && NEU.save.flagged(e.locked)));
-    var nl = open ? nearStep(d.near || 0) : 0, si = (open ? 3 : 0) + nl;
+    var nl = open ? (d.step !== undefined ? d.step : nearStep(d.near || 0)) : 0, si = (open ? 3 : 0) + nl;
     if (r.light[si]) return r.light[si];
     var C = colours(r.ts, r.name === 'portal' || r.name === 'rift' || r.name === 'frame' ? null : r.tint,
                     r.name === 'portal' || r.name === 'rift' || r.name === 'frame' ? r.tint : null);
