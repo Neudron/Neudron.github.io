@@ -44,7 +44,7 @@
       var v = {}, k;
       for (k in e) if (Object.prototype.hasOwnProperty.call(e, k)) v[k] = e[k];
       v.id = v.id || id + ':' + v.t + ':' + v.x + ',' + v.y + ':' + i;
-      v.t0 = 0; v.dead = false; v.solid = v.t === 'zip' || v.t === 'crumble';
+      v.t0 = 0; v.dead = false; v.solid = !!e.solid || v.t === 'zip' || v.t === 'crumble';
       return v;
     });
     levels[id] = def; return def;

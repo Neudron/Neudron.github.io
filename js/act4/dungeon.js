@@ -338,6 +338,7 @@
     }
     g[HUT.wall1 - 1][HUT.x0] = ' '; g[HUT.wall1][HUT.x0] = ' ';   /* the door */
     ents.push({ t: 'bed', x: 18, y: HUT.wall1 });
+    ents.push({ t: 'tdoor', x: 31, y: HUT.wall1 });   /* W20: the door to the tutorial room t0 */
     decor.push({ k: 'L', x: 26, y: HUT.wall0, f: 'B' });
     /* d0 holds the three lift heads, in order, for the lifts of d3, d6 and d9 */
     n = 0;
@@ -476,6 +477,116 @@
     if (n < 0) return origReplay(id, rec);
     return origReplay('dgn', rec, { spawn: zones[n].spawn, zone: id, goal: n < 10 ? 'd' + (n + 1) : 'door' });
   };
+
+  /* t0, the tutorial room (W20): 60x20 tiles behind the hut door (tdoor), no enemies, six stations left to right.
+     Each station is a sign plus an obstacle that needs exactly one verb: jump, dash, melee twice, charged melee,
+     a soul shot across a pit, a spell on a barrier (TP from the crystal), melee to open the chest. The door back
+     (tleave) is always open. Death respawns at the last station checkpoint (tcp). Per-open state lives on the level. */
+  var TW = 60, TH = 20, TPIT = [[11, 12], [18, 26], [39, 47]];
+  function tpit(x) { var i; for (i = 0; i < TPIT.length; i++) if (x >= TPIT[i][0] && x <= TPIT[i][1]) return true; return false; }
+  function tRows() {
+    var g = [], x, y, s;
+    for (y = 0; y < TH; y++) {
+      s = '';
+      for (x = 0; x < TW; x++) s += (y === 0 || x === TW - 1 || (x === 0 && y !== 15)) ? '#' : y < 16 ? '.' : tpit(x) ? ' ' : '#';
+      g.push(s);
+    }
+    return g;
+  }
+  function kn(def) { return String(NEU.keys && NEU.keys.get ? NEU.keys.get(def) : def).toUpperCase(); }
+  var TSIGN = {
+    jump: function () { return '* SPACE jumps the gap.'; },
+    dash: function () { return '* ' + kn('x') + ' in the air dashes the wide gap. it is too wide to jump.'; },
+    crate: function () { return '* ' + kn('z') + ' twice breaks a crate. the wall is two crates high.'; },
+    armour: function () { return '* hold ' + kn('z') + ' for a full swing. it breaks armour.'; },
+    shot: function () { return '* hold ' + kn('z') + ', then let go: a soul shot. hit the far target.'; },
+    spell: function () { return '* the crystal gives TP. ' + kn('c') + ' opens the strip. down picks SPELL I, ' + kn('z') + ' casts it.'; },
+    chest: function () { return '* ' + kn('z') + ' opens the chest.'; }
+  };
+  /* pit widths are measured (tests/fixes561.mjs): jump alone clears 8 tiles at best and never 9; a ground dash
+     clears up to 6; a dash in the air clears 9. So the wide gap is 9 wide and the shot pit 9 wide too. */
+  /* checkpoints sit two tiles past each pit: a fall touches none of them, only the landing does */
+  var TENTS = [
+    { t: 'tleave', x: 0, y: 15 }, { t: 'sign', x: 5, y: 15, key: 'jump' },
+    { t: 'tcp', x: 14, y: 15 }, { t: 'sign', x: 14, y: 15, key: 'dash' },
+    { t: 'tcp', x: 28, y: 15 }, { t: 'sign', x: 28, y: 15, key: 'crate' },
+    { t: 'tcrate', x: 30, y: 15, solid: true, hp: 2 }, { t: 'tcrate', x: 30, y: 14, solid: true, hp: 2 },
+    { t: 'tcp', x: 32, y: 15 }, { t: 'sign', x: 32, y: 15, key: 'armour' }, { t: 'tarm', x: 34, y: 15, solid: true },
+    { t: 'tcp', x: 36, y: 15 }, { t: 'sign', x: 36, y: 15, key: 'shot' },
+    { t: 'tbridge', x: 39, y: 16, solid: true }, { t: 'tbridge', x: 40, y: 16, solid: true }, { t: 'tbridge', x: 41, y: 16, solid: true },
+    { t: 'tbridge', x: 42, y: 16, solid: true }, { t: 'tbridge', x: 43, y: 16, solid: true }, { t: 'tbridge', x: 44, y: 16, solid: true },
+    { t: 'tbridge', x: 45, y: 16, solid: true }, { t: 'tbridge', x: 46, y: 16, solid: true }, { t: 'tbridge', x: 47, y: 16, solid: true },
+    { t: 'tcp', x: 49, y: 15 }, { t: 'sign', x: 49, y: 15, key: 'spell' }, { t: 'ttgt', x: 50, y: 13 },
+    { t: 'tcry', x: 51, y: 15 }, { t: 'tbar', x: 53, y: 14, solid: true }, { t: 'tbar', x: 53, y: 15, solid: true },
+    { t: 'sign', x: 54, y: 15, key: 'chest' }, { t: 'tchest', x: 55, y: 15 },
+    { t: 'tgate', x: 57, y: 14, solid: true }, { t: 'tgate', x: 57, y: 15, solid: true }
+  ];
+  function tk() { var L = P.level0(); return L ? L.kit : null; }
+  function tTargets() {
+    var L = P.level0(), out = [], i, e, s = L.ts;
+    for (i = 0; i < L.entities.length; i++) {
+      e = L.entities[i];
+      if ((e.t === 'ttgt' && !s.hit) || (e.t === 'tbar' && !s.bar)) out.push({ x: (e.x + 0.5) * T, y: (e.y + 0.5) * T, r: 8, e: e });
+    }
+    return out;
+  }
+  function tDamage(t, n, kind) {
+    var s = P.level0().ts;
+    if (!t || !t.e || kind === 'melee') return;
+    if (t.e.t === 'ttgt') s.hit = true;
+    else if (t.e.t === 'tbar' && kind === 'spell') s.bar = true;
+  }
+  function tOpen() {
+    var L = P.level0(), F = { x: 0, y: 0, fx: 1, fy: 0 }, i, e;
+    L.ts = { hit: false, bar: false, gate: false }; L.kitF = F;
+    L.kit = NEU.kit ? NEU.kit.create({ F: F, box: { AX: 0, AY: 0, AW: TW * T, AH: TH * T }, noMelee: true, adapter: {
+      targets: tTargets, damage: tDamage, hurtPlayer: function (n) { P.hurt(n); } } }) : null;
+    for (i = 0; i < L.entities.length; i++) { e = L.entities[i]; if (e.t === 'sign') e.lines = [TSIGN[e.key]()]; }
+  }
+  function tTick(dt) {
+    var L = P.level0(), h = P.hero(), f = L.kitF;
+    /* the pits open to a solid floor below the map: feet past the floor line (y 256) means a fall, so wake at the checkpoint */
+    if (h.y > 17 * T) { P.die(); return; }
+    if (!L.kit) return;
+    f.x = h.x; f.y = h.y - P.hh / 2; f.fx = h.face; f.fy = 0;
+    L.kit.hp = h.hp; L.kit.tick(dt);
+  }
+  function tKey(k, down) {
+    var lk = String(k).toLowerCase(), h = P.hero(), kt = tk();
+    if (!kt) return false;
+    if (down && kt.stripOpen) { kt.hp = h.hp; kt.keydown(k); h.hp = Math.max(h.hp, kt.hp); return true; }
+    if (down && lk === 'c') { kt.keydown('c'); return true; }
+    if (lk === 'z') { if (down) kt.keydown('z'); else kt.keyup('z'); }
+    return false;
+  }
+  function tLights(list) { var h = P.hero(); list.push(h.x / T, (h.y - 11) / T, 0.8); }
+  function tDraw(c, cx, cy) { var kt = tk(); if (!kt) return; c.save(); c.translate(-cx, -cy); kt.draw(c); c.restore(); }
+  P.level('t0', {
+    rows: tRows(), spawn: { x: 2, y: 15 }, entities: TENTS, tileset: 'dungeon', view: 'terraria', chunked: true, hp: 6, solid: '#',
+    faction: function () { return 'B'; }, zoneAt: function () { return null; }, cracks: {},
+    decor: [{ k: 'w', x: 5, y: 15, f: 'B' }, { k: 'w', x: 16, y: 15, f: 'B' }, { k: 'w', x: 28, y: 15, f: 'B' }, { k: 'w', x: 36, y: 15, f: 'B' }, { k: 'w', x: 49, y: 15, f: 'B' }, { k: 'w', x: 55, y: 15, f: 'B' }],
+    onOpen: tOpen, tick: tTick, key: tKey, draw: tDraw, lights: tLights, swing: function () { return 0; }   /* a hook: plat charges melee only when the level has one */
+  });
+  kd('tdoor', { touch: function (e, input, melee) { if (melee && !P.replaying()) origOpen('t0', {}); } });
+  kd('tleave', { touch: function () { if (!P.replaying()) origOpen('dgn', { spawn: { x: 29, y: HUT.wall1 }, zone: 'd0' }); } });
+  kd('tcp', { touch: function (e) { var L = P.level0(); if (L && (L.spawn.x !== e.x || L.spawn.y !== e.y)) L.spawn = { x: e.x, y: e.y }; } });
+  kd('tcrate', { touch: function (e, input, melee) { if (!melee || e.dead) return; e.hp -= 1; if (e.hp <= 0) e.dead = true; } });
+  kd('tarm', { touch: function (e, input, melee) {
+    if (!melee || e.dead) return;
+    if (P.hero().swingPow === 2) { e.dead = true; return; }
+    if (!e.said && !P.replaying()) { e.said = true; talk(['* the armour holds. hold ' + kn('z') + ' for a full swing.']); }
+  } });
+  kd('tbridge', { tick: function (e) { e.dead = !P.level0().ts.hit; } });
+  kd('tbar', { tick: function (e) { e.dead = !!P.level0().ts.bar; } });
+  kd('tgate', { tick: function (e) { e.dead = !!P.level0().ts.gate; } });
+  kd('tcry', { touch: function (e) { var kt = tk(); if (e.used) return; e.used = true; if (kt && !P.replaying()) kt.addTp(0.6); } });
+  kd('tchest', { touch: function (e, input, melee) {
+    var L = P.level0();
+    if (!melee || e.opened) return;
+    e.opened = true; L.ts.gate = true;
+    if (!P.replaying() && NEU.save && NEU.save.give && !NEU.save.has('nova')) NEU.save.give('nova');
+    talk(['* a grave nova. the gate ahead is open.']);
+  } });
 
   NEU.dungeon = {
     recordings: REC, bossOpen: false, bossLine: '', mageSign: '', sign: '', lastDeath: null,

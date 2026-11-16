@@ -228,8 +228,9 @@
     for (i = 0; i < 5; i++) c.drawImage(starSpr(i < n).cv, 0, 0, 7, 7, a.x1 - 20, y + 22 + i * 16, 14, 14);
     z = L.zoneAt(s.x, s.y - 11); depth = Math.round((s.y / T - 15) * 2);
     c.font = FONT; c.textBaseline = 'top'; c.textAlign = 'left';
-    c.fillStyle = INK; c.fillText(depth > 0 ? depth + "' underground" : 'surface', a.x0 + 14, y + 2);
-    c.fillStyle = '#E8DCC8'; c.fillText(depth > 0 ? depth + "' underground" : 'surface', a.x0 + 12, y);
+    var label = L.id === 't0' ? 'training room' : depth > 0 ? depth + "' underground" : 'surface';
+    c.fillStyle = INK; c.fillText(label, a.x0 + 14, y + 2);
+    c.fillStyle = '#E8DCC8'; c.fillText(label, a.x0 + 12, y);
     if (z) { c.fillStyle = '#8A7A9A'; c.fillText(z.id, a.x0 + 12, y + 18); }
   }
 
@@ -359,6 +360,18 @@
     var s = bedSpr();
     c.drawImage(s.cv, 0, 0, 32, 16, x - 8, y, 32, 16);
   };
+  /* W20 tutorial room props: palette-drawn, no sheet yet (art pass later). Dead props draw nothing. */
+  kd('tdoor').draw = function (c, x, y) { P.fr(c, x - 4, y - 16, 24, 32, '#5C3A20'); P.fr(c, x - 2, y - 14, 20, 30, '#12081E'); };
+  kd('tcrate').draw = function (c, x, y, e) { if (e.dead) return; P.fr(c, x + 1, y + 1, 14, 14, e.hp < 2 ? '#7A4E2A' : '#8A5A32'); P.fr(c, x + 3, y + 5, 10, 1, '#C8924F'); };
+  kd('tarm').draw = function (c, x, y, e) { if (e.dead) return; P.fr(c, x + 1, y + 1, 14, 14, '#5A6270'); P.fr(c, x + 1, y + 6, 14, 2, '#AEB8C8'); };
+  kd('tbridge').draw = function (c, x, y, e) { if (e.dead) return; P.fr(c, x, y, 16, 6, '#8A5A32'); P.fr(c, x, y + 6, 16, 1, '#5C3A20'); };
+  kd('tbar').draw = function (c, x, y, e) { if (e.dead) return; P.fr(c, x + 2, y, 3, 16, '#FF5FA8'); P.fr(c, x + 11, y, 3, 16, '#FF5FA8'); };
+  kd('tgate').draw = function (c, x, y, e) { if (e.dead) return; P.fr(c, x + 3, y, 2, 16, '#7A8CA0'); P.fr(c, x + 11, y, 2, 16, '#7A8CA0'); };
+  kd('tchest').draw = function (c, x, y, e) { P.fr(c, x + 1, y + 6, 14, 10, e.opened ? '#5C3A20' : '#8A5A32'); P.fr(c, x + 7, y + 5, 2, 3, '#FFD36A'); };
+  kd('ttgt').draw = function (c, x, y) { P.glow(c, x + 8, y + 8, 12, '#9AF0FF', 0.5); P.fr(c, x + 5, y + 5, 6, 6, '#E8FBFF'); };
+  kd('tcry').draw = function (c, x, y, e) { if (e.used) return; P.glow(c, x + 8, y + 8, 14, '#9AF0FF', 0.6); P.fr(c, x + 6, y + 4, 4, 8, '#9AF0FF'); };
+  kd('tcp').draw = function (c, x, y) { P.fr(c, x + 7, y + 6, 2, 10, '#C8B890'); P.fr(c, x + 9, y + 6, 4, 3, '#FFD36A'); };
+  kd('tleave').draw = function () {};
   var crumbleDraw = kd('crumble').draw;
   kd('crumble').draw = function (c, x, y, e, now) {
     var L = P.level0(), f, j;
