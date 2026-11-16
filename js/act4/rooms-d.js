@@ -678,6 +678,8 @@
       { t: 'exit', x: 0, y: 4, to: 'e3_hall', spawn: 'north', style: 'curtain' }
     ],
     onEnter: function (c) {
+      if (c.flagged('e4_seen')) return;
+      c.flag('e4_seen', 1);
       say(c, ['golden light from nowhere in particular.',
               'somebody is standing at the far end, not blocking it.']);
     }
@@ -706,9 +708,13 @@
          page — an object two acts old gains a new verb. */
       c.flag('tv_breakable', 1);
       if (NEU.quest) NEU.quest.mark('a4_told');
-      setTimeout(function () {
+      c.later(function () {
+        if (NEU.engine && NEU.engine.room !== 'e4_corridor') return;
         c.say(['the corridor lets you out. you are back on the page.'], 'narr');
-        setTimeout(function () { c.leave(); }, 1800);
+        c.later(function () {
+          if (NEU.engine && NEU.engine.room !== 'e4_corridor') return;
+          c.leave();
+        }, 1800);
       }, 2600);
     }
   }
