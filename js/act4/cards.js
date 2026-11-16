@@ -7,6 +7,7 @@
   var ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
   var active = false;
   var state = null;
+  var endPending = false;
   var CW = 72;
   var CH = 104;
 
@@ -83,7 +84,8 @@
     var calm;
     if (reduced() || !(amount > 0)) return;
     state.pops.push({ x: target === 'you' ? 544 : 48, y: 50, text: '-' + amount, t: 0, dur: 650 });
-    calm = NEU.motion && NEU.motion.calmFlash && NEU.motion.calmFlash();
+    calm = (NEU.motion && NEU.motion.calmFlash && NEU.motion.calmFlash()) ||
+      (NEU.juice && NEU.juice.noFlash);
     if (!calm) state.flash = { x: target === 'you' ? 528 : 32, y: 10, t: 0, dur: 120 };
   }
 
@@ -154,6 +156,16 @@
     if (NEU.dungeon && NEU.dungeon.toSurface) NEU.dungeon.toSurface();
   }
 
+  /* the LOSE board stays readable for a beat, then leaves. One pending
+     timer per duel; a fresh duel opened in the meantime is left alone. */
+  function finishLose(s) {
+    if (!endPending) return;
+    endPending = false;
+    if (state !== s) return;
+    if (active) close();
+    dungeonDeath();
+  }
+
   /* Hard stall guard only: at 40 turns the higher HP wins, a tie is a loss.
      Empty decks no longer end the duel — discard is reshuffled back in. */
   function settle() {
@@ -165,9 +177,8 @@
   }
 
   function play(idx) {
-    if (!state) return state;
+    if (!state || endPending) return state;
     if (!state.over) {
-      state.you.parry = false;           /* your parry expires at your turn start */
       act('you', idx);
       state.turn++;
       if (!state.over) {
@@ -176,13 +187,21 @@
         var mi = committedIndex();
         if (mi >= 0) act('mage', mi);
         state.you.block = 0;             /* your block decays at end of round, after the mage acts */
+        state.you.parry = false;         /* your parry decays at end of round too */
         chooseIntent();                  /* telegraph the next turn before you choose */
       }
       settle();
     }
     if (state.result === 'win') grant();
-    if (state.result === 'lose') { close(); dungeonDeath(); }
-    else draw();
+    if (state.result === 'lose') {
+      draw();                            /* show the LOSE board before it closes */
+      if (!endPending) {
+        endPending = true;
+        var s = state;
+        if (NEU.kernel && NEU.kernel.after) NEU.kernel.after(900, function () { finishLose(s); });
+        else setTimeout(function () { finishLose(s); }, 900);
+      }
+    } else draw();
     return state;
   }
 
@@ -545,7 +564,7 @@
   }
 
   function draw() {
-    var w, h, sway, cx, i, n, pos, f, t, x, y, shook, a, sel, k, pp;
+    var w, h, sway, cx, i, n, pos, f, t, x, y, shook, a, sel, k, pp, res, rw;
     if (!ctx || !state) return;
     w = canvas.width || 640;
     h = canvas.height || 480;
@@ -606,7 +625,12 @@
     text('NEXT:' + (state.over ? '-' : (state.mage.intent || '-')), 48, 106, 14, '#FFD080');
     text('BLK' + state.you.block + (state.you.parry ? ' PARRY' : ''), 544, 90, 12, '#C8B898');
     text('STREAK' + state.you.streak, 544, 106, 12, '#C8B898');
-    if (state.over) text(state.result === 'win' ? 'WIN' : state.result === 'lose' ? 'LOSE' : 'TIME', 320, 264, 24, '#FFE080');
+    if (state.over) {
+      res = state.result === 'win' ? 'WIN' : 'LOSE';
+      rw = ctx.measureText ? ctx.measureText(res) : null;
+      rw = rw && rw.width ? rw.width : res.length * 24 * 0.6;
+      text(res, 320 - rw / 2, 264, 24, '#FFE080');
+    }
     /* damage numbers rise and fade; a short plaque flash lands the hit */
     if (!reduced()) {
       if (state.flash) {
@@ -669,8 +693,8 @@
   function onClick(e) {
     var r, x, y, i, px;
     if (!active || !state) return;
-    if (state.over) { close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (NEU.kernel && NEU.kernel.current && NEU.kernel.current() !== 'cards') return;
+    if (state.over) { close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (!canvas || !canvas.getBoundingClientRect) return;
     r = canvas.getBoundingClientRect();
     if (!r.width || !r.height) return;
