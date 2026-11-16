@@ -1228,8 +1228,9 @@
 
   /* ── hitting her ────────────────────────────────────────────────
      Two strikes, both on Z. A tap (released before FIRE_HOLD) is the
-     melee slash: 6 damage, reach MELEE_R toward the nearest target.
-     Holding Z to FIRE_HOLD and releasing throws a fireball: 4 damage,
+     melee slash: the equipped melee's damage (Old Blade: 6), reach MELEE_R
+     toward the nearest target. Holding Z to FIRE_HOLD and releasing throws
+     a fireball: the equipped ranged's damage (Soul Fire: 4),
      homing, FIRE_CD cooldown. A landed fireball splits into 4 minis.
      BRIMSTONE, a laser, is in the C strip. */
 
@@ -2035,11 +2036,11 @@
       ok: function () { return hp < MAXHP && healCd <= 0; },
       tag: function () { return 'FREE'; },
       why: function () { return healCd > 0 ? 'WAIT ' + Math.ceil(healCd) + 's' : 'HP FULL'; } },
-    { name: 'BRIMSTONE', icon: 'buster', col: '#FF6A2A', cost: 0.5,
+    { name: 'BRIMSTONE', fx: 'beam', icon: 'buster', col: '#FF6A2A', cost: 0.5,
       ok: function () { return tp >= 0.5; },
       tag: function () { return '50% TP'; },
       why: function () { return 'NEED 50%'; } },
-    { name: 'SOUL SHIELD', icon: 'shield', col: '#8FD8FF', cost: 0.32,
+    { name: 'SOUL SHIELD', fx: 'shield', icon: 'shield', col: '#8FD8FF', cost: 0.32,
       ok: function () { return tp >= 0.32 && shieldT <= 0; },
       tag: function () { return '32% TP'; },
       why: function () { return shieldT > 0 ? 'ALREADY UP' : 'NEED 32%'; } },
@@ -2048,6 +2049,32 @@
       tag: function () { return 'FREE'; },
       why: function () { return rageMode ? 'BURNING' : Math.floor(rage * 100) + '% FULL'; } }
   ];
+  /* Spell presentation follows the same effects as kit.js. */
+  var SPELL_LOOK = { nova: { icon: 'buster', col: '#C9A4FF' }, heal: { icon: 'heal', col: '#5CF08C' }, beam: { icon: 'buster', col: '#FF6A2A' }, shield: { icon: 'shield', col: '#8FD8FF' } };
+  function equippedItem(slot) {
+    return NEU.items.get(NEU.save.equipped(slot)) || NEU.items.get({ melee: 'blade', ranged: 'soulfire', spell1: 'brimstone', spell2: 'soulshield' }[slot]);
+  }
+  function spellRow(i, d) {
+    var fx = d.fx, look = SPELL_LOOK[fx] || { icon: 'buster', col: COL.dim };
+    var cost = d.stats.tp / 100, pct = Math.round(d.stats.tp) + '% TP', need = 'NEED ' + Math.round(d.stats.tp) + '%';
+    STRIP[i] = { name: d.name.toUpperCase(), fx: fx, stats: d.stats, icon: look.icon, col: look.col, cost: cost,
+      ok: function () { return !!SPELL_LOOK[fx] && tp >= cost && !(fx === 'shield' && shieldT > 0); },
+      tag: function () { return pct; },
+      why: function () { return !SPELL_LOOK[fx] ? 'NOT IN FIGHT' : fx === 'shield' && shieldT > 0 ? 'ALREADY UP' : need; } };
+  }
+  /* The save owns what is equipped, items.js owns the numbers. Read once
+     per open: the loadout cannot change while the fight runs. Without
+     save.js or items.js the Old Blade / Soul Fire / BRIMSTONE / SOUL SHIELD
+     numbers above and in STRIP stand. */
+  function loadGear() {
+    if (!NEU.save || !NEU.items) return;
+    var m = equippedItem('melee'), r = equippedItem('ranged');
+    var s1 = equippedItem('spell1'), s2 = equippedItem('spell2');
+    MELEE_DMG = m.stats.dmg; MELEE_CD = m.stats.cd;
+    /* an item with no hold keeps the Soul Fire hold, so a tap is still a slash */
+    FIRE_DMG = r.stats.dmg; FIRE_CD = r.stats.cd; FIRE_HOLD = r.stats.hold || 0.45;
+    spellRow(1, s1); spellRow(2, s2);
+  }
   /* the shared map (danmaku.js), as bullet and polt use it: arrows or wasd
      move, Shift is focus. A moved key reaches here under its default name. */
   var arrowName = dm.keyName;
@@ -2062,12 +2089,20 @@
       hp += 1; healCd = HEAL_CD;
       if (NEU.juice) NEU.juice.burst(px, py, 10, '#B8FFD0');
       say('* a little warmth. one heart back.');
-    } else if (i === 1) {
-      tp = Math.max(0, tp - 0.5); beamStart();
+    } else if (o.fx === 'beam') {
+      tp = Math.max(0, tp - o.cost); beamStart();
       say('* brimstone, from your own soul.');
-    } else if (i === 2) {
-      tp = Math.max(0, tp - 0.32); shieldT = 30;
+    } else if (o.fx === 'shield') {
+      tp = Math.max(0, tp - o.cost); shieldT = 30;
       say('* the barrier blooms. it will take one hit.');
+    } else if (o.fx === 'nova') {
+      tp = Math.max(0, tp - o.cost);
+      for (var n = 0; n < o.stats.n; n++) {
+        var a = n * Math.PI * 2 / o.stats.n;
+        myShots.push({ owner: 'soul', kind: 'mini', x: px, y: py, vx: Math.cos(a) * MINI_SPEED, vy: Math.sin(a) * MINI_SPEED, r: 5, dmg: o.stats.dmg, age: 0, hitRefs: [] });
+      }
+    } else if (o.fx === 'heal') {
+      tp = Math.max(0, tp - o.cost); hp = Math.min(MAXHP, hp + o.stats.heal);
     } else {
       rage = 0; rageMode = 1; rageModeT = 8;
       sfxPlay('giga-hit');
@@ -2348,6 +2383,7 @@
     meleeCd = 0; grazeAt = -9;
     myShots = []; charging = false; chargeF = 0; shotCd = 0; myBeam = null;
     willCharge = false;
+    loadGear();
     /* 783: 540 (the rework's 720 cut by a quarter) raised 45 % after the player buffs (4-dmg split fireball, BRIMSTONE laser). The fight runs 4-5 minutes
        before desperation, with the attack pool, the bags and the combos
        filling it. Every phase gate in damageTarget is a FRACTION of bossMax,
@@ -2493,6 +2529,7 @@
                get stripSel() { return stripSel; },
                get healCd() { return healCd; },
                get meleeCd() { return meleeCd; },
+               get shotCd() { return shotCd; },
                get swings() { return F.swings.map(function (s) { return { x: s.x, y: s.y, ang: s.ang, t: s.t, dur: s.dur, hit: s.hit }; }); },
                get grazes() { return F.grazes.slice(); },
                get soulY() { return py; },
