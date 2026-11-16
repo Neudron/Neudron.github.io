@@ -156,14 +156,14 @@
     if (NEU.dungeon && NEU.dungeon.toSurface) NEU.dungeon.toSurface();
   }
 
-  /* the LOSE board stays readable for a beat, then leaves. One pending
-     timer per duel; a fresh duel opened in the meantime is left alone. */
+  /* the LOSE board stays readable for a beat, then leaves. The surface
+     teleport is never escapable: it fires even if a new duel opened. */
   function finishLose(s) {
     if (!endPending) return;
     endPending = false;
+    dungeonDeath();
     if (state !== s) return;
     if (active) close();
-    dungeonDeath();
   }
 
   /* Hard stall guard only: at 40 turns the higher HP wins, a tie is a loss.
@@ -217,6 +217,7 @@
 
   function open(opts) {
     var rng;
+    if (endPending) { endPending = false; dungeonDeath(); }
     opts = opts || {};
     rng = opts.rng;
     if (!rng && opts.seed != null && NEU.rand && NEU.rand.seeded) rng = NEU.rand.seeded(opts.seed);
@@ -627,6 +628,7 @@
     text('STREAK' + state.you.streak, 544, 106, 12, '#C8B898');
     if (state.over) {
       res = state.result === 'win' ? 'WIN' : 'LOSE';
+      ctx.font = '24px "Determination Mono"';   /* measure at the render size */
       rw = ctx.measureText ? ctx.measureText(res) : null;
       rw = rw && rw.width ? rw.width : res.length * 24 * 0.6;
       text(res, 320 - rw / 2, 264, 24, '#FFE080');
