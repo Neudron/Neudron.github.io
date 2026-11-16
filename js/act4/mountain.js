@@ -1,4 +1,19 @@
-/* mountain.js — eight original screens on the plat kernel (W5.4). */
+/* mountain.js — eight original screens on the plat kernel (W5.4).
+ *
+ * M1 movement metrics, measured by tests/fixes590.mjs on the real 60 Hz kernel
+ * (tiles, TILE=16). SAFE = 0.7 x measured maximum, HARD = 0.95 x measured
+ * maximum. Required-path gaps use SAFE or less; HARD only on optional refill
+ * ledges. Room heights climb from 34 to 60 tiles.
+ *
+ *  metric                  measured   SAFE (0.7x)   HARD (0.95x)
+ *  full jump height           3.563       2.494         3.385
+ *  running jump distance      8.115       5.680         7.709
+ *  dash distance              4.500       3.150         4.275
+ *  jump plus dash distance    9.606       6.724         9.126
+ *  wall-jump height gain      0.875       0.613         0.831
+ *  climb, full stamina       15.000      10.500        14.250
+ *  spring height              7.969       5.578         7.570
+ */
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
