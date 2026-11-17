@@ -21,13 +21,13 @@ const MODE_EDGES = [
 ];
 // One-way routes are intentional: d3_square is the park-gate entry to the city end (rooms-d.js:290-294); e1_hall routes there (rooms-d.js:407).
 // The bed exit changes from woods to hall after home is reached (rooms-e.js:298-301).
-// The prize hall stair is explicitly the way down to the storm (rooms-g.js:129-133); the trapdoor explicitly drops shut behind you (rooms-g.js:251-255).
+// The way down to the storm is the stairs in g_8, the rank T room, reached only through the g0_hall T door; the trapdoor explicitly drops shut behind you (rooms-g.js:251-255).
 // The Exo arena is entered by the scripted fight sequence (rooms-s.js:776); its hatch exits to the foyer (rooms-s.js:871).
 // Platform ascent and the tavern exits intentionally move forward or return to the woods.
 const ONE_WAY = new Set([
   'p1_tavern>m0', 'm7>p1_tavern',
   'p1_tavern>a_woods',
-  'e1_hall>d3_square', 'e6_room>a_woods', 'g0_hall>h1_storm',
+  'e1_hall>d3_square', 'e6_room>a_woods',
   'g_0>a_woods', 'x2_arena>x0_foyer',
   ...Array.from({ length: 7 }, (_, i) => `m${i}>m${i + 1}`),
   ...Array.from({ length: 3 }, (_, i) => `h${i}>h${i + 1}`),
