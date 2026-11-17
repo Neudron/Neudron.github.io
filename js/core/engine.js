@@ -1211,21 +1211,22 @@
       }
     } else drawFlat(camSX, camSY, v);
 
-    var d = drawCtx(now);
+    var d = drawCtx(now), i, e, k;
     renderEnts.length = 0;
     /* Woods sprite anchors stay within 64x112 px; full-room FX skip anchor culling. */
     var marginX = room.id === 'a_woods' ? 64 : 128, marginY = room.id === 'a_woods' ? 112 : 128;
     for (i = 0; i < ents.length; i++) {
       e = ents[i];
       if (e.dead) continue;
+      k = K && K.get(e);
       var ex = (e.x + 0.5) * TILE, ey = (e.y + 1) * TILE;
-      if ((K && K.get(e).floor) || OPAQUE_FLOOR[e.t] || e.roomSpan ||
-          (ex + marginX >= camSX && ex - marginX <= camSX + v.w && ey + marginY >= camSY && ey - marginY <= camSY + v.h))
+      var reachX = k && k.reach ? Math.max(marginX, k.reach(e)) : marginX;
+      if ((k && k.floor) || OPAQUE_FLOOR[e.t] || e.roomSpan ||
+          (ex + reachX >= camSX && ex - reachX <= camSX + v.w && ey + marginY >= camSY && ey - marginY <= camSY + v.h))
         renderEnts.push(e);
     }
     /* floor decals first and unsorted — sorting a plate by foot Y makes
        a block vanish underneath its own plate */
-    var i, e, k;
     for (i = 0; i < renderEnts.length; i++) {
       e = renderEnts[i];
       if (e.dead) continue;
