@@ -31,10 +31,19 @@
     configurable: true, enumerable: true,
     get: function () { return claims.length ? claims[claims.length - 1] : null; },
     set: function (v) {
-      var i;
-      if (!v) { claims.pop(); return; }
-      i = claims.indexOf(v);
-      if (i >= 0) claims.length = i + 1; else claims.push(v);
+      var i, k = NEU.kernel && NEU.kernel.scenes, sc;
+      if (v) {
+        i = claims.indexOf(v);
+        if (i >= 0) claims.length = i + 1; else claims.push(v);
+        return;
+      }
+      claims.pop();
+      /* A mode that opens another (cart, elevator, plat) can finish while the
+         newer claim is on top, and its guarded clear then misses. The old
+         plain global could not leak that; the stack drops the dead claims
+         the moment they surface. */
+      while (claims.length && k && (sc = k[claims[claims.length - 1]]) &&
+             !(typeof sc.running === 'function' ? sc.running() : sc.running)) claims.pop();
     }
   });
   if (preClaim) claims.push(preClaim);
@@ -164,8 +173,15 @@
     claims.length = 0;
     return true;
   }
-  /* the only claims the potion may close; every fight and story scene refuses */
+  /* the only claims and kernel scenes the potion may close; every fight and
+     story scene refuses, claim or not (cards and bolt claim nothing) */
   var CLOSEABLE = { plat: 1, rhythm: 1, shop: 1, craft: 1, dark: 1, deck: 1 };
+  var KSAFE = { engine: 1, plat: 1, cards: 1, rhythm: 1, craft: 1, dark: 1, deck: 1 };
+  function onlySafe() {
+    var st = NEU.kernel && NEU.kernel.stack, i;
+    for (i = 0; st && i < st.length; i++) if (!KSAFE[st[i]]) return false;
+    return true;
+  }
   function refuse() {
     if (NEU.talk) NEU.talk(["the potion won't open here."], 'narr');
     return false;
@@ -177,7 +193,7 @@
     if (!NEU.save || !NEU.save.has('recall')) return false;
     if (E.rooms && E.rooms.indexOf('e6_room') < 0) return false;
     if (recalling || E.debug.cine || (NEU.engineTrans && NEU.engineTrans.active) ||
-        (NEU.activeMinigame && !CLOSEABLE[NEU.activeMinigame])) return refuse();
+        (NEU.activeMinigame && !CLOSEABLE[NEU.activeMinigame]) || !onlySafe()) return refuse();
     /* before busy, the drawPlayer patch and the room snapshot: closing a
        mode can change the room and enter() resets busy */
     if (!closeModes()) return refuse();
@@ -226,7 +242,7 @@
     if (reducedMotion()) {
       /* control comes back after the iris has ended, not while it runs */
       at(250, function () {
-        ring(onScreen()); if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh(); home(0.4);
+        home(0.4); ring(onScreen()); if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();   /* the ring marks the bed */
         at(irisMs + 50, finish);
       });
       return true;
