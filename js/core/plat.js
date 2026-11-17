@@ -921,7 +921,7 @@
     if (!open()) return false;
     var after = mk(canvas.width, canvas.height), c2 = after.getContext('2d');
     if (c2) c2.drawImage(canvas, 0, 0);
-    levelSlide = NEU.engineTrans.start('mode:dungeon', before, 'down', redNow(), after, { wall: '#201B28' });
+    levelSlide = NEU.engineTrans.start('mode:dungeon', before, 'down', redNow(), after);
     return true;
   }
   function cloneLevel(src) {
