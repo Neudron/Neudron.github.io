@@ -24,11 +24,20 @@
   var NEU = window.NEU = window.NEU || {};
   function kn(d) { return NEU.keys ? NEU.keys.label(d) : d; }
 
+  /* THE pace table. scal-attacks.js (loaded first) reads NEU.scal.TUNE at
+     call time for the gaps and the phase transition. anim: fps per sprite
+     band; intro: s; phaseF, gap, gapBig: 60 Hz frames. */
+  var TUNE = {
+    anim: { idle: 8, idle_fast: 10, charge_telegraph: 12, charging: 20, charge_recovery: 12,
+            casting: 14, gigablast: 14, gigablast_p2: 14, hellblast: 14, hellblast_p2: 14 },
+    intro: 1.6, phaseF: 75, gap: 52, gapBig: 150
+  };
+
   var wrap = document.getElementById('bh');          // reuses the room's canvas
   var cv   = document.getElementById('bhCanvas');
-  if (!wrap || !cv) { NEU.scal = { open: function () {} }; return; }
+  if (!wrap || !cv) { NEU.scal = { open: function () {}, TUNE: TUNE }; return; }
   var ctx = cv.getContext ? cv.getContext('2d') : null;
-  if (!ctx) { NEU.scal = { open: function () {} }; return; }
+  if (!ctx) { NEU.scal = { open: function () {}, TUNE: TUNE }; return; }
   var msg = document.getElementById('bhMsg');
 
   var dm = NEU.danmaku || {};
@@ -901,7 +910,7 @@
     }
     if (inv > 0) inv -= dt;
 
-    if (mode === 'intro') { if (t > 2.6) startLead(); }
+    if (mode === 'intro') { if (t > TUNE.intro) startLead(); }
     else if (mode === 'wall') NEU.scalAtk.tick(dt);
     else if (mode === 'brothers') brothersTick(dt);
     else if (mode === 'break') breakTick(dt);
@@ -1686,16 +1695,17 @@
     var st = scalAnimState;
     if (st === 'gigablast' && phase === 2) st = 'gigablast_p2';
     if (st === 'hellblast' && phase === 2) st = 'hellblast_p2';
-    var b = BANDS[st] || BANDS.idle;
+    if (!BANDS[st]) st = 'idle';
+    var b = BANDS[st], fps = TUNE.anim[st];
     var c = b.rev
-      ? 5 - Math.floor(scalAnimTimer * b.fps) % 6
-      : Math.floor(scalAnimTimer * b.fps) % 6;
+      ? 5 - Math.floor(scalAnimTimer * fps) % 6
+      : Math.floor(scalAnimTimer * fps) % 6;
     var fy = b.t * 6 + c;             // frame.Y, 0-41
     return { frame: fy % 21, col: (fy / 21) | 0 };
   }
   var BANDS = {
-    idle:            { t: 0, fps: 4 },
-    idle_fast:       { t: 1, fps: 6 },
+    idle:            { t: 0 },
+    idle_fast:       { t: 1 },
     /* SupremeCalamitas.cs: the whole charging state — telegraph
        through dash — is one continuous FrameType.FasterUpwardDraft
        (confirmed in-file), band 1, the same band the dash itself
@@ -1703,16 +1713,16 @@
        wind-up before every dash showed her standing still — the
        tracker's "melee attack sprites aren't used" for the half of
        the charge a player actually has time to read. Same band as
-       `charging`, slower fps so the wind-up still reads as distinct
+       `charging`, slower fps (TUNE.anim) so the wind-up still reads as distinct
        from the dash it leads into. */
-    charge_telegraph:{ t: 1, fps: 8 },
-    charging:        { t: 1, fps: 16 },
-    charge_recovery: { t: 1, fps: 8, rev: true },
-    casting:         { t: 2, fps: 10 },
-    gigablast:       { t: 3, fps: 10 },
-    gigablast_p2:    { t: 4, fps: 10 },
-    hellblast:       { t: 5, fps: 10 },
-    hellblast_p2:    { t: 6, fps: 10 }
+    charge_telegraph:{ t: 1 },
+    charging:        { t: 1 },
+    charge_recovery: { t: 1, rev: true },
+    casting:         { t: 2 },
+    gigablast:       { t: 3 },
+    gigablast_p2:    { t: 4 },
+    hellblast:       { t: 5 },
+    hellblast_p2:    { t: 6 }
   };
 
   /* the bar's phase ticks: one at each gate in damageTarget */
@@ -2499,7 +2509,7 @@
     running: function () { return running; }
   });
 
-  NEU.scal = { open: open, close: close,
+  NEU.scal = { open: open, close: close, TUNE: TUNE,
                get running() { return running; },
                get active() { return active; },
                get hp() { return bossHP; },

@@ -967,7 +967,7 @@
 
   /* SupremeCalamitas.cs:2047-2129 (PhaseTransition). She clears the field,
      drops a ring of sixteen darts 600 px out, teleports 450 px above the soul,
-     and waits 105 f. The next attack is the head of G.queue, set by the gate:
+     and waits TUNE.phaseF f (75). The next attack is the head of G.queue, set by the gate:
      a pending lightning first, then shadow demon, brothers, seekers or desperation.
      WotG pass. verb: reset. dodge: ring 1 (16) opens a 3-dart gap toward
      the soul: hold under her and drift into it; ring 2 (20, turned half a
@@ -975,8 +975,8 @@
      (MomentOfCreation.cs:145-146) and a ring closing on her for 36 f.
      escalation: 16 then 20 darts, V 12 then 14; ring 2 is the peak (large
      kick: hit-stop). Owns the screen (loud). entry: any (the gate cut the
-     last attack; the field is cleared). exit: dim lifts at f 90, soul
-     below her, rings outbound; the queue's attack starts at f 105. */
+     last attack; the field is cleared). exit: dim lifts 15 f before the end, soul
+     below her, rings outbound; the queue's attack starts at TUNE.phaseF. */
   ATK.PhaseTransition = function (st) {
     if (st.f === 0) {
       A.clearAll();
@@ -993,8 +993,8 @@
       kick('medium', true);
     }
     if (st.f === 64) { ringRamp(A.bx, A.by, 20, V(14), TAU / 40); kick('large', true); }
-    if (st.f === 90) loud(false);
-    return st.f >= 105;
+    if (st.f === tune().phaseF - 15) loud(false);
+    return st.f >= tune().phaseF;
   };
 
   /* Arena Shrink (the final all-out). Over 1200 f the playable box closes 15%
@@ -2208,8 +2208,9 @@
   var GATE = [0.75, 0.45, 0.25, 0];
   /* TIMING: per attack, tele = its telegraph lead in frames (24-30 at 60 fps,
      asserted by fixes73 over a simulated fight); big = a signature pattern
-     that earns the long gap. Gaps: GAP f between attacks, GAP_BIG after big. */
-  var GAP = 72, GAP_BIG = 210;
+     that earns the long gap. Gaps: TUNE.gap f between attacks, TUNE.gapBig after big. */
+  /* the gap lengths live in NEU.scal.TUNE (boss-scal.js), read at call time */
+  function tune() { return NEU.scal.TUNE; }
   var TIMING = {
     HorizontalDarkSoulRelease: { tele: 30 }, CondemnationFanBurst: { tele: 30 }, ExplosiveCharges: { tele: 30 },
     SummonSuicideBomberDemons: { tele: 30, big: 1 }, BrimstoneLightning: { tele: 30 }, HexCollapse: { tele: 30 },
@@ -2306,14 +2307,14 @@
     G.hist.push({ name: name, lvl: G.lvl, f: G.fr });
   }
 
-  /* the breathing room after an attack: GAP f, or GAP_BIG after a big one */
+  /* the breathing room after an attack: TUNE.gap f, or TUNE.gapBig after a big one */
   function finish() {
     G.last = cur.name;
     G.hist[G.hist.length - 1].end = G.fr;
     cur = null;
     G.beam = null;
     if (A.over()) { G.wait = Infinity; return; }
-    G.wait = TIMING[G.last] && TIMING[G.last].big ? GAP_BIG : GAP;
+    G.wait = TIMING[G.last] && TIMING[G.last].big ? tune().gapBig : tune().gap;
   }
   /* the next attack after the gap. A phase gate that landed while an attack
      ran (G.pendN) starts its transition here, never in the middle of one. */
