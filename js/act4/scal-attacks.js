@@ -216,24 +216,6 @@
   }
   /* drawn first in draw(): the blackout, then the ramped warnings, then the
      tracked bullets' bloom and 6-tap afterimages (offset -v * i * 0.56 f) */
-  /* the desperation stage card: 30 f, alpha 0 -> 1 -> 0, spaced caps, black
-     stroke. It sits above the arena (bottom at AY - 44), clear of the field. */
-  function drawCard(ctx) {
-    var F = G.fx, t, txt;
-    if (!F || !F.title || G.fr - F.title.at >= 30) return;
-    t = (G.fr - F.title.at) / 30;
-    txt = F.title.text.split('').join(' ');
-    ctx.save();
-    ctx.globalAlpha = t < 0.5 ? t * 2 : (1 - t) * 2;
-    ctx.font = '32px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.lineWidth = 3; ctx.strokeStyle = '#000';
-    ctx.strokeText(txt, A.AX + A.AW / 2, A.AY - 44);
-    ctx.fillStyle = '#FFE0C0';
-    ctx.fillText(txt, A.AX + A.AW / 2, A.AY - 44);
-    ctx.restore();
-  }
-  /* the low ceiling's height, marked OUTSIDE the arena: a chevron pair on
-     each side pointing at the edge (static, so reduced motion needs no case) */
   function drawCeilMarks(ctx) {
     var y = A.AY + A.AH - G.ceil.C, xs = [A.AX - 14, A.AX + A.AW + 14], i, j, x;
     ctx.save();
@@ -2659,9 +2641,13 @@
     },
     /* what lives OUTSIDE the arena (the stage card, the ceiling's chevrons):
        boss-scal calls this after its vignette, which would paint over them */
+    /* the stage-name card on screen: { text, t 0..1 } for danmaku.stageLook, or null */
+    label: function () {
+      var F = G && G.fx;
+      return F && F.title && G.fr - F.title.at < 30 ? { text: F.title.text, t: (G.fr - F.title.at) / 30 } : null;
+    },
     drawOuter: function (ctx) {
       if (!G) return;
-      drawCard(ctx);
       if (G.ceil) drawCeilMarks(ctx);
     }
   };

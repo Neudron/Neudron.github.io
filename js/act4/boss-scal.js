@@ -629,30 +629,15 @@
     ctx.stroke();
     ctx.globalCompositeOperation = op; ctx.lineWidth = 1;
   }
-  /* the vignette's gradient is rebuilt only when its size or strength changes.
-     Outside the arena it is exactly the original. Inside the arena the same
-     gradient is laid at TUNE.fogArena, its edge capped at TUNE.fogArenaMax, so
-     the field stays readable. lv escalates through auraK (it includes the
-     desperation stage), so the fog still thickens per stage. */
-  var vgGrad = null, vgKey = '';
-  function drawVignette(w, h, lv) {
-    var key = w + '|' + h + '|' + lv, edge = 0.45 + lv * 0.1;
-    if (key !== vgKey) {
-      var r0 = Math.max(w, h) * (0.62 - lv * 0.07);
-      vgGrad = ctx.createRadialGradient(w / 2, h / 2, r0 * 0.45, w / 2, h / 2, r0);
-      vgGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      vgGrad.addColorStop(1, 'rgba(20,0,2,' + edge.toFixed(2) + ')');
-      vgKey = key;
-    }
-    ctx.save();
-    ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(AX, AY, AW, AH); ctx.clip('evenodd');
-    ctx.fillStyle = vgGrad; ctx.fillRect(0, 0, w, h);
-    ctx.restore();
-    ctx.save();
-    ctx.beginPath(); ctx.rect(AX, AY, AW, AH); ctx.clip();
-    ctx.globalAlpha = Math.min(TUNE.fogArena, TUNE.fogArenaMax / edge);
-    ctx.fillStyle = vgGrad; ctx.fillRect(AX, AY, AW, AH);
-    ctx.restore();
+  /* the desperation's staged look (tint under her, fog and stage-name card over the frame) is danmaku.stageLook;
+     the numbers are here. lv escalates through auraK (it includes the desperation stage). The fog is the original
+     outside the arena; inside it the same gradient is laid at TUNE.fogArena, its edge capped at TUNE.fogArenaMax. */
+  var LOOK = { tint: { rgb: '120,18,0', base: 0.03, per: 0.025, max: 0.24 },
+               fog: { rgb: '20,0,2', r0: 0.62, rStep: 0.07, a0: 0.45, aStep: 0.1, maxLv: 6, arena: 0, arenaMax: 0 } };
+  function look(layer, ak, w, h) {
+    if (!dm.stageLook) return;
+    LOOK.fog.arena = TUNE.fogArena; LOOK.fog.arenaMax = TUNE.fogArenaMax;
+    dm.stageLook(ctx, LOOK, { AX: AX, AY: AY, AW: AW, AH: AH }, { k: ak, w: w, h: h, label: layer === 'over' && NEU.scalAtk.label ? NEU.scalAtk.label() : null }, layer);
   }
   function drawAura(lv) {
     if (!dm.glow) return;
@@ -1753,7 +1738,7 @@
     var ak = auraK();
     if (ak) drawStorm(w, h, Math.min(7, ak));
     frame();
-    if (ak) { ctx.fillStyle = 'rgba(120,18,0,' + Math.min(0.24, 0.03 + ak * 0.025).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH); }
+    look('under', ak, w, h);
 
     /* her */
     if (mode !== 'won') {
@@ -1932,7 +1917,7 @@
     var rift = NEU.scalAtk.rift ? NEU.scalAtk.rift() : null;
     var off = rift ? splitOffset(rift.t / 60, rm()) : 0;
     if (off > 0) splitView(rift, off);
-    if (ak) drawVignette(w, h, Math.min(6, ak));
+    look('over', ak, w, h);
     NEU.scalAtk.drawOuter(ctx);
     if (NEU.juice) NEU.juice.overlay(ctx, w, h);
 
