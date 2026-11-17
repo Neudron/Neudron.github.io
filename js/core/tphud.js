@@ -80,21 +80,24 @@
     }
   }
 
+  /* The dungeon's kit while a dungeon level is the live plat level. The kit is born in onOpen, before plat
+     sets activeMinigame to 'plat', so it never carries that tag; a closed nested mode may also have nulled
+     the flag. Level and liveness decide, not the tag, and a stale kit never matches a closed plat. */
+  function dungeonKit() {
+    var L = NEU.plat && NEU.plat.level0 ? NEU.plat.level0() : null;
+    if (!L || L.tileset !== 'dungeon' || !NEU.plat.running()) return null;
+    return L.kit || (NEU.dgnFoes && NEU.dgnFoes.kit ? NEU.dgnFoes.kit() : null);
+  }
+
   /* The kit that is actually live: a minigame kit while its minigame runs,
-     or the dungeon's foe kit while the dgn level is the open plat level. */
+     or the dungeon's kit while a dungeon level is the open plat level. */
   function pick() {
-    var m = NEU.activeMinigame, cands = [], i, dk;
+    var m = NEU.activeMinigame, cands = [], i;
     var draedon = document.getElementById('draedon');
     if (m === 'draedon' && draedon && !draedon.hidden && NEU.kitLive) return NEU.kitLive;
+    if (m === 'plat' || !m) return dungeonKit();
     if (NEU.kitLive) cands.push(NEU.kitLive);
-    if (NEU.dgnFoes && NEU.dgnFoes.kit) { dk = NEU.dgnFoes.kit(); if (dk && cands.indexOf(dk) < 0) cands.push(dk); }
     for (i = 0; i < cands.length; i++) if (cands[i]._mini && cands[i]._mini === m) return cands[i];
-    if (!m) {
-      var L = NEU.plat && NEU.plat.level0 ? NEU.plat.level0() : null;
-      if (L && L.tileset === 'dungeon' && NEU.dgnFoes && NEU.dgnFoes.foes && NEU.dgnFoes.foes.length) {
-        for (i = 0; i < cands.length; i++) if (dk && cands[i] === dk) return cands[i];
-      }
-    }
     return null;
   }
 
