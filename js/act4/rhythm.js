@@ -1662,9 +1662,10 @@
   /* the window lost focus or the page hid: no key stays held, and a live round pauses */
   var refocusClick = false;
   function letGo() {
-    refocusClick = true;
     keys = {};
-    if (running && !S.paused && !wrap.hidden) togglePause();
+    if (!running || wrap.hidden) return;
+    refocusClick = true;
+    if (!S.paused) togglePause();
   }
   addEventListener('blur', letGo);
   document.addEventListener('visibilitychange', function () { if (document.hidden) letGo(); });
@@ -1680,6 +1681,7 @@
   });
 
   function retry() {
+    refocusClick = false;
     wrap.hidden = false;
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
@@ -1699,11 +1701,13 @@
     if (!S.paused) {
       S.paused = true; pausedAt = now(); stopBacking();
     } else {
+      refocusClick = false;
       S.paused = false; t0 += now() - pausedAt; backing();
     }
     draw(songPos());
   }
   function open() {
+    refocusClick = false;
     wrap.hidden = false;
     NEU.activeMinigame = 'rhythm';      /* the room underneath must not move or take Escape */
     document.body.classList.add('is-playing');
