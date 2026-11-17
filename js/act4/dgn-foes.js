@@ -32,17 +32,18 @@
   };
   /* Calamity's four Phantom Spirits: normal, sad, angry, happy (the only one that shoots), equal odds */
   var MOODS = [['dgPhantom', 1020, 0], ['dgPhantomS', 900, 0], ['dgPhantomM', 810, 0], ['dgPhantomL', 720, 1]];
-  /* sniper: first shot 1.67 s after it sees you, then every 3.33 s; a hit sets it back to 2.17 s */
-  var GUN = { sniper: { first: 1.67, every: 3.33, hit: 2.17, range: 700, v: 1600 }, shotgun: { first: 1.5, every: 3, hit: 2, range: 420, v: 700 },
-    rocket: { first: 1.5, every: 4, hit: 2.5, range: 520, v: 300 } };
+  /* D8: seconds each attack shows its shape before its hit can land. Single source of truth for
+     the windups below and for fixes601.mjs, which asserts every lead >= 0.4 s. */
+  var TELEGRAPH = { hammer: 0.6, ranged: 1.67, beam: 0.5, souls: 0.5, inferno: 1.67, lunge: 0.4, flame: 0.4, ghost: 0.4 };
+  /* all three guns: first shot 1.67 s after they see you (the ranged lead), then every
+     3.33/3/4 s; a hit sets it back to 2.17/2/2.5 s */
+  var GUN = { sniper: { first: TELEGRAPH.ranged, every: 3.33, hit: 2.17, range: 700, v: 1600 }, shotgun: { first: TELEGRAPH.ranged, every: 3, hit: 2, range: 420, v: 700 },
+    rocket: { first: TELEGRAPH.ranged, every: 4, hit: 2.5, range: 520, v: 300 } };
   /* casters: first windup 1.67 s; necromancer beams every 0.83 s after, five per cycle; ragged 3 volleys of 3 souls
      0.33 s apart, 1 s between volleys; diabolist 3 bolts, 1.67 s each, then it teleports */
   var SPELL = { beam: { first: 1.67, next: 0.83, per: 5, cycle: 7.5, hitTp: 0.5 }, souls: { first: 1.67, next: 1, per: 3, cycle: 9, hitTp: 0 },
-    inferno: { first: 1.67, next: 1.67, per: 3, cycle: 6.67, hitTp: 1 } };
+    inferno: { first: TELEGRAPH.inferno, next: 1.67, per: 3, cycle: 6.67, hitTp: 1 } };
   var PHANTOM = ['* Wails echo through the dilapidated dungeon halls...', '* Long-dead prisoners seek their zealous revenge...'];
-  /* D8: seconds each attack shows its shape before its hit can land. Single source of truth for
-     the windups below and for fixes601.mjs, which asserts every lead >= 0.4 s. */
-  var TELEGRAPH = { hammer: 0.6, ranged: 1.5, beam: 0.5, souls: 0.5, inferno: 1.67, lunge: 0.4, flame: 0.4, ghost: 0.4 };
   var foes = [], shots = [], pops = [], fxs = [], kit = null, F = { x: 0, y: 0, fx: 1, fy: 0 }, box = { AX: 0, AY: 0, AW: 640, AH: 360 }, lastDir = 0;
 
   function sheet(k) { return NEU.dgSheets && NEU.dgSheets[k]; }
@@ -205,7 +206,7 @@
     if (f.st === 0) {
       w = Math.sin(f.t * 4) * 30;
       f.vx = Math.cos(a) * f.v - Math.sin(a) * w; f.vy = Math.sin(a) * f.v + Math.cos(a) * w;
-      if (f.t > 4) { f.st = 1; f.t = 0; }
+      if (f.t > 4 && onScreen(f.x, f.y, 2 * T)) { f.st = 1; f.t = 0; }
       if (f.d.flame && (f.cd -= dt) <= 0) { f.cd = 2; if ((!solidAt(f.x, f.y) || f.angry) && onScreen(f.x, f.y, 2 * T)) f.glow = TELEGRAPH.flame; }
     } else if (f.st === 1) { f.vx *= 0.9; f.vy *= 0.9; if (f.t > TELEGRAPH.lunge) { f.st = 2; f.t = 0; f.lx = Math.cos(a) * 240; f.ly = Math.sin(a) * 240; } }
     else { f.vx = f.lx; f.vy = f.ly; if (f.t > 0.6) { f.st = 0; f.t = 0; } }
@@ -432,7 +433,7 @@
     c.save(); c.translate(-cx, -cy);
     for (i = 0; i < foes.length; i++) {
       f = foes[i]; if (f.dead) continue;
-      if (f.d.ai === 'ranged' && f.aim && f.t >= 0 && f.t < 1.67) line(c, f.x + f.face * 10, f.y - 6, f.aim.x, f.aim.y, f.t < 0.25 ? '#FF4040' : 'rgba(255,64,64,0.45)', f.t < 0.25 ? 3 : 6);
+      if (f.d.ai === 'ranged' && f.aim && f.t >= 0 && f.t < TELEGRAPH.ranged) line(c, f.x + f.face * 10, f.y - 6, f.aim.x, f.aim.y, f.t < 0.25 ? '#FF4040' : 'rgba(255,64,64,0.45)', f.t < 0.25 ? 3 : 6);
       if (f.st === 1 && f.aim && f.d.hammer) line(c, f.x, f.y - 8, f.aim.x, f.aim.y, 'rgba(255,224,128,0.6)', 8);
       if (f.path) for (p = 0; p + 3 < f.path.length; p += 2) line(c, f.path[p], f.path[p + 1], f.path[p + 2], f.path[p + 3], 'rgba(176,96,255,0.5)', 6);
       if (f.mark) ring(c, f.mark.x, f.mark.y, 28, f.t < 0.5 ? '#FF6A3A' : 'rgba(255,106,58,0.5)');

@@ -346,7 +346,10 @@
       g[y][HUT.x0] = 'g'; g[y][HUT.x1] = 'g';
       for (x = HUT.x0 + 1; x < HUT.x1; x++) g[y][x] = ' ';
     }
-    g[HUT.wall1 - 1][HUT.x0] = ' '; g[HUT.wall1][HUT.x0] = ' ';   /* the door */
+    g[HUT.wall1 - 1][HUT.x0] = ' '; g[HUT.wall1][HUT.x0] = ' ';   /* the west door */
+    /* a high east window: dash up and out to the lift heads; rows 12-14 stay solid so
+       the hut wall and the tutorial-door walk still behave as tested (fixes216/fixes561). */
+    g[HUT.wall0][HUT.x1] = ' '; g[HUT.wall0 + 1][HUT.x1] = ' ';
     ents.push({ t: 'bed', x: 18, y: HUT.wall1 });
     ents.push({ t: 'tdoor', x: 31, y: HUT.wall1 });   /* W20: the door to the tutorial room t0 */
     decor.push({ k: 'L', x: 26, y: HUT.wall0, f: 'B' });
@@ -465,10 +468,11 @@
     cv = document.getElementById('platCanvas');
     if (cv && NEU.juice && NEU.juice.shakeEl) NEU.juice.shakeEl(cv);
   } });
-  /* a chain lift: the one below only goes up; the head at the door rides down once that lift is open */
+  /* a chain lift: the one below only goes up; the head at the door rides down once that lift is open.
+     The ride is replay-safe: a recorded bed->d9 input chain must be able to take the lifts. */
   kd('lift', { touch: function (e, input, melee) {
     var to;
-    if (!melee || P.replaying()) return;
+    if (!melee) return;
     if (NEU.dungeon && NEU.dungeon._liftFrames > 0) return;
     if (e.top && !flagged('dgn_lift_' + e.n)) { talk(['* the chain is slack. it hangs from somewhere deep.']); return; }
     to = lifts[e.n + (e.top ? '' : 'top')];
