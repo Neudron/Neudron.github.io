@@ -498,7 +498,10 @@
   def.draw = draw; def.hud = hud; def.key = key; def.lights = lights; def.swing = axe;
   def.slow = function () { return kit ? kit.slow : 1; };
   def.tp = function () { return kit ? kit.tp : 0; };
-  def.onClose = function () { shots.length = 0; };
+  def.onClose = function () {
+    foes.length = 0; shots.length = 0; pops.length = 0; fxs.length = 0; kit = null;
+    if (NEU.dungeon && NEU.dungeon.finishDoorFx) NEU.dungeon.finishDoorFx();
+  };
   NEU.dgnFoes = { kinds: KIND, foes: foes, shots: shots, pops: pops, spawn: spawn, hit: hitFoe, axe: axe, kit: function () { return kit; },
     gun: GUN, spell: SPELL, moods: MOODS, beamPath: beamPath, spot: spot, telegraph: TELEGRAPH };
 })();

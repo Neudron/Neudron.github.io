@@ -368,6 +368,7 @@
   var def = P.level('dgn', {
     rows: build(), spawn: zones[0].spawn, entities: ents, tileset: 'dungeon', view: 'terraria', chunked: true, hp: 6, solid: '#g',
     onOpen: function (opts) {
+      finishDoorFx();
       live = P.level0(); here = ''; goal = opts.goal || '';
       track();
     },
@@ -637,19 +638,25 @@
      down the corridor, then a Deltarune-style fight box grows from the doorway
      (obj_growtangle: growcon 1 animate-in, growth 0..1). */
   var DOOR_T = { key: [0, 200], chains: [200, 500], open: [500, 1700], pan: [900, 1700], box: [1500, 1900] };
-  var doorFx = { active: false, reduced: false, done: false, snap: null, canvas: null, elapsed: 0, timeline: DOOR_T };
+  var doorFx = { active: false, reduced: false, done: false, snap: null, canvas: null, elapsed: 0, timeline: DOOR_T,
+    raf: 0, timer: 0, token: 0 };
   function seg(ms, r) { return Math.max(0, Math.min(1, (ms - r[0]) / (r[1] - r[0]))); }
   function doorProgress(ms) {
     return { key: seg(ms, DOOR_T.key), chains: seg(ms, DOOR_T.chains), open: seg(ms, DOOR_T.open),
       pan: seg(ms, DOOR_T.pan), box: seg(ms, DOOR_T.box) };
   }
   function finishDoorFx() {
+    doorFx.token++;
     doorFx.active = false; doorFx.done = true;
+    if (doorFx.raf) { if (window.cancelAnimationFrame) window.cancelAnimationFrame(doorFx.raf); doorFx.raf = 0; }
+    if (doorFx.timer) { clearTimeout(doorFx.timer); doorFx.timer = 0; }
     var cv = doorFx.canvas;
     if (cv && cv.parentNode) cv.parentNode.removeChild(cv);
     doorFx.canvas = null;
   }
   function playDoorOpening(snap, e) {
+    finishDoorFx();
+    var tok = doorFx.token;
     doorFx.snap = snap; doorFx.elapsed = 0; doorFx.done = false;
     doorFx.reduced = !!(P.reduced && P.reduced());
     doorFx.active = !doorFx.reduced;
@@ -662,7 +669,7 @@
     var g = cv.getContext('2d');
     var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
     function frame(now) {
-      if (!doorFx.active) return;
+      if (!doorFx.active || tok !== doorFx.token) return;
       var ms = Math.max(0, Math.min(DOOR_T.box[1], now - t0)), pr = doorProgress(ms);
       doorFx.elapsed = ms;
       if (e) e.unlock = pr.open;
@@ -671,11 +678,11 @@
         NEU.dungeonLook.drawOpening(g, cv.width, cv.height, snap, pr);
       }
       if (ms >= DOOR_T.box[1]) { finishDoorFx(); return; }
-      if (window.requestAnimationFrame) window.requestAnimationFrame(frame);
-      else setTimeout(function () { frame(t0 + ms + 16); }, 16);
+      if (window.requestAnimationFrame) doorFx.raf = window.requestAnimationFrame(frame);
+      else doorFx.timer = setTimeout(function () { frame(t0 + ms + 16); }, 16);
     }
-    if (window.requestAnimationFrame) window.requestAnimationFrame(frame);
-    else setTimeout(function () { frame(t0); }, 16);
+    if (window.requestAnimationFrame) doorFx.raf = window.requestAnimationFrame(frame);
+    else doorFx.timer = setTimeout(function () { frame(t0); }, 16);
   }
 
   NEU.dungeon = {
