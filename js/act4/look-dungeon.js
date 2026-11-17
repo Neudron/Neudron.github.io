@@ -138,7 +138,7 @@
   }
   /* water candles burn blue, chain lanterns amber; the flame steps at 2-3 Hz so nothing strobes */
   function live(c, cx, cy, L, now, a) {
-    var i, d, sx, sy, f = reducedNow() ? 0 : ((now / 380) | 0);
+    var i, d, sx, sy, t = P.time() * 1000, f = reducedNow() ? 0 : ((t / 380) | 0);
     for (i = 0; i < L.decor.length; i++) {
       d = L.decor[i]; if (d.k !== 'w' && d.k !== 'L') continue;
       sx = d.x * T - cx; sy = d.y * T - cy;
@@ -153,9 +153,9 @@
     if (z && z.n >= 7 && !reducedNow() && NEU.sheetReady && NEU.sheetReady(NEU.sheets.fxGigSmoke)) {
       var i2, px, py;
       for (i2 = 0; i2 < 3; i2++) {
-        px = a.x0 + P.mod(P.hash(i2, 7, z.n) * (a.x1 - a.x0) + now * 0.006 * (i2 + 1), a.x1 - a.x0);
-        py = a.y1 - P.mod(P.hash(i2, 3, z.n) * (a.y1 - a.y0) + now * 0.012, a.y1 - a.y0 + 64);
-        NEU.sheetDraw(c, 'fxGigSmoke', px, py, { scale: 1.6, alpha: 0.4, now: now + i2 * 373 });
+        px = a.x0 + P.mod(P.hash(i2, 7, z.n) * (a.x1 - a.x0) + t * 0.006 * (i2 + 1), a.x1 - a.x0);
+        py = a.y1 - P.mod(P.hash(i2, 3, z.n) * (a.y1 - a.y0) + t * 0.012, a.y1 - a.y0 + 64);
+        NEU.sheetDraw(c, 'fxGigSmoke', px, py, { scale: 1.6, alpha: 0.4, now: t + i2 * 373 });
       }
     }
   }
