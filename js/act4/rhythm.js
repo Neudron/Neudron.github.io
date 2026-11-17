@@ -736,7 +736,7 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
   }
-  addEventListener('resize', function () { if (running) layout(); });
+  addEventListener('resize', function () { layout(); });
 
   /* The arrows are our own pixel art (Funkin's are not licensed), built
      once into a 4x4 sheet of 17px cells: a 15px arrow, its ink outline,
