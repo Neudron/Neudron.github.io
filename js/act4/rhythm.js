@@ -1620,6 +1620,8 @@
   }
   addEventListener('keydown', function (e) {
     if (wrap.hidden) return;
+    /* a held key repeats: pause, restart and exit fire once per press */
+    if (e.repeat && (e.key === 'Escape' || e.key === 'Enter' || /^[rRzZ]$/.test(e.key) || (S.paused && /^[xX]$/.test(e.key)))) { e.preventDefault(); return; }
     if (won && (e.key === 'Escape' || e.key === 'Enter' || e.key === 'z' || e.key === 'Z')) {
       e.preventDefault();
       if (performance.now() - winAt > 600) close();
