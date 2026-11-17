@@ -20,7 +20,7 @@
     { id: 'tea', name: 'Ghost Tea', kind: 'heal', price: 12, sell: 6, fx: 'heal', stats: { heal: 4 }, desc: 'a little pale, like you.' },
     { id: 'elixir', name: 'Night Elixir', kind: 'heal', price: 40, sell: 20, fx: 'heal', stats: { heal: 'full' }, desc: 'all of it, apparently.' },
     { id: 'soup', name: 'Mushroom Soup', kind: 'heal', price: 0, sell: 0, fx: 'heal', stats: { heal: 0 }, desc: 'it smells like forgiveness.' },
-    { id: 'recall', name: 'Recall Potion', kind: 'key', price: 30, sell: 0, fx: 'recall', stats: {}, desc: 'a safe place, briefly.' },
+    { id: 'recall', name: 'Recall Potion', kind: 'key', price: 30, sell: 0, fx: 'recall', stats: {}, desc: 'takes you home, as often as you like.' },
     { id: 'boss_key', name: 'Bone Key', kind: 'key', price: 0, sell: 0, fx: 'key', stats: {}, desc: 'it opens something unpleasant.' },
     { id: 'dad_card', name: "Dad's Card", kind: 'quest', price: 0, sell: 0, fx: 'quest', stats: {}, desc: 'he kept the receipt.' },
     { id: 'pkg_misleading', name: 'Misleading-looking Package', kind: 'quest', price: 0, sell: 0, fx: 'quest', stats: {}, desc: 'it looks exactly as advertised.' },
