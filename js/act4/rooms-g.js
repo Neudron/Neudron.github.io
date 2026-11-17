@@ -126,11 +126,6 @@
         if (STYLE[n] === 'door') out.push(P('rope', doorX(n), 2, { lock: 'rank:' + r, rank: r }));
       });
       out.push({ t: 'save', x: 30, y: 4 });
-      /* the way down to the storm. Rank A or better opens it. T is a
-         room of its own, cosmetic, and is not on this path. */
-      out.push({ t: 'exit', x: 31, y: 5, to: 'h1_storm', spawn: 'top', style: 'stairs', locked: 'rank:A',
-                 lines: ['stairs down, behind a velvet rope. the rope wants an A.',
-                         'the best room is a nice room. it is not the way down.'] });
       out.push(P('podium', 16, 7, { solid: true,
                  lines: ['PRIZE CORRIDOR. one door per rank.',
                          'complaints go in the bin. there is no bin.'] }));
