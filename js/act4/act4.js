@@ -20,6 +20,25 @@
   var START = 'a1_clearing';         /* the recall potion lands here */
   var HOME = 'e6_room';             /* a fresh boot starts in your bedroom, sans at your left */
 
+  /* ── NEU.activeMinigame: a stack behind the old global ──────────
+     The ~25 modes that claim input still assign and read it as before.
+     A name pushes, a falsy value pops (so a mode closed over another
+     hands the claim back), a name already on the stack truncates to it
+     (plat.replay restores the old value that way). closeModes sweeps it. */
+  var claims = [];
+  var preClaim = NEU.activeMinigame;
+  Object.defineProperty(NEU, 'activeMinigame', {
+    configurable: true, enumerable: true,
+    get: function () { return claims.length ? claims[claims.length - 1] : null; },
+    set: function (v) {
+      var i;
+      if (!v) { claims.pop(); return; }
+      i = claims.indexOf(v);
+      if (i >= 0) claims.length = i + 1; else claims.push(v);
+    }
+  });
+  if (preClaim) claims.push(preClaim);
+
   /* Act IV's objectives are grouped, because a flat list of forty-five
      is not a list, it is wallpaper. quest.js shows one act at a time. */
   var STEPS = [
