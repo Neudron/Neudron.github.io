@@ -292,10 +292,13 @@
     S.score = 0; S.combo = 0; S.misses = 0; S.judged = 0; S.weight = 0; S.acc = 1;
     S.consecMiss = 0; S.glare = false; pops.length = 0;
   }
+  /* the backing beat: round 0 changes tempo with its sections, later rounds keep their own */
+  function tempoAt(sp) { return round === 0 ? BPM[Math.min(sectionOf(Math.max(sp, 0)), 2)] : BPM[round]; }
+  var backSec = -1;                  /* the section the loop was started in (round 0) */
   function backing() {
     if (NEU.settings && NEU.settings.muted) return;
     try {
-      var a = audio(), bl = beatLen(), sr = a.sampleRate || 44100;
+      var a = audio(), spB = songPos(), bl = 60 / tempoAt(spB), sr = a.sampleRate || 44100;
       var frames = (sr * bl) | 0;
       if (frames < 8) frames = 8;
       var buf = a.createBuffer(1, frames, sr);
@@ -306,14 +309,16 @@
         data[i] = (t < 0.03 ? 0.45 : 0) + Math.sin(2 * Math.PI * 110 * t) * 0.18;
       }
       if (loopSrc && loopSrc.stop) { try { loopSrc.stop(); } catch (e1) {} }
-      var g = a.createGain(), sp = songPos();
+      var g = a.createGain(), sp = spB;
       g.gain.setValueAtTime(0.08, a.currentTime);
       loopSrc = a.createBufferSource();
       loopSrc.buffer = buf;
       loopSrc.loop = true;
       loopSrc.connect(g); g.connect(a.destination);
       /* from the top at beat 0, or mid-loop when resuming from a pause */
-      if (sp < 0) loopSrc.start(t0); else loopSrc.start(now(), ((sp % bl) + bl) % bl);
+      var sec = sectionOf(Math.max(sp, 0)), from = round === 0 ? SEC[sec] : 0;
+      if (sp < 0) loopSrc.start(t0); else loopSrc.start(now(), ((sp - from) % bl + bl) % bl);
+      backSec = sec;
       loopSrc.stop(t0 + SONG);
     } catch (e2) {}
   }
@@ -488,6 +493,7 @@
     var sp = songPos();
     S.countdown = countLabel(sp);
     S.section = sectionOf(sp);
+    if (round === 0 && sp >= 0 && S.section !== backSec) backing();   /* the beat changes with the section */
     /* Leave prompt up: hold the frame. Notes that pass meanwhile are judged on resume. */
     if (NEU.juice && NEU.juice.frozen()) { lastSp = sp; draw(sp); return; }
     if (introOn) {
