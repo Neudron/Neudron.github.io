@@ -160,17 +160,19 @@
   }
 
   function act(who, idx) {
-    var p, id, enemy, dmg;
+    var p, id, enemy, dmg, tier, reflected, dealt;
     if (!state || state.over) return false;
     p = state[who];
     if (idx < 0 || idx >= p.hand.length) return false;
     id = p.hand.splice(idx, 1)[0];
     enemy = state[who === 'you' ? 'mage' : 'you'];
+    reflected = false;
+    dealt = 0;
     if (id !== 'ATTACK' && enemy.parry) enemy.parry = false;
     if (id === 'ATTACK') {
       dmg = attackDamage(who);
-      if (enemy.parry) { enemy.parry = false; fxHit(who, hurt(p, dmg)); }
-      else fxHit(who === 'you' ? 'mage' : 'you', hurt(enemy, dmg));
+      if (enemy.parry) { enemy.parry = false; reflected = true; dealt = hurt(p, dmg); fxHit(who, dealt); }
+      else { dealt = hurt(enemy, dmg); fxHit(who === 'you' ? 'mage' : 'you', dealt); }
       if (who === 'you') state.you.streak = Math.min(state.you.streak + 1, 3);
     } else if (id === 'HEAL') {
       var before = p.hp;
@@ -187,7 +189,15 @@
     }
     state.discard.push(id);
     if (who === 'you' && !reduced()) state.slide = { id: id, t: 0, dur: 280 };
-    if (NEU.juice && NEU.juice.hit) NEU.juice.hit(id === 'ATTACK' ? 'medium' : 'small');
+    /* Juice tiers: small for the quiet cards, medium for a normal ATTACK,
+       and large ONLY for the two beats that end or turn a fight — a parry
+       that lands (the blow is reflected) or a killing blow (a plate hits 0). */
+    tier = 'small';
+    if (id === 'ATTACK') {
+      tier = 'medium';
+      if (reflected || p.hp <= 0 || enemy.hp <= 0) tier = 'large';
+    }
+    if (NEU.juice && NEU.juice.hit) NEU.juice.hit(tier);
     if (state.mage.hp <= 0) { state.mage.hp = 0; state.over = true; state.result = 'win'; }
     else if (state.you.hp <= 0) { state.you.hp = 0; state.over = true; state.result = 'lose'; }
     if (!state.over) drawUp(who);
