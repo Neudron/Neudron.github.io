@@ -18,6 +18,7 @@
   var keys = {}, accumulator = 0, simClock = 0, camera = { x: 0, y: 0 }, prevX = 0, prevY = 0, prevCamX = 0, prevCamY = 0, baked = null, afterimages = [], bakeCache = {};
   var reduced = redNow(), view = { w: 640, h: 360, scale: 1 }, area = { x0: 0, y0: 0, x1: 640, y1: 360 };
   var painters = [], padB = {}, sprCache = {}, lastDraw = 0, chunks = {}, chunkOrder = [], CHUNK = 32, LRU = 12;
+  var ticked = true;   /* did the last step run the level tick? a frozen step (hit-stop, death, inventory) leaves foes where they were */
   var look = 0;   /* terraria camera: the eased facing look-ahead, px */
   var levelSlide = null;   /* D4: a 400 ms snapshot slide between mountain levels; holds the hero in place */
   function redNow() {
@@ -349,6 +350,7 @@
   }
   function step(dt, raw) {
     var input = parseInput(raw), prev = player.prev, mx, my, i, e;
+    ticked = false;
     if (!current || current.exited) return getState();
     /* D4: during the level slide the hero is held in place — a Celeste-style
        screen change, not a physics step with the new room already live. */
@@ -407,6 +409,7 @@
     touchEntities(input, player.swing === C.swing);
     for (i = 0; i < current.entities.length; i++) { e = current.entities[i]; if (kinds[e.t] && kinds[e.t].tick) kinds[e.t].tick(e, dt); }
     if (current.tick) current.tick(dt);
+    ticked = true;
     if (player.x < -24 || player.y > current.h * TILE + 64) die();
     player.squash = Math.max(0, player.squash - dt); player.stretch = Math.max(0, player.stretch - dt); player.hurtFlash = Math.max(0, player.hurtFlash - dt);
     if (player.onGround && Math.abs(player.vx) > 8) player.walked += Math.abs(player.vx) * dt;
@@ -1150,7 +1153,7 @@
     get levels() { return levels; }, _kinds: kinds,
     cam: function () { return { x: camera.x, y: camera.y }; },
     /* the render alpha camera, hero and (dgn-foes) bodies share: prev step to this step */
-    pose: heroPose, tint: tint, flashCol: flashCol, alpha: function () { return reduced ? 1 : Math.min(1, accumulator / STEP); } };
+    pose: heroPose, tint: tint, flashCol: flashCol, alpha: function () { return reduced || !ticked ? 1 : Math.min(1, accumulator / STEP); } };
   NEU.plat = api;
   if (NEU.kernel) NEU.kernel.register('plat', { canvas: canvas, tick: tick, open: open, close: close, running: function () { return live; } });
   document.addEventListener('keydown', function (e) {
