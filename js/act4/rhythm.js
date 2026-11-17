@@ -1496,7 +1496,7 @@
         if (side && l === S.blockLane && sp < S.blockUntil) f = 1;
         ctx.save();
         ctx.translate(0, sd.y);
-        var pulse = 1 - 0.1 * Math.max(0, 1 - (t - confirmAt[side][l]) / 0.15);   /* a hit dips to 0.9 and springs back */
+        var pulse = still() ? 1 : 1 - 0.1 * Math.max(0, 1 - (t - confirmAt[side][l]) / 0.15);   /* a hit dips to 0.9 and springs back */
         ctx.scale(1, Math.max(0.02, arrowFold(1 - S.arrowA)) * pulse);
         ctx.translate(0, -sd.y);
         arrow(f, l, sd.x + l * sd.p, sd.y, sd.s);
