@@ -434,7 +434,7 @@
     tick(sp);
     for (var i = 0; i < notes.length; i++) {
       var n = notes[i];
-      if (!n.mine || n.hit || n.lane !== lane) continue;
+      if (!n.mine || n.hit || n.done || n.lane !== lane) continue;
       var m = ms(Math.abs(n.t - sp));
       if (m <= WINDOW_MS && m < bm) { bm = m; best = n; }
     }
