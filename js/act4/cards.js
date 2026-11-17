@@ -7,14 +7,19 @@
   var ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
   var active = false;
   var state = null;
+  var losePending = null;
   var CW = 72;
   var CH = 104;
 
   var SPEC = [['ATTACK', 6], ['HEAL', 4], ['DEFEND', 3], ['PARRY', 3]];
   /* PLAN 9.4: no shuffle. Both orders are written data, guarded by the
-     solver in fixes522 (a reacting line wins, all-in ATTACK loses). */
-  var PLAYER_DECK = ['ATTACK', 'HEAL', 'ATTACK', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'ATTACK',
-    'PARRY', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'HEAL', 'ATTACK', 'DEFEND'];
+     solver in fixes522 (a reacting line wins, all-in ATTACK loses) and
+     fixes587 (never-ATTACK also loses). Cards are drawn with pop(), so the
+     opening four are this deck's tail: DEFEND, ATTACK, HEAL, DEFEND. That
+     lets a reacting player brace the telegraphed first attack without
+     handing the race to a player who never swings (fixes587). */
+  var PLAYER_DECK = ['ATTACK', 'PARRY', 'ATTACK', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'ATTACK',
+    'HEAL', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'HEAL', 'ATTACK', 'DEFEND'];
   var MAGE_DECK = ['ATTACK', 'ATTACK', 'HEAL', 'PARRY', 'HEAL', 'HEAL', 'DEFEND', 'ATTACK',
     'HEAL', 'ATTACK', 'ATTACK', 'DEFEND', 'PARRY', 'DEFEND', 'PARRY', 'ATTACK'];
   var ANIM = { lift: 150, flip: 200, travel: 250, effect: 300, discard: 150, hp: 60, retreat: 400 };
@@ -23,6 +28,13 @@
     HEAL: ['00100', '00100', '11111', '00100', '00100'],
     DEFEND: ['01110', '11111', '11111', '11111', '01110'],
     PARRY: ['00100', '01100', '11111', '00110', '00100']
+  };
+  /* The one written copy of each rule, reused by the hand and the intent. */
+  var RULES = {
+    ATTACK: 'deal 3. +1 for each attack in a row.',
+    HEAL: 'restore 3.',
+    DEFEND: 'block 3 until your next turn.',
+    PARRY: 'turn his next attack back on him. wasted if he does not attack.'
   };
 
   function reduced() {
@@ -47,24 +59,40 @@
 
   function blank() {
     return {
-      you: { hp: 15, hand: [], block: 0, parry: false, streak: 0 },
-      mage: { hp: 15, hand: [], block: 0, parry: false },
+      you: { hp: 15, hand: [], block: 0, blockShown: 0, parry: false, streak: 0 },
+      mage: { hp: 15, hand: [], block: 0, blockShown: 0, parry: false },
       deck: [], mageDeck: [], discard: [],
       sel: 0, over: false, result: null, awarded: false,
       clock: 0, flies: [], slide: null, grain: [], grainAt: -1000,
       disp: { you: 15, mage: 15 }, fx: [], intent: null,
+      pops: [], flash: null, legacy: false,
       exiting: false, exitT: 0, returned: false, endT: 0
     };
   }
 
   function hurt(p, dmg) {
-    var use;
+    var use, before = p.hp;
     if (p.block > 0) {
       use = p.block > dmg ? dmg : p.block;
       p.block -= use;
       dmg -= use;
     }
     p.hp -= dmg;
+    return before - p.hp;
+  }
+
+  /* Feedback only: a rising number over the struck/Healed plate and a short
+     plaque flash. Reduced motion drops both — juice owns the shake. */
+  function fxHit(target, amount, heal) {
+    var calm;
+    if (reduced() || !(amount > 0)) return;
+    state.pops.push({ x: target === 'you' ? 544 : 48, y: 50,
+      text: (heal ? '+' : '-') + amount, t: 0, dur: 650, heal: !!heal });
+    if (state.pops.length > 6) state.pops.shift();
+    if (heal) return;
+    calm = (NEU.motion && NEU.motion.calmFlash && NEU.motion.calmFlash()) ||
+      (NEU.juice && NEU.juice.noFlash);
+    if (!calm) state.flash = { x: target === 'you' ? 528 : 32, y: 10, t: 0, dur: 120 };
   }
 
   function drawUp(who) {
@@ -78,10 +106,21 @@
     }
   }
 
+  /* Fixed priority, pure over public state. Each rule only fires when its
+     card is actually in hand; the next rule then gets its turn. */
   function mageIndex() {
-    var h = state.mage.hand, i;
+    var h = state.mage.hand, i, through, dmg;
+    dmg = attackDamage('mage');
+    through = state.you.block >= dmg ? 0 : dmg - state.you.block;
+    if (!state.you.parry && state.you.hp - through <= 0) {
+      i = h.indexOf('ATTACK');
+      if (i >= 0) return i;
+    }
     if (state.mage.hp <= 6) { i = h.indexOf('HEAL'); if (i >= 0) return i; }
     if (state.you.streak >= 2) { i = h.indexOf('PARRY'); if (i >= 0) return i; }
+    if (state.you.streak === 1 && state.mage.hp <= 9) {
+      i = h.indexOf('DEFEND'); if (i >= 0) return i;
+    }
     i = h.indexOf('ATTACK');
     if (i >= 0) return i;
     return h.length ? 0 : -1;
@@ -116,24 +155,34 @@
     }
   }
 
+  function attackDamage(who) {
+    return who === 'you' ? Math.min(3 + state.you.streak, 5) : 3;
+  }
+
   function act(who, idx) {
-    var p, id, enemy;
+    var p, id, enemy, dmg, tier, reflected, dealt;
     if (!state || state.over) return false;
     p = state[who];
     if (idx < 0 || idx >= p.hand.length) return false;
     id = p.hand.splice(idx, 1)[0];
     enemy = state[who === 'you' ? 'mage' : 'you'];
+    reflected = false;
+    dealt = 0;
     if (id !== 'ATTACK' && enemy.parry) enemy.parry = false;
     if (id === 'ATTACK') {
-      if (enemy.parry) { enemy.parry = false; hurt(p, 3); }
-      else hurt(enemy, 3);
-      if (who === 'you') state.you.streak++;
+      dmg = attackDamage(who);
+      if (enemy.parry) { enemy.parry = false; reflected = true; dealt = hurt(p, dmg); fxHit(who, dealt); }
+      else { dealt = hurt(enemy, dmg); fxHit(who === 'you' ? 'mage' : 'you', dealt); }
+      if (who === 'you') state.you.streak = Math.min(state.you.streak + 1, 3);
     } else if (id === 'HEAL') {
+      var before = p.hp;
       p.hp = p.hp + 3;
       if (p.hp > 15) p.hp = 15;
+      fxHit(who, p.hp - before, true);
       if (who === 'you') state.you.streak = 0;
     } else if (id === 'DEFEND') {
       p.block = 3;
+      p.blockShown = 3;
       if (who === 'you') state.you.streak = 0;
     } else if (id === 'PARRY') {
       p.parry = true;
@@ -141,7 +190,15 @@
     }
     state.discard.push(id);
     if (who === 'you' && !reduced()) state.slide = { id: id, t: 0, dur: 280 };
-    if (NEU.juice && NEU.juice.hit) NEU.juice.hit(id === 'ATTACK' ? 'medium' : 'small');
+    /* Juice tiers: small for the quiet cards, medium for a normal ATTACK,
+       and large ONLY for the two beats that end or turn a fight — a parry
+       that lands (the blow is reflected) or a killing blow (a plate hits 0). */
+    tier = 'small';
+    if (id === 'ATTACK') {
+      tier = 'medium';
+      if (reflected || p.hp <= 0 || enemy.hp <= 0) tier = 'large';
+    }
+    if (NEU.juice && NEU.juice.hit) NEU.juice.hit(tier);
     if (state.mage.hp <= 0) { state.mage.hp = 0; state.over = true; state.result = 'win'; }
     else if (state.you.hp <= 0) { state.you.hp = 0; state.over = true; state.result = 'lose'; }
     if (!state.over) drawUp(who);
@@ -163,6 +220,15 @@
     if (NEU.dungeon && NEU.dungeon.toSurface) NEU.dungeon.toSurface();
   }
 
+  /* The board is held, then the surface teleport fires. A new duel cannot
+     swallow the pending death: the closure still pays it exactly once. */
+  function finishLose(s) {
+    if (!losePending || losePending.s !== s) return;
+    losePending = null;
+    if (state === s && active) close();
+    dungeonDeath();
+  }
+
   /* Both decks and both hands empty, both still up: the duel has nowhere
      to go. Higher HP wins. A tie is a loss. */
   function settle() {
@@ -175,27 +241,45 @@
   }
 
   function play(idx) {
-    var intent, youCard, mageCard, mi;
-    if (!state) return state;
+    var intent, youCard, mageCard, mi, wasOver, s, done;
+    if (!state || losePending) return state;
+    wasOver = state.over;
+    // Keep the just-played block visible for this frame; the real block
+    // expires at the start of its owner's next turn (see below).
+    state.you.blockShown = 0;
+    state.mage.blockShown = 0;
     if (!state.over) {
       intent = state.intent;
       youCard = state.you.hand[idx];
       mageCard = intent ? intent.id : null;
       act('you', idx);
       if (!state.over) {
+        /* his last block guarded your turn; it expires as his turn starts */
+        state.mage.block = 0;
         mi = intent && intent.index < state.mage.hand.length &&
              state.mage.hand[intent.index] === intent.id ? intent.index : mageIndex();
         if (mi >= 0) { mageCard = state.mage.hand[mi]; act('mage', mi); }
         else mageCard = null;
-      } else mageCard = null;
+        /* your block guarded his turn; it expires as your next turn starts */
+        state.you.block = 0;
+      }
       settle();
       queueFx(youCard, 'you');
       if (mageCard) queueFx(mageCard, 'mage');
       if (!state.over) beginTurn();
     }
     if (state.result === 'win') grant();
-    if (state.result === 'lose') { close(); dungeonDeath(); }
-    else draw();
+    if (state.result === 'lose') {
+      if (wasOver || state.legacy || reduced()) { close(); dungeonDeath(); }
+      else if (!losePending) {
+        draw();
+        s = state;
+        losePending = { s: s };
+        done = function () { finishLose(s); };
+        if (NEU.kernel && NEU.kernel.after) NEU.kernel.after(1200, done);
+        else setTimeout(done, 1200);
+      }
+    } else draw();
     return state;
   }
 
@@ -211,6 +295,7 @@
 
   function open(opts) {
     var rng;
+    if (losePending) { losePending = null; dungeonDeath(); }
     opts = opts || {};
     rng = opts.rng;
     if (!rng && opts.seed != null && NEU.rand && NEU.rand.seeded) rng = NEU.rand.seeded(opts.seed);
@@ -219,6 +304,7 @@
     /* Shipped game: fixed orders. An explicit rng/seed is kept only as a
        compatibility adapter for the older scripted suites. */
     if (opts.rng || opts.seed != null) {
+      state.legacy = true;
       state.deck = shuffle(buildDeck(), rng);
       state.mageDeck = shuffle(buildDeck(), rng);
     } else {
@@ -272,6 +358,14 @@
     if (state.slide) {
       state.slide.t += dt;
       if (state.slide.t >= state.slide.dur) state.slide = null;
+    }
+    for (i = state.pops.length - 1; i >= 0; i--) {
+      state.pops[i].t += dt;
+      if (state.pops[i].t >= state.pops[i].dur) state.pops.splice(i, 1);
+    }
+    if (state.flash) {
+      state.flash.t += dt;
+      if (state.flash.t >= state.flash.dur) state.flash = null;
     }
     for (i = state.fx.length - 1; i >= 0; i--) {
       state.fx[i].t += dt;
@@ -584,6 +678,18 @@
     ctx.fillText(s, x, y);
   }
 
+  /* One line, kept on screen when the selected card sits near an edge. */
+  function ruleLine(line, x, y, col) {
+    var w;
+    if (!line) return;
+    ctx.font = '16px "Determination Mono"';
+    if (ctx.measureText) {
+      w = ctx.measureText(line).width;
+      if (w) x = Math.min(x, 640 - w - 8);
+    }
+    text(line, x < 8 ? 8 : x, y, 16, col);
+  }
+
   /* A small face-up card used by the draw forecast and the mage's intent. */
   function miniCard(id, x, y, w, h, gold) {
     var f = FILL[id] || FILL.DEFEND;
@@ -620,7 +726,17 @@
   }
 
   function drawEnd() {
-    var e = state.endT | 0, i, x, y;
+    var e = reduced() ? 0 : state.endT | 0, i, x, y, win;
+    win = state.result === 'win';
+    /* one readable board on either result; the win keeps its little parade */
+    ctx.globalAlpha = 0.78;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(120, 186, 400, 148);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = win ? '#C8A040' : '#6A3A4A';
+    ctx.fillRect(120, 186, 400, 4);
+    text(win ? 'YOU WIN' : 'THE LAMP GOES OUT', 160, 210, 32, win ? '#FFE080' : '#C8B898');
+    text(win ? 'WIN' : 'LOSE', 288, 258, 32, win ? '#FFE080' : '#D07070');
     if (state.result === 'win') {
       /* hat tips, cards scatter, and the key + spell slide across */
       for (i = 0; i < 4; i++) {
@@ -629,18 +745,13 @@
         drawFace(state.mageDeck.length ? state.mageDeck[i % state.mageDeck.length] : 'ATTACK', x, y, false);
       }
       x = Math.min(320, 120 + e);
-      ctx.fillStyle = '#C8A040'; ctx.fillRect(x, 250, 22, 8);
-      ctx.fillStyle = '#B892FF'; ctx.fillRect(x + 28, 250, 14, 8);
-      text('YOU WIN', 250, 210, 32, '#FFE080');
-    } else if (state.result === 'lose') {
-      ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.85, e / 700) + ')';
-      ctx.fillRect(0, 0, 640, 480);
-      text('THE LAMP GOES OUT', 180, 220, 32, '#C8B898');
+      ctx.fillStyle = '#C8A040'; ctx.fillRect(x, 300, 22, 8);
+      ctx.fillStyle = '#B892FF'; ctx.fillRect(x + 28, 300, 14, 8);
     }
   }
 
   function draw() {
-    var w, h, sway, cx, i, n, pos, f, t, x, y, shook, a, sel, k;
+    var w, h, sway, cx, i, n, pos, f, t, x, y, shook, a, sel, k, pp, ft;
     if (!ctx || !state) return;
     w = canvas.width || 640;
     h = canvas.height || 480;
@@ -686,6 +797,7 @@
     if (state.intent && !state.over) {
       miniCard(state.intent.id, 124, 120, 48, 68, true);
       text('HE WILL PLAY', 118, 112, 16, '#FFE080');
+      ruleLine(RULES[state.intent.id], 124, 196, '#FFE080');
     }
     for (i = 0; i < state.you.hand.length; i++) {
       f = flyFor(i);
@@ -699,6 +811,9 @@
         drawFace(f.id, x, y, false);
       } else drawFace(state.you.hand[i], slotPos(i).x, slotPos(i).y, i === state.sel && !state.over);
     }
+    if (!state.over && state.you.hand[state.sel]) {
+      ruleLine(RULES[state.you.hand[state.sel]], 196 + state.sel * 86, 476, '#F0D8A8');
+    }
     if (state.slide && state.slide.t < state.slide.dur) {
       t = state.slide.t / state.slide.dur;
       drawFace(state.slide.id, qbez(300, 320, 284, t), qbez(360, 200, 236, t), false);
@@ -708,6 +823,29 @@
     text(String(Math.round(state.disp.you)), 544, 50, 32, '#F4EFE4');
     text('MAGE', 48, 70, 16, '#C8B898');
     text('YOU', 544, 70, 16, '#C8B898');
+    /* status icons sit just under each HP plate */
+    if (state.mage.blockShown > 0) {
+      icon(ctx, ICON.DEFEND, { '1': '#C8A040' }, 48, 84);
+      text('BLK' + state.mage.blockShown, 68, 94, 16, '#C8A040');
+    }
+    if (state.mage.parry) {
+      icon(ctx, ICON.PARRY, { '1': '#4A82C0' }, 48, 84);
+      text('PARRY', 68, 94, 16, '#4A82C0');
+    }
+    if (state.you.blockShown > 0) {
+      icon(ctx, ICON.DEFEND, { '1': '#C8A040' }, 544, 84);
+      text('BLK' + state.you.blockShown, 564, 94, 16, '#C8A040');
+    }
+    if (state.you.parry) {
+      icon(ctx, ICON.PARRY, { '1': '#4A82C0' }, 544, 84);
+      text('PARRY', 564, 94, 16, '#4A82C0');
+    }
+    /* up to three streak pips under the player plate */
+    for (i = 0; i < 3; i++) {
+      ctx.fillStyle = INK; ctx.fillRect(543 + i * 12, 110, 10, 10);
+      ctx.fillStyle = i < state.you.streak ? '#C8A040' : '#2A1C12';
+      ctx.fillRect(545 + i * 12, 112, 6, 6);
+    }
     if (!reduced()) {
       if (state.clock - state.grainAt >= 400) {
         state.grainAt = state.clock;
@@ -715,6 +853,22 @@
       }
       ctx.fillStyle = '#C8C0B4';
       for (i = 0; i < state.grain.length; i++) ctx.fillRect(state.grain[i].x, state.grain[i].y, 1, 1);
+    }
+    if (!reduced()) {
+      if (state.flash) {
+        ft = state.flash.t / state.flash.dur;
+        ctx.globalAlpha = (1 - ft > 0 ? 1 - ft : 0) * 0.6;
+        ctx.fillStyle = '#FFE8E8';
+        ctx.fillRect(state.flash.x - 6, state.flash.y - 6, 108, 78);
+        ctx.globalAlpha = 1;
+      }
+      for (i = 0; i < state.pops.length; i++) {
+        pp = state.pops[i];
+        ft = pp.t / pp.dur;
+        ctx.globalAlpha = 1 - ft > 0 ? 1 - ft : 0;
+        text(pp.text, pp.x, pp.y - 30 - Math.round(ft * 26), 16, pp.heal ? '#4AB880' : '#FF6B6B');
+        ctx.globalAlpha = 1;
+      }
     }
     if (NEU.juice && NEU.juice.end) NEU.juice.end(ctx, shook);
     if (NEU.juice && NEU.juice.overlay) NEU.juice.overlay(ctx, w, h);
@@ -732,10 +886,12 @@
     var k, n, r;
     if (!active || !state) return;
     if (NEU.kernel && NEU.kernel.current() !== 'cards') return;
+    if (losePending) return;
     r = (NEU.keys && NEU.keys.route) ? NEU.keys.route(e.key, {}) : { to: e.key, swallow: false };
     if (r.swallow) return;
     k = r.to;
     if (k === 'Escape') {
+      if (losePending) return;
       close();
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -752,12 +908,43 @@
     if (k === 'z' || k === 'Z') {
       e.preventDefault();
       e.stopImmediatePropagation();
+      if (losePending) return;
       if (state.over) { close(); return; }
       play(state.sel);
     }
   }
 
+  /* Tap selects; a second tap on the same card plays it. Mouse and touch
+     share the click path; the canvas may be letterboxed by object-fit. */
+  function onClick(e) {
+    var r, s, ox, oy, x, y, i, px;
+    if (!active || !state) return;
+    if (NEU.kernel && NEU.kernel.current && NEU.kernel.current() !== 'cards') return;
+    if (losePending) return;
+    if (state.over) { close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (!canvas || !canvas.getBoundingClientRect) return;
+    r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    s = Math.min(r.width / canvas.width, r.height / canvas.height);
+    ox = (r.width - canvas.width * s) / 2;
+    oy = (r.height - canvas.height * s) / 2;
+    x = (e.clientX - r.left - ox) / s;
+    y = (e.clientY - r.top - oy) / s;
+    if (y < 344 || y > 464) return;
+    for (i = 0; i < state.you.hand.length; i++) {
+      px = 196 + i * 86;
+      if (x >= px && x <= px + CW) {
+        if (state.sel !== i) { state.sel = i; draw(); }
+        else play(i);
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+    }
+  }
+
   window.addEventListener('keydown', onKey, true);
+  if (canvas && canvas.addEventListener) canvas.addEventListener('click', onClick, true);
 
   NEU.cards = {
     open: open,
@@ -766,7 +953,10 @@
     tick: tick,
     ANIM: ANIM,
     decks: function () { return { you: PLAYER_DECK.slice(), mage: MAGE_DECK.slice() }; },
+    RULES: RULES,
+    rule: function (id) { return RULES[id] || ''; },
     intent: function () { return state ? state.intent : null; },
+    think: function () { beginTurn(); return state ? state.intent : null; },
     shelf: function () {
       if (!state) return [];
       return [state.deck[state.deck.length - 1], state.deck[state.deck.length - 2]]
