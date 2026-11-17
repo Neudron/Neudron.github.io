@@ -1753,7 +1753,7 @@
     var ak = auraK();
     if (ak) drawStorm(w, h, Math.min(7, ak));
     frame();
-    if (ak) { ctx.fillStyle = 'rgba(120,18,0,' + Math.min(0.20, 0.03 + ak * 0.025).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH); }
+    if (ak) { ctx.fillStyle = 'rgba(120,18,0,' + Math.min(0.24, 0.03 + ak * 0.025).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH); }
 
     /* her */
     if (mode !== 'won') {
