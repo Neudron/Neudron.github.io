@@ -394,7 +394,7 @@
   function toSurface() {
     NEU.dungeon.lastDeath = here;
     if (NEU.mage && NEU.mage.active && NEU.mage.close) NEU.mage.close();
-    return origOpen('dgn', { spawn: { x: BED.x, y: BED.y }, zone: 'd0' });
+    return origOpen('dgn', { spawn: { x: BED.x, y: BED.y }, zone: 'd0', wipe: 0.25 });   /* the wipe-in the death wipe-out hands over to */
   }
 
   function kd(name, d) { var k = kinds[name] || (kinds[name] = {}), q; for (q in d) k[q] = d[q]; return k; }
