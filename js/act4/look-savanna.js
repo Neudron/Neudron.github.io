@@ -683,6 +683,11 @@
   KK.kind('savannaprop', {
     interactive: function () { return false; },
     width: function () { return 16; },
+    reach: function (e) {
+      var p = PROPS[e.v];
+      /* castShadow starts left of the anchor and stretches past the sprite. */
+      return p ? Math.round(p[0] * 1.9) - Math.round(p[0] * 0.3) : 0;
+    },
     draw: function (g, e, d) {
       var s = propSprite(e.v);
       if (s) { A().blit(g, s, d); return; }
