@@ -425,11 +425,18 @@
     for (i = 0; i < pops.length; i++) { c.fillStyle = '#12081E'; c.fillText(pops[i].s, (pops[i].x + 1) | 0, (pops[i].y + 1) | 0); c.fillStyle = '#FFE8A0'; c.fillText(pops[i].s, pops[i].x | 0, pops[i].y | 0); }
     c.textAlign = 'left';
     if (kit) kit.draw(c);
+    if (kit && kit.stripOpen) {
+      c.font = '16px monospace'; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillStyle = '#FF9E30';
+      c.fillText('< >', box.AX + (box.AW + Math.min(box.AW - 24, 464)) / 2 + 12 | 0, box.AY + box.AH / 2 - 16 | 0);
+      c.fillText('ITEMS', box.AX + (box.AW + Math.min(box.AW - 24, 464)) / 2 + 12 | 0, box.AY + box.AH / 2 | 0);
+    }
     c.restore();
   }
   function key(k, down) {
     var lk = String(k).toLowerCase(), h = hero();
     if (!kit) return false;
+    /* the strip owns C (C again closes it); Left / Right hands over to the full C menu: items, equip, the recall potion */
+    if (down && kit.stripOpen && (lk === 'arrowleft' || lk === 'arrowright') && NEU.inv) { kit.keydown('x'); NEU.inv.open(); return true; }
     if (down && kit.stripOpen) { kit.hp = h.hp; kit.keydown(k); h.hp = Math.max(h.hp, kit.hp); return true; }
     if (down && lk === 'c') { kit.keydown('c'); return true; }
     if (lk === 'z') { if (down) kit.keydown('z'); else kit.keyup('z'); }

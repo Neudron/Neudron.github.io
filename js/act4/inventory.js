@@ -509,10 +509,16 @@
        gate progression, and Z on them used to delete them outright. */
     if (NEU.talk) NEU.talk(SOUP_INFO[item.id] ? SOUP_INFO[item.id][2] : ['* ' + item.name + '. ' + (item.desc || '')], 'narr');
   }
+  /* C opens the menu over a live platformer level that does not own C itself (the mountain). The dungeon's levels
+     bind C to the fight strip (def.key) and hand over from there. plat.js freezes its sim while this box is open. */
+  function platMenu() {
+    var L = NEU.activeMinigame === 'plat' && NEU.plat && NEU.plat.level0 && NEU.plat.level0();
+    return !!L && !L.key;
+  }
   addEventListener('keydown', function (e) {
     var k = e.key, isOpen = box && !box.hidden;
     if (!isOpen) {
-      if ((k !== 'c' && k !== 'C') || !NEU.engine || !NEU.engine.running || NEU.activeMinigame ||
+      if ((k !== 'c' && k !== 'C') || !NEU.engine || !NEU.engine.running || (NEU.activeMinigame && !platMenu()) ||
           (NEU.tboxOpen && NEU.tboxOpen()) || (NEU.settings && NEU.settings.open_) ||
           /^(INPUT|TEXTAREA)$/.test(e.target && e.target.tagName) || document.getElementById('confirmExit')) return;
       e.preventDefault(); e.stopImmediatePropagation(); open(); return;
