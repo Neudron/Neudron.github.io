@@ -70,10 +70,12 @@
     }
   }
   /* the laser's segment this frame (a sweeping one moves from sw[0] to sw[1]) */
-  function laserSeg(l) {
-    var x = l.x, u;
-    if (l.sw) { u = clamp((G.fr - l.at) / (l.end - l.at), 0, 1); x = lerp(l.sw[0], l.sw[1], u); }
-    return arenaSeg({ x0: x, y0: l.y, x1: x + Math.cos(l.a) * l.len, y1: l.y + Math.sin(l.a) * l.len });
+  function laserSeg(l, fr) {
+    var x = l.x, y = l.y, u;
+    if (fr === undefined) fr = G.fr;
+    if (l.sw) { u = clamp((fr - l.at) / (l.end - l.at), 0, 1); x = lerp(l.sw[0], l.sw[1], u); }
+    if (l.vy) y += l.vy * (fr - l.t0);   /* a drifting lane (the telegraph drifts with it from t0) */
+    return arenaSeg({ x0: x, y0: y, x1: x + Math.cos(l.a) * l.len, y1: y + Math.sin(l.a) * l.len });
   }
   /* the part of a segment inside the fight arena (Liang-Barsky), or null.
      Beams stop at the walls: what a beam draws and hits stays in the box. */
@@ -304,6 +306,8 @@
         continue;
       }
       var ex = w.x + Math.cos(w.a) * (w.len || L), ey = w.y + Math.sin(w.a) * (w.len || L);
+      /* a drifting lane: the line is drawn where the lane will be (laserSeg moves the beam the same way, from the volley's t0) */
+      if (w.vy) { ctx.save(); ctx.translate(0, w.vy * (G.fr - w.t0)); }
       /* the gradient depends only on the line and its quantised ramp, so it is
          built once per (line, 1/16 step) and reused, not made per line per frame */
       var tq = Math.round(t * 16) / 16, fq = Math.round(fade * 16) / 16, gk = w.x + ',' + w.y + ',' + ex + ',' + ey + ',' + tq + ',' + fq, gr = F.grad[gk];
@@ -330,6 +334,7 @@
       ctx.strokeStyle = gr || 'rgba(' + c + ',' + (t * fade).toFixed(2) + ')';
       ctx.lineWidth = core;
       ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(ex, ey); ctx.stroke();
+      if (w.vy) ctx.restore();
     }
     for (wk = 0, wn = 0; wk < F.mine.length; wk++) {
       m = F.mine[wk];
@@ -1357,7 +1362,7 @@
      soul as it lights. Locks overlap, so the next line is tracking while
      the last beam burns. Dodge: the lock line shows where the beam goes. */
   ATK.EyeLockBeams = function (st) {
-    var f = st.f, k, e, n = !G.thin && G.lvl >= 2 ? 6 : 3;
+    var f = st.f, k, e, n = !G.thin && G.lvl >= 2 ? 8 : 4;
     if (f === 0) {
       st.p.eyes = [];
       for (k = 0; k < 3; k++) st.p.eyes.push({ x: A.AX + A.AW * (0.2 + 0.3 * k), y: A.AY + 14, lock: 20 + k * 45, l: null });
@@ -1418,37 +1423,52 @@
 
   /* Darkness with Light Slashes (WotG's DarknessWithLightSlashes.cs,
      rubric 6). The arena dims to 9 % (loud owns the dark) and six slash
-     volleys sweep it, one every 90 f. Each volley is four or five lanes 64
-     px apart, one of them on the soul's height when the warning shows; the
-     lanes show 30 f ahead, then 130 px bands of light travel the full box
-     in 70 f, alternating direction. Dodge: pick a dark gap between two
-     lanes; standing still is always a lane. */
+     volleys sweep it, one every 80 f. Each volley is two waves of seven
+     lanes 44 px apart (the second half a lane lower, 30 f later, the other
+     way), one lane on the soul's height when the warning shows; each lane
+     shows 26 f ahead, then a 130 px band of light travels the full box in
+     70 f. From phase 3 the volley drifts 1 px/f toward the arena's middle. Dodge: slip through the
+     dark gap between lanes and time the bars. */
   ATK.DarknessLightSlashes = function (st) {
-    var f = st.f, i, dir, y0, k, n;
+    var f = st.f, i, dir;
     move(A.AX + A.AW / 2, A.AY + A.AH * 0.2, 0.05);
     if (f === 0) { loud(true, 0.09); A.anim('casting'); }
     for (i = 0; i < 6; i++) {
-      if (f !== 60 + i * 90) continue;
+      if (f !== 60 + i * SLASH_EVERY) continue;
       dir = i % 2;
-      y0 = A.py - 64 * ((RNG() * 3) | 0);
-      n = G.lvl >= 2 ? 5 : 4;
-      for (k = 0; k < n; k++) {
-        var y = y0 + k * 64;
-        if (y < A.AY + 6 || y > A.AY + A.AH - 6) continue;
-        /* bw 8: the band is the 14 px the light actually hurts in, not a 130 px lane that looks unsafe */
-        warn({ x: dir ? A.AX + A.AW : A.AX, y: y, a: dir ? Math.PI : 0, life: 30, w: 4, len: A.AW, bw: 8 });
-        (function (d, ly) {
-          later(30, function () {
-            G.lasers.push({ x: d ? A.AX + A.AW : A.AX, y: ly, a: 0, len: 130, at: G.fr, end: G.fr + 70,
-                            sw: d ? [A.AX + A.AW, A.AX - 130] : [A.AX - 130, A.AX + A.AW] });
-          });
-        })(dir, y);
-      }
+      /* v4-B3: two waves of seven lanes 44 px apart, the second half a lane lower and 30 f
+         later, flying the other way. The block is slid to sit inside the arena, one lane on
+         the soul where it fits. From phase 3 the whole volley drifts 1 px/f. */
+      slashVolley(dir, G.lvl >= 3);
       cue('chime');
     }
-    if (f >= 60 + 6 * 90 + 30) { loud(false); return true; }
+    if (f >= 60 + 5 * SLASH_EVERY + SLASH_WAVE_GAP + SLASH_WARN + 70 + 6) { loud(false); return true; }
     return false;
   };
+  var SLASH_LANES = 7, SLASH_PITCH = 44, SLASH_WARN = 26, SLASH_WAVE_GAP = 30, SLASH_EVERY = 80;
+  function slashVolley(dir, drift) {
+    var span = (SLASH_LANES - 1) * SLASH_PITCH + SLASH_PITCH / 2, lo = A.AY + 6, hi = A.AY + A.AH - 6 - span,
+        y0 = clamp(A.py - SLASH_PITCH * ((RNG() * 3) | 0), lo, Math.max(lo, hi)), t0 = G.fr, vy;
+    /* the block drifts toward the middle of the arena, so its lanes stay in it */
+    vy = !drift ? 0 : y0 + span / 2 < A.AY + A.AH / 2 ? 1 : -1;
+    function wave(n) {
+      var d = n ? 1 - dir : dir, k, y;
+      for (k = 0; k < SLASH_LANES; k++) {
+        y = y0 + k * SLASH_PITCH + n * SLASH_PITCH / 2;
+        if (y < A.AY + 6 || y > A.AY + A.AH - 6) continue;
+        /* bw 8: the band is the 14 px the light actually hurts in, not a 130 px lane that looks unsafe */
+        warn({ x: d ? A.AX + A.AW : A.AX, y: y, a: d ? Math.PI : 0, life: SLASH_WARN, w: 4, len: A.AW, bw: 8, vy: vy, t0: t0 });
+        (function (ly) {
+          later(SLASH_WARN, function () {
+            G.lasers.push({ x: d ? A.AX + A.AW : A.AX, y: ly, a: 0, len: 130, at: G.fr, end: G.fr + 70, vy: vy, t0: t0,
+                            sw: d ? [A.AX + A.AW, A.AX - 130] : [A.AX - 130, A.AX + A.AW] });
+          });
+        })(y);
+      }
+    }
+    wave(0);
+    later(SLASH_WAVE_GAP, function () { wave(1); });
+  }
 
   /* Calamitous Rend (the screen cut, a WotG reality tear). She tears the arena
      with n slashes (4 in phase 3, 5 in the desperation), one every 90 f. Each
@@ -1967,17 +1987,40 @@
      (872c0a1~1), each an attack of its own again, and the desperation
      chain runs them between the new steps. ───────────────────────── */
 
-  /* 0: flame pillars. A strip telegraphs for 60 f, then is live for 105 f,
+  /* a column about to land at x: false when it would land on a soul with no way out (the standing columns
+     wall it in on both sides). The strip is still telegraphed first; it is the one drop a soul cannot dodge. */
+  function pillarOpen(x) {
+    var lo = A.AX + 12, hi = A.AX + A.AW - 12, z0 = x - 19.2, z1 = x + 19.2, at = G.fr + 36, i, b;
+    if (A.px <= z0 || A.px >= z1) return true;
+    for (i = 0; i < G.bones.length; i++) {
+      b = G.bones[i];
+      if (b.kind !== 'pillar' || b.end <= at) continue;
+      if (b.x < A.px) lo = Math.max(lo, b.x + 19.2); else hi = Math.min(hi, b.x - 19.2);
+    }
+    return lo < z0 - 0.5 || hi > z1 + 0.5;
+  }
+  /* 0: flame pillars. A strip telegraphs for 36 f, then is live for 120 f,
      and hurts the soul while it stands in it. Strips step 300 Terraria px
-     across the arena every 16 f. Lost souls every 18 f from her, straight
+     across the arena (every second one; the others stand beside the soul). Lost souls every 18 f from her, straight
      up, +-0.73 rad, speed 8-17 (RedirectingLostSoulProj, timeLeft 230),
      that turn down onto the soul after 40 f. */
   ATK.FlamePillars = function (st) {
     var s = st.f, p = st.p, len = G.lvl >= 4 ? 600 : 480;
     move(A.AX + A.AW / 2, A.AY + 30, 0.05);
-    if (s < len - 165 && s % 16 === 0) {
-      var k = p.k || 0;
-      column(A.AX + 20 + ((k * D(300)) % (A.AW - 40)), 16, A.AY, G.fr + 60, 105, 'pillar');
+    /* v4-B3: a column every 10 f, 36 f of warning, live 120 f. Even slots sit 24 px to
+       one side of the soul (alternating sides: the strip beside it, never on it), odd slots
+       are the old stepped sweep; the desperation adds a second sweep from the far wall. */
+    if (s < len - 156 && s % 10 === 0) {
+      var k = p.k || 0, span = A.AW - 40, sweep = (((k >> 1) * D(300)) % span);
+      if (k % 2 === 0) {
+        /* the far side when the near one is the wall: a column must never land on a soul standing in the corner */
+        var ax = A.px + (k % 4 === 0 ? -24 : 24);
+        if (ax < A.AX + 20 || ax > A.AX + A.AW - 20) ax = A.px + (k % 4 === 0 ? 24 : -24);
+        column(clamp(ax, A.AX + 20, A.AX + A.AW - 20), 16, A.AY, G.fr + 36, 120, 'pillar');
+      } else {
+        if (pillarOpen(A.AX + 20 + sweep)) column(A.AX + 20 + sweep, 16, A.AY, G.fr + 36, 120, 'pillar');
+        if (G.lvl >= 4 && pillarOpen(A.AX + A.AW - 20 - sweep)) column(A.AX + A.AW - 20 - sweep, 16, A.AY, G.fr + 36, 120, 'pillar');
+      }
       p.k = k + 1;
     }
     if (s < len - 60 && s % 18 === 0) {
@@ -2152,8 +2195,8 @@
      portals open along the dash path PORTAL.every[L] f apart, and each fires a
      beam perpendicular to the dash from its edge. Beams are telegraphed for the
      attack's tele, then live for beamLife f. Dodge: stand between two beams. */
-  var PORTAL = { count: [3, 4, 5, 5, 6], every: [18, 15, 12, 12, 10], beamLife: [40, 44, 48, 48, 52],
-                 bothWays: [0, 0, 1, 1, 1], dashes: [1, 2, 2, 2, 3] };
+  var PORTAL = { count: [5, 6, 7, 7, 8], every: [15, 12, 9, 9, 8], beamLife: [52, 56, 60, 60, 64],
+                 bothWays: [1, 1, 1, 1, 1], dashes: [1, 2, 2, 2, 3] };
   var PORTAL_DASH = 12;   /* f of the reposition dash itself */
   /* her dash to a third of the arena at her hover height. The path is
      telegraphed as a warn line from where she stands, then she slides along it
@@ -2343,6 +2386,9 @@
     begin(name);
   }
 
+  /* the soul at (x, y) is in a live column / on a live beam segment: hurtCheck's own tests, and the test hook's */
+  function boneHit(bo, x, y, bx) { return Math.abs(x - (bx === undefined ? bo.x : bx)) < bo.w + 3.2 && y > bo.y0 - 3.2 && y < bo.y1 + 3.2; }
+  function laserHit(s, x, y) { return segDist(x, y, s.x0, s.y0, s.x1, s.y1) < 7; }
   /* a hazard that holds the soul hurts her: the beam, the lasers, the bolts in
      their strike, the rend rifts. The hit itself is boss-scal's (shield,
      i-frames, dash). */
@@ -2361,7 +2407,7 @@
     for (i = 0; i < G.bones.length; i++) {
       bo = G.bones[i];
       if (G.fr < bo.at) continue;
-      if (Math.abs(A.px - bo.x) < bo.w + 3.2 && A.py > bo.y0 - 3.2 && A.py < bo.y1 + 3.2) { A.hit(); if (!G) return; break; }
+      if (boneHit(bo, A.px, A.py)) { A.hit(); if (!G) return; break; }
     }
     for (i = 0; i < G.lava.length; i++) {
       r = G.lava[i];
@@ -2384,7 +2430,7 @@
     for (i = 0; i < G.lasers.length; i++) {
       if (G.fr < G.lasers[i].at) continue;
       s = laserSeg(G.lasers[i]);
-      if (s && segDist(A.px, A.py, s.x0, s.y0, s.x1, s.y1) < 7 && !(A.dashI && A.dashI() > 0)) { A.hit(); if (!G) return; }
+      if (s && laserHit(s, A.px, A.py) && !(A.dashI && A.dashI() > 0)) { A.hit(); if (!G) return; }
     }
     for (i = 0; i < G.rend.length; i++) {
       r = G.rend[i];
@@ -2509,7 +2555,23 @@
       get warns() { return G && G.fx ? G.fx.warn : []; },
       get darkTo() { return G && G.fx ? G.fx.darkTo : 0; },
       /* the combo's converging gap column (ComboSkullRain), for fixes106 */
-      get convGap() { return G ? G.convGapX : undefined; }
+      get convGap() { return G ? G.convGapX : undefined; },
+      /* would a soul at (x, y) be hit by a column or beam at frame f (default now), for hazards already on the field (fixes660/661) */
+      hit: function (x, y, f) {
+        var i, s, b;
+        if (!G) return false;
+        if (f === undefined) f = G.fr;
+        for (i = 0; i < G.bones.length; i++) {
+          b = G.bones[i];
+          if (f >= b.at && f < b.end && boneHit(b, x, y, b.x0 + b.vx * (f - b.at) / 60)) return true;
+        }
+        for (i = 0; i < G.lasers.length; i++) {
+          if (f < G.lasers[i].at || f >= G.lasers[i].end) continue;
+          s = laserSeg(G.lasers[i], f);
+          if (s && laserHit(s, x, y)) return true;
+        }
+        return false;
+      }
     },
     /* the new bodies, for draw and the tests */
     beam: function () { return G ? G.beam : null; },
