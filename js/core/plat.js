@@ -762,14 +762,15 @@
   function archFill2(R, x, y, w, h, col) { R(x + 2, y, w - 4, 1, col); R(x + 1, y + 1, w - 2, 1, col); R(x, y + 2, w, h - 2, col); }
 
   var ENT = {
-    coin: function (c, px, py, e, now) { put(c, coinSpr(reduced ? 0 : ((now / 120) | 0) & 3), px + 3, py + 3); },
+    coin: function (c, px, py, e, now) { var t = (current && current.view === 'terraria') ? simClock * 1000 : now; put(c, coinSpr(reduced ? 0 : ((t / 120) | 0) & 3), px + 3, py + 3); },
     refill: function (c, px, py, e, now) {
-      var on = !(e.t0 > 0), dy = (on && !reduced) ? (((now / 400) | 0) & 1) : 0, k;
+      var t = (current && current.view === 'terraria') ? simClock * 1000 : now;
+      var on = !(e.t0 > 0), dy = (on && !reduced) ? (((t / 400) | 0) & 1) : 0, k;
       if (!on) c.globalAlpha = 0.3;
       else glow(c, px + 8, py + 8, 20, '#64E8FF', 0.15);
       put(c, refillSpr(), px + 3, py + 1 + dy);
       c.globalAlpha = 1;
-      if (on) { k = reduced ? 0 : ((now / 400) | 0) & 3; fr(c, px + [1, 13, 12, 2][k], py + [3, 5, 12, 11][k], 1, 1, '#64E8FF'); }
+      if (on) { k = reduced ? 0 : ((t / 400) | 0) & 3; fr(c, px + [1, 13, 12, 2][k], py + [3, 5, 12, 11][k], 1, 1, '#64E8FF'); }
     },
     crumble: function (c, px, py, e, now) {
       var s = skin(), j = (e.cs === 1 && !reduced) ? ((((now / 40) | 0) & 1) ? 1 : -1) : 0, f = fallOf(e);
