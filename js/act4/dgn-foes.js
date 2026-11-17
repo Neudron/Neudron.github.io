@@ -39,7 +39,7 @@
   var SPELL = { beam: { first: 1.67, next: 0.83, per: 5, cycle: 7.5, hitTp: 0.5 }, souls: { first: 1.67, next: 1, per: 3, cycle: 9, hitTp: 0 },
     inferno: { first: 1.67, next: 1.67, per: 3, cycle: 6.67, hitTp: 1 } };
   var PHANTOM = ['* Wails echo through the dilapidated dungeon halls...', '* Long-dead prisoners seek their zealous revenge...'];
-  var foes = [], shots = [], pops = [], fxs = [], kit = null, F = { x: 0, y: 0, fx: 1, fy: 0 }, box = { AX: 0, AY: 0, AW: 640, AH: 360 }, lastDir = 0;
+  var foes = [], shots = [], pops = [], fxs = [], dying = [], kit = null, F = { x: 0, y: 0, fx: 1, fy: 0 }, box = { AX: 0, AY: 0, AW: 640, AH: 360 }, lastDir = 0;
 
   function sheet(k) { return NEU.dgSheets && NEU.dgSheets[k]; }
   function sgn(v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
@@ -59,7 +59,7 @@
   function spawn(k, x, y, sp) {
     var d = KIND[k], sh, m, f;
     if (!d) return null;
-    f = { k: k, d: d, s: d.s, v: d.v, x: (x + 0.5) * T, y: 0, vx: 0, vy: 0, hp: d.hp, face: -1, t: 0, a: 0, n: 0, st: 0, sp: sp || null, walked: 0, flash: 0, cd: 0, shoots: 0 };
+    f = { k: k, d: d, s: d.s, v: d.v, x: (x + 0.5) * T, y: 0, vx: 0, vy: 0, hp: d.hp, face: -1, t: 0, a: 0, n: 0, st: 0, sp: sp || null, walked: 0, flash: 0, cd: 0, shoots: 0, born: 0 };
     if (d.phantom) { m = MOODS[(rnd() * 4) | 0]; f.s = m[0]; f.v = m[1]; f.shoots = m[2]; }
     sh = sheet(f.s); f.w = sh && sh.hit ? sh.hit.w : 16; f.h = sh && sh.hit ? sh.hit.h : 16; f.r = Math.min(f.w, f.h) / 2;
     f.y = d.ai === 'fighter' || d.ai === 'ranged' || d.ai === 'caster' || d.ai === 'warlock' ? floorBelow(x, y) * T - f.h / 2 : (y + 0.5) * T;
@@ -258,7 +258,9 @@
   }
   function die(f) {
     var n;
+    var sh0 = sheet(f.s);
     f.dead = true; if (f.sp) f.sp.cd = 20;
+    if (sh0 && !P.replaying()) dying.push({ s: f.s, fr: frameOf(f, sh0), x: f.x, y: f.y, face: f.face, h: f.h, t: 0.3, d: 0.3, sh: sh0 });
     if (NEU.juice && NEU.juice.burst) NEU.juice.burst(f.x, f.y, 10, '#E8DCC8', 120);
     fxs.push({ x: f.x, y: f.y, t: 0.45, d: 0.45, k: f.d.hammer ? 'fxHolySmite' : 'fxGigHitY' });
     if (NEU.save && NEU.save.addCoins && !P.replaying()) NEU.save.addCoins(1 + ((rnd() * 2) | 0));
@@ -300,7 +302,7 @@
     for (i = 0; i < shots.length; i++) { shots[i].ox = shots[i].x; shots[i].oy = shots[i].y; }
     for (i = 0; i < foes.length; i++) {
       f = foes[i]; if (f.dead || !active(f)) continue;
-      if (f.flash > 0) f.flash -= dt; if (f.said > 0) f.said -= dt;
+      if (f.flash > 0) f.flash -= dt; if (f.said > 0) f.said -= dt; f.born += dt;
       AI[f.d.ai](f, dt);
       if (!f.dead && touchHero(f)) hurtHero(1, sgn(h.x - f.x));
     }
@@ -320,6 +322,7 @@
         if (s.k !== 'fire' && s.k !== 'boom' && s.k !== 'hammer') shots.splice(i, 1);
       }
     }
+    for (i = dying.length - 1; i >= 0; i--) if ((dying[i].t -= dt) <= 0) dying.splice(i, 1);
     for (i = pops.length - 1; i >= 0; i--) if ((pops[i].t -= dt) <= 0) pops.splice(i, 1);
     for (i = fxs.length - 1; i >= 0; i--) if ((fxs[i].t -= dt) <= 0) fxs.splice(i, 1);
     /* Terraria-style respawn: a spawner refills off screen and far away after 20 s; a fighter is Bone Lee 1 in 30 */
@@ -343,7 +346,7 @@
   }
   function open() {
     var i, sps = def.spawners;
-    foes.length = 0; shots.length = 0; pops.length = 0; fxs.length = 0;
+    foes.length = 0; shots.length = 0; pops.length = 0; fxs.length = 0; dying.length = 0;
     kit = NEU.kit ? NEU.kit.create({ F: F, box: box, noMelee: true, adapter: {
       targets: function () { var out = [], i; for (i = 0; i < foes.length; i++) if (!foes[i].dead && foes[i].d.hp && onScreen(foes[i].x, foes[i].y, 0)) out.push(foes[i]); return out; },
       damage: function (t, n, kind) { if (kind !== 'melee') hitFoe(t, 1, sgn(t.x - F.x)); },
@@ -371,16 +374,32 @@
     return t % n;
   }
   function draw(c, cx, cy) {
-    var i, f, sh, k, L = NEU.dungeonLook;
+    var i, f, sh, k, L = NEU.dungeonLook, x, y, fl, still = P.reduced(), d, g;
     lerp();
     for (i = 0; i < foes.length; i++) {
       f = foes[i]; if (f.dead || !onScreen(f.dx, f.dy, 64)) continue;
       sh = sheet(f.s); if (!sh) continue;
       if (f.d.ai === 'ball') for (k = 0; k < f.len; k += 12) L.cut(c, 'dgLink', 0, 0, 12, 12, f.px + (f.dx - f.px) * k / f.len - 6 - cx, f.py + (f.dy - f.py) * k / f.len - 6 - cy);
-      if (f.tp && (P.reduced() || ((P.time() * 1000 / 150) | 0) & 1)) c.globalAlpha = 0.5;
-      L.cut(c, f.s, 0, frameOf(f, sh) * sh.fh, sh.fw, sh.fh, f.dx - sh.fw / 2 - cx, f.dy + f.h / 2 - sh.fh - cy + (f.d.ai === 'skull' || f.d.ai === 'spirit' || f.d.ai === 'ball' || f.d.ai === 'wheel' ? (sh.fh - f.h) / 2 : 2), f.face > 0);
+      x = f.dx - sh.fw / 2 - cx; y = f.dy + f.h / 2 - sh.fh - cy + (f.d.ai === 'skull' || f.d.ai === 'spirit' || f.d.ai === 'ball' || f.d.ai === 'wheel' ? (sh.fh - f.h) / 2 : 2);
+      /* a blink while it blinks to a new spot; a stepped fade-in for the first 0.3 s of a spawn (a dead brute's spirit rises where it fell) */
+      if (f.tp && (still || ((P.time() * 1000 / 150) | 0) & 1)) c.globalAlpha = 0.5;
+      else if (!still && f.born < 0.3) c.globalAlpha = Math.ceil(f.born / 0.3 * 4) / 4 || 0.25;
+      L.cut(c, f.s, 0, frameOf(f, sh) * sh.fh, sh.fw, sh.fh, x, y, f.face > 0);
       c.globalAlpha = 1;
-      if (f.flash > 0) { c.globalAlpha = 0.5; P.fr(c, (f.dx - f.w / 2 - cx) | 0, (f.dy - f.h / 2 - cy) | 0, f.w, f.h, '#FFFFFF'); c.globalAlpha = 1; }
+      /* the hurt frame: the sprite's own silhouette floods white for the 0.12 s hit window (dim under the calm-flash setting) */
+      if (f.flash > 0 && !still) {
+        fl = P.flashCol();
+        P.tint(c, x, y, sh.fw, sh.fh, function (gg) { L.cut(gg, f.s, 0, frameOf(f, sh) * sh.fh, sh.fw, sh.fh, 0, 0, f.face > 0); }, fl.c, fl.a * Math.min(1, f.flash / 0.08));
+        c.globalAlpha = 1;
+      }
+    }
+    /* death: the body whitens and folds into the floor over 0.3 s while the burst plays (reduced motion: the burst alone) */
+    if (!still) for (i = 0; i < dying.length; i++) {
+      d = dying[i]; k = 1 - d.t / d.d; sh = d.sh; if (!onScreen(d.x, d.y, 64)) continue;
+      fl = P.flashCol();
+      c.save(); c.translate((d.x - cx) | 0, (d.y + d.h / 2 + 2 - cy) | 0); c.scale(1 + 0.3 * k, Math.max(0.05, 1 - k));
+      P.tint(c, -sh.fw / 2, -sh.fh, sh.fw, sh.fh, function (gg) { L.cut(gg, d.s, 0, d.fr * sh.fh, sh.fw, sh.fh, 0, 0, d.face > 0); }, fl.c, fl.a * (1 - k * 0.6));
+      c.restore(); c.globalAlpha = 1;
     }
   }
   function line(c, x0, y0, x1, y1, col, step) {
@@ -465,7 +484,7 @@
   def.draw = draw; def.hud = hud; def.key = key; def.lights = lights; def.swing = axe;
   def.slow = function () { return kit ? kit.slow : 1; };
   def.tp = function () { return kit ? kit.tp : 0; };
-  def.onClose = function () { shots.length = 0; };
-  NEU.dgnFoes = { kinds: KIND, foes: foes, shots: shots, pops: pops, spawn: spawn, hit: hitFoe, axe: axe, kit: function () { return kit; },
+  def.onClose = function () { shots.length = 0; dying.length = 0; };
+  NEU.dgnFoes = { kinds: KIND, foes: foes, shots: shots, pops: pops, dying: dying, frameOf: frameOf, spawn: spawn, hit: hitFoe, axe: axe, kit: function () { return kit; },
     gun: GUN, spell: SPELL, moods: MOODS, beamPath: beamPath, spot: spot };
 })();
