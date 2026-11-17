@@ -217,17 +217,10 @@
   }
   function foreground(c, cx, cy, L, now, a) { shade(c, L, cx, cy, a); }
 
-  /* ── HUD: hearts top-right (kit HP), a TP star column under them, the depth line ─ */
-  var HEART = ['.kk.kk.', 'krrkrrk', 'krwrrrk', 'krrrrrk', '.krrrk.', '..krk..', '...k...'];
-  var STAR = ['...k...', '..kyk..', 'kkkyykk', 'kyyyyyk', '.kyyyk.', 'kyk.kyk', 'k.....k'];
-  function heartSpr(on) { return P.spr('dh' + on, 7, 7, function (R) { P.rows(R, HEART, on ? { k: INK, r: '#E8304A', w: '#FFC8D0' } : { k: INK, r: '#3A2030', w: '#4A2A3A' }, 0, 0); }); }
-  function starSpr(on) { return P.spr('ds' + on, 7, 7, function (R) { P.rows(R, STAR, on ? { k: INK, y: '#5AB8FF' } : { k: INK, y: '#1A2A48' }, 0, 0); }); }
+  /* ── HUD: the depth line top-left. Hearts, TP and the slots are the docked bar (tphud.js), one display each ─ */
   function hud(c, L, view, now, a) {
-    var s = P.state, i, x, y = a.y0 + 12, tp = L.tp ? L.tp() : 0, n, depth, z;
+    var s = P.state, y = a.y0 + 12, z, depth;
     if (!s) return;
-    for (i = 0; i < (L.hp || 6); i++) { x = a.x1 - 20 - (L.hp - 1 - i) * 16; c.drawImage(heartSpr(i < s.hp).cv, 0, 0, 7, 7, x, y, 14, 14); }
-    n = Math.round(tp * 5);
-    for (i = 0; i < 5; i++) c.drawImage(starSpr(i < n).cv, 0, 0, 7, 7, a.x1 - 20, y + 22 + i * 16, 14, 14);
     z = L.zoneAt(s.x, s.y - 11); depth = Math.round((s.y / T - 15) * 2);
     c.font = FONT; c.textBaseline = 'top'; c.textAlign = 'left';
     var label = L.id === 't0' ? 'training room' : depth > 0 ? depth + "' underground" : 'surface';
