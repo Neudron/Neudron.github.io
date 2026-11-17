@@ -25,6 +25,13 @@
     DEFEND: ['01110', '11111', '11111', '11111', '01110'],
     PARRY: ['00100', '01100', '11111', '00110', '00100']
   };
+  /* The one written copy of each rule, reused by the hand and the intent. */
+  var RULES = {
+    ATTACK: 'deal 3. +1 for each attack in a row.',
+    HEAL: 'restore 3.',
+    DEFEND: 'block 3 until your next turn.',
+    PARRY: 'turn his next attack back on him. wasted if he does not attack.'
+  };
 
   function reduced() {
     if (NEU.motion && NEU.motion.reduced) return !!NEU.motion.reduced();
@@ -652,6 +659,18 @@
     ctx.fillText(s, x, y);
   }
 
+  /* One line, kept on screen when the selected card sits near an edge. */
+  function ruleLine(line, x, y, col) {
+    var w;
+    if (!line) return;
+    ctx.font = '16px "Determination Mono"';
+    if (ctx.measureText) {
+      w = ctx.measureText(line).width;
+      if (w) x = Math.min(x, 640 - w - 8);
+    }
+    text(line, x < 8 ? 8 : x, y, 16, col);
+  }
+
   /* A small face-up card used by the draw forecast and the mage's intent. */
   function miniCard(id, x, y, w, h, gold) {
     var f = FILL[id] || FILL.DEFEND;
@@ -759,6 +778,7 @@
     if (state.intent && !state.over) {
       miniCard(state.intent.id, 124, 120, 48, 68, true);
       text('HE WILL PLAY', 118, 112, 16, '#FFE080');
+      ruleLine(RULES[state.intent.id], 124, 196, '#FFE080');
     }
     for (i = 0; i < state.you.hand.length; i++) {
       f = flyFor(i);
@@ -771,6 +791,9 @@
         y = qbez(188, 40, pos.y, t);
         drawFace(f.id, x, y, false);
       } else drawFace(state.you.hand[i], slotPos(i).x, slotPos(i).y, i === state.sel && !state.over);
+    }
+    if (!state.over && state.you.hand[state.sel]) {
+      ruleLine(RULES[state.you.hand[state.sel]], 196 + state.sel * 86, 476, '#F0D8A8');
     }
     if (state.slide && state.slide.t < state.slide.dur) {
       t = state.slide.t / state.slide.dur;
@@ -907,6 +930,8 @@
     tick: tick,
     ANIM: ANIM,
     decks: function () { return { you: PLAYER_DECK.slice(), mage: MAGE_DECK.slice() }; },
+    RULES: RULES,
+    rule: function (id) { return RULES[id] || ''; },
     intent: function () { return state ? state.intent : null; },
     think: function () { beginTurn(); return state ? state.intent : null; },
     shelf: function () {
