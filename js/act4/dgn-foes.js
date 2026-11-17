@@ -64,6 +64,8 @@
     var d = KIND[k], sh, m, f;
     if (!d) return null;
     f = { k: k, d: d, s: d.s, v: d.v, x: (x + 0.5) * T, y: 0, vx: 0, vy: 0, hp: d.hp, face: -1, t: 0, a: 0, n: 0, st: 0, sp: sp || null, walked: 0, flash: 0, cd: 0, shoots: 0 };
+    /* R6: summoned foes have no spawner, so remember the zone they were created in. */
+    if (!sp && def.zoneAt) { var oz = def.zoneAt(f.x, (y + 0.5) * T); if (oz) f.zoneId = oz.id; }
     if (d.phantom) { m = MOODS[(rnd() * 4) | 0]; f.s = m[0]; f.v = m[1]; f.shoots = m[2]; }
     sh = sheet(f.s); f.w = sh && sh.hit ? sh.hit.w : 16; f.h = sh && sh.hit ? sh.hit.h : 16; f.r = Math.min(f.w, f.h) / 2;
     f.y = d.ai === 'fighter' || d.ai === 'ranged' || d.ai === 'caster' || d.ai === 'warlock' ? floorBelow(x, y) * T - f.h / 2 : (y + 0.5) * T;
@@ -303,9 +305,9 @@
   function onScreen(x, y, m) { var v = P.view(), c = P.cam(); return x > c.x - m && x < c.x + v.w + m && y > c.y - m && y < c.y + v.h + m; }
   /* D7: a foe belongs to the zone it spawned in; it never wanders into its neighbour. */
   function zoneOf(f) {
-    var zs = def.zones, i;
-    if (!f.sp || !zs) return null;
-    for (i = 0; i < zs.length; i++) if (zs[i].id === f.sp.zone) return zs[i];
+    var zs = def.zones, i, id = f.sp ? f.sp.zone : f.zoneId;
+    if (!id || !zs) return null;
+    for (i = 0; i < zs.length; i++) if (zs[i].id === id) return zs[i];
     return null;
   }
   function zoneClamp(f, p) {
@@ -474,10 +476,13 @@
     if (kit) kit.draw(c);
     c.restore();
   }
+  /* R7: e.key is routed by plat.js before it reaches us; a rebound key arrives here as its
+     definition token already. Re-route explicitly so direct callers and rebound keys agree. */
   function key(k, down) {
-    var lk = String(k).toLowerCase(), h = hero();
+    var lk = String(k).toLowerCase(), h = hero(), routed;
     if (!kit) return false;
-    if (down && kit.stripOpen) { kit.hp = h.hp; kit.keydown(k); h.hp = Math.max(h.hp, kit.hp); return true; }
+    if (NEU.keys && NEU.keys.route) { routed = NEU.keys.route(k, {}); if (routed && !routed.swallow && routed.to) lk = String(routed.to).toLowerCase(); }
+    if (down && kit.stripOpen) { kit.hp = h.hp; kit.keydown(lk); h.hp = Math.max(h.hp, kit.hp); return true; }
     if (down && lk === 'c') { kit.keydown('c'); return true; }
     if (lk === 'z') { if (down) kit.keydown('z'); else kit.keyup('z'); }
     return false;
