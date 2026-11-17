@@ -260,7 +260,7 @@
     var n;
     var sh0 = sheet(f.s);
     f.dead = true; if (f.sp) f.sp.cd = 20;
-    if (sh0 && !P.replaying()) dying.push({ s: f.s, fr: frameOf(f, sh0), x: f.x, y: f.y, face: f.face, h: f.h, t: 0.3, d: 0.3, sh: sh0 });
+    if (sh0 && !P.replaying()) dying.push({ s: f.s, fr: frameOf(f, sh0), x: f.x, y: f.y, face: f.face, h: f.h, ay: f.d.ai === 'skull' || f.d.ai === 'spirit' || f.d.ai === 'ball' || f.d.ai === 'wheel' ? (sh0.fh - f.h) / 2 : 2, t: 0.3, d: 0.3, sh: sh0 });
     if (NEU.juice && NEU.juice.burst) NEU.juice.burst(f.x, f.y, 10, '#E8DCC8', 120);
     fxs.push({ x: f.x, y: f.y, t: 0.45, d: 0.45, k: f.d.hammer ? 'fxHolySmite' : 'fxGigHitY' });
     if (NEU.save && NEU.save.addCoins && !P.replaying()) NEU.save.addCoins(1 + ((rnd() * 2) | 0));
@@ -387,7 +387,7 @@
       L.cut(c, f.s, 0, frameOf(f, sh) * sh.fh, sh.fw, sh.fh, x, y, f.face > 0);
       c.globalAlpha = 1;
       /* the hurt frame: the sprite's own silhouette floods white for the 0.12 s hit window (dim under the calm-flash setting) */
-      if (f.flash > 0 && !still) {
+      if (f.flash > 0) {
         fl = P.flashCol();
         P.tint(c, x, y, sh.fw, sh.fh, function (gg) { L.cut(gg, f.s, 0, frameOf(f, sh) * sh.fh, sh.fw, sh.fh, 0, 0, f.face > 0); }, fl.c, fl.a * Math.min(1, f.flash / 0.08));
         c.globalAlpha = 1;
@@ -397,7 +397,7 @@
     if (!still) for (i = 0; i < dying.length; i++) {
       d = dying[i]; k = 1 - d.t / d.d; sh = d.sh; if (!onScreen(d.x, d.y, 64)) continue;
       fl = P.flashCol();
-      c.save(); c.translate((d.x - cx) | 0, (d.y + d.h / 2 + 2 - cy) | 0); c.scale(1 + 0.3 * k, Math.max(0.05, 1 - k));
+      c.save(); c.translate((d.x - cx) | 0, (d.y + d.h / 2 + d.ay - cy) | 0); c.scale(1 + 0.3 * k, Math.max(0.05, 1 - k));
       P.tint(c, -sh.fw / 2, -sh.fh, sh.fw, sh.fh, function (gg) { L.cut(gg, d.s, 0, d.fr * sh.fh, sh.fw, sh.fh, 0, 0, d.face > 0); }, fl.c, fl.a * (1 - k * 0.6));
       c.restore(); c.globalAlpha = 1;
     }
