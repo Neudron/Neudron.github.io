@@ -1,4 +1,19 @@
-/* mountain.js — eight original screens on the plat kernel (W5.4). */
+/* mountain.js — eight original screens on the plat kernel (W5.4).
+ *
+ * M1 movement metrics, measured by tests/fixes590.mjs on the real 60 Hz kernel
+ * (tiles, TILE=16). SAFE = 0.7 x measured maximum, HARD = 0.95 x measured
+ * maximum. Required-path gaps use SAFE or less; HARD only on optional refill
+ * ledges. Room heights climb from 34 to 60 tiles.
+ *
+ *  metric                  measured   SAFE (0.7x)   HARD (0.95x)
+ *  full jump height           3.563       2.494         3.385
+ *  running jump distance      8.115       5.680         7.709
+ *  dash distance              4.500       3.150         4.275
+ *  jump plus dash distance    9.606       6.724         9.126
+ *  wall-jump height gain      0.875       0.613         0.831
+ *  climb, full stamina       15.000      10.500        14.250
+ *  spring height              7.969       5.578         7.570
+ */
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
@@ -6,16 +21,36 @@
   if (!P || !P.level) return;
   var W = 48, H = 18, currentId = '';
 
-  /* recordings re-cut for the Celeste core (B1): edge-triggered jump/dash, so a held key is one press */
+  /* Recordings re-cut per room through the room's own mechanic (defect fix:
+     the old one-size rung-hop ladder proved the ladder, not the room). Every
+     segment is timed on the 60 Hz kernel; replayed twice with zero deaths by
+     tests/fixes591.mjs before any change to these lines ships. */
+  /* One 2-tile rung: hold jump through the arc, release one beat to re-arm
+     the edge-triggered jump. Measured on the 60 Hz kernel (tests/fixes590). */
+  function jumps(n, dir) { var r = [], i; for (i = 0; i < n; i++) { r.push([38, dir ? 'jump ' + dir : 'jump'], [3, dir || '']); } return r; }
+  function join() {
+    var r = [], i, j;
+    for (i = 0; i < arguments.length; i++) for (j = 0; j < arguments[i].length; j++) r.push(arguments[i][j]);
+    return r;
+  }
   var REC = {
-    m0: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, 'dash right']],
-    m1: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
-    m2: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right']],
-    m3: [[4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
-    m4: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [4, 'right']],
-    m5: [[4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right']],
-    m6: [[4, 'dash up right'], [12, 'right']],
-    m7: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'right down melee'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right']]
+    /* m0: plain 2-tile rung climb to the top shelf, then walk onto the exit. */
+    m0: join(jumps(16), [[8, 'right']]),
+    /* m1: climb to the spring ledge, ride the launch across the 4-tile gap,
+       then finish the rungs and walk to the exit column. */
+    m1: join(jumps(5), [[70, '']], jumps(8), [[30, 'right']]),
+    /* m2: climb to the top shelf, ride the zip across the 10-tile gap. */
+    m2: join(jumps(18), [[18, 'right']], [[230, '']], [[8, 'right']]),
+    /* m3: climb to the top shelf, cross the crumble bridge over spikes. */
+    m3: join(jumps(18), [[74, 'right']]),
+    /* m4: climb to the barrier, dash through the ceiling-high 'x' gate. */
+    m4: join(jumps(15), [[18, 'right']], [[12, 'dash right']], [[16, 'right']]),
+    /* m5: climb to the top shelf, cross the crumble bridge, ride the zip. */
+    m5: join(jumps(20), [[40, 'right']], [[212, '']], [[10, 'right']]),
+    /* m6: climb to the gust shelf, jump the gap, finish the rungs. */
+    m6: join(jumps(19), [[22, 'right']], [[100, '']], [[55, 'jump right']], jumps(3), [[10, 'right']]),
+    /* m7: climb, cross the crumble bridge, ride the zip under the hard gust. */
+    m7: join([[24, 'right']], jumps(25), [[42, 'right']], [[175, '']], [[10, 'right']], jumps(3), [[10, 'right']])
   };
 
   function blank() {
@@ -83,86 +118,153 @@
     here: function () { return NEU.mountain.active && P.levelId ? P.levelId() : currentId; }
   };
 
-  function build(n) {
-    var rows = blank(), id = 'm' + n, ents, spawn;
-    if (n === 0) {
-      fill(rows, 0, 8, 12, '#');
-      fill(rows, 9, 12, 13, '^');
-      fill(rows, 9, 12, 14, '#');
-      fill(rows, 13, 26, 12, '#');
-      fill(rows, 27, 30, 13, '^');
-      fill(rows, 27, 30, 14, '#');
-      fill(rows, 31, 47, 12, '#');
-      spawn = { x: 2, y: 11 };
-      ents = [{ t: 'refill', x: 18, y: 11 }, { t: 'exit', x: 42, y: 11 }];
-    } else if (n === 1) {
-      fill(rows, 0, 15, 14, '#');
-      fill(rows, 16, 18, 15, '^');
-      fill(rows, 16, 18, 16, '#');
-      fill(rows, 17, 42, 12, '#');
-      spawn = { x: 3, y: 13 };
-      ents = [{ t: 'spring', x: 15, y: 13 }, { t: 'exit', x: 36, y: 11 }];
-    } else if (n === 2) {
-      fill(rows, 0, 24, 14, '#');
-      fill(rows, 25, 28, 15, '^');
-      fill(rows, 25, 28, 16, '#');
-      fill(rows, 29, 47, 14, '#');
-      fill(rows, 16, 16, 9, 'v');
-      spawn = { x: 2, y: 13 };
-      ents = [{ t: 'zip', x: 16, y: 13, targetX: 16, targetY: 8 }, { t: 'exit', x: 42, y: 13 }];
-    } else if (n === 3) {
-      fill(rows, 0, 10, 14, '#');
-      fill(rows, 14, 30, 14, '#');
-      fill(rows, 11, 13, 15, '^');
-      fill(rows, 11, 13, 16, '#');
-      spawn = { x: 2, y: 13 };
-      ents = [
-        { t: 'crumble', x: 11, y: 14 }, { t: 'crumble', x: 12, y: 14 }, { t: 'crumble', x: 13, y: 14 },
-        { t: 'exit', x: 26, y: 13 }
-      ];
-    } else if (n === 4) {
-      fill(rows, 0, 47, 14, '#');
-      fill(rows, 18, 18, 12, 'x');
-      fill(rows, 18, 18, 13, 'x');
-      spawn = { x: 2, y: 13 };
-      ents = [{ t: 'exit', x: 40, y: 13 }];
-    } else if (n === 5) {
-      fill(rows, 0, 10, 14, '#');
-      fill(rows, 11, 14, 15, '^');
-      fill(rows, 11, 30, 13, '#');
-      spawn = { x: 4, y: 13 };
-      ents = [{ t: 'pogo', x: 8, y: 13 }, { t: 'exit', x: 24, y: 12 }];
-    } else if (n === 6) {
-      fill(rows, 4, 10, 16, '#');
-      fill(rows, 0, 3, 16, '^');
-      fill(rows, 11, 20, 16, '^');
-      fill(rows, 0, 20, 17, '#');
-      fill(rows, 2, 14, 11, '=');
-      spawn = { x: 6, y: 15 };
-      ents = [{ t: 'refill', x: 8, y: 10 }, { t: 'exit', x: 12, y: 10 }];
-    } else {
-      fill(rows, 0, 15, 14, '#');
-      fill(rows, 16, 18, 15, '^');
-      fill(rows, 16, 18, 16, '#');
-      fill(rows, 17, 26, 12, '#');
-      fill(rows, 27, 30, 13, '^');
-      fill(rows, 27, 30, 14, '#');
-      fill(rows, 31, 46, 12, '#');
-      spawn = { x: 3, y: 13 };
-      ents = [{ t: 'spring', x: 15, y: 13 }, { t: 'exit', x: 42, y: 11 }];
-    }
-    /* one lit lantern per screen: the focal point the eye finds first, standing on the floor it lights */
-    put(rows, LANTERN[n][0], LANTERN[n][1], "l");
-    /* and one trail banner on the same floor, well away from the lantern: the second prop the eye finds */
-    put(rows, BANNER[n][0], BANNER[n][1], "f");
-    add(id, rows, spawn, ents, n);
+  /* M2 (defect fix): each room's listed mechanic is a mandatory gate on the
+     ascent. No 3-tile rung ladder: column steps are 2 tiles (<= SAFE 2.494).
+     Each mechanic span stays inside its own measured SAFE budget (m1 spring,
+     m2 zip, m4 dash; m3 crumble, m5 crumble+zip, m6 wind, m7 crumble+zip under the hard gust).
+     Room ids, flags, exit chain and summit/elevator links are unchanged;
+     exit columns differ per room. */
+  function roomRows(w, h) {
+    var rows = [], y, x, s;
+    for (y = 0; y < h; y++) { s = ''; for (x = 0; x < w; x++) s += '.'; rows.push(s); }
+    return rows;
   }
-
-  var LANTERN = [[22, 11], [8, 13], [20, 13], [24, 13], [24, 13], [20, 12], [6, 10], [22, 11]];
-  var BANNER = [[5, 11], [28, 11], [33, 13], [5, 13], [9, 13], [28, 12], [13, 10], [33, 11]];
+  function rput(rows, x, y, ch) {
+    if (y < 0 || y >= rows.length || x < 0 || x >= rows[0].length) return;
+    rows[y] = rows[y].substring(0, x) + ch + rows[y].substring(x + 1);
+  }
+  function rfill(rows, x0, x1, y, ch) { var x; for (x = x0; x <= x1; x++) rput(rows, x, y, ch); }
+  function pit(rows, x0, x1, f) { rfill(rows, x0, x1, f, '.'); rfill(rows, x0, x1, f + 1, '^'); }
+  function ledge(rows, x0, x1, y) { rfill(rows, x0, x1, y, '='); }
+  function rcol(rows, x, top, bottom, skip) {
+    var y;
+    for (y = bottom; y >= top; y -= 2) {
+      if (skip && skip.indexOf(y) >= 0) continue;
+      rfill(rows, x, x + 2, y, '=');
+    }
+  }
+  function room(n, w, h, opts) {
+    var id = 'm' + n, rows = roomRows(w, h), f = h - 2, ents = [], def;
+    rfill(rows, 0, w - 1, f, '#');
+    opts.build(rows, ents, f);
+    rput(rows, opts.lantern[0], opts.lantern[1], 'l');
+    rput(rows, opts.banner[0], opts.banner[1], 'f');
+    ents.push({ t: 'checkpoint', x: 4, y: f - 1 });
+    if (opts.mid) ents.push({ t: 'checkpoint', x: opts.midX || 4, y: opts.mid });
+    ents.push({ t: 'exit', x: opts.exit[0], y: opts.exit[1] });
+    def = P.level(id, {
+      tiles: rows.join('\n'), spawn: { x: 4, y: f - 1 }, entities: ents, tileset: 'mountain',
+      chunked: true, resetOnDeath: true, cameraMode: 'mountain', quickRespawn: true,
+      camera: { focusY: 0.52 }, wind: opts.wind || null,
+      stage: opts.stage, altitude: opts.altitude,
+      onExit: makeExit(n)
+    });
+    def.recording = REC[id];
+    NEU.mountain.recordings[id] = REC[id];
+    return def;
+  }
+  /* m0 — plain SAFE stair climb; the two pits and refill are off-path teaches. */
+  room(0, 26, 34, {
+    stage: 'foot', altitude: 0, lantern: [22, 30], banner: [24, 30], exit: [5, 1],
+    build: function (rows, ents, f) {
+      rcol(rows, 4, 2, 30);
+      pit(rows, 11, 13, f); pit(rows, 19, 21, f);
+      ents.push({ t: 'refill', x: 16, y: f - 1 });
+    }
+  });
+  /* m1 — spring gate: a 4-tile gap (beyond the 3.563 jump) with a spring on
+     the lower ledge; the spring's 7.969 launch is the only way across. */
+  room(1, 26, 34, {
+    stage: 'foot', altitude: 120, lantern: [22, 30], banner: [24, 30], exit: [9, 1],
+    build: function (rows, ents, f) {
+      rcol(rows, 4, 2, 30, [20]);
+      ents.push({ t: 'spring', x: 4, y: 21 });
+      rfill(rows, 4, 9, 2, '=');
+      pit(rows, 17, 19, f);
+      ents.push({ t: 'spring', x: 18, y: f - 1 });
+      ledge(rows, 19, 22, 22); ents.push({ t: 'refill', x: 20, y: 21 });
+    }
+  });
+  /* m2 — zip gate: a 10-tile gap (beyond any running jump) bridged only by a
+     zip block; the chimney teeth are off-path hazard reads. */
+  room(2, 26, 40, {
+    stage: 'ridge', altitude: 600, lantern: [22, 36], banner: [24, 36], exit: [19, 1], mid: 20,
+    build: function (rows, ents, f) {
+      rcol(rows, 4, 2, 36);
+      ents.push({ t: 'zip', x: 7, y: 2, targetX: 18, targetY: 2 });
+      rfill(rows, 18, 20, 2, '=');
+      pit(rows, 12, 13, f);
+      rfill(rows, 21, 24, 12, 'v');
+    }
+  });
+  /* m3 — crumble gate: four crumble steps bridge a gap that a plain jump
+     cannot cross, each timed inside the 0.6 s stand window. */
+  room(3, 26, 40, {
+    stage: 'ridge', altitude: 900, lantern: [22, 36], banner: [24, 36], exit: [17, 1], mid: 20,
+    build: function (rows, ents, f) {
+      var x;
+      rcol(rows, 4, 2, 36);
+      rfill(rows, 4, 6, 2, '=');
+      for (x = 7; x <= 15; x++) ents.push({ t: 'crumble', x: x, y: 2 });
+      rfill(rows, 7, 15, 3, '^');
+      rfill(rows, 16, 18, 2, '=');
+      pit(rows, 20, 21, f);
+    }
+  });
+  room(4, 26, 34, {
+    stage: 'ridge', altitude: 1200, lantern: [22, 30], banner: [24, 30], exit: [10, 1],
+    build: function (rows, ents, f) {
+      rcol(rows, 4, 2, 30);
+      rfill(rows, 4, 6, 2, '=');
+      rfill(rows, 7, 8, 0, 'x'); rfill(rows, 7, 8, 1, 'x'); rfill(rows, 7, 8, 2, 'x');
+      rfill(rows, 9, 11, 2, '=');
+    }
+  });
+  room(5, 28, 44, {
+    stage: 'ridge', altitude: 1500, lantern: [26, 40], banner: [26, 40], exit: [22, 1], mid: 22,
+    build: function (rows, ents, f) {
+      var x;
+      rcol(rows, 4, 2, 40);
+      rfill(rows, 4, 6, 2, '=');
+      for (x = 7; x <= 11; x++) ents.push({ t: 'crumble', x: x, y: 2 });
+      rfill(rows, 7, 11, 3, '^');
+      ents.push({ t: 'zip', x: 12, y: 2, targetX: 22, targetY: 2 });
+      rfill(rows, 22, 24, 2, '=');
+      pit(rows, 20, 22, f);
+      ents.push({ t: 'pogo', x: 21, y: f - 2 });
+      ledge(rows, 21, 24, 33); ents.push({ t: 'refill', x: 22, y: 32 });
+    }
+  });
+  room(6, 28, 48, {
+    stage: 'summit', altitude: 2100, lantern: [26, 44], banner: [26, 44], exit: [18, 1], mid: 24,
+    wind: { x: 55, y: 0, period: 4.2, duty: 0.65 },
+    build: function (rows, ents, f) {
+      rcol(rows, 4, 8, 44);
+      rfill(rows, 4, 8, 8, '=');
+      rfill(rows, 16, 18, 8, '=');
+      rcol(rows, 17, 2, 8);
+      pit(rows, 18, 20, f);
+      ledge(rows, 22, 25, 40); ents.push({ t: 'refill', x: 23, y: 39 });
+      ents.push({ t: 'refill', x: 5, y: 7 });
+    }
+  });
+  room(7, 28, 60, {
+    stage: 'summit', altitude: 2400, lantern: [26, 56], banner: [26, 56], exit: [25, 1], mid: 30, midX: 9,
+    wind: { x: -88, y: 0, period: 3.6, duty: 0.76 },
+    build: function (rows, ents, f) {
+      var x;
+      rcol(rows, 8, 8, 56);
+      rfill(rows, 8, 10, 8, '=');
+      for (x = 11; x <= 15; x++) ents.push({ t: 'crumble', x: x, y: 8 });
+      rfill(rows, 11, 15, 9, '^');
+      ents.push({ t: 'zip', x: 16, y: 8, targetX: 24, targetY: 8 });
+      rfill(rows, 24, 26, 8, '=');
+      rcol(rows, 25, 2, 8);
+      pit(rows, 19, 21, f);
+      ents.push({ t: 'spring', x: 6, y: f - 1 });
+    }
+  });
   var n;
-  for (n = 0; n <= 7; n++) build(n);
-
   /*
    * Research-gated precision-platforming PROTOTYPES. Deliberately separate
    * from the eight-room story route: none counts toward the promised 60
