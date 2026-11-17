@@ -715,6 +715,7 @@
   }
   function lose() {
     running = false;
+    stopBacking();                       /* the track is cut with the round */
     resetScore();                        /* a death wipes the score */
     if (msg) {
       placeMsg(true);
