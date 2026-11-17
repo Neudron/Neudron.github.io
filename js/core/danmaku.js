@@ -576,11 +576,66 @@
     }
   }
 
+  /* stageLook: the staged look of a boss phase (the desperation recipe), in two layers so each sits where it did.
+       'under': a tint over the play area, before the sprites and bullets (look.tint).
+       'over': after the shaken frame, a fog over the whole viewport, full strength outside the play area and laid at
+       look.fog.arena (capped at look.fog.arenaMax) inside it so the field stays readable, then the stage-name card
+       (stage.label = { text, t } with t 0..1) above the arena. The boss owns the numbers (look) and the level
+       (stage.k: how far into the fight, 0 = none); this draws them. look = {
+         tint: { rgb, base, per, max },                   alpha min(max, base + k * per)
+         fog: { rgb, r0, rStep, a0, aStep, maxLv, arena, arenaMax } }   radius max(w, h) * (r0 - lv * rStep), edge alpha a0 + lv * aStep
+       r = the arena { AX, AY, AW, AH }; stage = { k, w, h, label }. */
+  var lookGrad = null, lookKey = '';
+  function stageLook(ctx, look, r, stage, layer) {
+    var k = stage && stage.k, tn, fg, lv, edge, key, r0, w, h;
+    if (!look || !k) return;
+    if (layer === 'under') {
+      tn = look.tint;
+      if (tn) { ctx.fillStyle = 'rgba(' + tn.rgb + ',' + Math.min(tn.max, tn.base + k * tn.per).toFixed(2) + ')'; ctx.fillRect(r.AX, r.AY, r.AW, r.AH); }
+      return;
+    }
+    fg = look.fog; w = stage.w; h = stage.h;
+    if (fg) {
+      lv = Math.min(fg.maxLv, k); edge = fg.a0 + lv * fg.aStep;
+      key = w + '|' + h + '|' + lv + '|' + fg.rgb + '|' + fg.r0 + '|' + fg.rStep;
+      if (key !== lookKey) {
+        r0 = Math.max(w, h) * (fg.r0 - lv * fg.rStep);
+        lookGrad = ctx.createRadialGradient(w / 2, h / 2, r0 * 0.45, w / 2, h / 2, r0);
+        lookGrad.addColorStop(0, 'rgba(0,0,0,0)');
+        lookGrad.addColorStop(1, 'rgba(' + fg.rgb + ',' + edge.toFixed(2) + ')');
+        lookKey = key;
+      }
+      /* outside the arena at full strength (evenodd: the viewport minus the arena) ... */
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(r.AX, r.AY, r.AW, r.AH); ctx.clip('evenodd');
+      ctx.fillStyle = lookGrad; ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+      /* ... and the same gradient, thinner, inside it */
+      ctx.save();
+      ctx.beginPath(); ctx.rect(r.AX, r.AY, r.AW, r.AH); ctx.clip();
+      ctx.globalAlpha = Math.min(fg.arena, fg.arenaMax / edge);
+      ctx.fillStyle = lookGrad; ctx.fillRect(r.AX, r.AY, r.AW, r.AH);
+      ctx.restore();
+    }
+    if (stage.label) {
+      var t = stage.label.t, txt = stage.label.text.split('').join(' ');
+      ctx.save();
+      ctx.globalAlpha = t < 0.5 ? t * 2 : (1 - t) * 2;
+      ctx.font = '32px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.lineWidth = 3; ctx.strokeStyle = '#000';
+      ctx.strokeText(txt, r.AX + r.AW / 2, r.AY - 44);
+      ctx.fillStyle = '#FFE0C0';
+      ctx.fillText(txt, r.AX + r.AW / 2, r.AY - 44);
+      ctx.restore();
+    }
+  }
+
   NEU.danmaku = {
     arena: arena,
     fight: fight, move: move, dash: dash, tap: tap, key: key, keyName: keyName,
     tick: tick, hurt: hurt, mul: mul, slow: slow, pop: pop, bossHit: bossHit,
     adrenaline: adrenaline, rage: rage, soulMode: soulMode,
+    stageLook: stageLook,
     glow: glow, drawFX: drawFX, drawFlash: drawFlash, hud: hud, barW: barW,
     DASH_CD: DASH_CD, ADREN_ON: ADREN_ON,
     TAP: 0,      /* double-tap window, s; 0 = off: X is the only dash */
