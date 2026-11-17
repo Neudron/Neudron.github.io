@@ -1607,9 +1607,9 @@
   /* ── input ──────────────────────────────────────────────────────*/
   function laneOf(e) {
     var k = e.key;
+    /* keys.js has already turned a moved key back into its default name */
     function hit(def, arrow) {
-      var b = (NEU.keys && NEU.keys.get) ? NEU.keys.get(def) : def;
-      return k === arrow || k === b || (b.length === 1 && k === b.toUpperCase());
+      return k === arrow || k === def || (def.length === 1 && k === def.toUpperCase());
     }
     if (hit('a', 'ArrowLeft')) return 0;
     if (hit('s', 'ArrowDown')) return 1;
