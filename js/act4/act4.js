@@ -182,7 +182,6 @@
        mode can change the room and enter() resets busy */
     if (!closeModes()) return refuse();
     recalling = true;
-    NEU.save.take('recall');
     NEU.save.flag('used_recall', 1);
     if (NEU.quest) NEU.quest.mark('a4_home');
     var api = E.api, cv = document.getElementById('engCanvas'), end = NEU.engineTrans && NEU.engineTrans.get('portal:recall');
