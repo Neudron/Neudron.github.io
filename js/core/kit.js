@@ -201,7 +201,7 @@
       dt = Math.max(0, Number(dt) || 0);
       meleeCd = Math.max(0, meleeCd - dt); rangedCd = Math.max(0, rangedCd - dt); healCd = Math.max(0, healCd - dt);
       if (charge) chargeT += dt;
-      if (F.dashI > 0) F.dashI = Math.max(0, F.dashI - dt);
+      if (!opts.danmakuMovement && F.dashI > 0) F.dashI = Math.max(0, F.dashI - dt);
       if (dash) {
         var speed = 90, nx = F.x + Math.cos(dash.ang) * speed * dt, ny = F.y + Math.sin(dash.ang) * speed * dt;
         F.x = Math.max(box.AX, Math.min(box.AX + box.AW, nx)); F.y = Math.max(box.AY, Math.min(box.AY + box.AH, ny));

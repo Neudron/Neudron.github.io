@@ -439,6 +439,7 @@
     return hurtRaw(dx, dy);
   }
 
+  function bossHurtable() { return sig <= 0; }
   var STRIKE_CD = 0.18, lastHit = -1;   /* game seconds between strikes */
   function tryHit(target, amount) {
     if (!running || t - lastHit < STRIKE_CD) return;
@@ -457,7 +458,7 @@
       say("* the copy comes apart. the original notices.");
       return;
     }
-    if (sig > 0) { say('* not yet.'); return; }
+    if (!bossHurtable()) { say('* not yet.'); return; }
     if (target ? target.kind !== 'boss' : Math.hypot(px - bx, py - by) > 40) return;
     /* Six blade damage is normalized to one boss point: 900 HP at the
        kit's 0.3 s cadence is 270 s of clean hits; movement and dodging put
@@ -1012,8 +1013,9 @@
 
     /* the label sits outside the shake and outside the arena: on the
        boss-bar row, right-aligned under the bar, on a dark plate (AA) */
-    if (mode !== 'won' && (running || vuln > 0)) {
-      var isV = vuln > 0, lt = isV ? 'VULNERABLE' : 'INVULNERABLE';
+    var isV = bossHurtable();
+    if (running && (!isV || vuln > 0)) {
+      var lt = isV ? 'VULNERABLE' : 'INVULNERABLE';
       var lbw = dm.barW ? dm.barW(innerWidth) : 480, lbx = ((innerWidth - lbw) / 2) | 0;
       /* 32px: the punish window is the one moment to read at a glance */
       ctx.font = '32px "Determination Mono","Pixelify Sans",monospace';
@@ -1091,7 +1093,7 @@
     phaseFlash = 0; phaseFlashes = 0; flashedPhase = 0;
     px = AX + AW / 2; py = AY + AH - 70;
     F = dm.fight(px, py);
-    kit = NEU.kit ? NEU.kit.create({ F: F, box: kitBox,
+    kit = NEU.kit ? NEU.kit.create({ F: F, box: kitBox, danmakuMovement: true,
       theme: { rim: '#2E6F62', acc: '#7FE3C4', hot: '40,150,120', hotLine: '#7FE3C4', well: '#10302A', title: 'SOUL  ACTIONS' }, adapter: {
       targets: function () {
         bossTarget.x = bx; bossTarget.y = by; bossTarget.r = 22;
