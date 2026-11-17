@@ -1651,6 +1651,14 @@
     if (l >= 0) { release(l); keys[LANES[l]] = false; }
   });
 
+  /* the window lost focus or the page hid: no key stays held, and a live round pauses */
+  function letGo() {
+    keys = {};
+    if (running && !S.paused && !wrap.hidden) togglePause();
+  }
+  addEventListener('blur', letGo);
+  document.addEventListener('visibilitychange', function () { if (document.hidden) letGo(); });
+
   /* the paused song's way out (the esc button is gone): X, or a tap */
   function leavePrompt() {
     if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Rhythm Game', close);
