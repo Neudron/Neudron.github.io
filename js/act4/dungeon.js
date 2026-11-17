@@ -655,6 +655,14 @@
     else setTimeout(function () { frame(t0); }, 16);
   }
 
+  function enterDungeon(opts) {
+    var id = typeof opts === 'string' ? opts : (opts && opts.id) || 'd0';
+    var zone = typeof opts === 'string' ? opts : opts && opts.zone;
+    /* B4/J3: the first surface entry falls through the dungeon shaft. Other zones keep the direct open. */
+    if (zone !== 'd0' || P.replaying()) return P.open(id, opts);
+    return P.dungeonFall(function () { return P.open(id, opts); });
+  }
+
   NEU.dungeon = {
     recordings: REC, bossOpen: false, bossLine: '', mageSign: '', sign: '', lastDeath: null,
     /* B3: a won mage duel hands the dungeon back safely. calmUntil is the
@@ -677,6 +685,7 @@
     here: function () { return P.running() && P.levelId() === 'dgn' ? here : ''; },
     spawnPx: function (id) { var n = dN(id); return n < 0 ? null : px(zones[n].spawn); },
     savePx: function () { return px(save); },
+    enter: enterDungeon,
     bed: BED, bedPx: function () { return px(BED); },
     toSurface: toSurface
   };
