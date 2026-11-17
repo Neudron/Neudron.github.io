@@ -138,16 +138,56 @@
     el.animate(frames, { duration: ms, delay: delay || 0, easing: easing || 'ease-out', fill: 'both' });
   }
   function drop(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
+  /* Every mode that can sit over the room, closed in one place: the kernel
+     stack (top down, never the engine), the platformer (dungeon and
+     mountain), cards, the rhythm overlay, then the claims the engine's own
+     Escape list knows. Each close is guarded by "is it open": rhythm's
+     close walks to the street, so a stray call would warp the player.
+     Returns true when nothing but the room is left. */
+  var ESC = ['quiz', 'craft', 'shop', 'dark', 'bullet', 'deck'];
+  function closeModes() {
+    var K = NEU.kernel, names = K && K.stack ? K.stack.slice().reverse() : [], i, s, m;
+    function open(sc) { return sc && (typeof sc.running === 'function' ? sc.running() : sc.running); }
+    for (i = 0; i < names.length; i++) {
+      s = K.scenes[names[i]];
+      if (names[i] !== 'engine' && s && s.close && open(s)) s.close();
+    }
+    if (NEU.plat && NEU.plat.running && NEU.plat.running() && NEU.plat.close) NEU.plat.close();
+    if (NEU.cards && NEU.cards.running && NEU.cards.running() && NEU.cards.close) NEU.cards.close();
+    if (NEU.rhythm && NEU.rhythm.running && NEU.rhythm.close) NEU.rhythm.close();
+    for (i = 0; i < ESC.length; i++) {
+      m = NEU[ESC[i]];
+      if (NEU.activeMinigame === ESC[i] && m && m.close) m.close();
+    }
+    /* a won duel or a won rhythm round closes on an animation: not down yet */
+    if (K && K.stack.some(function (n) { return n !== 'engine'; })) return false;
+    claims.length = 0;
+    return true;
+  }
+  /* the only claims the potion may close; every fight and story scene refuses */
+  var CLOSEABLE = { plat: 1, rhythm: 1, shop: 1, craft: 1, dark: 1, deck: 1 };
+  function refuse() {
+    if (NEU.talk) NEU.talk(["the potion won't open here."], 'narr');
+    return false;
+  }
+  function where() { var w = NEU.engine.where(); return w ? w.room : null; }   /* the area, not the shared physical room */
   function recall() {
-    if (recalling || !NEU.engine || !NEU.engine.enter || !NEU.engine.running) return false;
+    var E = NEU.engine;
+    if (!E || !E.enter || !E.running) return false;
     if (!NEU.save || !NEU.save.has('recall')) return false;
-    if (NEU.engine.rooms && NEU.engine.rooms.indexOf('e6_room') < 0) return false;
+    if (E.rooms && E.rooms.indexOf('e6_room') < 0) return false;
+    if (recalling || E.debug.cine || (NEU.engineTrans && NEU.engineTrans.active) ||
+        (NEU.activeMinigame && !CLOSEABLE[NEU.activeMinigame])) return refuse();
+    /* before busy, the drawPlayer patch and the room snapshot: closing a
+       mode can change the room and enter() resets busy */
+    if (!closeModes()) return refuse();
     recalling = true;
     NEU.save.take('recall');
     NEU.save.flag('used_recall', 1);
     if (NEU.quest) NEU.quest.mark('a4_home');
-    var api = NEU.engine.api, cv = document.getElementById('engCanvas'), end = NEU.engineTrans && NEU.engineTrans.get('portal:recall');
+    var api = E.api, cv = document.getElementById('engCanvas'), end = NEU.engineTrans && NEU.engineTrans.get('portal:recall');
     var ringEl = null, strips = [], started = Date.now(), look = NEU.engineLook, drawPlayer = look && look.drawPlayer;
+    var ids = [], watch = 0, expect = where(), irisMs = 400;
     if (drawPlayer && !reducedMotion()) look.drawPlayer = function (ctx, x, y, face, walked, moving, scale, now, extra) {
       var t = Date.now() - started, rows = t < 1250 ? 18 : t < 1550 ? Math.ceil(18 * (1550 - t) / 300) : t < 2350 ? 0 : Math.min(18, Math.floor(18 * (t - 2350) / 300));
       if (!rows) return;
@@ -156,23 +196,40 @@
     };
     if (api && api.busy) api.busy(true);
     if (api && api.act) api.act('drink', 0.85);
-    function at(ms, fn) { setTimeout(fn, ms); }
+    /* Every exit (the end, a room change, a throw) comes through here once. */
+    function finish() {
+      if (!recalling) return;
+      recalling = false;
+      ids.forEach(clearTimeout); ids = [];
+      clearInterval(watch);
+      parts.forEach(drop); parts = [];
+      cv.style.transition = ''; cv.style.filter = '';
+      if (look) look.drawPlayer = drawPlayer;
+      if (api && api.busy) api.busy(false);
+    }
+    function at(ms, fn) {
+      ids.push(setTimeout(function () {
+        try { fn(); } catch (e) { finish(); if (window.console) console.error('recall', e); }
+      }, ms));
+    }
+    /* A room change that is not ours ends the sequence: engine.js has no
+       event for it, and api.later dies with the visit, so we poll. */
+    watch = setInterval(function () { if (!E.running || where() !== expect) finish(); }, 50);
     function home(iris) {
       /* enter(), not go(): go() silently no-ops while another iris is
          still running, which would leave busy held forever. enter()
          always lands and releases the lock itself, so busy is re-taken. */
-      NEU.engine.enter('e6_room', 'bed', { iris: iris });
+      E.enter('e6_room', 'bed', { iris: iris });
+      expect = where();
+      irisMs = Math.round(E.debug.iris * 1000);
       if (api && api.busy) api.busy(true);
     }
-    function finish() {
-      parts.forEach(drop); parts = [];
-      if (look) look.drawPlayer = drawPlayer;
-      if (api && api.busy) api.busy(false);
-      recalling = false;
-    }
     if (reducedMotion()) {
-      at(250, function () { ring(onScreen()); if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh(); home(0.4); });
-      at(500, finish);
+      /* control comes back after the iris has ended, not while it runs */
+      at(250, function () {
+        ring(onScreen()); if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh(); home(0.4);
+        at(irisMs + 50, finish);
+      });
       return true;
     }
     at(850, function () {
@@ -339,7 +396,7 @@
   }
 
   NEU.act4 = {
-    open: open, wake: wake, settle: settle, ending: ending, install: install, recall: recall,
+    open: open, wake: wake, settle: settle, ending: ending, install: install, recall: recall, closeModes: closeModes,
     get start() { return START; },
     get done() { return !!(NEU.save && NEU.save.flagged('act4_done')); },
     steps: STEPS
