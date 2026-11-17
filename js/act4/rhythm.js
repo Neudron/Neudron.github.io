@@ -742,7 +742,8 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
   }
-  addEventListener('resize', function () { layout(); });
+  /* layout() clears the canvas: a round that is over redraws its held frame */
+  addEventListener('resize', function () { layout(); if (!running && !wrap.hidden) draw(songPos()); });
 
   /* The arrows are our own pixel art (Funkin's are not licensed), built
      once into a 4x4 sheet of 17px cells: a 15px arrow, its ink outline,
