@@ -2253,7 +2253,11 @@
      asserted by fixes73 over a simulated fight); big = a signature pattern
      that earns the long gap. Gaps: TUNE.gap f between attacks, TUNE.gapBig after big. */
   /* the gap lengths live in NEU.scal.TUNE (boss-scal.js), read at call time */
-  function tune() { return NEU.scal.TUNE; }
+  function tune() {
+    return (NEU.scal && NEU.scal.TUNE) || {
+      phaseF: 75, gap: 52, gapBig: 150, ceilVeil: 0.45
+    };
+  }
   var TIMING = {
     HorizontalDarkSoulRelease: { tele: 30 }, CondemnationFanBurst: { tele: 30 }, ExplosiveCharges: { tele: 30 },
     SummonSuicideBomberDemons: { tele: 30, big: 1 }, BrimstoneLightning: { tele: 30 }, HexCollapse: { tele: 30 },
