@@ -133,8 +133,12 @@
     }
   }
 
+  function attackDamage(who) {
+    return who === 'you' ? Math.min(3 + state.you.streak, 5) : 3;
+  }
+
   function act(who, idx) {
-    var p, id, enemy;
+    var p, id, enemy, dmg;
     if (!state || state.over) return false;
     p = state[who];
     if (idx < 0 || idx >= p.hand.length) return false;
@@ -142,9 +146,10 @@
     enemy = state[who === 'you' ? 'mage' : 'you'];
     if (id !== 'ATTACK' && enemy.parry) enemy.parry = false;
     if (id === 'ATTACK') {
-      if (enemy.parry) { enemy.parry = false; fxHit(who, hurt(p, 3)); }
-      else fxHit(who === 'you' ? 'mage' : 'you', hurt(enemy, 3));
-      if (who === 'you') state.you.streak++;
+      dmg = attackDamage(who);
+      if (enemy.parry) { enemy.parry = false; fxHit(who, hurt(p, dmg)); }
+      else fxHit(who === 'you' ? 'mage' : 'you', hurt(enemy, dmg));
+      if (who === 'you') state.you.streak = Math.min(state.you.streak + 1, 3);
     } else if (id === 'HEAL') {
       var before = p.hp;
       p.hp = p.hp + 3;
@@ -781,6 +786,12 @@
     if (state.you.parry) {
       icon(ctx, ICON.PARRY, { '1': '#4A82C0' }, 544, 84);
       text('PARRY', 564, 94, 16, '#4A82C0');
+    }
+    /* up to three streak pips under the player plate */
+    for (i = 0; i < 3; i++) {
+      ctx.fillStyle = INK; ctx.fillRect(543 + i * 12, 110, 10, 10);
+      ctx.fillStyle = i < state.you.streak ? '#C8A040' : '#2A1C12';
+      ctx.fillRect(545 + i * 12, 112, 6, 6);
     }
     if (!reduced()) {
       if (state.clock - state.grainAt >= 400) {
