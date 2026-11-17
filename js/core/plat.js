@@ -414,7 +414,7 @@
     player.squash = Math.max(0, player.squash - dt); player.stretch = Math.max(0, player.stretch - dt); player.hurtFlash = Math.max(0, player.hurtFlash - dt);
     if (player.onGround && Math.abs(player.vx) > 8) player.walked += Math.abs(player.vx) * dt;
     for (i = afterimages.length - 1; i >= 0; i--) { afterimages[i].t -= dt; if (afterimages[i].t <= 0) afterimages.splice(i, 1); }
-    placeCamera(reduced ? -2 : (Math.abs(player.x - prevX) > 48 || Math.abs(player.y - prevY) > 48 ? -1 : dt));
+    placeCamera(reduced ? -2 : (current.view === 'terraria' && (Math.abs(player.x - prevX) > 48 || Math.abs(player.y - prevY) > 48) ? -1 : dt));
     return getState();
   }
   function getState() { return { x: player.x, y: player.y, vx: player.vx, vy: player.vy, face: player.face, st: player.st,
@@ -446,7 +446,7 @@
     player.wipe = current.quickRespawn ? 0.07 : WIPE;
     simClock = 0;
     if (current.onRespawn) current.onRespawn();
-    if (current.cameraMode === 'mountain' || current.view === 'terraria') placeCamera(-1);
+    if (current.cameraMode === 'mountain' || current.tileset === 'dungeon') placeCamera(-1);
   }
   function bake() {
     if (!current || !document.createElement) return;
