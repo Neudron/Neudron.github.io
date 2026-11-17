@@ -59,8 +59,8 @@
 
   function blank() {
     return {
-      you: { hp: 15, hand: [], block: 0, parry: false, streak: 0 },
-      mage: { hp: 15, hand: [], block: 0, parry: false },
+      you: { hp: 15, hand: [], block: 0, blockShown: 0, parry: false, streak: 0 },
+      mage: { hp: 15, hand: [], block: 0, blockShown: 0, parry: false },
       deck: [], mageDeck: [], discard: [],
       sel: 0, over: false, result: null, awarded: false,
       clock: 0, flies: [], slide: null, grain: [], grainAt: -1000,
@@ -182,6 +182,7 @@
       if (who === 'you') state.you.streak = 0;
     } else if (id === 'DEFEND') {
       p.block = 3;
+      p.blockShown = 3;
       if (who === 'you') state.you.streak = 0;
     } else if (id === 'PARRY') {
       p.parry = true;
@@ -243,6 +244,10 @@
     var intent, youCard, mageCard, mi, wasOver, s, done;
     if (!state || losePending) return state;
     wasOver = state.over;
+    // Keep the just-played block visible for this frame; the real block
+    // expires at the start of its owner's next turn (see below).
+    state.you.blockShown = 0;
+    state.mage.blockShown = 0;
     if (!state.over) {
       intent = state.intent;
       youCard = state.you.hand[idx];
@@ -257,7 +262,7 @@
         else mageCard = null;
         /* your block guarded his turn; it expires as your next turn starts */
         state.you.block = 0;
-      } else mageCard = null;
+      }
       settle();
       queueFx(youCard, 'you');
       if (mageCard) queueFx(mageCard, 'mage');
@@ -819,17 +824,17 @@
     text('MAGE', 48, 70, 16, '#C8B898');
     text('YOU', 544, 70, 16, '#C8B898');
     /* status icons sit just under each HP plate */
-    if (state.mage.block > 0) {
+    if (state.mage.blockShown > 0) {
       icon(ctx, ICON.DEFEND, { '1': '#C8A040' }, 48, 84);
-      text('BLK' + state.mage.block, 68, 94, 16, '#C8A040');
+      text('BLK' + state.mage.blockShown, 68, 94, 16, '#C8A040');
     }
     if (state.mage.parry) {
       icon(ctx, ICON.PARRY, { '1': '#4A82C0' }, 48, 84);
       text('PARRY', 68, 94, 16, '#4A82C0');
     }
-    if (state.you.block > 0) {
+    if (state.you.blockShown > 0) {
       icon(ctx, ICON.DEFEND, { '1': '#C8A040' }, 544, 84);
-      text('BLK' + state.you.block, 564, 94, 16, '#C8A040');
+      text('BLK' + state.you.blockShown, 564, 94, 16, '#C8A040');
     }
     if (state.you.parry) {
       icon(ctx, ICON.PARRY, { '1': '#4A82C0' }, 544, 84);
@@ -881,10 +886,12 @@
     var k, n, r;
     if (!active || !state) return;
     if (NEU.kernel && NEU.kernel.current() !== 'cards') return;
+    if (losePending) return;
     r = (NEU.keys && NEU.keys.route) ? NEU.keys.route(e.key, {}) : { to: e.key, swallow: false };
     if (r.swallow) return;
     k = r.to;
     if (k === 'Escape') {
+      if (losePending) return;
       close();
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -901,6 +908,7 @@
     if (k === 'z' || k === 'Z') {
       e.preventDefault();
       e.stopImmediatePropagation();
+      if (losePending) return;
       if (state.over) { close(); return; }
       play(state.sel);
     }
@@ -912,6 +920,7 @@
     var r, s, ox, oy, x, y, i, px;
     if (!active || !state) return;
     if (NEU.kernel && NEU.kernel.current && NEU.kernel.current() !== 'cards') return;
+    if (losePending) return;
     if (state.over) { close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (!canvas || !canvas.getBoundingClientRect) return;
     r = canvas.getBoundingClientRect();
