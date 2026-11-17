@@ -87,6 +87,7 @@
     ctx.restore();
   }
   kind('slide', { ms: 320, pre: function () {}, cover: function () {}, post: function () {} });
+  kind('portal', { ms: 320 });
   kind('door', { ms: 220 });
   kind('stairs', { ms: 270 });
   kind('fall', { ms: 520 });
