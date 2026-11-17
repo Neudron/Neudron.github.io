@@ -18,6 +18,7 @@
   var keys = {}, accumulator = 0, simClock = 0, camera = { x: 0, y: 0 }, prevX = 0, prevY = 0, prevCamX = 0, prevCamY = 0, baked = null, afterimages = [], bakeCache = {};
   var reduced = redNow(), view = { w: 640, h: 360, scale: 1 }, area = { x0: 0, y0: 0, x1: 640, y1: 360 };
   var painters = [], padB = {}, sprCache = {}, lastDraw = 0, chunks = {}, chunkOrder = [], CHUNK = 32, LRU = 12;
+  var look = 0;   /* terraria camera: the eased facing look-ahead, px */
   var levelSlide = null;   /* D4: a 400 ms snapshot slide between mountain levels; holds the hero in place */
   function redNow() {
     if (NEU.motion && NEU.motion.reduced) return NEU.motion.reduced();
@@ -410,7 +411,7 @@
     player.squash = Math.max(0, player.squash - dt); player.stretch = Math.max(0, player.stretch - dt);
     if (player.onGround && Math.abs(player.vx) > 8) player.walked += Math.abs(player.vx) * dt;
     for (i = afterimages.length - 1; i >= 0; i--) { afterimages[i].t -= dt; if (afterimages[i].t <= 0) afterimages.splice(i, 1); }
-    placeCamera(reduced ? -1 : dt);
+    placeCamera(reduced ? -2 : (Math.abs(player.x - prevX) > 48 || Math.abs(player.y - prevY) > 48 ? -1 : dt));
     return getState();
   }
   function getState() { return { x: player.x, y: player.y, vx: player.vx, vy: player.vy, face: player.face, st: player.st,
@@ -442,7 +443,7 @@
     player.wipe = current.quickRespawn ? 0.07 : WIPE;
     simClock = 0;
     if (current.onRespawn) current.onRespawn();
-    if (current.cameraMode === 'mountain') placeCamera(-1);
+    if (current.cameraMode === 'mountain' || current.view === 'terraria') placeCamera(-1);
   }
   function bake() {
     if (!current || !document.createElement) return;
@@ -514,6 +515,25 @@
       R(cx - 1, 2, 1, 1, q.tip);
     }
   }
+  /* Terraria camera. dt -1 = hard cut (open, teleport, respawn: look-ahead resets to the facing); dt -2 = locked follow
+     (reduced motion: no easing, the look-ahead stays where the last cut put it, so a turn never jumps the view).
+     Horizontal: the facing look-ahead eases (no 48 px flip) and a speed lead cancels the follow lag (steady lag = v / K).
+     Vertical: a deadzone while airborne (a jump or hop never moves the view), a slow recentre once grounded, a small lead when falling fast.
+     Fixed-step only: foe AI gates on the camera, so it must not depend on the frame rate. */
+  var CAM_K = 9.75, CAM_LOOK = 24, CAM_LEAD = 56;
+  function placeTerraria(dt, worldW, worldH) {
+    var tx, ty, dz, e, kx, ky;
+    if (dt === -1) look = player.face * CAM_LOOK;
+    else if (dt > 0) look += (player.face * CAM_LOOK - look) * (1 - Math.exp(-5 * dt));
+    tx = player.x + look + (dt > 0 ? clamp(player.vx / CAM_K, -CAM_LEAD, CAM_LEAD) : 0) - view.w / 2;
+    ty = player.y - HH - view.h / 2 + (dt > 0 && player.vy > 300 ? clamp((player.vy - 300) * 0.2, 0, 40) : 0);
+    tx = clamp(tx, 0, Math.max(0, worldW - view.w)); ty = clamp(ty, 0, Math.max(0, worldH - view.h));
+    if (dt <= 0) { camera.x = tx; camera.y = ty; return; }
+    dz = view.h * 0.08;
+    if (!player.onGround) { e = ty - camera.y; ty = Math.abs(e) <= dz ? camera.y : ty - (e > 0 ? dz : -dz); }
+    kx = 1 - Math.exp(-CAM_K * dt); ky = 1 - Math.exp(-(player.onGround ? 3 : CAM_K) * dt);
+    camera.x += (tx - camera.x) * kx; camera.y += (ty - camera.y) * ky;
+  }
   function placeCamera(dt) {
     var worldH = current.h * TILE, worldW = current.w * TILE, tx, ty, k, cfg;
     if (current.cameraMode === 'mountain') {
@@ -528,14 +548,7 @@
       camera.x += (tx - camera.x) * k; camera.y += (ty - camera.y) * k;
       return;
     }
-    if (current.view === 'terraria') {
-      /* Terraria: smooth follow on both axes with a small look-ahead, clamped to the world, rounded at draw */
-      tx = clamp(player.x + player.face * 24 - view.w / 2, 0, Math.max(0, worldW - view.w));
-      ty = clamp(player.y - HH - view.h / 2, 0, Math.max(0, worldH - view.h));
-      k = dt < 0 ? 1 : 1 - Math.pow(0.85, dt * 60);
-      camera.x += (tx - camera.x) * k; camera.y += (ty - camera.y) * k;
-      return;
-    }
+    if (current.view === 'terraria') { placeTerraria(dt, worldW, worldH); return; }
     camera.x = clamp(player.x - view.w / 2, 0, Math.max(0, worldW - view.w));
     if (worldH < view.h) camera.y = (worldH - view.h) / 2;
     else camera.y = clamp(player.y - view.h / 2, 0, Math.max(0, worldH - view.h));
@@ -878,6 +891,7 @@
     current.solids = current.entities.filter(function (e) { return e.solid; });
     player.x = (current.spawn.x + 0.5) * TILE; player.y = (current.spawn.y + 1) * TILE; player.hp = current.hp || 0;
     if (opts.face) player.face = opts.face;
+    if (opts.wipe) player.wipe = Math.min(WIPE, opts.wipe);   /* a wipe-in over the first frames: a respawn lands on a covered screen */
     if (carry) {
       player.vx = carry.vx; player.vy = carry.vy;
       player.dashes = carry.dashes; if (!opts.face) player.face = carry.face;
@@ -1073,7 +1087,9 @@
     snap: function () { if (current) placeCamera(-1); }, fallOf: fallOf, dropChunks: function () { chunks = {}; chunkOrder = []; }, ent: function (t, c, x, y, e, now) { if (ENT[t]) ENT[t](c, x, y, e, now || 0); },
     levelId: function () { return current ? current.id : ''; },
     get levels() { return levels; }, _kinds: kinds,
-    cam: function () { return { x: camera.x, y: camera.y }; } };
+    cam: function () { return { x: camera.x, y: camera.y }; },
+    /* the render alpha camera, hero and (dgn-foes) bodies share: prev step to this step */
+    alpha: function () { return reduced ? 1 : Math.min(1, accumulator / STEP); } };
   NEU.plat = api;
   if (NEU.kernel) NEU.kernel.register('plat', { canvas: canvas, tick: tick, open: open, close: close, running: function () { return live; } });
   document.addEventListener('keydown', function (e) {

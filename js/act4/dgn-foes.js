@@ -109,7 +109,7 @@
     var im = fxIm(k), sh = im && NEU.dgSheets[k], w, h;
     if (!im) return false;
     w = sh.fw || sh.w; h = sh.fh || sh.h;
-    c.save(); c.translate(s.x | 0, s.y | 0); c.rotate(Math.atan2(s.vy || 0, s.vx || 1));
+    c.save(); c.translate(s.dx | 0, s.dy | 0); c.rotate(Math.atan2(s.vy || 0, s.vx || 1));
     c.drawImage(im, 0, 0, w, h, (-w / 2) | 0, (-h / 2) | 0, w, h); c.restore();
     return true;
   }
@@ -296,6 +296,8 @@
     F.x = h.x; F.y = h.y - P.hh / 2; F.fx = h.face; F.fy = 0;
     if (kit) { kit.hp = h.hp; kit.tick(dt); }
     if (P.replaying()) return;
+    for (i = 0; i < foes.length; i++) { foes[i].ox = foes[i].x; foes[i].oy = foes[i].y; }
+    for (i = 0; i < shots.length; i++) { shots[i].ox = shots[i].x; shots[i].oy = shots[i].y; }
     for (i = 0; i < foes.length; i++) {
       f = foes[i]; if (f.dead || !active(f)) continue;
       if (f.flash > 0) f.flash -= dt; if (f.said > 0) f.said -= dt;
@@ -351,9 +353,17 @@
     for (i = 0; i < sps.length; i++) { sps[i].cd = 0; sps[i].foe = spawn(sps[i].k, sps[i].x, sps[i].y, sps[i]); }
   }
 
-  /* ── drawing: bodies under the light map, telegraphs and shots above it ── */
+  /* ── drawing: bodies under the light map, telegraphs and shots above it ──
+     Bodies and shots are drawn between their last two fixed steps with the render alpha the camera and the hero use
+     (P.alpha), so nothing judders against the interpolated camera. A jump over 32 px (a blink, a lunge) is not blended. */
+  function ip(o, c, a) { return o == null || Math.abs(c - o) > 32 ? c : o + (c - o) * a; }
+  function lerp() {
+    var a = P.alpha ? P.alpha() : 1, i, f, s;
+    for (i = 0; i < foes.length; i++) { f = foes[i]; f.dx = ip(f.ox, f.x, a); f.dy = ip(f.oy, f.y, a); }
+    for (i = 0; i < shots.length; i++) { s = shots[i]; s.dx = ip(s.ox, s.x, a); s.dy = ip(s.oy, s.y, a); }
+  }
   function frameOf(f, sh) {
-    var n = sh.frames, d = f.d, t = (Date.now() / 160) | 0, a;
+    var n = sh.frames, d = f.d, t = P.reduced() ? 0 : (P.time() * 1000 / 160) | 0, a;   /* the sim clock: it stops with hit-stop and pause */
     if (d.ai === 'fighter' || d.ai === 'warlock') return !f.ground ? 1 % n : Math.abs(f.vx) > 8 ? 2 + ((f.walked / 8) | 0) % Math.max(1, n - 2) : 0;
     if (d.ai === 'ranged') { if (f.warn || f.t >= 0 && Math.abs(f.vx) < 8) { a = Math.atan2((f.aim ? f.aim.y : f.y) - f.y, Math.abs((f.aim ? f.aim.x : f.x) - f.x) || 1); return Math.max(0, Math.min(4, Math.round(2 + a / 0.6))); } return 5 + ((f.walked / 8) | 0) % (n - 5); }
     if (d.ai === 'caster') return f.t < 0.5 ? (f.t < 0.15 ? 2 : 1) : 0;
@@ -362,14 +372,15 @@
   }
   function draw(c, cx, cy) {
     var i, f, sh, k, L = NEU.dungeonLook;
+    lerp();
     for (i = 0; i < foes.length; i++) {
-      f = foes[i]; if (f.dead || !onScreen(f.x, f.y, 64)) continue;
+      f = foes[i]; if (f.dead || !onScreen(f.dx, f.dy, 64)) continue;
       sh = sheet(f.s); if (!sh) continue;
-      if (f.d.ai === 'ball') for (k = 0; k < f.len; k += 12) L.cut(c, 'dgLink', 0, 0, 12, 12, f.px + (f.x - f.px) * k / f.len - 6 - cx, f.py + (f.y - f.py) * k / f.len - 6 - cy);
-      if (f.tp && ((Date.now() / 150) | 0) & 1) c.globalAlpha = 0.5;
-      L.cut(c, f.s, 0, frameOf(f, sh) * sh.fh, sh.fw, sh.fh, f.x - sh.fw / 2 - cx, f.y + f.h / 2 - sh.fh - cy + (f.d.ai === 'skull' || f.d.ai === 'spirit' || f.d.ai === 'ball' || f.d.ai === 'wheel' ? (sh.fh - f.h) / 2 : 2), f.face > 0);
+      if (f.d.ai === 'ball') for (k = 0; k < f.len; k += 12) L.cut(c, 'dgLink', 0, 0, 12, 12, f.px + (f.dx - f.px) * k / f.len - 6 - cx, f.py + (f.dy - f.py) * k / f.len - 6 - cy);
+      if (f.tp && (P.reduced() || ((P.time() * 1000 / 150) | 0) & 1)) c.globalAlpha = 0.5;
+      L.cut(c, f.s, 0, frameOf(f, sh) * sh.fh, sh.fw, sh.fh, f.dx - sh.fw / 2 - cx, f.dy + f.h / 2 - sh.fh - cy + (f.d.ai === 'skull' || f.d.ai === 'spirit' || f.d.ai === 'ball' || f.d.ai === 'wheel' ? (sh.fh - f.h) / 2 : 2), f.face > 0);
       c.globalAlpha = 1;
-      if (f.flash > 0) { c.globalAlpha = 0.5; P.fr(c, (f.x - f.w / 2 - cx) | 0, (f.y - f.h / 2 - cy) | 0, f.w, f.h, '#FFFFFF'); c.globalAlpha = 1; }
+      if (f.flash > 0) { c.globalAlpha = 0.5; P.fr(c, (f.dx - f.w / 2 - cx) | 0, (f.dy - f.h / 2 - cy) | 0, f.w, f.h, '#FFFFFF'); c.globalAlpha = 1; }
     }
   }
   function line(c, x0, y0, x1, y1, col, step) {
@@ -380,27 +391,28 @@
   function ring(c, x, y, r, col) { var k; c.fillStyle = col; for (k = 0; k < 16; k++) c.fillRect((x + Math.cos(k * 0.3927) * r) | 0, (y + Math.sin(k * 0.3927) * r) | 0, 2, 2); }
   function hud(c, cx, cy) {
     var i, f, s, v = P.view(), k, p, still = P.reduced();
+    lerp();
     box.AX = cx; box.AY = cy; box.AW = v.w; box.AH = v.h;
     c.save(); c.translate(-cx, -cy);
     for (i = 0; i < foes.length; i++) {
       f = foes[i]; if (f.dead) continue;
-      if (f.d.ai === 'ranged' && f.aim && f.t >= 0 && f.t < 1.67) line(c, f.x + f.face * 10, f.y - 6, f.aim.x, f.aim.y, f.t < 0.25 ? '#FF4040' : 'rgba(255,64,64,0.45)', f.t < 0.25 ? 3 : 6);
-      if (f.st === 1 && f.aim && f.d.hammer) line(c, f.x, f.y - 8, f.aim.x, f.aim.y, 'rgba(255,224,128,0.6)', 8);
+      if (f.d.ai === 'ranged' && f.aim && f.t >= 0 && f.t < 1.67) line(c, f.dx + f.face * 10, f.dy - 6, f.aim.x, f.aim.y, f.t < 0.25 ? '#FF4040' : 'rgba(255,64,64,0.45)', f.t < 0.25 ? 3 : 6);
+      if (f.st === 1 && f.aim && f.d.hammer) line(c, f.dx, f.dy - 8, f.aim.x, f.aim.y, 'rgba(255,224,128,0.6)', 8);
       if (f.path) for (p = 0; p + 3 < f.path.length; p += 2) line(c, f.path[p], f.path[p + 1], f.path[p + 2], f.path[p + 3], 'rgba(176,96,255,0.5)', 6);
       if (f.mark) ring(c, f.mark.x, f.mark.y, 28, f.t < 0.5 ? '#FF6A3A' : 'rgba(255,106,58,0.5)');
       if (f.tp) { ring(c, f.tp.x, f.tp.y, 6 + (still ? 0 : (f.tp.t * 20) | 0), '#E8D8FF'); P.fr(c, f.tp.x - 1, f.tp.y - 1, 2, 2, '#FFFFFF'); }
-      if (f.glow > 0 || f.st === 1 && f.d.ai === 'skull') ring(c, f.x, f.y, f.r + 4, '#FF4040');
-      if (f.d.ai === 'caster' && f.d.spell === 'souls' && f.t < 0.5 && !f.tp && !f.mute) P.fr(c, (f.x + f.face * 10 - 2) | 0, (f.y - 12) | 0, 4, 4, '#9AF0FF');
+      if (f.glow > 0 || f.st === 1 && f.d.ai === 'skull') ring(c, f.dx, f.dy, f.r + 4, '#FF4040');
+      if (f.d.ai === 'caster' && f.d.spell === 'souls' && f.t < 0.5 && !f.tp && !f.mute) P.fr(c, (f.dx + f.face * 10 - 2) | 0, (f.dy - 12) | 0, 4, 4, '#9AF0FF');
     }
     for (i = 0; i < shots.length; i++) {
       s = shots[i];
       if (s.k === 'beam') { for (p = 0; p + 3 < s.path.length; p += 2) line(c, s.path[p], s.path[p + 1], s.path[p + 2], s.path[p + 3], '#D8A0FF', 2); continue; }
       if (s.k === 'fire' || s.k === 'boom') {
-        P.glow(c, s.x, s.y, s.r * 1.5, '#FF6A3A', 0.3); ring(c, s.x, s.y, s.r, '#FFB050'); ring(c, s.x, s.y, s.r * 0.6, '#FFE0A0');
+        P.glow(c, s.dx, s.dy, s.r * 1.5, '#FF6A3A', 0.3); ring(c, s.dx, s.dy, s.r, '#FFB050'); ring(c, s.dx, s.dy, s.r * 0.6, '#FFE0A0');
         var bim = fxIm(s.k === 'fire' ? 'dgFxFire' : 'dgFxBoom');
         if (bim) {
-          if (s.k === 'fire') { var f = (s.age * 6) | 0, fs = 32; c.drawImage(bim, (f % 4) * fs, 0, fs, fs, (s.x - fs / 2) | 0, (s.y - fs / 2) | 0, fs, fs); }
-          else { var bs = Math.max(48, Math.min(160, (s.r * 1.4) | 0)); c.drawImage(bim, 0, 0, 48, 48, (s.x - bs / 2) | 0, (s.y - bs / 2) | 0, bs, bs); }
+          if (s.k === 'fire') { var f = (s.age * 6) | 0, fs = 32; c.drawImage(bim, (f % 4) * fs, 0, fs, fs, (s.dx - fs / 2) | 0, (s.dy - fs / 2) | 0, fs, fs); }
+          else { var bs = Math.max(48, Math.min(160, (s.r * 1.4) | 0)); c.drawImage(bim, 0, 0, 48, 48, (s.dx - bs / 2) | 0, (s.dy - bs / 2) | 0, bs, bs); }
         }
         continue;
       }
@@ -409,16 +421,16 @@
            the other projectiles */
         var him = fxIm('dgHammer');
         if (him) {
-          c.save(); c.translate(s.x | 0, s.y | 0);
+          c.save(); c.translate(s.dx | 0, s.dy | 0);
           c.rotate(Math.atan2(s.vy || 0, s.vx || 1));
           c.drawImage(him, -19, -19, 38, 38);
           c.restore();
-        } else NEU.dungeonLook.cut(c, 'dgHammer', 0, 0, 38, 38, s.x - 19, s.y - 19);
+        } else NEU.dungeonLook.cut(c, 'dgHammer', 0, 0, 38, 38, s.dx - 19, s.dy - 19);
         continue;
       }
       k = { bullet: '#FFE8A0', pellet: '#FFD070', rocket: '#FF8A3A', soul: '#9AF0FF', flame: '#E8E8FF', ghost: '#7FE3C4', bolt: '#FF6A3A' }[s.k] || '#FFFFFF';
-      P.glow(c, s.x, s.y, 12, k, 0.25);
-      if (!fxShot(c, s, FXS[s.k])) P.fr(c, (s.x - s.r / 2) | 0, (s.y - s.r / 2) | 0, Math.max(2, s.r), Math.max(2, s.r), k);
+      P.glow(c, s.dx, s.dy, 12, k, 0.25);
+      if (!fxShot(c, s, FXS[s.k])) P.fr(c, (s.dx - s.r / 2) | 0, (s.dy - s.r / 2) | 0, Math.max(2, s.r), Math.max(2, s.r), k);
     }
     for (i = 0; i < fxs.length; i++) if (NEU.fxBurst) NEU.fxBurst(c, fxs[i].k, fxs[i].x, fxs[i].y, 1 - fxs[i].t / fxs[i].d, 1.4);
     c.font = '16px "Determination Mono","Pixelify Sans",monospace'; c.textAlign = 'center'; c.textBaseline = 'bottom';
