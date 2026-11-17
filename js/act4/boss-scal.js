@@ -1918,6 +1918,12 @@
     var off = rift ? splitOffset(rift.t / 60, rm()) : 0;
     if (off > 0) splitView(rift, off);
     look('over', ak, w, h);
+    /* the fog sits over the soul too: a thin ring keeps it findable, bright in the blue section where it lies on the dark floor */
+    if (ak && mode === 'fight') {
+      ctx.save(); ctx.globalAlpha = 0.85; ctx.lineWidth = 2;
+      ctx.strokeStyle = NEU.scalSoul && NEU.scalSoul.mode && NEU.scalSoul.mode() === 'blue' ? '#B8E6FF' : '#FFB0B0';
+      ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
     NEU.scalAtk.drawOuter(ctx);
     if (NEU.juice) NEU.juice.overlay(ctx, w, h);
 
