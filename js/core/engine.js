@@ -1033,6 +1033,10 @@
         var sp = sweep(px, py, d[0] * SPEED * dt, d[1] * SPEED * dt, d[0], d[1]);
         px = sp.x; py = sp.y;
         walked += Math.sqrt((px - bp) * (px - bp) + (py - bq) * (py - bq));
+        /* The cell test above reads the feet row, the sweep reads the whole
+           feet box: a pillar the box clips is solid to one and open to the
+           other. No progress means the wall is here, so the slide ends. */
+        if (px === bp && py === bq) stopSlide();
         checkTriggers(); checkPuzzle();
       }
       return;
