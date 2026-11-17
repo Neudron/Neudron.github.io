@@ -7,7 +7,7 @@
   if (NEU.__gameLazy) return;
   NEU.__gameLazy = true;
 
-  var queue = [], loading = false, loaded = false;
+  var queue = [], loading = false, loaded = false, stepClick = false;
   var URL = window.__NEU_GAME_URL__;
 
   function real(name, method, args) {
@@ -31,15 +31,26 @@
       loaded = true; loading = false;
       window.__NEU_GAME_READY__ = true;
       replay();
+      /* the click that started the load: its real handler is bound now */
+      var panel = document.getElementById('panel'), btn = document.getElementById('bhStart');
+      if (stepClick && btn && panel && !panel.hidden) btn.click();
+      stepClick = false;
     };
     s.onerror = function () {
-      loading = false;
+      loading = false; stepClick = false;
       window.__NEU_GAME_ERROR__ = true;
       if (window.console) console.error('game bundle failed to load:', URL);
     };
     document.head.appendChild(s);
   }
   window.__NEU_GAME_LOAD__ = load;
+
+  /* "step in" is bound by the game bundle, so before it lands the button is
+     dead. Load the bundle on the click and replay the click when it is here. */
+  document.addEventListener('click', function (e) {
+    if (loaded || !e.target || !e.target.closest || !e.target.closest('#bhStart')) return;
+    stepClick = true; load();
+  });
 
   function stub(name, state, entries, methods, rets) {
     var api = {}, i;
