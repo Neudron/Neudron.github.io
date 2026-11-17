@@ -13,9 +13,13 @@
 
   var SPEC = [['ATTACK', 6], ['HEAL', 4], ['DEFEND', 3], ['PARRY', 3]];
   /* PLAN 9.4: no shuffle. Both orders are written data, guarded by the
-     solver in fixes522 (a reacting line wins, all-in ATTACK loses). */
-  var PLAYER_DECK = ['ATTACK', 'HEAL', 'ATTACK', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'ATTACK',
-    'PARRY', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'HEAL', 'ATTACK', 'DEFEND'];
+     solver in fixes522 (a reacting line wins, all-in ATTACK loses) and
+     fixes587 (never-ATTACK also loses). Cards are drawn with pop(), so the
+     opening four are this deck's tail: DEFEND, ATTACK, HEAL, DEFEND. That
+     lets a reacting player brace the telegraphed first attack without
+     handing the race to a player who never swings (fixes587). */
+  var PLAYER_DECK = ['ATTACK', 'PARRY', 'ATTACK', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'ATTACK',
+    'HEAL', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'HEAL', 'ATTACK', 'DEFEND'];
   var MAGE_DECK = ['ATTACK', 'ATTACK', 'HEAL', 'PARRY', 'HEAL', 'HEAL', 'DEFEND', 'ATTACK',
     'HEAL', 'ATTACK', 'ATTACK', 'DEFEND', 'PARRY', 'DEFEND', 'PARRY', 'ATTACK'];
   var ANIM = { lift: 150, flip: 200, travel: 250, effect: 300, discard: 150, hp: 60, retreat: 400 };
