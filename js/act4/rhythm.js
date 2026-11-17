@@ -234,7 +234,7 @@
     /* A pickup after the dodge keeps the longest wait inside MAX_GAP
        whatever the bar snapping does. */
     for (s = 0; s < SECTIONS; s++) {
-      t = BREAK_AT[s] + DODGE + EASE_OUT + 0.5 * 60 / BPM[Math.min(s, 2)];
+      t = RETURN_AT[s] + 60 / BPM[Math.min(s, 2)];
       notes.push({ t: t, end: t, lane: (s + 1) % 4, mine: true, hit: false, done: false });
     }
     for (i = 0; i < ITEMS.length; i++) {
