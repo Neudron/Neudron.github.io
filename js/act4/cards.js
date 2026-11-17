@@ -95,10 +95,21 @@
     }
   }
 
+  /* Fixed priority, pure over public state. Each rule only fires when its
+     card is actually in hand; the next rule then gets its turn. */
   function mageIndex() {
-    var h = state.mage.hand, i;
+    var h = state.mage.hand, i, through, dmg;
+    dmg = attackDamage('mage');
+    through = state.you.block >= dmg ? 0 : dmg - state.you.block;
+    if (!state.you.parry && state.you.hp - through <= 0) {
+      i = h.indexOf('ATTACK');
+      if (i >= 0) return i;
+    }
     if (state.mage.hp <= 6) { i = h.indexOf('HEAL'); if (i >= 0) return i; }
     if (state.you.streak >= 2) { i = h.indexOf('PARRY'); if (i >= 0) return i; }
+    if (state.you.streak === 1 && state.mage.hp <= 9) {
+      i = h.indexOf('DEFEND'); if (i >= 0) return i;
+    }
     i = h.indexOf('ATTACK');
     if (i >= 0) return i;
     return h.length ? 0 : -1;
@@ -897,6 +908,7 @@
     ANIM: ANIM,
     decks: function () { return { you: PLAYER_DECK.slice(), mage: MAGE_DECK.slice() }; },
     intent: function () { return state ? state.intent : null; },
+    think: function () { beginTurn(); return state ? state.intent : null; },
     shelf: function () {
       if (!state) return [];
       return [state.deck[state.deck.length - 1], state.deck[state.deck.length - 2]]
