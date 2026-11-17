@@ -670,6 +670,22 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .tphud__icon { position: absolute; left: 6px; top: 4px; width: 32px; height: 32px; image-rendering: pixelated; }
 .tphud__cd { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: rgba(0, 0, 0, .78); }
 .tphud__cost { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; text-align: center; color: #d49aff; font-style: normal; }
+/* Dungeon dock (tphud.js .is-dock): hearts, TP, equipped slots with key labels, carried heals; docked to the bottom edge over .plat (76). Boss fights keep the floating strip. */
+.tphud__hp, .tphud__use, .tphud__key { display: none; }
+.tphud.is-dock { left: 0; right: 0; bottom: 0; transform: none; justify-content: center; gap: 32px; padding: 8px 24px 8px;
+  border-width: 0; border-top: 4px solid #fff; box-shadow: inset 0 4px 0 #000, inset 0 6px 0 #fff; pointer-events: none; }
+.tphud.is-dock .tphud__hp { display: flex; gap: 4px; }
+.tphud.is-dock .tphud__hp.is-hurt { animation: tphudHurt .35s steps(4, end); }
+.tphud__heart { width: 28px; height: 28px; image-rendering: pixelated; }
+.tphud.is-dock .tphud__use { display: flex; gap: 8px; }
+.tphud.is-dock .tphud__key { display: block; position: absolute; left: 0; right: 0; bottom: 2px; text-align: center; color: #fff; text-decoration: none; white-space: nowrap; }
+.tphud.is-dock .tphud__chip { width: 64px; height: 72px; pointer-events: auto; cursor: pointer; }
+.tphud.is-dock .tphud__icon { left: 14px; }
+.tphud.is-dock .tphud__cost { bottom: 22px; }
+.tphud.is-dock .tphud__item .tphud__cost { bottom: 4px; color: #fff; }
+.tphud.is-dock .tphud__chip[data-slot="melee"], .tphud.is-dock .tphud__chip[data-slot="ranged"] { cursor: default; }
+.tphud.is-dock .tphud__chip:hover { border-color: #FF9E30; }
+@keyframes tphudHurt { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-4px, 0); } 75% { transform: translate(4px, 0); } }
 /* Phone: one column, the stats as a row, a shorter list, so the whole menu
    including the description fits the phone screen without a scroll. */
 @media (max-width: 800px) {
@@ -688,8 +704,10 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .inv, .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
   .tphud__fill { transition: none !important; }
+  .tphud__hp { animation: none !important; }
 }
 html.rm .inv, html.rm .inv *, html.rm .inv *::before, html.rm .inv *::after { animation: none !important; transition: none !important; }
+html.rm .tphud__hp { animation: none !important; }
 
 .kernel-play { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .kernel-play canvas { display: block; width: min(100vw, 166.67vh); height: auto; aspect-ratio: 5 / 3; image-rendering: pixelated; }
