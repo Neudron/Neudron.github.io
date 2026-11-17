@@ -32,6 +32,24 @@
   var msg  = document.getElementById('bhMsg');
   var duration = document.getElementById('bhDuration');
 
+  /* The result popup: a big rainbow card with the seconds survived on a win,
+     a plain one with the seconds that were left to win on a death. Built
+     here (inside #bh, so no new z-index) and never takes a click or a key. */
+  var pop = document.createElement('div');
+  pop.id = 'bhPop'; pop.className = 'bh__pop'; pop.hidden = true;
+  pop.setAttribute('aria-hidden', 'true');   /* announce() already says it */
+  pop.style.pointerEvents = 'none';
+  wrap.appendChild(pop);
+  function hidePop() { pop.hidden = true; if (msg) msg.classList.remove('is-low'); }
+  function showPop(win, secs) {
+    pop.className = 'bh__pop ' + (win ? 'bh__pop--win' : 'bh__pop--lose');
+    pop.innerHTML = '<b class="bh__pop-t">' + (win ? 'you made it' : 'so close') + '</b> ' +
+      '<b class="bh__pop-n">' + secs.toFixed(1) + ' s</b> ' +
+      '<span class="bh__pop-s">' + (win ? 'survived the whole clock' : 'left to win') + '</span>';
+    pop.hidden = false;
+    if (msg) msg.classList.add('is-low');
+  }
+
   /* dm.hud keeps #bhLive on HP and phase; the death and the end lines
      are written here, after it, so they are the last thing said. */
   var live = document.getElementById('bhLive');
@@ -1002,6 +1020,7 @@
     sheet();
     running = true; last = performance.now();
     if (msg) msg.hidden = true;
+    hidePop();
     draw();
     if (!NEU.kernel) requestAnimationFrame(step);
     if (NEU.kernel) NEU.kernel.push('bullet');
@@ -1044,6 +1063,9 @@
       outroF = 54; requestAnimationFrame(outro);
     }
     if (!quiet) draw();
+    /* The timer only exists in the bounded runs: the win shows the clock
+       survived, the death what was left of it. */
+    if (!endless) showPop(good, good ? span() : Math.max(0, span() - t));
 
     if (endless && !charged) {
       /* No win out here: the number is how long you lasted. */
@@ -1153,6 +1175,7 @@
     running = false;
     if (NEU.kernel && NEU.kernel.current() === 'bullet') NEU.kernel.pop();
     wrap.hidden = true;
+    hidePop();
     document.body.classList.remove('is-playing');
     if (NEU.quest) NEU.quest.lock(false);
     /* You came in here to charge the console; tell the dock on the way out. */

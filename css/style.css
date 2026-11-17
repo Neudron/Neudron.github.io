@@ -963,6 +963,54 @@ body.is-playing { overflow: hidden; }
   white-space: nowrap;
 }
 .bh__msg small { color: var(--dim); }
+.bh__msg.is-low { top: 74%; }                 /* the result popup owns the middle */
+
+/* The result popup (bullet.js): inside .bh, so it sits on the room's own
+   layer and under the textbox. Pointer-events none; fonts in 16 px steps.
+   Body is opaque: the canvas keeps drawing the box edge and phase line
+   under it, and any alpha lets that text bleed through the card.
+   The rainbow is a stepped, repeating gradient slid sideways over 3 s
+   (about 0.3 Hz, nowhere near the 3 Hz flash line); calm motion freezes it. */
+.bh__pop {
+  position: absolute; left: 50%; top: 30%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 32px);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 32px 48px;
+  background: var(--void);
+  border: 4px solid var(--bone);
+  text-align: center; white-space: nowrap;
+  animation: bh-pop-in .36s steps(6) both;
+}
+.bh__pop[hidden] { display: none; }
+.bh__pop-t { font: 400 32px/1 var(--font); color: var(--bone); }
+.bh__pop-n { font: 400 96px/1 var(--font); color: var(--bone); }
+.bh__pop-s { font: 400 16px/1 var(--font); color: var(--dim); }
+.bh__pop--lose { border-color: #E23B55; }
+.bh__pop--lose .bh__pop-n { color: #E23B55; }
+.bh__pop--win {
+  --rb: linear-gradient(90deg, #FF3B3B, #FF9A2E, #FFE23B, #5BE05B, #3BD6E0, #4A7BFF, #B05BFF, #FF3B3B);
+  border: 0;
+  background:
+    linear-gradient(var(--void), var(--void)) padding-box,
+    var(--rb) border-box;
+  border: 6px solid transparent;
+  background-size: auto, 200% 100%;
+  animation: bh-pop-in .36s steps(6) both, bh-rb 3s steps(24) infinite;
+}
+.bh__pop--win .bh__pop-t, .bh__pop--win .bh__pop-n {
+  background: var(--rb); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  animation: bh-rb 3s steps(24) infinite;
+}
+@keyframes bh-pop-in { from { transform: translate(-50%, -50%) scale(.4); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+@keyframes bh-rb { from { background-position: 0 0; } to { background-position: 200% 0; } }
+@media (max-width: 520px) { .bh__pop { padding: 16px 24px; } .bh__pop-n { font-size: 64px; } .bh__pop-t { font-size: 16px; } }
+html.rm .bh__pop, html.rm .bh__pop--win, html.rm .bh__pop--win .bh__pop-t, html.rm .bh__pop--win .bh__pop-n { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .bh__pop, .bh__pop--win, .bh__pop--win .bh__pop-t, .bh__pop--win .bh__pop-n { animation: none; }
+}
 .bh__keys {
   position: absolute; left: 0; right: 0; bottom: 18px;
   margin: 0; text-align: center;
