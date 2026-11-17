@@ -214,6 +214,36 @@
   }
   /* drawn first in draw(): the blackout, then the ramped warnings, then the
      tracked bullets' bloom and 6-tap afterimages (offset -v * i * 0.56 f) */
+  /* the desperation stage card: 30 f, alpha 0 -> 1 -> 0, spaced caps, black
+     stroke. It sits above the arena (bottom at AY - 44), clear of the field. */
+  function drawCard(ctx) {
+    var F = G.fx, t, txt;
+    if (!F || !F.title || G.fr - F.title.at >= 30) return;
+    t = (G.fr - F.title.at) / 30;
+    txt = F.title.text.split('').join(' ');
+    ctx.save();
+    ctx.globalAlpha = t < 0.5 ? t * 2 : (1 - t) * 2;
+    ctx.font = '32px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 3; ctx.strokeStyle = '#000';
+    ctx.strokeText(txt, A.AX + A.AW / 2, A.AY - 44);
+    ctx.fillStyle = '#FFE0C0';
+    ctx.fillText(txt, A.AX + A.AW / 2, A.AY - 44);
+    ctx.restore();
+  }
+  /* the low ceiling's height, marked OUTSIDE the arena: a chevron pair on
+     each side pointing at the edge (static, so reduced motion needs no case) */
+  function drawCeilMarks(ctx) {
+    var y = A.AY + A.AH - G.ceil.C, xs = [A.AX - 14, A.AX + A.AW + 14], i, j, x;
+    ctx.save();
+    ctx.strokeStyle = '#4A7BFF'; ctx.lineWidth = 2; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    for (i = 0; i < 2; i++) {
+      x = xs[i];
+      for (j = 0; j < 2; j++) {
+        ctx.beginPath(); ctx.moveTo(x - 6, y - 14 + j * 8); ctx.lineTo(x, y - 8 + j * 8); ctx.lineTo(x + 6, y - 14 + j * 8); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
   function drawFx(ctx) {
     var F = G.fx, i, w, t, fade, op = ctx.globalCompositeOperation, L = beamLen(), c, s, m, sp, rot, n, wk, wn;
     if (!F) return;
@@ -300,18 +330,6 @@
       ctx.strokeStyle = gr || 'rgba(' + c + ',' + (t * fade).toFixed(2) + ')';
       ctx.lineWidth = core;
       ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(ex, ey); ctx.stroke();
-    }
-    /* the desperation stage card: 30 f, alpha 0 -> 1 -> 0, spaced caps, black stroke */
-    if (F.title && G.fr - F.title.at < 30) {
-      t = (G.fr - F.title.at) / 30;
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = t < 0.5 ? t * 2 : (1 - t) * 2;
-      ctx.font = '32px monospace'; ctx.textAlign = 'center';
-      ctx.lineWidth = 3; ctx.strokeStyle = '#000';
-      ctx.strokeText(F.title.text.split('').join(' '), A.AX + A.AW / 2, A.AY + A.AH * 0.35);
-      ctx.fillStyle = '#FFE0C0';
-      ctx.fillText(F.title.text.split('').join(' '), A.AX + A.AW / 2, A.AY + A.AH * 0.35);
-      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'lighter';
     }
     for (wk = 0, wn = 0; wk < F.mine.length; wk++) {
       m = F.mine[wk];
@@ -2576,6 +2594,13 @@
         drawEyes(ctx);
         drawSparks(ctx);
       } finally { ctx.restore(); }
+    },
+    /* what lives OUTSIDE the arena (the stage card, the ceiling's chevrons):
+       boss-scal calls this after its vignette, which would paint over them */
+    drawOuter: function (ctx) {
+      if (!G) return;
+      drawCard(ctx);
+      if (G.ceil) drawCeilMarks(ctx);
     }
   };
 
@@ -2820,12 +2845,13 @@
         ctx.fillStyle = 'rgba(' + rampRGB(t) + ',' + (0.4 + 0.6 * t).toFixed(2) + ')';
         for (var dx = A.AX; dx < A.AX + A.AW; dx += 16) ctx.fillRect(dx | 0, (y - 2) | 0, 10, 2);
       } else {
-        ctx.fillStyle = 'rgba(40,0,6,0.78)'; ctx.fillRect(A.AX, A.AY, A.AW, y - A.AY);
+        /* a moderate veil (TUNE.ceilVeil, was 0.78) and a firm 2 px #4A7BFF rim */
+        ctx.fillStyle = 'rgba(40,0,6,' + tune().ceilVeil + ')'; ctx.fillRect(A.AX, A.AY, A.AW, y - A.AY);
         ctx.globalCompositeOperation = 'lighter';
         ctx.fillStyle = 'rgba(255,58,26,0.30)'; ctx.fillRect(A.AX, (y - 10) | 0, A.AW, 10);
         ctx.fillStyle = 'rgba(255,154,74,0.35)'; ctx.fillRect(A.AX, (y - 4) | 0, A.AW, 4);
         ctx.globalCompositeOperation = op;
-        ctx.fillStyle = '#FFF0D0'; ctx.fillRect(A.AX, (y - 2) | 0, A.AW, 2);
+        ctx.fillStyle = '#4A7BFF'; ctx.fillRect(A.AX, (y - 2) | 0, A.AW, 2);
         ctx.fillStyle = '#FF9A4A';
         for (var dq = A.AX + ((G.fr * 2) % 40); dq < A.AX + A.AW; dq += 40) ctx.fillRect(dq | 0, (y + (G.fr + dq) % 12) | 0, 2, 3);
       }
