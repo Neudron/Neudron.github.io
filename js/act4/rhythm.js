@@ -1660,7 +1660,9 @@
   });
 
   /* the window lost focus or the page hid: no key stays held, and a live round pauses */
+  var refocusClick = false;
   function letGo() {
+    refocusClick = true;
     keys = {};
     if (running && !S.paused && !wrap.hidden) togglePause();
   }
@@ -1672,7 +1674,10 @@
     if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Rhythm Game', close);
     else close();
   }
-  wrap.addEventListener('click', function () { if (S.paused) leavePrompt(); });
+  wrap.addEventListener('click', function () {
+    if (refocusClick) { refocusClick = false; return; }
+    if (S.paused) leavePrompt();
+  });
 
   function retry() {
     wrap.hidden = false;
