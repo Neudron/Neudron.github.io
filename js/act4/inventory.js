@@ -173,7 +173,41 @@
       var li = e.target && e.target.closest ? e.target.closest('li') : null, idx;
       if (!li || li.parentNode !== list) return;
       idx = Array.prototype.indexOf.call(list.children, li);
-      if (idx >= 0 && idx !== sel) { sel = idx; render(); }
+      if (idx < 0 || idx >= rows.length || idx === sel || drinking ||
+          (NEU.tboxOpen && NEU.tboxOpen())) return;
+      var previous = list.children[sel];
+      if (previous) { previous.classList.remove('is-sel'); previous.setAttribute('aria-selected', 'false'); }
+      sel = idx; clicked = -1;
+      li.classList.add('is-sel'); li.setAttribute('aria-selected', 'true');
+      renderSelection(tab === 1 ? equippedItem(curSlot()) : null);
+    });
+    /* the mouse and touch do what the keys do: a tab switches, a category opens
+       on a second tap, a row selects on the first tap and acts on the second */
+    box.addEventListener('click', function (e) {
+      var n = e.target, tabEl = null, slot = null, li = null, sp = null;
+      while (n && n !== box) {
+        if (n.className && typeof n.className === 'string') {
+          if (n.className.indexOf('inv__tab') === 0 && n.getAttribute('data-tab')) tabEl = n;
+          else if (n.classList.contains('inv__spell') && n.getAttribute('data-j')) sp = n;
+          else if (n.className.indexOf('inv__slot') === 0 && n.getAttribute('data-i') !== null) slot = n;
+        }
+        if (n.parentNode === list && n.tagName === 'LI') li = n;
+        n = n.parentNode;
+      }
+      if (drinking || (NEU.tboxOpen && NEU.tboxOpen())) return;
+      if (tabEl) { switchTab(Number(tabEl.getAttribute('data-tab'))); return; }
+      if (slot && tab === 1) {
+        var i = Number(slot.getAttribute('data-i'));
+        if (sp && cat === i && opened) { spell = Number(sp.getAttribute('data-j')); tick(); render(); return; }
+        if (cat === i && !opened) { activate(); return; }
+        cat = i; spell = 0; opened = false; tick(); render(); return;
+      }
+      if (li) {
+        var idx = Array.prototype.indexOf.call(list.children, li);
+        if (idx < 0 || idx >= rows.length) return;
+        if (idx === sel && idx === clicked && (tab === 0 || opened)) { activate(); return; }
+        sel = idx; tick(); render(); clicked = idx;
+      }
     });
   }
 
@@ -324,8 +358,9 @@
 
   function render() {
     if (!box) return;
+    clicked = -1;
     box.querySelector('.inv__coins').textContent = '◎ ' + (NEU.save && NEU.save.coins ? NEU.save.coins() : 0);
-    var buttons = box.querySelectorAll('.inv__tab'), i, j, c, it, html, focus, current, chosen, shown, equipped;
+    var buttons = box.querySelectorAll('.inv__tab'), i, j, c, it, html, focus, equipped;
     for (i = 0; i < buttons.length; i++) {
       buttons[i].className = 'inv__tab' + (tab === i ? ' is-sel' : '');
       buttons[i].setAttribute('aria-selected', tab === i ? 'true' : 'false');
@@ -341,11 +376,11 @@
       html = '';
       for (i = 0; i < CATS.length; i++) {
         c = CATS[i];
-        html += '<div class="inv__slot' + (cat === i ? ' is-focus' : '') + '"><span class="inv__sym ' + c.icon + '"></span><div class="inv__slotbody"><b>' + c.label + '</b>';
+        html += '<div class="inv__slot' + (cat === i ? ' is-focus' : '') + '" data-i="' + i + '"><span class="inv__sym ' + c.icon + '"></span><div class="inv__slotbody"><b>' + c.label + '</b>';
         for (j = 0; j < c.slots.length; j++) {
           it = equippedItem(c.slots[j]);
           focus = cat === i && opened && spell === j;
-          html += '<span class="inv__gear' + (c.slots.length > 1 ? ' inv__spell' : '') + (focus ? ' is-focus' : '') + '">'
+          html += '<span class="inv__gear' + (c.slots.length > 1 ? ' inv__spell' : '') + (focus ? ' is-focus' : '') + '" data-j="' + j + '">'
             + '<canvas class="inv__gearicon" width="16" height="16" data-item="' + (it ? it.id : '') + '"></canvas>'
             + '<span class="inv__gearname">' + (c.slots.length > 1 ? SPELL_NAMES[j] : '') + (it ? it.name : '—') + '</span> '
             + '<i class="inv__kind k-' + (it ? it.kind : 'none') + '">' + (it ? (KIND_LABEL[it.kind] || it.kind) : '') + '</i> '
@@ -399,8 +434,11 @@
     hint.hidden = !(equip && !opened);
     hint.textContent = equip && !opened ? 'Z opens ' + CATS[cat].label : '';
     if (!rows.length && !(equip && !opened)) list.innerHTML = '<li>(nothing)</li>';
-    current = equip ? equipped : null; chosen = selectedItem();
-    shown = equip ? (opened && chosen ? chosen : current) : chosen;
+    renderSelection(equipped);
+  }
+  function renderSelection(current) {
+    var equip = tab === 1, chosen = selectedItem();
+    var shown = equip ? (opened && chosen ? chosen : current) : chosen;
     /* Full name lives here, never in the narrow list column. */
     var statHtml = equip ? statText(shown, current) : '';
     if (equip) statHtml = '<div class="inv__statname">' + (shown ? itemLabel(shown) : (current ? current.name : '')) + '</div>' + statHtml;
@@ -412,9 +450,11 @@
     detail.textContent = (shown && shown.desc) || '';
     live(shown ? itemLabel(shown) : 'no items');
   }
-  function pick(next) { if (!rows.length) return; sel = (next + rows.length) % rows.length; render(); }
-  function switchTab(next) { tab = (next + 2) % 2; sel = 0; spell = 0; opened = false; render(); }
-  function moveCat(d) { cat = (cat + d + CATS.length) % CATS.length; spell = 0; render(); }
+  var clicked = -1;   /* the row the last click selected: a second click on it acts */
+  function tick() { if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick(); }
+  function pick(next) { if (!rows.length) return; sel = (next + rows.length) % rows.length; tick(); render(); }
+  function switchTab(next) { tab = (next + 2) % 2; sel = 0; spell = 0; opened = false; tick(); render(); }
+  function moveCat(d) { cat = (cat + d + CATS.length) % CATS.length; spell = 0; tick(); render(); }
   function reduced() { return document.documentElement.classList.contains('rm'); }
 
   /* The bowl tips toward the soul, steam puffs rise off the row, the row

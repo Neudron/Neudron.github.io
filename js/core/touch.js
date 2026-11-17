@@ -67,7 +67,7 @@
 
     { id: 'polt',   on: function () { return NEU.polt && NEU.polt.running; },
       a: 'z',     aLabel: 'strike', b: 'Escape',
-      x: 'x',     xLabel: 'dash',   stick: true },
+      x: 'x',     xLabel: 'dash',   c: 'c', cLabel: 'TP', stick: true },
 
     { id: 'bullet', on: function () { return NEU.bullet && NEU.bullet.running; },
       a: 'Enter', aLabel: 'ok',     b: 'Escape',
@@ -91,7 +91,7 @@
     /* the fallback world — see the note at the top of the list */
     { id: 'engine', on: function () { return NEU.engine && NEU.engine.running; },
       a: 'z',     aLabel: 'talk',   b: 'Escape',
-      x: 'r',     xLabel: 'reset',  stick: true }
+      x: 'r',     xLabel: 'reset',  c: 'c', cLabel: 'items', stick: true }
   ];
 
   /* ── should we be visible at all ───────────────────────────────── */
