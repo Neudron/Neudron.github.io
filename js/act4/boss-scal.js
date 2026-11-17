@@ -24,13 +24,16 @@
   var NEU = window.NEU = window.NEU || {};
   function kn(d) { return NEU.keys ? NEU.keys.label(d) : d; }
 
-  /* THE pace table. scal-attacks.js (loaded first) reads NEU.scal.TUNE at
-     call time for the gaps and the phase transition. anim: fps per sprite
+  /* THE tuning table. scal-attacks.js (loaded first) reads NEU.scal.TUNE at
+     call time for the gaps, the phase transition and the ceiling veil. anim: fps per sprite
      band; intro: s; phaseF, gap, gapBig: 60 Hz frames. */
   var TUNE = {
     anim: { idle: 8, idle_fast: 10, charge_telegraph: 12, charging: 20, charge_recovery: 12,
             casting: 14, gigablast: 14, gigablast_p2: 14, hellblast: 14, hellblast_p2: 14 },
-    intro: 1.6, phaseF: 75, gap: 52, gapBig: 150
+    intro: 1.6, phaseF: 75, gap: 52, gapBig: 150,
+    /* B2 art knobs (owner retunes here): the desperation fog laid over the arena,
+       its edge cap, and the gravity ceiling's veil (it was 0.78) */
+    fogArena: 0.55, fogArenaMax: 0.60, ceilVeil: 0.45
   };
 
   var wrap = document.getElementById('bh');          // reuses the room's canvas
@@ -626,18 +629,30 @@
     ctx.stroke();
     ctx.globalCompositeOperation = op; ctx.lineWidth = 1;
   }
-  /* the vignette's gradient is rebuilt only when its size or strength changes */
+  /* the vignette's gradient is rebuilt only when its size or strength changes.
+     Outside the arena it is exactly the original. Inside the arena the same
+     gradient is laid at TUNE.fogArena, its edge capped at TUNE.fogArenaMax, so
+     the field stays readable. lv escalates through auraK (it includes the
+     desperation stage), so the fog still thickens per stage. */
   var vgGrad = null, vgKey = '';
   function drawVignette(w, h, lv) {
-    var key = w + '|' + h + '|' + lv;
+    var key = w + '|' + h + '|' + lv, edge = 0.45 + lv * 0.1;
     if (key !== vgKey) {
       var r0 = Math.max(w, h) * (0.62 - lv * 0.07);
       vgGrad = ctx.createRadialGradient(w / 2, h / 2, r0 * 0.45, w / 2, h / 2, r0);
       vgGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      vgGrad.addColorStop(1, 'rgba(20,0,2,' + (0.45 + lv * 0.1).toFixed(2) + ')');
+      vgGrad.addColorStop(1, 'rgba(20,0,2,' + edge.toFixed(2) + ')');
       vgKey = key;
     }
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(AX, AY, AW, AH); ctx.clip('evenodd');
     ctx.fillStyle = vgGrad; ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+    ctx.save();
+    ctx.beginPath(); ctx.rect(AX, AY, AW, AH); ctx.clip();
+    ctx.globalAlpha = Math.min(TUNE.fogArena, TUNE.fogArenaMax / edge);
+    ctx.fillStyle = vgGrad; ctx.fillRect(AX, AY, AW, AH);
+    ctx.restore();
   }
   function drawAura(lv) {
     if (!dm.glow) return;
@@ -1738,7 +1753,7 @@
     var ak = auraK();
     if (ak) drawStorm(w, h, Math.min(7, ak));
     frame();
-    if (ak) { ctx.fillStyle = 'rgba(120,18,0,' + Math.min(0.24, 0.03 + ak * 0.025).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH); }
+    if (ak) { ctx.fillStyle = 'rgba(120,18,0,' + Math.min(0.20, 0.03 + ak * 0.025).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH); }
 
     /* her */
     if (mode !== 'won') {
@@ -1918,6 +1933,7 @@
     var off = rift ? splitOffset(rift.t / 60, rm()) : 0;
     if (off > 0) splitView(rift, off);
     if (ak) drawVignette(w, h, Math.min(6, ak));
+    NEU.scalAtk.drawOuter(ctx);
     if (NEU.juice) NEU.juice.overlay(ctx, w, h);
 
     var fa = flashAlpha();
@@ -1947,11 +1963,12 @@
     }
     if (breakT >= 0) drawBreak();
     if (bannerTxt) {
-      ctx.font = BANNER_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      /* a 24 px plate above the arena (y < AY - 8): the field stays clear */
+      ctx.font = FONT_UI; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       var bnw = (ctx.measureText(bannerTxt).width + 32) | 0, bnx = (AX + AW / 2) | 0;
-      ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(bnx - (bnw >> 1), AY + 16, bnw, 48);
+      ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(bnx - (bnw >> 1), AY - 36, bnw, 24);
       ctx.fillStyle = bannerTxt === 'VULNERABLE' ? '#FFC46A' : '#B8E6FF';
-      ctx.fillText(bannerTxt, bnx, AY + 24);
+      ctx.fillText(bannerTxt, bnx, AY - 32);
       ctx.textAlign = 'left';
     }
     drawBroBars(w);
