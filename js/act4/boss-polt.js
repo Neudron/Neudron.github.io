@@ -70,6 +70,7 @@
 
   function say(s) { line = s; lineT = performance.now(); }
 
+  var kitBox = { AX: 0, AY: 0, AW: 800, AH: 600 };
   function layout() {
     var dpr = Math.min(devicePixelRatio || 1, 2);
     cv.width = (innerWidth * dpr) | 0; cv.height = (innerHeight * dpr) | 0;
@@ -90,6 +91,7 @@
     var over = AY + AH + 72 - (innerHeight - 44);
     if (over > 0) AH = Math.max(300, AH - over) | 0;
     arenaCache = {};
+    kitBox.AX = AX; kitBox.AY = AY; kitBox.AW = AW; kitBox.AH = AH;   /* the C strip follows resizes */
   }
   addEventListener('resize', function () { if (running) layout(); });
 
@@ -258,6 +260,7 @@
        so dt covers the skipped vsyncs */
     var dt = Math.min(0.033, (nowMs - last) / 1000); last = nowMs;
     if (NEU.juice && NEU.juice.frozen()) { draw(nowMs); return; }
+    if (kit) dt *= kit.slow;                        /* the C strip slows the fight to 0.2x, as Scal's does */
     t += dt;
     if (inv > 0) inv -= dt;
 
@@ -266,7 +269,7 @@
     dm.move(F, keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH });
     px = F.x; py = F.y;
     dm.tick(F, dt, 1 - Math.min(1, Math.max(0, Math.hypot(px - bx, py - by) - 40) / 260));
-    if (kit) kit.tick(dt);
+    if (kit) { kit.hp = hp; kit.tick(dt); }
     tickAttacks(dt);
 
     /* him — Plantera-like chase, faster each phase */
@@ -412,6 +415,7 @@
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.x < AX - 50 || b.x > AX + AW + 50 || b.y < AY - 50 || b.y > AY + AH + 50) continue;
       keep.push(b);
+      if (kit) kit.graze(b);                          /* near misses fill TP, so the C strip has something to spend */
       var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
       if (dx * dx + dy * dy < rr * rr && hurt(b.vx, b.vy)) return;
     }
@@ -1056,11 +1060,12 @@
     if (!running && !dying && mode !== 'won' && (e.key === 'Enter' || e.key === 'z' || e.key === 'Z')) { e.preventDefault(); open(); return; }
     /* z (or Enter) strikes before the soul looks at the key; x dashes.
        A held key's auto-repeat is not a strike. */
-    if (running && kit && (e.key === 'z' || e.key === 'Z' || e.key === 'c' || e.key === 'C')) {
-      e.preventDefault(); if (!e.repeat) kit.keydown(e.key); return;
-    }
-    if (running && kit && kit.stripOpen && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Up' || e.key === 'Down')) {
-      e.preventDefault(); kit.keydown(e.key); return;
+    var kk = running && kit && (e.key === 'z' || e.key === 'Z' || e.key === 'c' || e.key === 'C' ||
+      (kit.stripOpen && (e.key === 'x' || e.key === 'X' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Up' || e.key === 'Down')));
+    if (kk) {
+      e.preventDefault();
+      if (!e.repeat) { kit.hp = hp; kit.keydown(e.key); hp = Math.max(hp, kit.hp); }
+      return;
     }
     if ((e.key === 'Enter' || e.key === 'z' || e.key === 'Z') && running) { e.preventDefault(); if (!e.repeat) tryHit(); return; }
     if (running && dm.key(F, e)) { e.preventDefault(); return; }
@@ -1086,7 +1091,8 @@
     phaseFlash = 0; phaseFlashes = 0; flashedPhase = 0;
     px = AX + AW / 2; py = AY + AH - 70;
     F = dm.fight(px, py);
-    kit = NEU.kit ? NEU.kit.create({ F: F, box: { AX: AX, AY: AY, AW: AW, AH: AH }, adapter: {
+    kit = NEU.kit ? NEU.kit.create({ F: F, box: kitBox,
+      theme: { rim: '#2E6F62', acc: '#7FE3C4', hot: '40,150,120', hotLine: '#7FE3C4', well: '#10302A', title: 'SOUL  ACTIONS' }, adapter: {
       targets: function () {
         bossTarget.x = bx; bossTarget.y = by; bossTarget.r = 22;
         var out = [bossTarget];
@@ -1094,7 +1100,8 @@
         return out;
       },
       damage: function (target, n) { tryHit(target, Math.max(1, Math.round(n / 6))); },
-      hurtPlayer: function (n) { hurtRaw(0, 0); }
+      hurtPlayer: function (n) { hurtRaw(0, 0); },
+      sfx: function (n) { if (NEU.sfx && NEU.sfx[n]) NEU.sfx[n](); }
     } }) : null;
     bx = AX + AW / 2; by = AY + 80; bz = 0;
     charging = 0; glow = 0; nextFire = 1.4; nextCharge = 5;
