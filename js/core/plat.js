@@ -32,7 +32,7 @@
       maxFall: C.maxFall, dashTime: 0, dashCd: 0, refillCd: 0, dashAttack: 0, dashX: 0, dashY: 0, duck: false,
       wallSlide: C.slideTime, slideDir: 0, wallBoost: 0, boostDir: 0, forceX: 0, forceDir: 0, climbNoMove: 0, lastClimb: 0,
       swing: 0, pogo: false, squash: 0, stretch: 0, walked: 0, hp: 0, inv: 0, hopWait: 0,
-      meleeHold: 0, charging: false, chargeK: 0, swingPow: 1, swingDown: false, hitStop: 0 };
+      meleeHold: 0, charging: false, chargeK: 0, swingPow: 1, swingDown: false, hitStop: 0, hurtFlash: 0 };
   }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function sign(v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
@@ -130,7 +130,7 @@
     if (player.dead > 0 || player.inv > 0) return false;
     if (NEU.cheat && NEU.cheat.god) return false;
     if (!current || !current.hp) { die(); return true; }
-    player.hp = Math.max(0, player.hp - (n || 1)); player.inv = C.hurtInv;
+    player.hp = Math.max(0, player.hp - (n || 1)); player.inv = C.hurtInv; player.hurtFlash = 0.14;
     player.vx = (dir || -player.face) * C.kbX; player.vy = C.kbY; player.st = 0; player.varJump = 0;
     if (NEU.juice && NEU.juice.hit && !replaying) { NEU.juice.hit('medium', { colour: '#FF5577', dx: player.vx, dy: player.vy }); if (NEU.juice.burst) NEU.juice.burst(player.x, player.y - HH / 2, 10, '#FF5577', 140); }
     if (NEU.sfx && NEU.sfx.hit && !replaying) NEU.sfx.hit(0.8);
@@ -334,7 +334,7 @@
     hits = current && current.swing ? current.swing(player, down, charged) : 0;
     if (NEU.sfx && !replaying) { if (charged && NEU.sfx.snap) NEU.sfx.snap(); else if (NEU.sfx.whoosh) NEU.sfx.whoosh(); }
     if (hits > 0 && !replaying) {
-      player.hitStop = (charged ? 0.09 : 0.045) * (reduced ? 0.33 : 1);
+      player.hitStop = (NEU.settings && NEU.settings.hitstop) ? 0 : (charged ? 0.09 : 0.045) * (reduced ? 0.33 : 1);
       if (NEU.juice && NEU.juice.hit) NEU.juice.hit(charged ? 'medium' : 'small', { dx: player.face, dy: 0 });
       if (NEU.juice && NEU.juice.burst) NEU.juice.burst(player.x + player.face * 22, player.y - 12, charged ? 16 : 8, charged ? '#FFD36A' : '#FFF0A6', charged ? 180 : 120);
       if (NEU.sfx && NEU.sfx.hit) NEU.sfx.hit(charged ? 0.9 : 0.45);
@@ -408,7 +408,7 @@
     for (i = 0; i < current.entities.length; i++) { e = current.entities[i]; if (kinds[e.t] && kinds[e.t].tick) kinds[e.t].tick(e, dt); }
     if (current.tick) current.tick(dt);
     if (player.x < -24 || player.y > current.h * TILE + 64) die();
-    player.squash = Math.max(0, player.squash - dt); player.stretch = Math.max(0, player.stretch - dt);
+    player.squash = Math.max(0, player.squash - dt); player.stretch = Math.max(0, player.stretch - dt); player.hurtFlash = Math.max(0, player.hurtFlash - dt);
     if (player.onGround && Math.abs(player.vx) > 8) player.walked += Math.abs(player.vx) * dt;
     for (i = afterimages.length - 1; i >= 0; i--) { afterimages[i].t -= dt; if (afterimages[i].t <= 0) afterimages.splice(i, 1); }
     placeCamera(reduced ? -2 : (Math.abs(player.x - prevX) > 48 || Math.abs(player.y - prevY) > 48 ? -1 : dt));
@@ -618,7 +618,7 @@
     if (api.live) api.live(ctx, cx, cy, L, now, area);
     if (!reduced) for (ai = 0; ai < afterimages.length; ai++) {
       ctx.globalAlpha = (afterimages[ai].t / 0.12) * 0.28;
-      drawHero(ctx, afterimages[ai].x - cx, afterimages[ai].y - cy, player.face, false);
+      drawHero(ctx, afterimages[ai].x - cx, afterimages[ai].y - cy, player.face, false, true);
     }
     ctx.globalAlpha = 1;
     for (i = 0; i < L.entities.length; i++) {
@@ -638,7 +638,11 @@
       if (player.inv > 0) ctx.globalAlpha = reduced ? 0.6 : ((((now / 170) | 0) & 1) ? 0.35 : 1); /* 340 ms period: under the 3 Hz flash cap */
       drawHero(ctx, drawX - cx, drawY - cy, player.face, player.onGround);
       ctx.globalAlpha = 1;
-    } else deathRing(ctx, drawX - cx, drawY - cy - HH / 2, 1 - player.dead / (current.quickRespawn ? 0.18 : DEATH));
+    } else {
+      hs = 1 - player.dead / (current.quickRespawn ? 0.18 : DEATH);
+      if (current.view === 'terraria' && !reduced && hs < 0.3) heroDissolve(ctx, drawX - cx, drawY - cy, player.face, hs / 0.3);
+      deathRing(ctx, drawX - cx, drawY - cy - HH / 2, hs);
+    }
     if (player.dead <= 0 && player.swing > 0)
       meleeArc(ctx, drawX - cx, drawY - cy, player.face, player.swingDown, player.swingPow === 2, 1 - player.swing / C.swing);
     if (player.dead <= 0 && player.charging) chargeArc(ctx, drawX - cx, drawY - cy, player.face, player.chargeK);
@@ -870,14 +874,58 @@
       c.fillRect(sx - 1, sy - 1, 3, 3);
     }
   }
-  function drawHero(c, wx, wy, face, moving) {
+  /* the dungeon hero's pose, procedural until the Batch F frames land: take-off stretch, airborne lean, landing squash,
+     dash streak, a swing lunge and a hurt flash. Scales hang from the feet. null = the plain sprite (reduced motion, other levels). */
+  function heroPose() {
+    var sx = 1, sy = 1, ox = 0, k;
+    if (!current || current.view !== 'terraria' || reduced) return null;
+    if (player.st === 2) { sx = 1.2; sy = 0.84; }
+    else if (player.stretch > 0) { k = player.stretch / 0.12; sx = 1 - 0.14 * k; sy = 1 + 0.22 * k; }
+    else if (!player.onGround && player.st === 0) { sx = 0.94; sy = player.vy < 0 ? 1.08 : 1.1; }
+    if (player.squash > 0) { k = player.squash / 0.12; sx = 1 + 0.25 * k; sy = 1 - 0.22 * k; }
+    if (player.swing > 0) ox = player.face * 3 * (player.swing / C.swing);
+    if (player.hurtFlash > 0) { sx *= 0.88; sy *= 1.12; }
+    return { sx: sx, sy: sy, ox: ox, flash: player.hurtFlash > 0 };
+  }
+  /* a silhouette flood: paint(g) draws into a w x h scratch at (0, 0); the opaque pixels become col, then it is stamped at x, y */
+  var tintCv = null;
+  function tint(c, x, y, w, h, paint, col, a) {
+    var g;
+    if (!tintCv || tintCv.width < w || tintCv.height < h) tintCv = mk(Math.max(64, w), Math.max(64, h));
+    g = tintCv.getContext && tintCv.getContext('2d');
+    if (!g) return false;
+    g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, tintCv.width, tintCv.height); g.imageSmoothingEnabled = false;
+    paint(g);
+    g.globalCompositeOperation = 'source-atop'; g.fillStyle = col; g.fillRect(0, 0, w, h); g.globalCompositeOperation = 'source-over';
+    c.globalAlpha *= a == null ? 1 : a;
+    c.drawImage(tintCv, 0, 0, w, h, x | 0, y | 0, w, h);
+    return true;
+  }
+  /* flashes dim instead of whitening under the calm-flash setting */
+  function flashCol() { return NEU.settings && NEU.settings.flash ? { c: '#C8788C', a: 0.6 } : { c: '#FFFFFF', a: 1 }; }
+  function heroPaint(g, x, y, face, moving) {
     var look = NEU.engineLook;
+    look.drawPlayer(g, x, y, face > 0 ? 'right' : 'left', player.walked || 0, !!moving && !reduced, 2, 1000, { settle: false });
+  }
+  function drawHero(c, wx, wy, face, moving, plain) {
+    var look = NEU.engineLook, po = plain ? null : heroPose(), f;
     if (look && look.drawPlayer) {
-      look.drawPlayer(c, wx, wy, face > 0 ? 'right' : 'left', player.walked || 0, !!moving && !reduced, 2, 1000, { settle: player.squash > 0 && !reduced });
+      if (!po) { look.drawPlayer(c, wx, wy, face > 0 ? 'right' : 'left', player.walked || 0, !!moving && !reduced, 2, 1000, { settle: player.squash > 0 && !reduced }); return; }
+      c.save(); c.translate((wx + po.ox) | 0, wy | 0); c.scale(po.sx, po.sy);
+      look.drawPlayer(c, 0, 0, face > 0 ? 'right' : 'left', player.walked || 0, !!moving && !reduced, 2, 1000, {});
+      if (po.flash) { f = flashCol(); c.globalAlpha = f.a; tint(c, -16, -40, 32, 44, function (g) { heroPaint(g, 16, 40, face, moving); }, f.c, 1); c.globalAlpha = 1; }
+      c.restore();
       return;
     }
     c.fillStyle = '#FF00FF';
     c.fillRect((wx - HW) | 0, (wy - HH) | 0, HW * 2, HH);
+  }
+  /* death: the hero whitens and folds up into the ring (t 0..1 across the first 30% of the death timer) */
+  function heroDissolve(c, wx, wy, face, t) {
+    var f = flashCol();
+    c.save(); c.translate(wx | 0, wy | 0); c.scale(1 + 0.3 * t, Math.max(0.05, 1 - t));
+    tint(c, -16, -40, 32, 44, function (g) { heroPaint(g, 16, 40, face, false); }, f.c, f.a);
+    c.restore(); c.globalAlpha = 1;
   }
   function open(id, opts) {
     var i, carry;
@@ -1089,7 +1137,7 @@
     get levels() { return levels; }, _kinds: kinds,
     cam: function () { return { x: camera.x, y: camera.y }; },
     /* the render alpha camera, hero and (dgn-foes) bodies share: prev step to this step */
-    alpha: function () { return reduced ? 1 : Math.min(1, accumulator / STEP); } };
+    pose: heroPose, tint: tint, flashCol: flashCol, alpha: function () { return reduced ? 1 : Math.min(1, accumulator / STEP); } };
   NEU.plat = api;
   if (NEU.kernel) NEU.kernel.register('plat', { canvas: canvas, tick: tick, open: open, close: close, running: function () { return live; } });
   document.addEventListener('keydown', function (e) {
