@@ -46,6 +46,9 @@
     { field: '#070A14', rim: COL.bone },
     { field: '#061418', rim: COL.ecto },
     { field: '#14070E', rim: COL.red }];
+  /* One authority for the phase gates: the damage check and the HUD ticks
+     both read this table, so the bar can never disagree with the fight. */
+  var PHASE_GATES = [1, 0.65, 0.35];
   var VULN_COL = '#FFC46A';            /* same gold as her VULNERABLE banner */
   var REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   /* PLAN 9.5: the boss reads at 2x so his legs and hooks are legible. */
@@ -425,8 +428,9 @@
   }
 
   /* One damage path; a dash or the i-frames pass through. True = dead. */
+  function immune() { return inv > 0 || F.dashI > 0 || (NEU.cheat && NEU.cheat.god); }
   function hurtRaw(dx, dy) {
-    if (inv > 0 || F.dashI > 0 || (NEU.cheat && NEU.cheat.god)) return false;   /* dev `god` (dev.js) */
+    if (immune()) return false;   /* dev `god` (dev.js) */
     hp--; inv = IFRAMES;
     dm.hurt(F, px, py - 12);
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
@@ -435,7 +439,8 @@
     return false;
   }
   function hurt(dx, dy) {
-    if (kit && kit.hit(1)) return false;
+    if (immune()) return false;                                /* a shield is not spent on a hit that cannot land */
+    if (kit && kit.hit(1)) { inv = IFRAMES; return false; }    /* one pop, then real i-frames */
     return hurtRaw(dx, dy);
   }
 
@@ -473,7 +478,7 @@
     var killing = bossHP <= 0;
     if (killing) bossHP = 1;
     var pct = bossHP / bossMax;
-      if (pct <= 0.35 && phase < 3) {
+    if (pct <= PHASE_GATES[2] && phase < 3) {
       phase = 3;
       pulsePhase();
       if (NEU.poltAtk) NEU.poltAtk.phase(phase);
@@ -482,7 +487,7 @@
       say("* it makes another one of itself.");
       if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(3);
       if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', phase);
-    } else if (pct <= 0.65 && phase < 2) {
+    } else if (pct <= PHASE_GATES[1] && phase < 2) {
       phase = 2;
       pulsePhase();
       if (NEU.poltAtk) NEU.poltAtk.phase(phase);
@@ -1008,7 +1013,7 @@
 
     if (kit) kit.draw(ctx);
     dm.hud(ctx, F, { w: innerWidth, h: innerHeight, AY: AY, AH: AH, name: 'polterghast',
-                     hp: bossHP, max: bossMax, ticks: [0.5, 0.2],
+                     hp: bossHP, max: bossMax, ticks: PHASE_GATES.slice(1),
                      php: hp, pmax: MAXHP, phase: phase });
 
     /* the label sits outside the shake and outside the arena: on the
@@ -1069,7 +1074,7 @@
       if (!e.repeat) { kit.hp = hp; kit.keydown(e.key); hp = Math.max(hp, kit.hp); }
       return;
     }
-    if ((e.key === 'Enter' || e.key === 'z' || e.key === 'Z') && running) { e.preventDefault(); if (!e.repeat) tryHit(); return; }
+    if ((e.key === 'z' || e.key === 'Z') && running) { e.preventDefault(); if (!e.repeat) tryHit(); return; }
     if (running && dm.key(F, e)) { e.preventDefault(); return; }
     var n = dm.keyName(e); if (n) { keys[n] = true; e.preventDefault(); }
   });
@@ -1153,6 +1158,11 @@
                get running() { return running; },
                get phase() { return phase; },
                get hp() { return bossHP; },
+               get iframe() { return inv; },
+               get php() { return hp; },
+               get gates() { return PHASE_GATES.slice(); },
+               /* the player-damage funnel, so tests can drive one hit exactly */
+               hit: function (dx, dy) { return hurt(dx, dy); },
                get clone() { return !!clone; },
                get hooks() { return hooks.length; },
                /* what a renderer draws: the locked charge path, the punish window,
