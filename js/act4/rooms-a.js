@@ -201,7 +201,8 @@
   function woodsCrackOpen() {
     if (crackLatched) return;
     crackLatched = true;
-    if (NEU.plat && NEU.plat.open) NEU.plat.open('d0');
+    if (NEU.dungeon && NEU.dungeon.enter) NEU.dungeon.enter('d0');
+    else if (NEU.plat && NEU.plat.open) NEU.plat.open('d0');
   }
   function crackReduced() {
     try {

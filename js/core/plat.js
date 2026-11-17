@@ -866,10 +866,14 @@
     c.fillStyle = '#FF00FF';
     c.fillRect((wx - HW) | 0, (wy - HH) | 0, HW * 2, HH);
   }
+  function clearLevelSlide() {
+    if (levelSlide && NEU.engineTrans && NEU.engineTrans.active === levelSlide) NEU.engineTrans.cut();
+    levelSlide = null;
+  }
   function open(id, opts) {
     var i, carry;
     if (!levels[id]) return false;
-    levelSlide = null;
+    clearLevelSlide();
     opts = opts || {};
     carry = live && opts.carry ? { vx: player.vx, vy: player.vy, dashes: player.dashes, face: player.face } : null;
     if (live) close();
@@ -901,15 +905,23 @@
     opts = opts || {};
     if (!levels[id]) return false;
     var ms = opts.ms == null ? 400 : opts.ms;
-    if (reduced || !NEU.engineTrans || !document.createElement || !canvas || !ctx) return open(id, opts);
+    if (reduced || !NEU.engineTrans || NEU.engineTrans.active || !document.createElement || !canvas || !ctx) return open(id, opts);
     var before = mk(canvas.width, canvas.height), c = before.getContext('2d');
     if (c) c.drawImage(canvas, 0, 0);
-    levelSlide = null;
     if (!open(id, opts)) return false;
     var after = mk(canvas.width, canvas.height), c2 = after.getContext('2d');
     if (c2) c2.drawImage(canvas, 0, 0);
-    NEU.engineTrans.start('slide', before, opts.dir || 'right', false, after, { ms: ms });
-    levelSlide = { ms: ms };
+    levelSlide = NEU.engineTrans.start('slide', before, opts.dir || 'right', false, after, { ms: ms });
+    return true;
+  }
+  /* B4/J3: the themed dungeon entry — same snapshot driver as slideOpen, 'mode:dungeon' instead of 'slide'. */
+  function dungeonFall(open) {
+    if (!NEU.engineTrans || NEU.engineTrans.active || !document.createElement || !canvas || !ctx) return open();
+    var before = NEU.kernel && NEU.kernel.bridge ? NEU.kernel.bridge() : null;
+    if (!open()) return false;
+    var after = mk(canvas.width, canvas.height), c2 = after.getContext('2d');
+    if (c2) c2.drawImage(canvas, 0, 0);
+    levelSlide = NEU.engineTrans.start('mode:dungeon', before, 'down', redNow(), after, { wall: '#201B28' });
     return true;
   }
   function cloneLevel(src) {
@@ -920,7 +932,7 @@
   }
   function close() {
     if (!live) return;
-    levelSlide = null;
+    clearLevelSlide();
     live = false;
     if (overlay) overlay.hidden = true;
     if (current && current.onClose) current.onClose();
@@ -940,9 +952,10 @@
     var oldLevel = current, oldPlayer = player, oldLive = live, oldPaused = paused;
     var oldAccumulator = accumulator, oldClock = simClock, oldImages = afterimages, oldBaked = baked;
     var oldStack = NEU.kernel ? NEU.kernel.stack.slice() : null;
-    var oldMini = NEU.activeMinigame;
+    var oldMini = NEU.activeMinigame, oldSlide = levelSlide;
     replaying = true;
-    if (!open(id, opts)) { replaying = false; return { reached: false, deaths: 0, frames: 0 }; }
+    levelSlide = null;
+    if (!open(id, opts)) { replaying = false; levelSlide = oldSlide; return { reached: false, deaths: 0, frames: 0 }; }
     var frames = 0, deaths = 0, i, j, pair, state, wasDead = false;
     for (i = 0; i < recording.length; i++) {
       pair = recording[i];
@@ -952,7 +965,7 @@
     var reached = !!current.exited, end = getState();
     replaying = false;
     live = oldLive; current = oldLevel; player = oldPlayer; paused = oldPaused;
-    accumulator = oldAccumulator; simClock = oldClock; afterimages = oldImages; baked = oldBaked;
+    accumulator = oldAccumulator; simClock = oldClock; afterimages = oldImages; baked = oldBaked; levelSlide = oldSlide;
     if (oldStack && NEU.kernel) { NEU.kernel.stack.length = 0; for (i = 0; i < oldStack.length; i++) NEU.kernel.stack.push(oldStack[i]); }
     NEU.activeMinigame = oldMini;
     if (overlay) overlay.hidden = !live; return { reached: reached, deaths: deaths, frames: frames, end: end };
@@ -1029,7 +1042,7 @@
   kinds.door = { touch: function (e, input, melee) { if (!melee) return; var ok = !e.locked || (NEU.save && (NEU.save.flagged(e.locked) || NEU.save.has(e.locked))); if (ok) { e.dead = true; } else if (NEU.talk) NEU.talk([e.waits || ('It waits for ' + e.locked + '.')], 'narr'); } };
   kinds.barrier = { touch: function () {} };
 
-  var api = { level: level, open: open, slideOpen: slideOpen, close: close, running: function () { return live; },
+  var api = { level: level, open: open, slideOpen: slideOpen, dungeonFall: dungeonFall, close: close, running: function () { return live; },
     painters: painters, pad: padB, spr: spr, rows: rowsOf, ell: ell, mod: mod, spike: spikeShape, glow: glow, fr: fr, steel: STEEL,
     mk: mk, C: C, TILE: TILE, hw: HW, hh: HH,
     hash: function (x, y, z) {
