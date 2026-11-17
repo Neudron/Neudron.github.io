@@ -139,7 +139,7 @@
       ['start from the brazier the plaque says comes before another.',
        'the fourth one hangs off the first. the rest falls in around them.']],
     b4_ice: [
-      ['the mouse is slow: it takes one step for every two of yours.',
+      ['the mouse is slow: it takes one step for every three of yours.',
        'it scurries straight away from you, and it runs along whatever is in the way.'],
       ['stand on the far side of the mouse from the cheese, and walk towards it.',
        'it cannot leave the ice. drive it through the channels at the top and the bottom.']],
@@ -1036,7 +1036,7 @@
      The slide is gone. What replaces it is a living thing: a mouse
      under the frozen pool, and a cheese under the ice on the far side
      of it. The mouse is afraid of you and it is slow — it takes one
-     step for every two of yours — and it scurries straight away from
+     step for every three of yours — and it scurries straight away from
      you; if something is in the way it runs along it. You cannot
      touch it through the ice. You herd it.
 
@@ -1045,19 +1045,19 @@
      sits in the middle one, and a knight frozen solid stands beside
      it. The player walks the flagstones round the pool (stepping onto
      the ice still slides, which is a hazard here, not a tool). Every
-     second step the player takes, the mouse takes one.
+     third step the player takes, the mouse takes one.
 
      The rule is deliberately slow: the player walks at six cells a
-     second and the mouse at three, so you can get round it, head it
+     second and the mouse at two, so you can get round it, head it
      off, and drive it. That is the whole puzzle — observation (which
      way does it go), positioning (stand where you want it to flee),
      and the patience to walk behind it. R resets the room. */
 
-  /* The mouse. One step for every two the player takes, straight away
+  /* The mouse. One step for every three the player takes, straight away
      from the player; if that cell is not open ice it runs along the
      obstruction, preferring the direction that still increases the
      distance. It never leaves the ice and it never crosses a block. */
-  function stepMouse(room, c, px, py) {
+  function nextMouseCell(room, c, px, py) {
     var m = room.mouse, g = room.grid, es = c.ents(), i, x, y;
     var dx = m.x - px, dy = m.y - py;
     var cand = [], seen = {};
@@ -1068,11 +1068,10 @@
       if (seen[k]) return;
       seen[k] = 1; cand.push([ax, ay]);
     }
+    var hx = sgn(dx) || 1, vy = sgn(dy) || 1;
     if (Math.abs(dx) >= Math.abs(dy)) {
-      var vy = dy === 0 ? 1 : sgn(dy);
-      push(sgn(dx), 0); push(0, vy); push(0, -vy); push(-sgn(dx), 0);
+      push(hx, 0); push(0, vy); push(0, -vy); push(-hx, 0);
     } else {
-      var hx = dx === 0 ? 1 : sgn(dx);
       push(0, sgn(dy)); push(hx, 0); push(-hx, 0); push(0, -sgn(dy));
     }
     function free(ax, ay) {
@@ -1089,8 +1088,9 @@
     }
     for (i = 0; i < cand.length; i++) {
       x = m.x + cand[i][0]; y = m.y + cand[i][1];
-      if (free(x, y)) { m.x = x; m.y = y; return; }
+      if (free(x, y)) return { x: x, y: y };
     }
+    return null;
   }
 
   function mouseStage(c, n) {
@@ -1100,12 +1100,10 @@
     r.cheese = { x: st.cheese.x, y: st.cheese.y };
     r.grid = st.grid || r.stages[0].grid;
     for (i = es.length - 1; i >= 0; i--) if (es[i].iceTool) es.splice(i, 1);
-    if (st.block) es.push({ t: 'block', x: st.block.x, y: st.block.y, solid: true, push: true, iceTool: true });
     for (i = 0; i < (st.plates || []).length; i++)
       es.push({ t: 'decor', skin: 'iceplate', x: st.plates[i].x, y: st.plates[i].y, iceTool: true, crack: st.plates[i].crack });
     for (i = 0; i < es.length; i++) if (es[i].t === 'sign') es[i].lines = n === 1 ?
-      ['step on the two rim plates to crack their ice cells.', 'the mouse cannot enter a cracked cell. r resets this stage.'] : n === 2 ?
-      ['push the stone across the ice until it stops.', 'it blocks the mouse. r resets this stage.'] : es[i].lines;
+      ['step on the two rim plates to crack their ice cells.', 'the mouse cannot enter a cracked cell. r resets this stage.'] : es[i].lines;
     if (NEU.roomArt) delete NEU.roomArt._paints[r.id];
   }
 
@@ -1131,7 +1129,7 @@
     entities: castleLook(12).concat([
       { t: 'sign', x: 2, y: 2, skin: 'lectern',
         lines: ['something small moves under the ice.',
-                'it is afraid of you, and it is slow: it takes one step for every two of yours.',
+                'it is afraid of you, and it is slow: it takes one step for every three of yours.',
                 'it scurries straight away from you. if something is in the way, it runs along it.',
                 'the cheese is under the ice too. you cannot touch it. you herd it.'] },
       { t: 'exit', x: 19, y: 6, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice', style: 'door',
@@ -1143,37 +1141,42 @@
       Q('sconce', 9, 1), Q('armour', 1, 2, { solid: true }), Q('armour', 18, 10, { solid: true }),
       Q('rubble', 2, 10)
     ]),
-    stage: 0, cracks: {},
+    stage: 0, cracks: {}, mouseEvery: 3,
     stages: [
       { mouse: { x: 4, y: 5 }, cheese: { x: 9, y: 6 } },
       { mouse: { x: 8, y: 2 }, cheese: { x: 5, y: 4 },
         grid: ['####################', '####################', '#.....iii..........#', '#...iiii...........#', '#...iii............#', '#....ii............#', '#....iii...........#', '#..................#', '#..................#', '#..................#', '#..................#', '####################'],
-        plates: [{ x: 6, y: 7, crack: { x: 7, y: 6 } }, { x: 4, y: 2, crack: { x: 5, y: 3 } }] },
-      { mouse: { x: 8, y: 2 }, cheese: { x: 9, y: 3 },
-        grid: ['####################', '####################', '#......iiii........#', '#......iii.........#', '#........i.........#', '#..................#', '#..................#', '#..................#', '#..................#', '#..................#', '#..................#', '####################'],
-        block: { x: 10, y: 4 } }
+        plates: [{ x: 6, y: 7, crack: { x: 7, y: 6 } }, { x: 4, y: 2, crack: { x: 5, y: 3 } }] }
     ],
     mouse: { x: 4, y: 5 },
     cheese: { x: 9, y: 6 },
     _cell: null, _steps: 0,
     mouseAt: function () { return { x: this.mouse.x, y: this.mouse.y }; },
     cheeseAt: function () { return { x: this.cheese.x, y: this.cheese.y }; },
+    nextCell: function () {
+      var c = E.api;
+      if (!c || this.__solved) return null;
+      var p = c.player;
+      return nextMouseCell(this, c, Math.floor(p.x / 16), Math.floor((p.y - 1) / 16));
+    },
     onEnter: function (c) {
       /* Unsolved visits reset; a solved room keeps the mouse at its cheese. */
       if (!this.stages[0].grid) this.stages[0].grid = this.grid;
-      mouseStage(c, c.flagged('solved:b4_ice') ? 2 : Math.max(0, Math.min(2, Number(NEU.save.flag('b4_stage')) || 0)));
+      var last = this.stages.length - 1;
+      var saved = Math.floor(Number(NEU.save.flag('b4_stage')) || 0);
+      mouseStage(c, c.flagged('solved:b4_ice') ? last : Math.max(0, Math.min(last, saved)));
       if (c.flagged('solved:b4_ice')) { this.mouse.x = this.cheese.x; this.mouse.y = this.cheese.y; }
       if (c.flagged('b4_seen')) return;
       c.flag('b4_seen', 1);
       say(c, ['the middle of the room is a frozen pool, and something small moves under it.',
-              'it is afraid of you, and it is slow: it takes one step for every two of yours.',
+              'it takes one step for every three of yours. the paw print shows where it would go.',
               'it scurries straight away from you. if something is in the way, it runs along it.',
               'there is cheese under the ice. you cannot touch it. you herd it.']);
     },
     /* The engine's default "every plate has a block" rule cannot know
        about a mouse, so this room owns its win condition — and the
        mouse itself is driven from here, once per cell the player
-       crosses, so it moves at exactly half their pace. */
+       crosses. */
     solved: function (c) {
       var m = this.mouse, ch = this.cheese;
       var p = c.player;
@@ -1189,10 +1192,19 @@
           this.cracks[es[i].crack.x + ',' + es[i].crack.y] = true; es[i].armed = true;
         }
         this._steps++;
-        if (this._steps >= 2) { this._steps = 0; stepMouse(this, c, cx, cy); }
+        if (this._steps >= this.mouseEvery) {
+          this._steps = 0;
+          var next = nextMouseCell(this, c, cx, cy);
+          if (!next) {
+            mouseStage(c, this.stage);
+            say(c, ['the mouse sulks. the ice resets.']);
+            return false;
+          }
+          m.x = next.x; m.y = next.y;
+        }
       }
       if (m.x !== ch.x || m.y !== ch.y) return false;
-      if (this.stage < 2) {
+      if (this.stage < this.stages.length - 1) {
         c.flag('b4_stage', this.stage + 1);
         mouseStage(c, this.stage + 1);
         return false;

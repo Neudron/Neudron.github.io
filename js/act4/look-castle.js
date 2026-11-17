@@ -566,6 +566,16 @@
         W(g, o, S, xx + 7, yy + 9, 2, 6, '#30283A');
       }
       if (!m || !ch) return;
+      var next = room.nextCell && room.nextCell();
+      if (next) {
+        var nx = next.x * T + 8, ny = next.y * T + 8;
+        g.globalAlpha = 0.55;
+        W(g, o, S, nx - 4, ny - 4, 2, 2, '#D7F0FF');
+        W(g, o, S, nx - 1, ny - 6, 2, 2, '#D7F0FF');
+        W(g, o, S, nx + 2, ny - 4, 2, 2, '#D7F0FF');
+        W(g, o, S, nx - 2, ny, 4, 4, '#D7F0FF');
+        g.globalAlpha = 1;
+      }
       /* the cheese: a wedge under the ice, seen through it */
       var cx = ch.x * T + 8, cy = ch.y * T + 9;
       g.globalAlpha = 0.85;
