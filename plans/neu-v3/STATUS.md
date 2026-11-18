@@ -24,7 +24,7 @@ Public `main` / `origin/main`: `d4010ef` (untouched; no push, merge or deploy pe
 | V3-100 world graph | LANDED | `js/core/world-graph.js`, `scripts/check-world.mjs`, `plans/neu-v3/WORLD_GRAPH.md` (local-only, not in repo), `fixes569`; feature-disabled by default, legacy go remains authoritative |
 | B3-11 world graph tool | PARTIAL | `scripts/worldgraph.mjs` present; 38 rooms / 90 edges after village and exo-hall merges; 2 lock-setter questions (`home_larder`, `home_cellar`) and 2 intentional one-way `x2_arena` edges reported by the validator |
 | Reference board (V3-002) | NOT DONE | `plans/neu-v3/references/INDEX.md`: 23 of 24 image leads preview-only; 20-screenshot review gate not satisfied |
-| Asset redistribution rights | CLEARED (owner, 2026-11-16) | Owner granted permission for all bundled assets. `assets/manifest.v3.json` status `OWNER_AUTHORIZED`, restriction/warning removed, every group `CLEARED` with creator recorded; `img/act4/CREDITS.md` has the creator index |
+| Asset redistribution rights | RIGHTS_PENDING (non-commercial fan work) | No rightsholder licence is claimed. `assets/manifest.v3.json` keeps franchise groups `RIGHTS_PENDING` with a warning; `img/act4/CREDITS.md` gives attribution and states the non-commercial fan-use terms. Calamity/Terraria/Deltarune/Undertale folders remain rights-review queues per AGENTS.md |
 | Frame pacing / touch / manual playthrough | WAIVED (owner, 2026-11-16) | Batch 13 items in PLAN §14 waived by owner: reload at every save point, 60/120/144/240 Hz rAF emulation, touch viewport captures, full manual story run, final `TRACE.csv` audit. Automated gate + build/verify stand as the ship gate |
 | Rubric owner scores | WAIVED (owner, 2026-11-16) | `review/b4/rubric.md` owner scores intentionally left blank; builder notes are not scores |
 | Reference board V3-002 | WAIVED (owner, 2026-11-16) | 23/24 screenshot leads preview-only accepted; `references/INDEX.md` remains research-only |
@@ -32,4 +32,4 @@ Public `main` / `origin/main`: `d4010ef` (untouched; no push, merge or deploy pe
 
 ## Gate conclusion
 
-All planned code work is landed; automated gate, `check-world`, build and verify are green. D7/D8/D9 have real-browser current-state captures; 13 other orders remain jsdom-only. Batch 12/13, rubric scores, reference-board gate and B1 foundation gaps are explicitly WAIVED by the owner on 2026-11-16. Asset rights are cleared by the owner. PR to `main` is authorized; direct push to `main` is not.
+All planned code work is landed; automated gate, `check-world`, build and verify are green. D7/D8/D9 have real-browser current-state captures; 13 other orders remain jsdom-only. Batch 12/13, rubric scores, reference-board gate and B1 foundation gaps are explicitly WAIVED by the owner on 2026-11-16. Asset rights remain pending (non-commercial fan attribution only); no rightsholder licence is claimed. PR to `main` was authorized on 2026-11-16; direct push to `main` is not.
