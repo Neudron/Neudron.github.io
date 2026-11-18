@@ -92,7 +92,14 @@
   var paceV = 0, paceA = 0;            // api.pace: the scripted walk's top speed and acceleration (0 = the usual)
   var ents = [];                       // live copy of room.entities
   var images = {};
-  var layers = {};                     // baked static layer per room id
+  var layers = {};                     // baked static layer per room id (small rooms)
+  /* W1: oversized rooms paint lazily into 32-tile (512 native px) chunks.
+     Each canvas is 512*512*4 = 1 MiB; the 24-chunk budget (~24 MiB) is the
+     measured ceiling for one active zone. Chunks are pure visual cache — no
+     land, spawn, save or area hook ever keys off a chunk coordinate. */
+  var CHUNK_TILES = 32, CHUNK_PX = 512, CHUNK_BUDGET = 24 * 1024 * 1024;
+  var chunks = {}, chunkOrder = [], chunkBytes = 0, chunkRoom = null, chunked = false;
+  var visibleKeys = {};
   var timers = [];                     // api.later — die with the visit
   var promptFor = null, promptT = 0, clock = 0;
 
@@ -122,6 +129,7 @@
     def.w = def.grid.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
     rooms[id] = def;
     delete layers[id];
+    if (chunkRoom === id) resetChunks(null);
     return def;
   }
 
@@ -617,11 +625,25 @@
 
   /* ── transitions ──────────────────────────────────────────────── */
   function dirVector(dir) { return DIRV[dir] || ({ n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] })[dir] || [0, 1]; }
+  /* W1: a hi-dpi 1440p viewport makes cv 5120px wide. Snapshot canvases must
+     stay under the 4096 allocation ceiling; downscale the copy so the whole
+     frame survives even then (display coordinates are unchanged). */
+  var SNAP_CAP = 4096;
+  function snapshotInto(canvas) {
+    var w = Math.max(1, Math.min(SNAP_CAP, cv.width | 0)), h = Math.max(1, Math.min(SNAP_CAP, cv.height | 0));
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    var c = canvas.getContext('2d');
+    if (c) {
+      if (w === cv.width && h === cv.height) c.drawImage(cv, 0, 0);
+      else c.drawImage(cv, 0, 0, w, h);
+    }
+    return c;
+  }
   function captureTransition(canvas) {
-    canvas.width = cv.width; canvas.height = cv.height;
     prevPX = px; prevPY = py; prevCamX = camX; prevCamY = camY;
     hideTransitionPlayer = true; draw(frameNow); hideTransitionPlayer = false;
-    var c = canvas.getContext('2d'); if (c) c.drawImage(cv, 0, 0);
+    snapshotInto(canvas);
   }
   function finishPhysical() {
     var held = physical && physical.heldKeys || {}, wasCine = !!(physical && physical.wasCine);
@@ -731,18 +753,14 @@
       if (reduced) { land(id, spawn); busy = false; return; }
       transitionStarting = true;
       if (!transitionCanvas) transitionCanvas = document.createElement('canvas');
-      transitionCanvas.width = cv.width; transitionCanvas.height = cv.height;
       var fromX = Math.round(px * S) - Math.round((camX + kickX) * S);
       var fromY = Math.round(py * S) - Math.round((camY + kickY) * S);
       hideTransitionPlayer = true; draw(frameNow); hideTransitionPlayer = false;
-      var tc = transitionCanvas.getContext('2d');
-      if (tc) tc.drawImage(cv, 0, 0);
+      var tc = snapshotInto(transitionCanvas);
       land(id, spawn);
       if (!transitionNewCanvas) transitionNewCanvas = document.createElement('canvas');
-      transitionNewCanvas.width = cv.width; transitionNewCanvas.height = cv.height;
       hideTransitionPlayer = true; draw(frameNow); hideTransitionPlayer = false;
-      tc = transitionNewCanvas.getContext('2d');
-      if (tc) tc.drawImage(cv, 0, 0);
+      tc = snapshotInto(transitionNewCanvas);
       if (T.start(kind, transitionCanvas, dir, reduced, transitionNewCanvas)) {
         transitionPlayer = { x: fromX, y: fromY,
           toX: Math.round(px * S) - Math.round((camX + kickX) * S),
@@ -860,10 +878,105 @@
   function clearLater() { for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]); timers = []; }
 
   /* ── the baked layer ──────────────────────────────────────────── */
+  function resetChunks(id) {
+    chunks = {}; chunkOrder = []; chunkBytes = 0;
+    chunkRoom = id || (room ? room.id : null);
+  }
+  function chunkKey(cx, cy) { return cx + ',' + cy; }
+  function touchChunk(k) {
+    var i = chunkOrder.indexOf(k);
+    if (i >= 0) { chunkOrder.splice(i, 1); chunkOrder.push(k); }
+  }
+  function needChunk(cx, cy) {
+    if (!room) return null;
+    var k = chunkKey(cx, cy), cv = chunks[k];
+    if (cv) { touchChunk(k); return cv; }
+    var L = look();
+    if (!L || !L.bakeChunk) return null;
+    try { cv = L.bakeChunk(room, tilesets[room.tileset], room.tileset, cx, cy); }
+    catch (e) {
+      if (window.console && console.warn) console.warn('[neu] chunk bake failed: ' + k, e);
+      return null;
+    }
+    if (!cv) return null;
+    chunks[k] = cv; chunkOrder.push(k); chunkBytes += CHUNK_PX * CHUNK_PX * 4;
+    return cv;
+  }
+  function evictChunks(vis) {
+    var guard = 0, k, cv;
+    while (chunkBytes > CHUNK_BUDGET && chunkOrder.length && guard++ < CHUNK_TILES * 4) {
+      k = chunkOrder[0];
+      if (vis && vis[k]) { chunkOrder.shift(); chunkOrder.push(k); continue; }
+      cv = chunks[k];
+      if (cv) chunkBytes -= CHUNK_PX * CHUNK_PX * 4;
+      delete chunks[k]; chunkOrder.shift();
+    }
+  }
+  function chunkRange(camSX, camSY, v, padX, padY) {
+    var n = CHUNK_TILES * TILE;
+    var x0 = Math.max(0, Math.floor((camSX - padX) / n));
+    var y0 = Math.max(0, Math.floor((camSY - padY) / n));
+    var x1 = Math.min(Math.floor((room.w - 1) / CHUNK_TILES), Math.floor((camSX + v.w + padX) / n));
+    var y1 = Math.min(Math.floor((room.h - 1) / CHUNK_TILES), Math.floor((camSY + v.h + padY) / n));
+    return { x0: x0, y0: y0, x1: x1, y1: y1 };
+  }
+  /* Flat tiles for a chunk not baked yet — a cold miss still shows ground
+     immediately instead of a hole. Bounded to the one 32x32 tile rect. */
+  function drawFlatChunk(cx, cy, camSX, camSY, S) {
+    var ts = tilesets[room.tileset] || { colours: {}, solid: '#' };
+    var x0 = cx * CHUNK_TILES, y0 = cy * CHUNK_TILES;
+    var x1 = Math.min(room.w, x0 + CHUNK_TILES), y1 = Math.min(room.h, y0 + CHUNK_TILES);
+    for (var y = y0; y < y1; y++) for (var x = x0; x < x1; x++) {
+      var ch = at(x, y);
+      ctx.fillStyle = (ts.colours && ts.colours[ch]) || (ts.solid.indexOf(ch) >= 0 ? '#1a1a24' : '#0d0d12');
+      ctx.fillRect(Math.round((x * TILE - camSX) * S), Math.round((y * TILE - camSY) * S), TILE * S, TILE * S);
+    }
+  }
+  function drawChunkLayer(camSX, camSY, ox, oy, S, v) {
+    var vis = chunkRange(camSX, camSY, v, 0, 0);
+    var ahead = Math.ceil(v.w / (CHUNK_TILES * TILE)) + 1;
+    var pre = chunkRange(camSX, camSY, v, ahead * CHUNK_TILES * TILE, 0);
+    var k, cx, cy, cv, made = 0, prewarmed = false, smooth;
+    visibleKeys = {};
+    /* visible chunks first, bounded so a cold teleport cannot spike a frame */
+    for (cy = vis.y0; cy <= vis.y1; cy++) for (cx = vis.x0; cx <= vis.x1; cx++) {
+      k = chunkKey(cx, cy); visibleKeys[k] = 1;
+      cv = chunks[k];
+      if (cv) touchChunk(k);
+      else if (made < 3) { if (needChunk(cx, cy)) made++; }
+    }
+    /* prewarm exactly one chunk per frame, one camera-width outside the view */
+    for (cy = pre.y0; cy <= pre.y1 && !prewarmed; cy++) for (cx = pre.x0; cx <= pre.x1 && !prewarmed; cx++) {
+      k = chunkKey(cx, cy);
+      if (!visibleKeys[k] && !chunks[k]) { needChunk(cx, cy); prewarmed = true; }
+    }
+    evictChunks(visibleKeys);
+    smooth = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
+    for (cy = vis.y0; cy <= vis.y1; cy++) for (cx = vis.x0; cx <= vis.x1; cx++) {
+      cv = chunks[chunkKey(cx, cy)];
+      if (cv) ctx.drawImage(cv, Math.round(cx * CHUNK_PX * S) - ox, Math.round(cy * CHUNK_PX * S) - oy, CHUNK_PX * S, CHUNK_PX * S);
+      else drawFlatChunk(cx, cy, camSX, camSY, S);
+    }
+    ctx.imageSmoothingEnabled = smooth;
+  }
+  function chunkInfo() {
+    var L = look();
+    return { chunked: chunked, size: CHUNK_PX, tiles: CHUNK_TILES, count: chunkOrder.length,
+      bytes: chunkBytes, budget: CHUNK_BUDGET, room: chunkRoom, visible: Object.keys(visibleKeys).length,
+      alloc: L && L.allocStats ? { made: L.allocStats.made, over: L.allocStats.over, maxSide: L.allocStats.maxSide } : null };
+  }
   function bake() {
     var L = look();
-    if (!L || !room || layers[room.id]) return;
+    if (!L || !room) return;
     var ts = tilesets[room.tileset];
+    var big = room.w * TILE > L.ALLOC_CAP || room.h * TILE > L.ALLOC_CAP;
+    if (big && L.bakeChunk) {
+      if (chunkRoom !== room.id) resetChunks();
+      chunked = true;
+      return;
+    }
+    chunked = false;
+    if (layers[room.id]) return;
     try { layers[room.id] = L.bakeRoom(room, ts, room.tileset); } catch (e) { layers[room.id] = null; }
   }
 
@@ -1192,16 +1305,20 @@
     function sx(wx) { return Math.round(wx * S) - ox; }
     function sy(wy) { return Math.round(wy * S) - oy; }
 
-    var layer = layers[room.id];
-    if (!L || !L.surround || !L.surround(ctx, room.tileset, -ox, -oy,
-      (layer ? layer.width : (room.grid[0] || '').length * TILE) * S,
-      (layer ? layer.height : room.grid.length * TILE) * S, w, h, S)) {
+    var layer = chunked ? null : layers[room.id];
+    var worldW = chunked ? room.w * TILE : (layer ? layer.width : (room.grid[0] || '').length * TILE);
+    var worldH = chunked ? room.h * TILE : (layer ? layer.height : room.grid.length * TILE);
+    if (!L || !L.surround || !L.surround(ctx, room.tileset, -ox, -oy, worldW * S, worldH * S, w, h, S)) {
       ctx.fillStyle = '#050507'; ctx.fillRect(0, 0, w, h);
     }
-    if (layer && L) {
-      /* PERF: the floor pass below paints over the whole room, so when a
-         floor does, this layer and its tiles would be painted under it
-         and never seen. Skip them. */
+    /* PERF: an opaque floor pass paints over the whole room, so the static
+       tiles beneath it are never seen. The same skip applies to chunks. */
+    if (chunked && L) {
+      if (!floorHidesLayer(K)) {
+        drawChunkLayer(camSX, camSY, ox, oy, S, v);
+        L.drawAnimated(ctx, room, tilesets[room.tileset], room.tileset, camSX, camSY, S, now, v);
+      }
+    } else if (layer && L) {
       if (!floorHidesLayer(K)) {
         var smooth = ctx.imageSmoothingEnabled;
         ctx.imageSmoothingEnabled = false;
@@ -1667,6 +1784,7 @@
       return ids;
     },
     tilesets: function () { return tilesets; },
+    chunkInfo: chunkInfo,
     api: API,
     /* dev */
     warp: function (id, spawn) { if (!resolve(id, spawn)) return false; return running ? land(id, spawn) : enter(id, spawn); },
@@ -1678,7 +1796,7 @@
     /* read-only internals for tests and the dev console */
     get debug() {
       return { scale: S, cam: { x: camX, y: camY }, focus: { x: camFocusX, y: camFocusY }, camLead: { x: camLeadX, y: camLeadY }, vel: { x: vx, y: vy }, padH: padH,
-               baked: !!(room && layers[room.id]), fade: fade, iris: fadeSpan, prompt: promptFor,
+               baked: !!(room && (chunked || layers[room.id])), fade: fade, iris: fadeSpan, prompt: promptFor,
                lights: (room && look()) ? lightsFor(0, camX, camY, view()).list.length : 0,
                cine: cine, seat: sitting ? { x: sitting.x, y: sitting.y } : null,
                view: view(), timers: timers.length };
