@@ -194,7 +194,7 @@
   var variant = false, plan = null, planRng = null, qi = 0, attempt = 0;
   var meter = 0, lastGz = -9;
   var t = 0, hp = 3, maxHP = 3, inv = 0, last = 0;
-  var hitWindow = dm.IFRAMES || 1.15;
+  var iScale = 1;   /* tier i-frame scale: the timer runs at 1/iScale, the grant stays the shared IFRAMES */
   var F = dm.fight(0, 0), keys = {};
   var bullets = [], emitters = [], phase = 0, phaseAt = 0;
   var AW = 0, AH = 0, AX = 0, AY = 0;     // box rect, canvas space
@@ -479,7 +479,7 @@
   /* One hit, from anything. Dash i-frames count. Returns true on death. */
   function hitPlayer(dx, dy) {
     if (inv > 0 || F.dashI > 0 || (NEU.cheat && NEU.cheat.god)) return false;   /* dev `god on` (dev.js) */
-    hp--; inv = hitWindow;
+    hp--; inv = dm.IFRAMES || 1.15;
     if (cell > 0) { cell = 0; cellLostAt = performance.now(); if (NEU.juice) NEU.juice.burst(F.x, F.y, 12, PAL.elec, 160); }
     dm.hurt(F, F.x, F.y - 12);
     /* MEDIUM: felt, but never enough to make the pattern unreadable on
@@ -543,7 +543,7 @@
     }
     aims = ka;
 
-    if (inv > 0) inv -= dt;
+    if (inv > 0) inv -= dt / iScale;
     bullets = dm.step(bullets, bdt, { AX: AX, AY: AY, AW: AW, AH: AH });
     var b = dm.hits(bullets, F.x, F.y, PLAYER_R);
     if (b && hitPlayer(b.vx, b.vy)) return;
@@ -908,7 +908,7 @@
       }
       ctx.restore();
     }
-    dm.drawFX(ctx, F, inv);
+    dm.drawFX(ctx, F, inv * iScale);
     drawGrazeSparks();
     if (t - pulseAt < 0.3) {
       var pk = (t - pulseAt) / 0.3;
@@ -991,7 +991,7 @@
     outroF = 0;
     if (NEU.diff) NEU.diff.begin();
     maxHP = NEU.diff ? NEU.diff.fpick([6, 5, 3, 3, 2, 2, 1]) : 3;
-    hitWindow = (dm.IFRAMES || 1.15) * (NEU.diff ? NEU.diff.f('iframes') : 1);
+    iScale = NEU.diff ? NEU.diff.f('iframes') : 1;
     t = 0; hp = maxHP; inv = 0; won = false; chargeWon = false; cheat = '';
     announce('HP ' + hp + '/' + maxHP);
     beatAt = -Infinity;
@@ -1212,7 +1212,7 @@
 
   NEU.bullet = { open: open, close: close, get endless() { return endless; }, get running() { return running; },
                  get won() { return won; }, get phase() { return phase; }, get soul() { return F; },
-                 get inv() { return inv; }, hit: function () { return hitPlayer(0, 0); },
+                 get inv() { return inv * iScale; }, hit: function () { return hitPlayer(0, 0); },
                  get variant() { return variant; }, get plan() { return plan; }, get meter() { return meter; }, get hp() { return hp; },
                  get phases() { return PHASES; }, get bullets() { return bullets; },
                  get aims() { return aims; },
