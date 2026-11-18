@@ -620,6 +620,24 @@
     for (var i = 0; i + 1 < xy.length; i += 2) out.push(Q('column', xy[i], xy[i + 1], extra));
     return out;
   }
+  /* Flavour-only inspectables (R1/R4). Each has its own line and a castle
+     skin from look-castle.js. None owns an item, a flag or a door, and
+     none is solid: the castle's one-cell corridors must stay walkable. */
+  function inspect(v, x, y, lines) {
+    /* `look` is the engine's figure key; `skin` is the castle's art. */
+    return { t: 'npc', skin: v, look: v === 'statue' ? 'stone' : v, x: x, y: y, lines: lines };
+  }
+  /* R5: something you notice by knocking. The first look spends the flag
+     and says what is there; later looks are shorter and quieter. */
+  function hollow(x, y, key, found, after) {
+    return { t: 'npc', skin: 'statue', look: 'stone', x: x, y: y, secret: key,
+      run: function (c) {
+        if (c.flagged(key)) { c.say([after], 'narr'); return; }
+        c.flag(key, 1);
+        if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+        c.say(found, 'narr');
+      } };
+  }
 
   /* ══ B1 — the throne room ════════════════════════════════════════
      The lie is here, and so is the evidence against it.
@@ -692,7 +710,14 @@
       Q('urn', 4, 11, { solid: true }), Q('urn', 18, 11, { solid: true }),
       Q('bones', 3, 10), Q('rubble', 20, 10),
       Q('candles', 7, 12, { solid: true }), Q('candles', 15, 12, { solid: true, seed: 1 }),
-      Q('candles', 4, 12, { solid: true, seed: 2 }), Q('candles', 18, 12, { solid: true, seed: 3 })
+      Q('candles', 4, 12, { solid: true, seed: 2 }), Q('candles', 18, 12, { solid: true, seed: 3 }),
+      inspect('banner', 6, 8, ['a banner. the crest is a teapot.',
+                                'nobody in the castle will explain the teapot.']),
+      inspect('bookshelf', 17, 8, ['a shelf: "Proper Grave Care", "Proper Grave Care, Again",',
+                                    '"Proper Grave Care: The Earlier Years".',
+                                    'the castle takes its graves seriously.']),
+      inspect('statue', 8, 10, ['a stone knight with a point-down sword.',
+                                 'the nose is polished. somebody has been asking it for luck for a very long time.'])
     ]).concat(columns([2, 3, 2, 5, 2, 7, 2, 9, 2, 11, 20, 3, 20, 5, 20, 7, 20, 9, 20, 11])),
     castFx: function () { return castState(); },
     /* the east door while the cast runs: shut with its padlock to 1700,
@@ -904,7 +929,12 @@
       Q('books', 1, 10, { solid: true }), Q('books', 19, 10, { solid: true }),
       Q('sconce', 3, 1), Q('sconce', 17, 1),
       Q('candles', 10, 10, { solid: true }), Q('rubble', 18, 4),
-      Q('glow', 10, 4, { r: 72, col: '#D8C8FF', g: 0.08 })
+      Q('glow', 10, 4, { r: 72, col: '#D8C8FF', g: 0.08 }),
+      inspect('banner', 3, 3, ['a banner of a bowl and a flame.',
+                                'it has been mended so often the bowl is now mostly flame.']),
+      inspect('bookshelf', 17, 3, ['a shelf of riddle books, all shut.',
+                                    'the spines read "Ask", "Answer", and "Do Not Say It Out Loud".',
+                                    'the last one has a padlock on it.'])
     ]).concat(columns([2, 3, 18, 3, 2, 8, 18, 8])),
     onEnter: function (c) {
       b2picked = c.flagged('b2_ash') || c.flagged('solved:b2_blocks') ? 'ash' : '';
@@ -995,7 +1025,9 @@
       { t: 'exit', x: 0, y: 6, to: 'b2_blocks', spawn: 'east', style: 'curtain' },
       Q('sconce', 2, 1), Q('sconce', 20, 1),
       Q('urn', 1, 10, { solid: true }), Q('urn', 21, 10, { solid: true }),
-      Q('rubble', 11, 10), Q('bones', 7, 10, { seed: 1 })
+      Q('rubble', 11, 10), Q('bones', 7, 10, { seed: 1 }),
+      inspect('banner', 11, 2, ['a banner with four flames on it, none of them lit.',
+                                 'somebody has numbered the hems. the numbers do not match the flames.'])
     ]).concat(columns([3, 8, 19, 8])),
     onEnter: function (c) {
       b3seq = [];
@@ -1140,7 +1172,17 @@
       Q('statue', 9, 5, { frozen: true, solid: true }),
       Q('glow', 3, 4, { r: 46, col: '#BFE0FF' }), Q('glow', 16, 4, { r: 46, col: '#BFE0FF' }),
       Q('sconce', 9, 1), Q('armour', 1, 2, { solid: true }), Q('armour', 18, 10, { solid: true }),
-      Q('rubble', 2, 10)
+      Q('rubble', 2, 10),
+      inspect('banner', 10, 2, ['a hunter\'s banner, stiff with frost.',
+                                 'the animal on it has been reversed by the cold. it looks worried.']),
+      inspect('bookshelf', 2, 9, ['a shelf of ledgers, frozen shut.',
+                                   'every title is "On The Subject Of Not Falling Through Ice".',
+                                   'there is no volume two.']),
+      inspect('statue', 17, 4, ['a frozen knight, caught mid-salute.',
+                                 'the ice has kept him perfectly, which is more than can be said for the salute.']),
+      inspect('plaque', 16, 2, ['a brass plaque, iced over.',
+                                 '"THE LAKE IS NOT A ROAD." somebody has scratched',
+                                 '"not with that attitude" underneath.'])
     ]),
     stage: 0, cracks: {}, mouseEvery: 3,
     stages: [
@@ -1289,7 +1331,9 @@
       Q('candelabra', 7, 3, { solid: true }), Q('candelabra', 13, 3, { solid: true }),
       Q('sconce', 1, 1), Q('sconce', 19, 1),
       Q('armour', 1, 10, { solid: true }), Q('armour', 19, 10, { solid: true }),
-      Q('candles', 10, 10, { solid: true })
+      Q('candles', 10, 10, { solid: true }),
+      inspect('banner', 3, 5, ['a banner showing a mirror reflecting a smaller mirror.',
+                                'the smaller mirror is reflecting a smaller banner. it goes on for a while.'])
     ]).concat(columns([3, 3, 17, 3])),
     /* One plate under the mirror's gaze, and you standing where it
        looks. The mirror turns with e; the room counts what it looks
@@ -1412,6 +1456,21 @@
               '"set the light where every open eye can see it."'];
     return ['a brass plaque by the west door. the lettering is too fine to read without a light.'];
   }
+  /* R12: lanterns you find and light stay lit and are saved, so the crypt
+     fills in as you explore it instead of waiting for one magic torch. The
+     skin draws the visible radius; this only owns the flag and the line. */
+  function lightLantern(c, n) {
+    var es = c.ents(), e = null, i;
+    for (i = 0; i < es.length; i++) if (es[i].lantern && es[i].n === n) e = es[i];
+    if (!e) return;
+    if (e.lit) { c.say(['that one is lit already.'], 'narr'); return; }
+    e.lit = true;
+    if (NEU.save) NEU.save.flag('b6_lantern_' + n, 1);
+    if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+    if (NEU.juice) NEU.juice.hit('small', { colour: '#FFC873' });
+    c.say(['you lift the lantern down and light it.',
+           'the dark gives back a little of itself.'], 'narr');
+  }
   E.register('b6_dark', {
     tileset: 'castle',
     eyes: B6_EYES, sockets: B6_SOCKETS,
@@ -1449,7 +1508,20 @@
       Q('bones', 6, 2), Q('bones', 13, 10, { seed: 1 }), Q('rubble', 18, 2), Q('bones', 1, 10),
       /* nothing solid in the corridors: they are one cell wide and the
          dark is enough of an obstacle */
-      Q('candles', 6, 10, { lightIf: 'solved:b6_dark' }), Q('rubble', 1, 2)
+      Q('candles', 6, 10, { lightIf: 'solved:b6_dark' }), Q('rubble', 1, 2),
+      /* three lanterns to find. Each lit one is its own saved light pool,
+         so the room reads as a place before you solve anything. */
+      { t: 'npc', x: 3, y: 2, colour: '#E4C46A', lantern: true, n: 0, skin: 'lantern', look: 'lamp',
+        run: function (c) { lightLantern(c, 0); } },
+      { t: 'npc', x: 10, y: 2, colour: '#E4C46A', lantern: true, n: 1, skin: 'lantern', look: 'lamp',
+        run: function (c) { lightLantern(c, 1); } },
+      { t: 'npc', x: 16, y: 10, colour: '#E4C46A', lantern: true, n: 2, skin: 'lantern', look: 'lamp',
+        run: function (c) { lightLantern(c, 2); } },
+      hollow(16, 2, 'b6_hollow',
+        ['this stone knight sounds hollow when you knock.',
+         'inside: a note. "do not tell the others about the biscuit tin."',
+         'there is no biscuit tin.'],
+        'the hollow knight. still empty, still smug.')
     ]),
     onEnter: function (c) {
       b6ents = c.ents();
@@ -1460,6 +1532,7 @@
       for (var i = 0; i < b6ents.length; i++) {
         if (b6ents[i].torch && b6lit) b6ents[i].dead = true;
         if (b6ents[i].socket) b6ents[i].seated = !!(b6lit && b6ents[i].correct);
+        if (b6ents[i].lantern) b6ents[i].lit = !!c.flagged('b6_lantern_' + b6ents[i].n);
       }
       if (c.flagged('b6_seen')) return;
       c.flag('b6_seen', 1);

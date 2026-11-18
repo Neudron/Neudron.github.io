@@ -620,20 +620,31 @@
     },
     b6_dark: function (g, o, S, d, c) {
       /* Painted eyes live at the six pocket mouths. They are ink on the
-         wall, so they only read inside the carried torch radius; two of
-         them stay shut until the torch has been carried past them. */
+         wall: an eye reads inside the carried torch OR any lit lantern,
+         so finding a lantern visibly reveals part of the crypt. The last
+         two stay shut until the torch has been carried past them. */
       var room = roomOf(d), eyes = room && room.eyes;
       if (!eyes || !eyes.length) return;
       var solved = flagged('solved:b6_dark');
       var lt = room.light && d.api ? room.light(d.api) : null;
-      if (!lt && !solved) return;
-      var px = lt ? (lt.x + 0.5) * T : 0, py = lt ? (lt.y + 0.5) * T : 0;
+      var es = d.api && d.api.ents ? d.api.ents() : [], lights = [], j;
+      if (lt) lights.push({ x: lt.x, y: lt.y });
+      for (j = 0; j < es.length; j++)
+        if (es[j].lantern && es[j].lit) lights.push({ x: es[j].x, y: es[j].y });
+      if (!lights.length && !solved) return;
       var rad = solved ? 100000 : ((room.dark && room.dark(d.api)) || 72) * 0.7 + 12;
       for (var i = 0; i < eyes.length; i++) {
         var e = eyes[i];
         if (e.shut && !solved && (!lt || lt.x <= e.x)) continue;
         var ex = e.x * T + 8, ey = e.y * T + 8;
-        if (!solved && (Math.abs(ex - px) > rad || Math.abs(ey - py) > rad)) continue;
+        if (!solved) {
+          var near = false;
+          for (j = 0; j < lights.length; j++) {
+            var lx = (lights[j].x + 0.5) * T, ly = (lights[j].y + 1) * T - 8;
+            if (Math.abs(ex - lx) <= rad && Math.abs(ey - ly) <= rad) { near = true; break; }
+          }
+          if (!near) continue;
+        }
         var ox = e.dir === 'west' ? -2 : e.dir === 'east' ? 2 : 0;
         var oy = e.dir === 'north' ? -2 : e.dir === 'south' ? 2 : 0;
         W(g, o, S, ex - 4, ey - 2, 9, 5, '#7A6A4A');
@@ -850,6 +861,10 @@
     draw: function (g, e, d) {
       var f = CPROP[e.v];
       if (f) blit(g, f(e), d, e.dx || 0, e.dy || 0);
+      else {                       /* missing art is LOUD, never a silent gap */
+        g.fillStyle = '#FF00FF';
+        g.fillRect(d.sx - 4 * d.S, d.sy - 8 * d.S, 8 * d.S, 8 * d.S);
+      }
       propLive(g, e, d);
     },
     width: function () { return 0; },
@@ -1062,6 +1077,58 @@
 
   /* ── castle skins ───────────────────────────────────────────────── */
   var skins = A.skins;
+  /* Flavour inspectables. All palette-drawn here; no new source art. */
+  skins.banner = {
+    width: 0,
+    draw: function (g, e, d) {
+      blit(g, sprite('banner', 24, 44, 12, 40, function (R) {
+        R(-10, -40, 20, 2, '#6A5A3A');                       /* rod */
+        R(-9, -38, 18, 34, '#4A1E3A'); R(-8, -37, 16, 32, '#5A2444');
+        R(-8, -37, 1, 32, '#2A1024'); R(7, -37, 1, 32, '#2A1024');
+        R(-9, -6, 18, 2, '#B8903A');                          /* hem */
+        for (var i = -7; i < 8; i += 3) R(i, -4, 1, 3, '#B8903A');
+        /* the teapot crest, stitched badly */
+        R(-4, -28, 8, 6, '#B8903A'); R(-5, -30, 10, 2, '#E4C46A');
+        R(4, -26, 3, 2, '#B8903A'); R(-3, -22, 7, 1, '#8A6A2A');
+        R(-1, -32, 2, 2, '#E4C46A');
+      }), d);
+    }
+  };
+  skins.bookshelf = {
+    width: 0,
+    draw: function (g, e, d) { blit(g, CPROP.books(), d); }
+  };
+  skins.statue = {
+    width: 0,
+    draw: function (g, e, d) { blit(g, CPROP.statue(e), d); }
+  };
+  /* b6's findable lanterns. Unlit is a cold glass box; lit has a flame and
+     a light record, so it cuts a visible saved pool out of the crypt dark. */
+  skins.lantern = {
+    width: 0,
+    draw: function (g, e, d) {
+      var on = !!e.lit;
+      blit(g, sprite('lantern' + (on ? 1 : 0), 16, 30, 8, 28, function (R) {
+        R(0, -28, 1, 5, '#3A3040');
+        R(-3, -23, 7, 2, '#5A5060');
+        R(-5, -21, 11, 2, '#8A7040');
+        R(-5, -19, 11, 14, '#2A2232');
+        R(-4, -18, 9, 12, on ? '#FFC873' : '#3A3346');
+        R(-3, -17, 7, 10, on ? '#FFE6A0' : '#2E2838');
+        R(-5, -19, 1, 14, '#8A7040'); R(4, -19, 1, 14, '#5A4A2A');
+        R(-5, -5, 11, 2, '#8A7040'); R(-3, -3, 7, 2, '#5A5060');
+        R(-2, -13, 1, 5, '#E8DCC8');
+        if (on) { R(-1, -15, 2, 4, '#FFB347'); R(-1, -12, 1, 1, '#FFF2C4'); }
+      }), d);
+      if (on) flame(g, d.sx, d.sy - 14 * d.S, d.S, 1, d.now, e.n || 0);
+    },
+    /* Even unlit, a lantern is findable: it keeps a faint glass gleam, so
+       the dark room has visible light pools before anything is solved. */
+    light: function (e) {
+      return e.lit ? { r: 64, col: '#FFC873', glow: 0.3, flicker: true }
+                   : { r: 38, col: '#9A8460', glow: 0.26 };
+    }
+  };
   skins.throne2 = {
     width: 0,
     draw: function (g, e, d) {
