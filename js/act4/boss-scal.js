@@ -1467,7 +1467,7 @@
   function damageTarget(kind, ref, amount) {
     /* Returns true when the strike landed (a melee's +1 % TP needs it). */
     /* dev `dmg` multiplier (dev.js); absent or 1 is the normal fight */
-    var eff = amount * (rageMode ? 2 : 1) * ((NEU.cheat && NEU.cheat.dmgMul) || 1);
+    var eff = amount * (rageMode ? 2 : 1) * ((NEU.cheat && NEU.cheat.dmgMul) || 1) * dp('dmg');
     if (kind === 'seeker') {
       if (!NEU.scalSeekers || !NEU.scalSeekers.hit(ref.x, ref.y, 0)) return false;
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
