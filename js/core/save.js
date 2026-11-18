@@ -34,6 +34,7 @@
 
   var KEY = 'neu.save.v1';
   var BAD = 'neu.save.bad';
+  var BAK = 'neu.save.bak';
   var VERSION = 3;
   var DEFAULT_EQUIP = { melee: 'blade', ranged: 'soulfire', spell1: 'brimstone', spell2: 'soulshield' };
 
@@ -175,6 +176,13 @@
          my file go", the answer is a key away. */
       /* A second corrupt save gets its own key, so the first copy stays. */
       try { st.setItem(st.getItem(BAD) === null ? BAD : BAD + '.' + Date.now(), raw); st.removeItem(KEY); } catch (e2) {}
+      try {
+        var backup = JSON.parse(st.getItem(BAK));
+        if (validVersion(backup)) {
+          warn('your save file was unreadable. the last good copy was restored.');
+          return normalise(migrate(backup));
+        }
+      } catch (e3) {}
       warn("your save file was unreadable. starting fresh.");
       return null;
     }
@@ -191,15 +199,20 @@
     /* Another tab saved after this one loaded, so its file is newer than
        our copy. Writing ours would silently throw its progress away. */
     try {
-      var theirs = JSON.parse(st.getItem(KEY));
+      var previous = st.getItem(KEY);
+      var theirs = JSON.parse(previous);
       var theirStamp = theirs && typeof theirs.stamp === 'number' ? theirs.stamp : 0;
       if (theirStamp > (mem.stamp || 0)) {
         warn('this game is open in another tab, which has newer progress. reload to save here.');
         return;
       }
     } catch (e0) {}
-    mem.stamp = Date.now();
+    mem.stamp = Math.max(Date.now(), (mem.stamp || 0) + 1);
     try {
+      if (validVersion(theirs)) {
+        /* A full backup quota must not prevent an autosave that still fits. */
+        try { st.setItem(BAK, previous); } catch (backupError) {}
+      }
       st.setItem(KEY, JSON.stringify(mem));
       ok = true;
     } catch (e) {
@@ -226,10 +239,85 @@
   addEventListener('beforeunload', flush);
   addEventListener('blur', flush);
 
+  function validVersion(s) {
+    return s && typeof s === 'object' && !Array.isArray(s) &&
+      typeof s.v === 'number' && Math.floor(s.v) === s.v && s.v >= 1 && s.v <= VERSION;
+  }
+
+  function slotKey(n) {
+    return n === 1 || n === 2 || n === 3 ? 'neu.save.slot.' + n : null;
+  }
+
+  function slot(n, load) {
+    var card = { n: n, empty: false, ok: false, meta: null };
+    try {
+      var raw = store().getItem(slotKey(n));
+      if (raw === null) { card.empty = true; card.ok = true; return card; }
+      var saved = JSON.parse(raw);
+      if (validVersion(saved) && validVersion(saved.data) && saved.meta) {
+        card.meta = saved.meta; card.ok = true;
+        if (load) card.data = saved.data;
+      }
+    } catch (e) {}
+    return card;
+  }
+
+  function restoreSnapshot(s) {
+    var data = normalise(migrate(s));
+    /* A deliberate load replaces the current file, including an older slot. */
+    var stored;
+    try { stored = JSON.parse(store().getItem(KEY)); } catch (e) {}
+    data.stamp = stored && typeof stored.stamp === 'number' ? stored.stamp : 0;
+    NEU.save.apply(data);
+  }
+
   /* ── the public surface ─────────────────────────────────────────*/
   NEU.save = {
     get data() { return mem; },
     get usable() { return ok; },
+
+    slots: function () { return [slot(1), slot(2), slot(3)]; },
+    saveSlot: function (n) {
+      var key = slotKey(n);
+      if (!key) return false;
+      NEU.save.capture();
+      var meta = { group: mem.flags.a1_seen ? 'act IV' : 'acts I-III',
+        done: Object.keys(mem.quest.done).length, diff: NEU.diff ? NEU.diff.name() : 'Medium',
+        t_play: NEU.save.playtime(), saved: Date.now() };
+      try { store().setItem(key, JSON.stringify({ v: VERSION, data: mem, meta: meta })); }
+      catch (e) { warn("couldn't save this slot. storage is full or blocked."); return false; }
+      return true;
+    },
+    loadSlot: function (n) {
+      if (!slotKey(n)) return false;
+      var s = slot(n, true);
+      if (!s.data) return false;
+      restoreSnapshot(s.data);
+      return true;
+    },
+    deleteSlot: function (n) {
+      if (!slotKey(n)) return false;
+      try { store().removeItem(slotKey(n)); return true; } catch (e) { return false; }
+    },
+    exportJSON: function () { NEU.save.capture(); return NEU.save.serialise(); },
+    importJSON: function (text) {
+      if (typeof text !== 'string' || text.length > 262144) return { ok: false, why: 'invalid file size' };
+      var s;
+      try {
+        s = JSON.parse(text, function (k, value) { return k === '__proto__' ? undefined : value; });
+      } catch (e) { return { ok: false, why: 'unreadable JSON' }; }
+      if (!validVersion(s)) return { ok: false, why: s && s.v > VERSION ? 'newer save version' : 'invalid save version' };
+      restoreSnapshot(s);
+      return { ok: true, why: '' };
+    },
+    newGame: function () {
+      var flags = mem.flags;
+      NEU.save.wipe();
+      Object.keys(flags).forEach(function (k) { if (k.indexOf('opt_') === 0) mem.flags[k] = flags[k]; });
+      write(true);
+      return mem;
+    },
+    playtime: function () { return Math.max(0, Number(mem.flags.t_play) || 0); },
 
     /* Pulls the live state out of quest.js rather than keeping a
        second copy — one source of truth is the rule that keeps this
@@ -372,4 +460,10 @@
     if (NEU.quest && NEU.quest.restore) NEU.quest.restore(mem.quest);
     write(true);
   })();
+  setInterval(function () {
+    if (NEU.engine && NEU.engine.running && document.visibilityState !== 'hidden') {
+      mem.flags.t_play = NEU.save.playtime() + 1;
+      write();
+    }
+  }, 1000);
 })();
