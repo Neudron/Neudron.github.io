@@ -986,13 +986,14 @@
   }
 
   /* ── start / finish ───────────────────────────────────────────────*/
+  /* a pending death animation is cancelled by restarting */
   function begin() {
-    dying = 0;                           /* a pending death animation is cancelled by restarting */
+    dying = 0; won = false; chargeWon = false; cheat = '';
     outroF = 0;
     if (NEU.diff) NEU.diff.begin();
     maxHP = NEU.diff ? NEU.diff.fpick([6, 5, 3, 3, 2, 2, 1]) : 3;
     iScale = NEU.diff ? NEU.diff.f('iframes') : 1;
-    t = 0; hp = maxHP; inv = 0; won = false; chargeWon = false; cheat = '';
+    t = 0; hp = maxHP; inv = 0;
     announce('HP ' + hp + '/' + maxHP);
     beatAt = -Infinity;
     F = dm.fight(0, 0);
