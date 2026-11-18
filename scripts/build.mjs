@@ -18,7 +18,7 @@ const SHELL = [
   'js/core/motion.js', 'js/data/data.js', 'js/page/main.js', 'js/page/stars.js',
   'js/core/quest.js', 'js/core/save.js', 'js/core/keys.js', 'js/core/juice.js', 'js/core/rand.js', 'js/core/kernel.js', 'js/core/tune.js', 'js/core/diff.js',
   'js/game/sword.js', 'js/game/sans.js', 'js/core/music.js', 'js/core/perf.js',
-  'js/core/settings.js', 'js/core/touch.js', 'js/core/dev.js'
+  'js/core/settings.js', 'js/core/menu.js', 'js/core/touch.js', 'js/core/dev.js'
 ];
 const GAME = [
   'js/data/items.js', 'js/core/danmaku.js', 'js/core/kit.js',
@@ -40,6 +40,7 @@ const GAME = [
   'js/act4/exo-combos.js', 'js/act4/boss-exo.js', 'js/act4/boss-draedon.js',
   'js/act4/exo-ares.js', 'js/act4/exo-twins.js', 'js/act4/crack.js',
   'js/act4/cart.js', 'js/act4/elevator.js', 'js/act4/inventory.js',
+  'js/act4/shopkit.js', 'js/act4/dummy.js',
   'js/core/tphud.js', 'js/game/deck.js'
 ];
 const FILES = [

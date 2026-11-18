@@ -728,10 +728,24 @@
     }
   }
 
+  /* The topmost overlay owns the keyboard. Settings sits above the duel
+     (gear button, Ctrl+Shift+,), and the main menu / practice room sit
+     above it too. Without this guard, Right moved the card cursor and
+     Escape closed the duel BEHIND an open settings panel. Returning
+     early lets the higher overlay's own listener handle the key. */
+  function covered() {
+    return !!(NEU.settings && NEU.settings.open_) ||
+           !!(NEU.menu && NEU.menu.active) ||
+           !!(NEU.dummy && NEU.dummy.active);
+  }
+
   function onKey(e) {
     var k, n, r;
-    if (!active || !state) return;
+    if (!active || !state || covered()) return;
     if (NEU.kernel && NEU.kernel.current() !== 'cards') return;
+    /* Tab is not a duel action. Swallow it so quest.js cannot open the
+       objectives panel over a live hand of cards. */
+    if (e.key === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); return; }
     r = (NEU.keys && NEU.keys.route) ? NEU.keys.route(e.key, {}) : { to: e.key, swallow: false };
     if (r.swallow) return;
     k = r.to;
