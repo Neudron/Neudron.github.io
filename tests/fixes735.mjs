@@ -146,6 +146,21 @@ function parkedHitFrame(NEU, tier) {
   } finally { w.close(); }
 }
 
+{
+  const { w, NEU } = make();
+  try {
+    for (const [tier, multiplier] of [['bot', 0.6], ['medium', 1], ['ultrakill', 1.4]]) {
+      NEU.diff.set(tier); NEU.scal.close(); NEU.scal.open();
+      const box = NEU.scal.box;
+      NEU.scal.arm(box.x + 100, box.y + 100, box.x + 300, box.y + 100);
+      NEU.scal.shotAt(box.x + 200, box.y + 200, 2, 60, 0);
+      const before = NEU.scal.bullets[0].x;
+      NEU.scal.simulate(1 / 60);
+      assert.ok(Math.abs(NEU.scal.bullets[0].x - before - multiplier) < 1e-9, tier + ' bullet speed');
+    }
+  } finally { w.close(); }
+}
+
 for (const file of ['fixes695.mjs', 'fixes715.mjs']) {
   const r = spawnSync(process.execPath, ['tests/' + file], { encoding: 'utf8' });
   assert.equal(r.status, 0, file + ' Medium identity:\n' + r.stdout + r.stderr);
