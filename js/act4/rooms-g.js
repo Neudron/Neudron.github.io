@@ -293,9 +293,13 @@
       /* the gap between the leaves: a tear of weather (style rift) */
       { t: 'exit', x: 10, y: 2, to: 'h2_machine', spawn: 'door', style: 'rift' },
       { t: 'exit', x: 0, y: 5, to: 'g_8', spawn: 'stairs', style: 'stairs' },
-      P('menhir', 4, 3, { solid: true }), P('menhir', 16, 4, { solid: true }),
-      P('stormlamp', 7, 4, { solid: true }), P('stormlamp', 13, 4, { solid: true }),
-      P('rubble', 14, 7), P('rubble', 5, 8), P('rod', 18, 3, { solid: true })
+      P('menhir', 4, 3, { solid: true, lines: ['a standing stone. rain runs down it in bright threads.', 'the rune is older than the door and does not match it.'] }),
+      P('menhir', 16, 4, { solid: true, lines: ['another stone, turned to face the gap.', 'it was here before the stairs.'] }),
+      P('stormlamp', 7, 4, { solid: true, lines: ['a lamp that keeps burning in weather that should have put it out.', 'the glass is warm. nobody maintains it.'] }),
+      P('stormlamp', 13, 4, { solid: true, lines: ['the other lamp. it dims when the door flashes.', 'there is no wiring.'] }),
+      P('rubble', 14, 7, { lines: ['wet gravel. something scratched underneath, or just the rain.'] }),
+      P('rubble', 5, 8, { lines: ['under the loose stones, a rune scratched by hand.', 'someone stood here a long time, waiting for the weather to stop.'], secret: true }),
+      P('rod', 18, 3, { solid: true, lines: ['an iron rod, ridged with old burns.', 'it hums when the sky forks.'] })
     ],
     onEnter: function (c) {
       if (c.flagged('h1_seen')) return;
@@ -348,7 +352,9 @@
       P('aframe', 12, 11, { lines: ['OUT OF ORDER.', 'the sign is not on the machine. it is on the room.'] }),
       P('mbin', 21, 8, { solid: true }), P('crate2', 4, 15, { solid: true }), P('crate2', 5, 15, { solid: true, k: 1 }),
       P('pillar', 5, 4), P('pillar', 25, 4), P('pillar', 5, 13), P('pillar', 25, 13),
-      P('coin', 22, 11, { lines: ['a coin.', 'it is painted on the floor. someone thought that was funny.'] })
+      P('coin', 22, 11, { lines: ['a coin.', 'it is painted on the floor. someone thought that was funny.'] }),
+      P('hpanel', 8, 8, { lines: ['a service panel on a stalk, blinking at a slow, patient rate.', 'the readout is a row of dashes. it has been blinking since before you came in.'] }),
+      P('hpanel', 22, 8, { lines: ['the second panel. its light is out of step with the first.', 'under the grime, a scratch: one, then two, then nothing. someone counted.'], secret: true })
     ],
     onEnter: function (c) {
       /* The trip is committed on the decision, so a reload before the
@@ -611,9 +617,16 @@
                 'it wants mushroom soup. you are certain of this in a way you cannot defend.'],
         run: function (c) { pot(c); } },
       { t: 'exit', x: 20, y: 5, to: 'd1_street', spawn: 'portal', style: 'portal' },
-      P('bigshroom', 3, 2, { k: 0 }), P('bigshroom', 17, 2, { k: 1 }), P('bigshroom', 3, 8, { k: 2 }), P('bigshroom', 17, 8, { k: 3 }),
-      P('tinyshroom', 6, 3), P('tinyshroom', 14, 7, { k: 1 }), P('tinyshroom', 7, 7, { k: 2 }), P('tinyshroom', 13, 3, { k: 3 }),
-      P('spoon', 6, 5), P('spoon', 14, 5, { k: 1 })
+      P('bigshroom', 3, 2, { k: 0, lines: ['a mushroom taller than you. its cap is a colour you have no name for.', 'it is pleased you came.'] }),
+      P('bigshroom', 17, 2, { k: 1, lines: ['a second giant, leaning toward the pot.', 'the gills are a very soft pink.'] }),
+      P('bigshroom', 3, 8, { k: 2, lines: ['this one has a face in the spores.', 'it does not blink.'] }),
+      P('bigshroom', 17, 8, { k: 3, lines: ['the last giant, half in shadow.', 'it smells of rain, though there is no rain here.'] }),
+      P('tinyshroom', 6, 3, { lines: ['a small mushroom. a spot of green on it, like a stain.'] }),
+      P('tinyshroom', 14, 7, { k: 1, lines: ['another tiny one, growing out of a ring of darker soil.'] }),
+      P('tinyshroom', 7, 7, { k: 2, lines: ['this one is bent toward the wall, as if listening.'] }),
+      P('tinyshroom', 13, 3, { k: 3, lines: ['under its cap, a message in spore-print: nothing you can read.', 'you are certain it means something.'], secret: true }),
+      P('spoon', 6, 5, { lines: ['a spoon, hanging in the air.', 'it points at the pot, the way a compass points north.'] }),
+      P('spoon', 14, 5, { k: 1, lines: ['a second spoon. it is not reflecting you.'] })
     ],
     onEnter: function (c) {
       /* Soup made but not yet woken (a reload in the 3.2s window, or a

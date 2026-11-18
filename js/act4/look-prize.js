@@ -1316,6 +1316,8 @@
      weather in it). The stairs from the best room come through the
      west wall; south and east the floor breaks off into sky ('v'). */
   var SKY = ['#04050E', '#070A1A', '#0A1026', '#0E1632', '#131C3E'];
+  /* the same puddles are painted once and flash in ANIM.h1 — one source */
+  var H1_PUD = [[5, 6, 9], [12, 6, 12], [9, 7, 8], [3, 4, 6], [14, 3, 7]];
   function stormSky(P, x, y, w, h, seed) {
     /* stepped cloud bands, lighter toward the bottom where the storm
        lights them from below */
@@ -1376,9 +1378,8 @@
     var path = [[1, 5], [2, 5], [3, 5], [4, 5], [5, 5], [6, 5], [7, 4], [8, 4], [9, 4], [10, 4], [10, 3], [11, 4], [8, 5], [9, 3], [11, 3]];
     for (i = 0; i < path.length; i++) { P.a(0.22); P.r(path[i][0] * T + 1, path[i][1] * T + 2, T - 2, T - 4, '#6A7AB0'); P.a(1); }
     /* puddles holding the door's light */
-    var pud = [[5, 6, 9], [12, 6, 12], [9, 7, 8], [3, 4, 6], [14, 3, 7]];
-    for (i = 0; i < pud.length; i++) {
-      var px = pud[i][0] * T + 8, py = pud[i][1] * T + 8, pw = pud[i][2];
+    for (i = 0; i < H1_PUD.length; i++) {
+      var px = H1_PUD[i][0] * T + 8, py = H1_PUD[i][1] * T + 8, pw = H1_PUD[i][2];
       P.oval(px, py, pw + 1, 4, '#141A2C'); P.oval(px, py, pw, 3, '#1A2850');
       P.r(px - pw + 3, py - 1, pw, 1, '#6E8CFF'); P.r(px - 2, py + 1, pw - 2, 1, '#3A4E8A'); P.px(px + 2, py - 2, '#C8D8FF');
     }
@@ -1422,15 +1423,32 @@
   ANIM.h1 = function (g, o, S, now) {
     /* a vein of lightning crawls across the door's leaves now and
        then: on for 120 ms, once every few seconds */
-    var cx = 10 * T + 8, ph = now % 4700;
-    if (ph < 120) {
+    var cx = 10 * T + 8, ph = now % 4700, flash = ph < 120, i;
+    if (flash) {
       var side = ((now / 4700) | 0) & 1 ? 1 : -1, x = cx + side * 20, y = 6;
-      for (var i = 0; i < 6; i++) { var nx = x + ((hsh(i + ((now / 4700) | 0)) - 0.5) * 8) | 0; W(g, o, S, nx, y, 1, 6, '#C8D8FF'); x = nx; y += 6; }
+      for (i = 0; i < 6; i++) { var nx = x + ((hsh(i + ((now / 4700) | 0)) - 0.5) * 8) | 0; W(g, o, S, nx, y, 1, 6, '#C8D8FF'); x = nx; y += 6; }
+      /* the same fork reflected in every puddle, held for that one beat */
+      for (i = 0; i < H1_PUD.length; i++) {
+        var fx = H1_PUD[i][0] * T + 8, fy = H1_PUD[i][1] * T + 8, fw = H1_PUD[i][2];
+        W(g, o, S, fx - fw + 3, fy - 1, fw, 1, '#C8D8FF');
+        W(g, o, S, fx - 2, fy + 1, fw - 3, 1, '#6E8CFF');
+      }
+    }
+    /* rain on the flagstones: each drop falls, then a ring of splash.
+       movement only — the flash above is the only light change, 1/4.7 s */
+    var t = now / 1000;
+    for (i = 0; i < 30; i++) {
+      var rx = 8 + ((hsh(i * 5) * (20 * T)) | 0), k = (t * (1.4 + hsh(i * 11)) + hsh(i * 3)) % 1;
+      var ry = (3 * T + k * 6 * T) | 0;
+      if (k < 0.92) W(g, o, S, rx, ry, 1, 3, flash ? '#9FB8FF' : '#3A4E8A');
+      else {
+        var sk = (k - 0.92) / 0.08, sw = 1 + ((sk * 4) | 0);
+        W(g, o, S, rx - sw, ry + 3, sw * 2 + 1, 1, flash ? '#C8D8FF' : '#4A6098');
+      }
     }
     /* two cloud wisps drifting under the landing */
-    var t = now / 1000;
-    for (var k = 0; k < 2; k++) {
-      var wx = ((t * (3 + k * 2) + k * 140) % 380) - 40, wy = 150 + k * 12;
+    for (i = 0; i < 2; i++) {
+      var wx = ((t * (3 + i * 2) + i * 140) % 380) - 40, wy = 150 + i * 12;
       W(g, o, S, wx, wy, 22, 1, '#26325C'); W(g, o, S, wx + 4, wy - 1, 12, 1, '#323E6A');
     }
   };
@@ -1548,6 +1566,25 @@
     var wing = ((now / 60) | 0) & 1;
     W(g, o, S, mx, my, 1, 1, '#C8C0B0');
     W(g, o, S, mx - 1, my - wing, 1, 1, '#8A8478'); W(g, o, S, mx + 1, my - wing, 1, 1, '#8A8478');
+  };
+  /* A service panel on a stalk: one status LED blinks once a second
+     (500 ms lit / 500 ms dark = 1 Hz, well under the 3 Hz ceiling).
+     Reduced motion keeps the dim paint and draws no flash at all. */
+  PROP.hpanel = {
+    w: 14, h: 30, ax: 7, ay: 29, shadow: 8,
+    paint: function (P) {
+      P.r(6, 12, 2, 16, K); P.r(6, 12, 1, 16, '#3A4466'); P.r(4, 27, 6, 2, K);
+      P.r(1, 2, 12, 12, K); P.r(2, 3, 10, 10, '#1A2028'); P.r(2, 3, 10, 1, '#3A4450');
+      P.r(3, 5, 8, 4, '#0C1218'); P.r(4, 6, 6, 1, '#5A7A6A');
+      P.r(3, 11, 1, 1, '#6B7A6E'); P.r(5, 11, 1, 1, '#6B7A6E');
+      P.r(7, 11, 1, 1, '#2A3830'); P.r(9, 11, 1, 1, '#2A3830');
+      P.r(10, 4, 2, 2, '#3A2A18');   /* the LED, painted dark; anim lights it */
+    },
+    anim: function (g, x, y, S, now) {
+      if (still()) return;
+      g.fillStyle = ((now / 500) | 0) & 1 ? '#E0A04A' : '#3A2A18';
+      g.fillRect(x + 3 * S, y - 25 * S, 2 * S, 2 * S);
+    }
   };
   NPCART.vending = {
     w: 32, h: 50, ax: 16, ay: 48, shadow: 22,
