@@ -839,8 +839,12 @@
   var note = null;
   function hideNote() {
     if (!note) return;
+    var onHide = note.__onHide;
     if (note.__tuckObs) note.__tuckObs.disconnect();
     note.remove(); note = null;
+    /* Dismissing a held warning releases the game. Runs after the note is
+       gone, so a callback that reopens settings never re-tucks this node. */
+    if (onHide) onHide();
   }
   function tuckNote() {
     if (!note) return;
@@ -848,11 +852,12 @@
     if (!tb || tb.hidden) { note.style.bottom = '24px'; return; }
     note.style.bottom = Math.max(24, Math.round(innerHeight - tb.getBoundingClientRect().top + 12)) + 'px';
   }
-  function showNote(text, actions) {
+  function showNote(text, actions, onHide) {
     hideNote();
     note = document.createElement('div');
     note.className = 'rmnote';
     note.setAttribute('role', 'status');
+    note.__onHide = onHide || null;
     var p = document.createElement('p');
     p.className = 'rmnote__t';
     p.textContent = text;
@@ -888,15 +893,27 @@
        ['settings', open]]);
   }
 
-  /* Before the first game scene: the photosensitivity heads-up. */
+  /* Before the first game scene: the photosensitivity heads-up. Both
+     callers (engine.enter, bullet.open) invoke this before their first
+     frame, so holding here means the warning lands before any flash —
+     not partway through a fight that is already lighting up. */
+  var flashHeld = false;
+  function releaseFlash() {
+    if (flashHeld && NEU.juice) NEU.juice.pause(false);
+    flashHeld = false;
+  }
   function warnFlash() {
     if (!M.once('flash')) return;
     if (M.calmFlash() && shakePct() === 0) return;   /* already calm */
+    /* The note is non-blocking by design, so the game must be held while
+       it is up. The combat scenes check juice.frozen() at their step top;
+       pausing there stops the sim before the first impact can flash. */
+    if (NEU.juice && NEU.juice.pause) { NEU.juice.pause(true); flashHeld = true; }
     showNote('heads up: the game has flashing lights and screen shake. ' +
              'you can turn them down any time with the gear (top left).',
       [['ok', null],
        ['make it calm', calmAll],
-       ['settings', open]]);
+       ['settings', open]], releaseFlash);
   }
 
   /* The old "reduce flashing" switch, carried over once into motion.js. */
