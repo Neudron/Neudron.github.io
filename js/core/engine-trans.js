@@ -29,9 +29,10 @@
     if (active.t >= 1) { var a = active; active = null; if (a.def.post) a.def.post(a); return false; }
     return true;
   }
-  function motion(w, h, scale) {
-    if (!active) return null;
-    var t = 1 - Math.pow(1 - active.t, 3), d = active.dir;
+  function motion(w, h, scale, a) {
+    a = a || active;
+    if (!a) return null;
+    var t = 1 - Math.pow(1 - a.t, 3), d = a.dir;
     var x = d === 'right' ? w : d === 'left' ? -w : 0;
     var y = d === 'down' ? h : d === 'up' ? -h : 0;
     return { t: t, x: Math.round(x * (1 - t) / scale) * scale,
@@ -105,18 +106,18 @@
     }
     ctx.restore();
   }
-  function draw(ctx, w, h, scale) {
-    if (!active) return;
-    if (active.name === 'portal:water') {
+  function drawState(ctx, w, h, scale, a) {
+    if (!a) return;
+    if (a.name === 'portal:water') {
       /* the inlet: rings open from the splash point, not from a flat wipe */
-      var t = active.t, ox = Math.round(active.wx * w), oy = Math.round(active.wy * h);
+      var t = a.t, ox = Math.round(a.wx * w), oy = Math.round(a.wy * h);
       var rad = Math.ceil(Math.max(w, h) * (0.15 + 0.9 * t));
       var i, rr;
       ctx.save(); ctx.imageSmoothingEnabled = false;
-      if (active.canvas) ctx.drawImage(active.canvas, 0, 0, w, h);
+      if (a.canvas) ctx.drawImage(a.canvas, 0, 0, w, h);
       ctx.save();
       ctx.beginPath(); ctx.arc(ox, oy, Math.max(1, rad), 0, Math.PI * 2); ctx.clip();
-      if (active.incoming) ctx.drawImage(active.incoming, 0, 0, w, h);
+      if (a.incoming) ctx.drawImage(a.incoming, 0, 0, w, h);
       ctx.restore();
       for (i = 0; i < 3; i++) {
         rr = Math.max(1, rad - i * 26 * (1 - t) - i * 6);
@@ -127,15 +128,47 @@
       }
       ctx.globalAlpha = 1; ctx.restore(); return;
     }
-    if (active.reduced) { if (active.canvas) ctx.drawImage(active.canvas, 0, 0, w, h); return; }
-    if (active.def.draw) { active.def.draw(ctx, w, h, scale, active); return; }
-    if (active.name === 'fall') { drawFall(ctx, w, h, scale, active); return; }
-    if (!active.canvas) return;
-    var m = motion(w, h, scale);
+    if (a.reduced) { if (a.canvas) ctx.drawImage(a.canvas, 0, 0, w, h); return; }
+    if (a.def.draw) { a.def.draw(ctx, w, h, scale, a); return; }
+    if (a.name === 'fall') { drawFall(ctx, w, h, scale, a); return; }
+    if (!a.canvas) return;
+    var m = motion(w, h, scale, a);
     ctx.save(); ctx.imageSmoothingEnabled = false;
-    if (active.incoming) ctx.drawImage(active.incoming, m.x, m.y, w, h);
-    ctx.drawImage(active.canvas, m.oldX, m.oldY, w, h);
+    if (a.incoming) ctx.drawImage(a.incoming, m.x, m.y, w, h);
+    ctx.drawImage(a.canvas, m.oldX, m.oldY, w, h);
     ctx.restore();
+  }
+  function draw(ctx, w, h, scale) { drawState(ctx, w, h, scale, active); }
+  /* B4W: themed mode entry on its own overlay canvas, never in the shared `active` slot.
+     openFn runs NOW (locks, overlays and callbacks keep today's timing); the overlay only paints over it. */
+  var overlay = null;
+  function enterMode(name, openFn, opts) {
+    var k = get(name), before = (opts && opts.before) || (NEU.kernel && NEU.kernel.bridge ? NEU.kernel.bridge() : null);
+    var ok = openFn();
+    if (ok === false || !k || typeof document === 'undefined' || !document.createElement) return ok;
+    var reduced = !!(NEU.motion && NEU.motion.reduced && NEU.motion.reduced());
+    if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    var cv = document.createElement('canvas'); cv.id = 'modeTrans';
+    cv.width = innerWidth; cv.height = innerHeight; overlay = cv;
+    document.body.appendChild(cv);
+    var g = cv.getContext && cv.getContext('2d');
+    if (!g) { cv.parentNode.removeChild(cv); return ok; }
+    g.imageSmoothingEnabled = false;
+    var st = { name: name, def: k, canvas: before, incoming: null, dir: k.dir || 'right', t: 0,
+      ms: reduced ? k.cut || 150 : (opts && opts.ms) || k.ms, wall: '#16141E', look: (opts && opts.look) || '#280204', reduced: reduced };
+    var last = 0, firstFrame = true;
+    function tick(now) {
+      if (!overlay || overlay !== cv) return;               /* a newer entry replaced this one */
+      if (firstFrame) { firstFrame = false; st.incoming = NEU.kernel && NEU.kernel.bridge ? NEU.kernel.bridge() : null; last = now; }
+      st.t = Math.min(1, st.t + (now - last) / st.ms); last = now;
+      g.clearRect(0, 0, cv.width, cv.height);
+      if (st.reduced) { if (st.canvas) g.drawImage(st.canvas, 0, 0, cv.width, cv.height); }
+      else drawState(g, cv.width, cv.height, 1, st);
+      if (st.t >= 1) { cv.parentNode && cv.parentNode.removeChild(cv); if (overlay === cv) overlay = null; return; }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+    return ok;
   }
   kind('slide', { ms: 320, pre: function () {}, cover: function () {}, post: function () {} });
   kind('door', { ms: 220 });
@@ -158,7 +191,7 @@
   kind('mode:rhythm', { ms: 700, cut: 150, draw: drawStatic });
   kind('mode:quiz', { ms: 700, cut: 150, draw: drawStatic });
   kind('mode:cards', { ms: 600, cut: 150, draw: drawCards });
-  NEU.engineTrans = { kind: kind, get: get, enabled: enabled, start: start, step: step, draw: draw, motion: motion,
+  NEU.engineTrans = { kind: kind, get: get, enabled: enabled, start: start, step: step, draw: draw, motion: motion, enterMode: enterMode,
     setOrigin: function (x, y) { waterAt.x = x; waterAt.y = y; },
-    get active() { return active; }, cut: function () { active = null; } };
+    get active() { return active; }, get overlay() { return overlay; }, cut: function () { active = null; } };
 })();
