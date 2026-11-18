@@ -475,6 +475,77 @@
      a locked cellar door), e4 a 16-tile last corridor. Two more rooms
      exist behind doors that never open — the larder and the cellar —
      and they say so when you bump them. */
+  /* ── WO-RWK-HOME: a house you can read ────────────────────────────
+     Palette-drawn only — no new rips, no sheets, no canvas over 4096.
+     look-city.js owns the wallpaper; these are the small things you
+     stop and touch, plus rain on the glass. */
+  function homeRain(P, x, y, w, h, n) {
+    var i, xx, yy;
+    P.a(0.5);
+    for (i = 0; i < 11; i++) {
+      xx = x + 2 + ((i * 7 + n * 5) % Math.max(1, w - 4));
+      yy = y + ((i * 11 + n * 3) % Math.max(1, h - 7));
+      P(xx, yy, 1, 4 + (i % 3), i % 3 ? '#4E628C' : '#7E92BE');
+      if (i % 4 === 0) P(xx + 1, yy + 3, 1, 2, '#3A4A6E');
+    }
+    P.a(1);
+  }
+
+  if (NEU.lookCity && NEU.lookCity.props) {
+    var HP = NEU.lookCity.props;
+    HP.homebooks = { w: 26, h: 40, ax: 13, ay: 38, paint: function (P) {
+      P(-12, -38, 24, 40, '#0E0A08');
+      P(-11, -37, 22, 38, '#3A2A22');
+      P(-11, -29, 22, 2, '#5A4030'); P(-11, -19, 22, 2, '#5A4030'); P(-11, -9, 22, 2, '#5A4030');
+      P(-10, -27, 3, 8, '#6A3A3A'); P(-6, -28, 4, 9, '#3A4A5A'); P(-1, -26, 3, 7, '#7A6A3A');
+      P(3, -28, 3, 9, '#4A3A5A'); P(7, -27, 3, 8, '#3A5A4A'); P(-10, -17, 5, 7, '#7A4A3A');
+      P(-4, -18, 3, 8, '#5A5A6A'); P(0, -17, 4, 7, '#6A4A3A'); P(5, -18, 5, 8, '#3A4A5A');
+      P(-10, -7, 4, 6, '#4A5A4A'); P(-5, -8, 3, 7, '#7A4A3A'); P(1, -7, 5, 6, '#5A3A5A');
+      P(7, -8, 3, 7, '#6A6A5A'); P(-12, 0, 24, 2, '#0E0A08');
+    } };
+    HP.homeposter = { w: 20, h: 24, ax: 10, ay: 22, paint: function (P) {
+      P(-9, -22, 18, 22, '#0E0A08');
+      P(-8, -21, 16, 20, '#2E2A38'); P(-8, -21, 16, 1, '#4E4A58');
+      P(-6, -18, 12, 12, '#141A2C'); P(0, -16, 3, 3, '#D8E0F0'); P(1, -15, 1, 1, '#7E8EAE');
+      P(-5, -8, 10, 1, '#6E6A62'); P(-4, -6, 8, 1, '#5E5A52'); P(-9, 0, 18, 2, '#1A1A20');
+    } };
+    HP.homebowl = { w: 16, h: 8, ax: 8, ay: 6, paint: function (P) {
+      P(-7, -2, 14, 3, '#3A342C'); P(-6, -5, 12, 4, '#5A5248');
+      P(-5, -5, 10, 1, '#8A8274'); P(-2, -6, 5, 1, '#4E6A8A'); P(-8, 0, 16, 1, '#141210');
+    } };
+    HP.homestack = { w: 18, h: 16, ax: 9, ay: 14, paint: function (P) {
+      P(-8, -13, 16, 13, '#0E0A08');
+      P(-7, -12, 14, 4, '#4A3A2A'); P(-6, -11, 12, 1, '#7A6448');
+      P(-7, -8, 14, 4, '#3A4A5A'); P(-6, -7, 12, 1, '#6A7A8A');
+      P(-7, -4, 14, 3, '#5A3A3A'); P(-6, -3, 12, 1, '#8A5A4A'); P(-8, 0, 16, 2, '#12100E');
+    } };
+  }
+
+  if (NEU.lookCity && NEU.lookCity.rooms) {
+    var HR = NEU.lookCity.rooms, HID = ['e1_hall', 'e2_hall', 'e3_hall'];
+    for (var h = 0; h < HID.length; h++) {
+      (function (id) {
+        var base = HR[id];
+        if (!base || !base.paint) return;
+        var W = base.w * 16, sx = W / 384;
+        var win = W > 260 ? [Math.round(64 * sx), Math.round(288 * sx)] : [24];
+        HR[id] = { w: base.w, h: base.h, paint: function (P) {
+          base.paint(P);
+          for (var i = 0; i < win.length; i++) homeRain(P, win[i] + 1, -14, 30, 29, id.charCodeAt(1) + i);
+          /* one wrong detail per corridor, beside the thing you can touch */
+          if (id === 'e1_hall') {
+            P(118, -16, 27, 19, '#20180E'); P(120, -14, 23, 15, '#3A3228');
+            P(122, -12, 7, 9, '#C8BCA0'); P(131, -12, 6, 9, '#8A92A8');
+          } else if (id === 'e2_hall') {
+            P(170, -13, 15, 13, '#2A2A32'); P(171, -12, 13, 11, '#4A4A54'); P(173, -10, 9, 6, '#2E2E38');
+          } else {
+            P(80, -12, 18, 11, '#2A2A30'); P(82, -10, 14, 7, '#33333A'); P(83, -9, 12, 1, '#4A4A54');
+          }
+        } };
+      })(HID[h]);
+    }
+  }
+
   function hallGrid(w, solids) {
     var rows = [], x, y, i, h, r;
     for (y = 0; y < 8; y++) {
@@ -522,7 +593,12 @@
     P('coatstand', 2, 2, { lines: ['a coat on a stand.',
                                    'it is not yours. it is everyone\'s.'] }),
     P('gclock', 17, 2, { n: 1, lines: ['the clock says ten past three.',
-                                      'it has said ten past three since you got here.'] })
+                                      'it has said ten past three since you got here.'] }),
+    P('homeposter', 5, 1, { lines: ['a poster of a band nobody admits to liking.'] }),
+    P('homebooks', 10, 2, { lines: ['shelves of books, filed by colour instead of by author.'] }),
+    P('homebowl', 14, 3, { lines: ['a bowl with its name worn off. it is still somebody\'s.'] }),
+    P('homestack', 4, 3, { lines: ['parcels addressed to a name that moved out.'] }),
+    P('cat', 13, 3, { lines: ['a cat who has decided the hallway is hers.'] })
   ]);
   corridor('e2_hall', 14, 'e3_hall', 'e1_hall', ['arch', 'door'], [4, 2, 9, 2, 11, 2], [
     { t: 'exit', x: 7, y: 1, to: 'e7_nook', spawn: 'door', style: 'door' },
@@ -535,7 +611,12 @@
     P('chair', 4, 2, { lines: ['a chair, facing the wall.',
                               'you could sit in it. you won\'t.'] }),
     P('gclock', 11, 2, { n: 2, lines: ['the clock runs backwards.',
-                                      'it is in a hurry to be earlier.'] })
+                                      'it is in a hurry to be earlier.'] }),
+    P('homeposter', 2, 1, { lines: ['a poster of a moon. someone signed the back.'] }),
+    P('homebooks', 12, 2, { lines: ['one shelf, half empty. the gap has a shape.'] }),
+    P('homebowl', 3, 3, { lines: ['two bowls. the second is for when guests come.'] }),
+    P('homestack', 8, 3, { lines: ['letters, all to the same wrong address.'] }),
+    P('cat', 6, 3, { lines: ['a cat in the one warm patch of floor.'] })
   ], { nook: { x: 7, y: 3, face: 'down' } });
   corridor('e3_hall', 24, 'e4_corridor', 'e2_hall', ['door', 'curtain'], [12, 6, 21, 2], [
     { t: 'exit', x: 12, y: 1, to: 'e5_dad', spawn: 'door', style: 'door', locked: 'dad_door',
@@ -551,7 +632,20 @@
     P('none', 18, 1, { lines: ['a scuff mark at shoulder height.',
                                'something wide was carried through here. recently.'] }),
     P('gclock', 21, 2, { n: 3, lines: ['the clock has no hands.',
-      'it does not want to tell you the time. it wants you to know that.'] })
+      'it does not want to tell you the time. it wants you to know that.'] }),
+    P('homeposter', 4, 1, { lines: ['a poster curling at the corners, older than the door.'] }),
+    P('homebooks', 16, 2, { lines: ['a tower of books that should have fallen by now.'] }),
+    P('homebowl', 5, 3, { lines: ['water with a dust rim. somebody still fills it.'] }),
+    P('homestack', 9, 3, { lines: ['a box marked KEEP. kept by nobody.'] }),
+    P('cat', 17, 3, { lines: ['a cat that blinks at the door with no key.'] }),
+    P('none', 3, 1, { run: function (c) {
+      if (c.flagged('home_hollow')) {
+        c.say(['behind the panel: a cat in a hat. nobody admits to it.'], 'narr');
+        return;
+      }
+      c.flag('home_hollow', 1);
+      c.say(['the wall sounds hollow here. you knock twice.'], 'narr');
+    } })
   ]);
 
   /* The nook you outgrew: a music box that still plays its five notes,
