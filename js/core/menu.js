@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {}, el = null, sky = null, ctx = null;
-  var stack = [], screens = {}, open_ = false, mode = '', previousFocus = null, frame = 0;
+  var stack = [], screens = {}, open_ = false, mode = '', previousFocus = null, frame = 0, lastFrame = 0;
   var rows = [], selected = 0, raf = 0;
   var bands = ['#08080B', '#0C0A12', '#110D1A', '#160F20', '#1B1026', '#22102A', '#2A0F2A', '#280204'];
 
@@ -15,9 +15,12 @@
     document.body.appendChild(el);
     if (NEU.motion && NEU.motion.on) NEU.motion.on(motionChanged);
   }
-  function drawSky() {
+  function drawSky(ts) {
     raf = 0;
     if (!ctx || mode !== 'title') return;
+    var now = ts || performance.now();
+    if (lastFrame && now > lastFrame) frame += (now - lastFrame) * 60 / 1000;
+    lastFrame = now;
     var w = sky.width = window.innerWidth, h = sky.height = window.innerHeight, i;
     ctx.imageSmoothingEnabled = false;
     for (i = 0; i < bands.length; i++) { ctx.fillStyle = bands[i]; ctx.fillRect(0, Math.floor(h * i / bands.length), w, Math.ceil(h / bands.length)); }
@@ -26,15 +29,15 @@
     ctx.strokeStyle = '#22222E'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(w * .75 - 4, h * .22 - 25); ctx.lineTo(w * .75 + 2, h * .22 - 8); ctx.lineTo(w * .75 - 3, h * .22 + 2); ctx.lineTo(w * .75 + 6, h * .22 + 10); ctx.lineTo(w * .75 + 3, h * .22 + 25); ctx.stroke();
     if (!reduced()) {
       for (i = 0; i < 24; i++) {
-        var y = h - ((frame * (i % 3 + 1) + i * 71) % h);
-        ctx.fillStyle = i % 2 ? '#FF4A2A' : '#FFC46A'; ctx.fillRect((i * 97 + Math.sin((frame + i * 13) / 30) * 6 + w) % w, y, 2, 2);
+        var y = h - ((frame * (0.3 + i % 4 * 0.07) + i * 71) % h);
+        ctx.fillStyle = i % 2 ? '#FF4A2A' : '#FFC46A'; ctx.fillRect((i * 97 + Math.sin((frame + i * 13) * Math.PI * 2 / 180) * 6 + w) % w, y, 2, 2);
       }
-      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(w * .75 + (frame % 60 < 30 ? -3 : 3), h * .22 + 2, 2, 2);
+      var crack = [[-4, -25], [2, -8], [-3, 2], [6, 10], [3, 25]][Math.floor(frame / 4) % 5];
+      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(w * .75 + crack[0], h * .22 + crack[1], 2, 2);
     }
-    frame++;
     if (mode === 'title' && !reduced()) raf = requestAnimationFrame(drawSky);
   }
-  function stopSky() { if (raf) cancelAnimationFrame(raf); raf = 0; }
+  function stopSky() { if (raf) cancelAnimationFrame(raf); raf = 0; lastFrame = 0; }
   function motionChanged(r) { if (el) el.classList.toggle('is-reduced', !!r); if (r) stopSky(); if (mode === 'title') drawSky(); }
   function label(def) { return NEU.keys && NEU.keys.label ? NEU.keys.label(def) : def; }
   function focusables() { return el ? Array.prototype.slice.call(el.querySelectorAll('button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex="-1"])')) : []; }

@@ -1202,7 +1202,7 @@ html.rm .tphud__hp { animation: none !important; }
 .menu__row { position: relative; box-sizing: border-box; width: 100%; height: 48px; padding: 2px 16px 2px 32px; border: 3px solid #5C5C70; background: #050104; color: #EDE7DE; text-align: left; font: 32px/38px var(--font), monospace; cursor: pointer; }
 .menu__row:focus-visible { outline: 2px solid #B892FF; outline-offset: 2px; }
 .menu__row.is-selected { border-color: #FFFFFF; color: #FFFF00; }
-.menu__row.is-selected::before { position: absolute; left: 6px; content: '▶'; }
+.menu__row.is-selected::before { position: absolute; left: 6px; content: '▶'; animation: menuMarkerNudge 100ms ease-out; }
 .menu__row:disabled { color: #5A5668; cursor: default; }
 .menu__hint { float: right; padding-top: 9px; font-size: 16px; }
 .menu__footer { position: absolute; right: 16px; bottom: 0; left: 16px; margin: 0; color: #8A8598; font-size: 16px; }
@@ -1219,8 +1219,10 @@ html.rm .tphud__hp { animation: none !important; }
 .is-title .menu__row:nth-child(6) { animation-delay: 330ms; }
 .is-pause .menu__panel--pause { animation: menuPanelIn 67ms steps(2, end) both; }
 .is-reduced .menu__row, .is-reduced .menu__title { animation: none !important; opacity: 1; transform: none; }
+.is-reduced .menu__row.is-selected::before { animation: none; }
 .is-reduced .menu__panel--pause { animation: none !important; }
 @keyframes menuTitleDrop { from { transform: translateY(-8px); } to { transform: translateY(0); } }
 @keyframes menuRowRise { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes menuPanelIn { from { opacity: 0; transform: translate(-50%, -50%) scale(.96); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes menuMarkerNudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
 @media (prefers-reduced-motion: reduce) { .menu * { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }
