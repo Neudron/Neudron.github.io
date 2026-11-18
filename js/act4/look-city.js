@@ -847,15 +847,62 @@
     paintD1(clipTo(P, 0, 16, 0, 400));
     paintD2(clipTo(P, 384, 32, 400, 688));
     paintD3(clipTo(P, 672, 0, 688, 1072));
-    /* street-alley seam: one tile of kerb drops the street's pavement to
-       the alley floor, the same stepped treatment as the square seam */
-    var cols = ['#4A4458', '#3A3448', '#2E2A3A'];
-    for (var i = 0; i < 3; i++) P(400, 64 + i * 5, 16, 6, cols[i]);
-    P(400, 64, 16, 1, '#5A5668');
     /* the alley-square seam: three drawn steps on its two cells */
-    for (i = 0; i < 3; i++) P(672 + i * 11, 112 + i * 5, 11, 16 - i * 5, cols[i]);
+    var cols = ['#4A4458', '#3A3448', '#2E2A3A'];
+    for (var i = 0; i < 3; i++) P(672 + i * 11, 112 + i * 5, 11, 16 - i * 5, cols[i]);
     /* the alley's south wall, under its last two rows (the street has its parapet) */
     P(400, 192, 288, 32, '#0C0C0E');
+
+    /* The end tenement turns toward the alley. Carry its roof and footing
+       around the corner to the lower cornice and deeper wall base. */
+    for (i = 0; i < 8; i++) {
+      var x = 400 + i * 2, roof = -10 + i * 3, foot = 64 + i * 2;
+      P(x, roof, 2, foot - roof, '#191820');
+      P(x, roof, 2, 2, '#393542');
+      P(x, roof + 3, 2, 2, '#0D0C12');
+      for (var y = 0; y < 64; y += 8) {
+        if (y + i * 2 >= roof + 5) P(x, y + i * 2, 2, 1, '#25232B');
+      }
+      P(x, foot, 2, 2, '#09090E');
+    }
+    P(399, -10, 1, 74, '#38343E');
+
+    /* A low yard wall runs back from the street. Its two broken ends
+       frame the one walkable row. The ironwork admits the lamp spill. */
+    for (i = 0; i < 2; i++) {
+      var top = i ? 144 : 80, end = i ? 209 : 128;
+      P(406, top, 4, end - top, '#17161E');
+      P(406, top, 1, end - top, '#3A3740');
+      for (var post = top + 3; post < end - 3; post += 8) {
+        P(402, post, 5, 2, '#272632');
+        P(402, post - 1, 2, 3, '#4A4651');
+      }
+      var jamb = i ? top : end - 6;
+      P(400, jamb, 15, 6, '#13121B');
+      P(400, jamb, 12, 2, '#4A4651');
+      P(412, jamb + 1, 3, 4, '#292632');
+    }
+    /* Service paving fans into the setts. The street stripe ends before
+       the sill. A drain crosses the sill in the direction of travel. */
+    for (i = 0; i < 4; i++) {
+      var lip = 391 + (i % 3) * 2, row = 128 + i * 4;
+      P(lip, row, 421 - lip, 4, '#1C1B24');
+      for (var stone = lip; stone < 421; stone += 8) {
+        P(stone, row, 6, 3, i % 2 ? '#292731' : '#302D35');
+      }
+    }
+    P(392, 135, 33, 1, '#101016');
+    P(395, 134, 16, 1, '#4C4746');
+    P(411, 134, 13, 1, '#302E38');
+
+    /* The alley fence stands above the canal parapet. Turn the coping
+       back in three ledges and tie the south jamb into both walls. */
+    for (i = 0; i < 4; i++) {
+      var cap = 204 - i * 10;
+      P(397 + i * 5, cap, 5, 12, '#22202B');
+      P(397 + i * 5, cap, 5, 2, '#46414F');
+      P(397 + i * 5, cap + 10, 5, 2, '#100F16');
+    }
   }
 
   var ROOMS = {
