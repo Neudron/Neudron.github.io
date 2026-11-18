@@ -2060,9 +2060,9 @@
   };
   var STRIP = [
     { name: 'HEAL', icon: 'heal', col: '#5CF08C', cost: 0,
-      ok: function () { return hp < MAXHP && healCd <= 0; },
+      ok: function () { return dp('heals') > 0 && hp < MAXHP && healCd <= 0; },
       tag: function () { return 'FREE'; },
-      why: function () { return healCd > 0 ? 'WAIT ' + Math.ceil(healCd) + 's' : 'HP FULL'; } },
+      why: function () { return dp('heals') <= 0 ? 'NO HEALS' : healCd > 0 ? 'WAIT ' + Math.ceil(healCd) + 's' : 'HP FULL'; } },
     { name: 'BRIMSTONE', fx: 'beam', icon: 'buster', col: '#FF6A2A', cost: 0.5,
       ok: function () { return tp >= 0.5; },
       tag: function () { return '50% TP'; },
@@ -2085,9 +2085,9 @@
     var fx = d.fx, look = SPELL_LOOK[fx] || { icon: 'buster', col: COL.dim };
     var cost = d.stats.tp / 100, pct = Math.round(d.stats.tp) + '% TP', need = 'NEED ' + Math.round(d.stats.tp) + '%';
     STRIP[i] = { name: d.name.toUpperCase(), fx: fx, stats: d.stats, icon: look.icon, col: look.col, cost: cost,
-      ok: function () { return !!SPELL_LOOK[fx] && tp >= cost && !(fx === 'shield' && shieldT > 0); },
+      ok: function () { return !!SPELL_LOOK[fx] && (fx !== 'heal' || dp('heals') > 0) && tp >= cost && !(fx === 'shield' && shieldT > 0); },
       tag: function () { return pct; },
-      why: function () { return !SPELL_LOOK[fx] ? 'NOT IN FIGHT' : fx === 'shield' && shieldT > 0 ? 'ALREADY UP' : need; } };
+      why: function () { return !SPELL_LOOK[fx] ? 'NOT IN FIGHT' : fx === 'heal' && dp('heals') <= 0 ? 'NO HEALS' : fx === 'shield' && shieldT > 0 ? 'ALREADY UP' : need; } };
   }
   /* The save owns what is equipped, items.js owns the numbers. Read once
      per open: the loadout cannot change while the fight runs. Without
@@ -2108,7 +2108,7 @@
   function useStrip(i) {
     var o = STRIP[i];
     if (!o.ok()) {
-      say(i === 0 && hp >= MAXHP ? '* you are already whole.' : '* not now.');
+      say(dp('heals') <= 0 && (i === 0 || o.fx === 'heal') ? '* no heals. you chose this.' : i === 0 && hp >= MAXHP ? '* you are already whole.' : '* not now.');
       stripShake = performance.now();
       return;
     }
