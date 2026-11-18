@@ -2431,7 +2431,7 @@
        filling it. Every phase gate in damageTarget is a FRACTION of bossMax,
        so they rescale for free, and core/music.js takes hpMax from the first
        reading per fight. */
-    bossMax = 783; bossHP = bossMax; phase = 1; held = false; shotsFired = 0;
+    bossMax = Math.round(783 * dp('bossHp')); bossHP = bossMax; phase = 1; held = false; shotsFired = 0;
     pvx = 0; pvy = 0;
     /* dev `skip` to a phase (dev.js): start the boss at a share of its HP,
        once, so the next fight starts full again */
