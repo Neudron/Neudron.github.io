@@ -77,6 +77,13 @@
     P(117, 5, 22, 14, '#10162A');
     P(129, 7, 2, 6, '#C8C8D0'); P(130, 8, 1, 4, '#A0A0AC');
     for (y = 5; y < 19; y += 2) P(117, y, 22, 1, '#2A2A34');
+    /* weather: rain tracked down the glass, a wet sill */
+    for (y = 6; y < 19; y += 3) {
+      P(119 + ((y * 7) % 16), y, 1, 4, '#6E86B8');
+      P(124 + ((y * 5) % 12), y + 1, 1, 3, '#4E628C');
+      P(117 + ((y * 3) % 20), y + 2, 1, 1, '#9FB0D0');
+    }
+    P(116, 20, 24, 1, '#54627E');
     P(114, 21, 28, 2, '#3E3E48');
     /* floorboards: end seams offset per row, nail dots */
     for (y = 32, ln = 0; y < 128; y += 4, ln++) {
@@ -99,6 +106,10 @@
     P(92, 40, 1, 1, '#6A6258');
     P(140, 88, 1, 1, '#5A534C');
     P(48, 100, 1, 1, '#6A6258');
+    /* the small clutter you walk past: shoes, a bin, a dropped sock */
+    P(60, 86, 8, 4, '#1A1614'); P(70, 86, 8, 4, '#1A1614');
+    P(48, 76, 6, 7, '#2A2620'); P(49, 75, 4, 1, '#4A4238');
+    P(146, 82, 7, 3, '#3A2E2A');
     /* front wall */
     P(0, 96, 256, 32, '#18181C');
     P(0, 96, 256, 2, '#32323A');
@@ -237,6 +248,12 @@
         ], 'narr');
         if (NEU.note && NEU.note.open) NEU.note.open();
       } },
+      { t: 'cityprop', v: 'homeposter', x: 6, y: 0, lines: ['a poster of a lake, pinned over an older stain.'] },
+      { t: 'cityprop', v: 'homebooks', x: 14, y: 1, lines: ['manuals for machines that no longer exist.'] },
+      { t: 'cityprop', v: 'sconce', x: 14, y: 1 },
+      { t: 'cityprop', v: 'homebowl', x: 13, y: 3, lines: ['a bowl beside the bed. somebody moved it closer.'] },
+      { t: 'cityprop', v: 'homestack', x: 5, y: 4, lines: ['papers held down by a chipped mug.'] },
+      { t: 'cityprop', v: 'cat', x: 10, y: 3, lines: ['a cat asleep at the foot of the bed. do not tell dad.'] },
       { t: 'exit', x: 7, y: 6, to: 'e3_hall', spawn: 'dad', style: 'door' }
     ],
     onEnter: function () {
@@ -295,6 +312,12 @@
         c.say([c.flagged('must_leave') ? 'go power the console off. then look at that crack.'
                                        : 'the console powers off at your desk. z on it when you are done.'], 'sans');
       } },
+      { t: 'cityprop', v: 'homeposter', x: 6, y: 0, lines: ['a star map. one star has been circled twice.'] },
+      { t: 'cityprop', v: 'homebooks', x: 14, y: 1, lines: ['books you bought and never opened.'] },
+      { t: 'cityprop', v: 'sconce', x: 14, y: 1 },
+      { t: 'cityprop', v: 'homebowl', x: 13, y: 3, lines: ['a bowl pushed under the bed, out of the way.'] },
+      { t: 'cityprop', v: 'homestack', x: 5, y: 4, lines: ['school things, never sorted, never thrown out.'] },
+      { t: 'cityprop', v: 'cat', x: 10, y: 3, lines: ['a cat watching the rain through the blinds.'] },
       { t: 'exit', x: 7, y: 6, to: 'a1_clearing', spawn: 'default', style: 'door', locked: 'bed_free',
         label: 'door', lines: ['* sans: go look at that crack first.'] }
     ],
