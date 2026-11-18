@@ -449,6 +449,13 @@
     /* chain-link on the near wall */
     for (i = 0; i < W; i += 4) { P(i, 140, 1, 1, '#3A3846'); P(i + 2, 139, 1, 1, '#3A3846'); }
     P(0, 138, W, 1, '#2A2836');
+    /* D1's last lamp pool is cut at this clip; continue its stepped colour
+       in three fading bands so it decays across the seam instead of ending
+       square. Same palette, kerb and clip widths untouched. */
+    P.a(0.06); P(16, 55, 2, 14, '#FFB45E');
+    P.a(0.035); P(18, 57, 2, 10, '#FFB45E');
+    P.a(0.018); P(20, 60, 2, 4, '#FFB45E');
+    P.a(1);
   }
   function graffiti(P, glow) {
     var c1 = glow ? '#E8D8FF' : '#6A4A9A', c2 = glow ? '#9AF2E4' : '#2E6A64';
