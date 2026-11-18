@@ -1163,6 +1163,8 @@
                get gates() { return PHASE_GATES.slice(); },
                /* the player-damage funnel, so tests can drive one hit exactly */
                hit: function (dx, dy) { return hurt(dx, dy); },
+               /* Replay tests use the same cooldown and phase checks as a weapon strike. */
+               hurtBoss: function (n) { return tryHit(bossTarget, n); },
                get clone() { return !!clone; },
                get hooks() { return hooks.length; },
                /* what a renderer draws: the locked charge path, the punish window,
