@@ -112,6 +112,18 @@
     if (m === 'd') return C.dg1;
     return sandTone(room, x, y) ? C.sd3 : C.sd4;
   }
+  /* painted colour of a neighbouring FLOOR tile, read from its tile char;
+     null for a wall or void. dryGrassTile dithers its edges against this. */
+  function matOf(room, x, y) {
+    var ch = tk(room, x, y);
+    if (isPath(ch)) return C.e4;
+    if (ch === 'r') return C.r2;
+    if (ch === 'm') return C.m2;
+    if (ch === 's') return C.s2;
+    if (ch === 'd') return C.dg1;
+    if (ch === '.') return sandTone(room, x, y) ? C.sd3 : C.sd4;
+    return null;
+  }
 
   function sandTile(g, room, x, y, px, py) {
     var tone = sandTone(room, x, y), i, n, yy, xx, col, k;
@@ -166,7 +178,7 @@
   /* dry grass over packed earth: two grass tones, a stone and a footprint
      every few tiles. Never one flat fill. */
   function dryGrassTile(g, room, x, y, px, py) {
-    var tone = hs(x, y, 900) < 0.3, i, fx, fy;
+    var tone = hs(x, y, 900) < 0.3, i, fx, fy, nx, ny, col;
     rc(g, px, py, T, T, tone ? C.dg0 : C.dg1);
     for (i = 0; i < 3; i++) rc(g,
       px + ((hs(x, y, 910 + i) * 12) | 0), py + ((hs(x, y, 920 + i) * 12) | 0),
@@ -181,6 +193,19 @@
       rc(g, fx, fy, 2, 1, C.e0); rc(g, fx + 3, fy + 1, 2, 1, C.e0);
     }
     speckle(g, room, x, y, px, py, C.g0, C.g3, 3, 970);
+    /* ragged seam: dither the two-tile band where this patch meets another
+       floor material. Paint only — tile data, spawns and collision untouched. */
+    for (i = 0; i < 4; i++) {
+      nx = i === 1 ? 1 : i === 3 ? -1 : 0;
+      ny = i === 2 ? 1 : i === 0 ? -1 : 0;
+      col = matOf(room, x + nx, y + ny);
+      if (col === C.dg1) {
+        col = matOf(room, x + nx * 2, y + ny * 2);
+        if (col && col !== C.dg1) dither(g, px, py, i, col, 2);
+      } else if (col) {
+        dither(g, px, py, i, col, 4);
+      }
+    }
   }
   /* red laterite: stepped patches, hairline cracks, warm east-facing rim */
   function lateriteTile(g, room, x, y, px, py) {
