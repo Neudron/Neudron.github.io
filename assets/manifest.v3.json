@@ -1,7 +1,8 @@
 {
   "schema": "neu-v3-asset-inventory/1",
   "baseline": "bbb4331e9ded30a9160bee3d087d6f08cc3479eb",
-  "status": "OWNER_AUTHORIZED",
+  "status": "RIGHTS_PENDING",
+  "rights_note": "Non-commercial fan project. No rightsholder licence or redistribution right is claimed for franchise art; these folders are rights-review queues, not evidence of permission.",
   "fields": [
     "asset_id",
     "scene_id",
@@ -22,50 +23,50 @@
     {
       "id": "existing-calamity",
       "prefix": "img/act4/calamity/",
-      "license": "owner_permission_granted_2026-11-16",
-      "status": "CLEARED",
+      "license": null,
+      "status": "RIGHTS_PENDING",
       "author": "Calamity Team (CalamityModPublic contributors)"
     },
     {
       "id": "existing-terraria",
       "prefix": "img/act4/terraria/",
-      "license": "owner_permission_granted_2026-11-16",
-      "status": "CLEARED",
+      "license": null,
+      "status": "RIGHTS_PENDING",
       "author": "Re-Logic; HD pack by Andras Suller"
     },
     {
       "id": "existing-deltarune",
       "prefix": "img/act4/deltarune/",
-      "license": "owner_permission_granted_2026-11-16",
-      "status": "CLEARED",
+      "license": null,
+      "status": "RIGHTS_PENDING",
       "author": "Toby Fox"
     },
     {
       "id": "existing-undertale",
       "prefix": "img/act4/undertale/",
-      "license": "owner_permission_granted_2026-11-16",
-      "status": "CLEARED",
+      "license": null,
+      "status": "RIGHTS_PENDING",
       "author": "Toby Fox"
     },
     {
       "id": "existing-vfx",
       "prefix": "img/act4/vfx/",
-      "license": "owner_permission_granted_2026-11-16",
-      "status": "CLEARED",
+      "license": null,
+      "status": "RIGHTS_PENDING",
       "author": "Will Tice / unTied Games; BDragon"
     },
     {
       "id": "existing-tiles",
       "prefix": "img/act4/tiles/",
-      "license": "owner_permission_granted_2026-11-16",
-      "status": "CLEARED",
+      "license": null,
+      "status": "RIGHTS_PENDING",
       "author": "Toby Fox (atlas crops); site palette remap"
     },
     {
       "id": "existing-audio",
       "prefix": "audio/act4/",
-      "license": "owner_permission_granted_2026-11-16",
-      "status": "CLEARED",
+      "license": null,
+      "status": "RIGHTS_PENDING",
       "author": "Site-owned / owner-authorized"
     }
   ],

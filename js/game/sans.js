@@ -2534,6 +2534,7 @@
        it — unless the player has already reached rank T, in which case
        the set has nothing left to show and the television stays fixed. */
     if (tvBroken && NEU.save && NEU.save.flagged('rank:T')) {
+      if (NEU.restoreTV) NEU.restoreTV();
       if (NEU.talk) NEU.talk(['the television has nothing left to show you.', 'it is fixed now.'], 'narr');
       return;
     }

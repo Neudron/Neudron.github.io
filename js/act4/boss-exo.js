@@ -60,6 +60,8 @@
     ar = NEU.danmaku && NEU.danmaku.arena ? NEU.danmaku.arena(w, h, 760, 500, 20) : null;
     if (ar) { box.AX = ar.AX; box.AY = ar.AY; box.AW = ar.AW; box.AH = ar.AH; }
     else { box.AX = 20; box.AY = 40; box.AW = 760; box.AH = 480; }
+    /* keep the arena floor above the floating TP strip (#tphud: bottom 24px + 80px tall + 8px gap) */
+    if (box.AY + box.AH > h - 112) box.AH = Math.max(300, h - 112 - box.AY) | 0;
     if (mode === 'select' && ctx) drawBackdrop();
   }
   function centerPlayer() {

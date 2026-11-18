@@ -90,8 +90,8 @@
       AY = ((innerHeight - AH) / 2 + 20) | 0;
     }
     /* the kit HUD (tab 18 + box 48, 24 under the arena) must clear the
-       controls hint row, which starts about 44px above the window floor */
-    var over = AY + AH + 72 - (innerHeight - 44);
+       floating TP strip (#tphud: bottom 24px + 80px tall, plus an 8px gap) */
+    var over = AY + AH + 72 - (innerHeight - 112);
     if (over > 0) AH = Math.max(300, AH - over) | 0;
     arenaCache = {};
     kitBox.AX = AX; kitBox.AY = AY; kitBox.AW = AW; kitBox.AH = AH;   /* the C strip follows resizes */
@@ -1065,7 +1065,7 @@
     /* The win screen is over: z there must not reopen the fight and
        hand the kill out a second time. */
     if (!running && !dying && mode !== 'won' && (e.key === 'Enter' || e.key === 'z' || e.key === 'Z')) { e.preventDefault(); open(); return; }
-    /* z (or Enter) strikes before the soul looks at the key; x dashes.
+    /* z strikes before the soul looks at the key (Enter only retries); x dashes.
        A held key's auto-repeat is not a strike. */
     var kk = running && kit && (e.key === 'z' || e.key === 'Z' || e.key === 'c' || e.key === 'C' ||
       (kit.stripOpen && (e.key === 'x' || e.key === 'X' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Up' || e.key === 'Down')));

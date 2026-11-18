@@ -568,7 +568,7 @@
     NEU.perf.start();
     log('meter on. budget ' + NEU.perf.TARGET.toFixed(1) + 'ms target / ' +
         NEU.perf.WARN.toFixed(1) + 'ms warn / ' + NEU.perf.FAIL.toFixed(1) + 'ms fail.');
-    log('reading is  fps   p50 / p95 / worst ms   scene. judged on p95.');
+    log('reading is  fps   p50 / p99 / worst ms   scene. judged on p99 (the 1% low).');
   };
 
   CMDS.k = CMDS.key = CMDS.sans;     // aliases, because typing is the cost

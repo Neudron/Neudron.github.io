@@ -808,13 +808,14 @@
       var rows = room.mist || [];
       for (var ri = 0; ri < rows.length; ri++) {
         var row = typeof rows[ri] === 'number' ? { x0: 0, x1: room.w - 1 } : rows[ri];
-        var mx = row.x0 * T, bandW = (row.x1 - row.x0 + 1) * T, ec = mkCanvas(129 * 48, 16), eg = ec.getContext && ec.getContext('2d');
+        var mx = row.x0 * T, bandW = (row.x1 - row.x0 + 1) * T, ec = mkCanvas(65 * 48, 32), eg = ec.getContext && ec.getContext('2d');
         if (!eg) { c.edges[ri] = null; continue; }
+        /* 129 phases, 65 per row: one row was 6192px wide, over the 4096px canvas cap */
         for (var phase = 0; phase <= 128; phase++) for (var j = 0; j < 3; j++) {
           eg.globalAlpha = (j + 1) / 3;
-          eg.drawImage(mc, phase + mx + j * 8, 0, 8, 16, phase * 48 + j * 8, 0, 8, 16);
+          eg.drawImage(mc, phase + mx + j * 8, 0, 8, 16, (phase % 65) * 48 + j * 8, ((phase / 65) | 0) * 16, 8, 16);
           eg.globalAlpha = (3 - j) / 3;
-          eg.drawImage(mc, phase + mx + bandW - 24 + j * 8, 0, 8, 16, phase * 48 + 24 + j * 8, 0, 8, 16);
+          eg.drawImage(mc, phase + mx + bandW - 24 + j * 8, 0, 8, 16, (phase % 65) * 48 + 24 + j * 8, ((phase / 65) | 0) * 16, 8, 16);
         }
         eg.globalAlpha = 1;
         c.edges[ri] = ec;
@@ -842,7 +843,11 @@
           var sx0 = Math.round(dir > 0 ? drift : 128 - drift);
           var mx = row.x0 * T, mw = (row.x1 - row.x0 + 1) * T;
           var dx = ox + mx * S, dy = oy + (row.y * T) * S, fade = 24, edge = c.edges[i];
-          if (edge) g.drawImage(edge, sx0 * 48, 0, 48, 16, dx, dy, 48 * S, 16 * S);
+          if (edge) {
+            /* the atlas cell is [left fade 24 | right fade 24]: left at the band's start, right at its end */
+            g.drawImage(edge, (sx0 % 65) * 48, ((sx0 / 65) | 0) * 16, 24, 16, dx, dy, 24 * S, 16 * S);
+            g.drawImage(edge, (sx0 % 65) * 48 + 24, ((sx0 / 65) | 0) * 16, 24, 16, dx + (mw - 24) * S, dy, 24 * S, 16 * S);
+          }
           else {
             fade = 0;
             g.drawImage(c.mist, sx0 + mx, 0, mw, 16, dx, dy, mw * S, 16 * S);

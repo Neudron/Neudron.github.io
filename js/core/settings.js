@@ -822,7 +822,17 @@
      (role=status), shown once each, and every one has the fix as a
      button, not as instructions. */
   var note = null;
-  function hideNote() { if (note) { note.remove(); note = null; } }
+  function hideNote() {
+    if (!note) return;
+    if (note.__tuckObs) note.__tuckObs.disconnect();
+    note.remove(); note = null;
+  }
+  function tuckNote() {
+    if (!note) return;
+    var tb = document.getElementById('tbox');
+    if (!tb || tb.hidden) { note.style.bottom = '24px'; return; }
+    note.style.bottom = Math.max(24, Math.round(innerHeight - tb.getBoundingClientRect().top + 12)) + 'px';
+  }
   function showNote(text, actions) {
     hideNote();
     note = document.createElement('div');
@@ -844,6 +854,13 @@
     });
     note.appendChild(row);
     document.body.appendChild(note);
+    var tboxEl = document.getElementById('tbox');
+    if (tboxEl && typeof MutationObserver !== 'undefined') {
+      note.__tuckObs = new MutationObserver(tuckNote);
+      note.__tuckObs.observe(tboxEl, { attributes: true, attributeFilter: ['hidden'] });
+      addEventListener('resize', tuckNote);
+    }
+    tuckNote();
   }
 
   /* First visit with the device asking for less motion: say it, once. */

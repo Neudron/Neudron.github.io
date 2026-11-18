@@ -2229,6 +2229,7 @@ kbd { font: 400 16px/1 var(--font); padding: 2px 6px; border: 2px solid var(--ed
   border: 2px solid var(--accent); border-radius: 16px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, .5);
 }
+.rmnote { transition: bottom .15s var(--ease, ease-out); }
 .rmnote__t { margin: 0 0 12px; font: 400 16px/1.4 var(--font); }
 .rmnote__row { display: flex; flex-wrap: wrap; gap: 12px; }
 .sett__x {

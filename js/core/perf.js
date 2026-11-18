@@ -113,7 +113,8 @@
     var p99 = a[Math.min(n - 1, (n * 0.99) | 0)];
     var worst = a[n - 1];
     /* Judged on the 1% low, not the mean and not p95. See the header. */
-    var verdict = p99 <= TARGET ? 'ok' : p99 <= WARN ? 'warn' : p99 <= FAIL ? 'over' : 'fail';
+    /* +1 ms: a vsync-locked 60 Hz frame lands at 16.67 ms plus rAF jitter and is on budget */
+    var verdict = p99 <= TARGET + 1 ? 'ok' : p99 <= WARN ? 'warn' : p99 <= FAIL ? 'over' : 'fail';
     return { n: n, fps: mean ? 1000 / mean : 0, mean: mean, p50: p50, p99: p99,
              worst: worst, worstEver: worstEver, verdict: verdict };
   }

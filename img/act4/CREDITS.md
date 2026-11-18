@@ -16,9 +16,11 @@ the way in. Keep one row per source set; add a row when a new set lands.
 | BDragon | `vfx/FxHoly.png` (holy smite strip) | BDragon asset pack, free tier | Free tier: non-commercial use with attribution. | Cropped to the one strip used. |
 | Original / generated here | `tiles/*.png`, `witch-face.png`, `act123/*.png` crops | Drawn for this site, or cropped from the rips above | — | The `tiles/` atlases are picked from the Deltarune atlases and re-mapped onto the site's own palette; `witch-face.png` is a crop of the TownNPC witch portrait. |
 
-## Creator index (cleared 2026-11-16)
+## Creator index (non-commercial fan work)
 
-Owner has granted permission for every bundled asset set. Rights restriction removed from `assets/manifest.v3.json`; credits below name the creators.
+No licence or redistribution right has been granted by the original rightsholders for the Calamity, Terraria, Deltarune or Undertale art below. It is bundled here as attributed fan art in a free, non-commercial project; all rights remain with the respective creators. Contact the site owner if any use here is objectionable. The VFX packs carry their own free-tier attribution terms, and the Act IV audio is site-owned.
+
+These folders are rights-review queues, not evidence of permission. Do not reuse or redistribute the franchise assets outside this non-commercial project.
 
 | Set | Creator(s) |
 |---|---|
