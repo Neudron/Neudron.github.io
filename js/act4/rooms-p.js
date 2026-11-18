@@ -298,6 +298,178 @@
   K.kind('easel', { interactive: function () { return false; }, draw: drawEasel });
   K.kind('paintpot', { interactive: function () { return false; }, draw: drawPot });
 
+  /* ── tavern life ────────────────────────────────────────────────────
+     Patrons, a joke board, a dartboard and one small secret. Flavour only:
+     no new items, flags, exits or spawns, and every sprite is a cached
+     canvas paint (no ripped art, nothing near a 4096px bake). Nothing is
+     timed — the dart pointer only steps on the frame clock and you throw
+     whenever you like, and reduced motion holds it still. */
+  function tavSfx(n) { if (NEU.sfx && NEU.sfx[n]) NEU.sfx[n](); }
+  function openBox(e, sys) { return NEU.tboxOpen && NEU.tboxOpen(); }
+
+  var JOKES = [
+    'the board: "Darts night. Every night. Nobody has ever won. Nobody has ever stopped."',
+    'the board: "Soup today. Soup yesterday. The soup remembers."',
+    'the board: "WANTED: a second opinion. The first one agreed with the landlord."',
+    'the board: "If this note hangs crooked, the room is sideways. Do not adjust."'
+  ];
+
+  function paintPatron(e) {
+    return function (R) {
+      var coat = e.coat || '#6A4A7A', hat = e.hat || '#3A2A20', skin = e.skin || '#C49A78';
+      sh(R, 0, 0, 7, 2);
+      R(-6, -11, 12, 11, INK); R(-5, -10, 10, 10, coat);
+      R(-5, -10, 2, 10, '#000000'); R(3, -10, 2, 10, '#000000');
+      R(-5, -3, 10, 2, '#000000');
+      R(-4, -20, 8, 9, INK); R(-3, -19, 6, 7, skin);
+      R(-2, -16, 1, 1, '#1A120C'); R(1, -16, 1, 1, '#1A120C');
+      R(-2, -14, 4, 1, '#5A3A28');
+      R(-5, -23, 10, 4, INK); R(-4, -22, 8, 2, hat); R(-6, -20, 12, 1, hat);
+      R(5, -10, 4, 6, INK); R(6, -9, 3, 4, '#C8A040'); R(7, -9, 1, 2, '#F0E0A0');
+    };
+  }
+  function drawPatron(g, e, d) {
+    pix(g);
+    var ra = RA();
+    if (!ra) return;
+    pic('vzi:patron:' + e.x + '_' + e.y, 24, 26, 12, 25, paintPatron(e), g, d);
+  }
+  K.kind('tavernpatron', {
+    interactive: function () { return true; },
+    fire: function (e, sys) {
+      if (openBox(e, sys)) return;
+      var lines = e.lines || ['the regular nods, and says nothing.'];
+      var i = e._i || 0;
+      sys.say([lines[i % lines.length]], 'narr');
+      e._i = i + 1;
+      tavSfx('tick');
+    },
+    draw: drawPatron
+  });
+
+  function paintNotice(R) {
+    var i;
+    sh(R, 0, 0, 10, 2);
+    R(-11, -28, 22, 22, INK); R(-10, -27, 20, 20, '#3A2416');
+    R(-9, -26, 18, 18, '#8A5A32');
+    R(-8, -25, 8, 7, '#E8DCC0'); R(-8, -25, 8, 1, '#FFFFFF');
+    R(2, -25, 6, 6, '#D8C8A8'); R(2, -25, 6, 1, '#FFFFFF');
+    R(-5, -16, 9, 6, '#E8DCC0'); R(-5, -16, 9, 1, '#FFFFFF');
+    for (i = 0; i < 4; i++) {
+      R(-7, -23 + i, 5, 1, '#6A5A48');
+      R(3, -23 + i, 3, 1, '#6A5A48');
+      R(-4, -14 + i, 6, 1, '#6A5A48');
+    }
+    R(-5, -24, 1, 1, '#C4323A'); R(4, -24, 1, 1, '#4A7AC8'); R(-2, -15, 1, 1, '#E2B84A');
+  }
+  function drawNotice(g, e, d) { pix(g); pic('vzi:notice', 24, 30, 12, 28, paintNotice, g, d); }
+  K.kind('tavernnotice', {
+    interactive: function () { return true; },
+    fire: function (e, sys) {
+      if (openBox(e, sys)) return;
+      var i = e._i || 0;
+      sys.say([JOKES[i % JOKES.length], 'the next one is the same joke, slightly wetter.'], 'narr');
+      e._i = i + 1;
+      tavSfx('tick');
+    },
+    draw: drawNotice
+  });
+
+  /* eight sectors, clockwise from the top. Score is flavour, never a flag. */
+  var DART = [
+    { n: 'bull', p: 50, c: '#E2B84A' }, { n: 'twenty', p: 20, c: '#C4323A' },
+    { n: 'five', p: 5, c: '#6A6A78' }, { n: 'fifteen', p: 15, c: '#4A7AC8' },
+    { n: 'ten', p: 10, c: '#8A5A32' }, { n: 'fifteen', p: 15, c: '#4A7AC8' },
+    { n: 'five', p: 5, c: '#6A6A78' }, { n: 'twenty', p: 20, c: '#C4323A' }
+  ];
+  function dartWedge(R, cx, cy, r0, r1, a0, a1, col) {
+    var dx, dy, rr, ang;
+    for (dy = -r1; dy <= r1; dy++) for (dx = -r1; dx <= r1; dx++) {
+      rr = Math.sqrt(dx * dx + dy * dy);
+      if (rr < r0 || rr > r1) continue;
+      ang = Math.atan2(dy, dx); if (ang < 0) ang += 2 * Math.PI;
+      if (ang >= a0 && ang < a1) R(cx + dx, cy + dy, 1, 1, col);
+    }
+  }
+  function paintDart(R) {
+    var i, a0;
+    sh(R, 0, 0, 11, 2);
+    R(-13, -21, 26, 26, INK); R(-12, -20, 24, 24, '#2A2A34');
+    RA().blob(R, 0, -8, 12, 12, '#8A8278');
+    RA().blob(R, 0, -8, 11, 11, INK);
+    for (i = 0; i < 8; i++) {
+      a0 = i * Math.PI / 4 - Math.PI / 8 - Math.PI / 2;
+      dartWedge(R, 0, -8, 6, 11, a0, a0 + Math.PI / 4, DART[i].c);
+      dartWedge(R, 0, -8, 2, 6, a0, a0 + Math.PI / 4, i % 2 ? '#1A1A22' : '#26262E');
+    }
+    RA().blob(R, 0, -8, 2, 2, '#E2B84A'); RA().blob(R, 0, -8, 1, 1, '#FFF2C4');
+    R(-12, -3, 24, 2, '#3A2416');
+  }
+  function drawDart(g, e, d) {
+    var ra = RA(), s, S = d.S || 1, x = d.sx | 0, y = d.sy | 0, dd, sec, ang, px, py, i, a, bx, by;
+    pix(g);
+    if (!ra) return;
+    s = ra.sprite('vzi:dartboard', 30, 32, 15, 28, paintDart);
+    ra.blit(g, s, d, 0, 0);
+    dd = e._d || (e._d = { throws: 0, score: 0, landed: [] });
+    if (!reducedNow()) e._aim = ((d.now / 700) | 0) & 7;
+    else if (e._aim === undefined) e._aim = 0;
+    sec = e._aim | 0;
+    ang = (sec + 0.5) * Math.PI / 4 - Math.PI / 2;
+    px = x + Math.round(Math.cos(ang) * 12 * S);
+    py = y - 8 * S + Math.round(Math.sin(ang) * 12 * S);
+    box(g, '#FFF2C4', px - S, py - S, 2 * S, 2 * S);
+    for (i = 0; i < dd.landed.length; i++) {
+      a = (dd.landed[i] + 0.5) * Math.PI / 4 - Math.PI / 2;
+      bx = x + Math.round(Math.cos(a) * 8 * S);
+      by = y - 8 * S + Math.round(Math.sin(a) * 8 * S);
+      box(g, '#EDE7DE', bx - S, by - S, 2 * S, 2 * S);
+    }
+  }
+  K.kind('taverndart', {
+    interactive: function () { return true; },
+    fire: function (e, sys) {
+      if (openBox(e, sys)) return;
+      var dd = e._d || (e._d = { throws: 0, score: 0, landed: [] });
+      var hit = DART[e._aim | 0] || DART[0];
+      dd.score += hit.p; dd.throws += 1;
+      var lines = ['clack. ' + hit.n + ', ' + hit.p + ' points. that is ' + dd.score + ' all told.'];
+      dd.landed.push(e._aim | 0);
+      if (dd.landed.length > 6) dd.landed.shift();
+      if (dd.throws === 1) lines.push('no clock, no rush. the board is patient.');
+      sys.say(lines, 'narr');
+      if (NEU.juice && NEU.juice.hit) NEU.juice.hit('small');
+      sys.burst(e, 4, hit.c);
+      tavSfx('tick');
+    },
+    draw: drawDart
+  });
+
+  function paintSecret(R) {
+    sh(R, 0, 0, 7, 1);
+    R(-8, -6, 16, 6, '#12081E'); R(-7, -5, 14, 5, '#5A3418');
+    R(-7, -5, 14, 1, '#8A5A32'); R(-4, -3, 3, 1, '#2A1810');
+  }
+  function drawSecret(g, e, d) {
+    pix(g);
+    pic('vzi:secret', 18, 9, 9, 8, paintSecret, g, d);
+    if (e._found) box(g, '#E8DCC0', (d.sx | 0) - 2 * (d.S || 1), (d.sy | 0) - 4 * (d.S || 1), 4 * (d.S || 1), 3 * (d.S || 1));
+  }
+  K.kind('tavernsecret', {
+    interactive: function () { return true; },
+    fire: function (e, sys) {
+      if (openBox(e, sys)) return;
+      if (!e._found) {
+        e._found = true;
+        sys.say(['under the loose board: a note. "the soup is fine." it is not.'], 'narr');
+        if (NEU.juice && NEU.juice.hit) NEU.juice.hit('small');
+        sys.burst(e, 5, '#E8DCC0');
+      } else sys.say(['just the board now. the note has said its piece.'], 'narr');
+      tavSfx('tick');
+    },
+    draw: drawSecret
+  });
+
   function tryLeave(api) {
     var path;
     if (NEU.save && (NEU.save.flagged('mtn_heaven') || NEU.save.flagged('mtn_evil'))) {
@@ -348,6 +520,15 @@
       { t: 'painter', x: 5, y: 6 },
       { t: 'work', x: 14, y: 3, path: 'heaven' },
       { t: 'work', x: 18, y: 3, path: 'evil' },
+      { t: 'tavernnotice', x: 6, y: 2 },
+      { t: 'taverndart', x: 16, y: 2 },
+      { t: 'tavernpatron', x: 3, y: 6, coat: '#6A4A7A', hat: '#3A2A20',
+        lines: ['the old regular: "the usual." which is, in fact, always the same.'] },
+      { t: 'tavernpatron', x: 17, y: 6, coat: '#4A6A5A', hat: '#8A5A32',
+        lines: ['a traveller: "the road was long. the stool is short. I will take it."'] },
+      { t: 'tavernpatron', x: 12, y: 5, coat: '#8A4A3A', hat: '#2A2A34',
+        lines: ['the bard, between songs: "the soup is the real instrument."'] },
+      { t: 'tavernsecret', x: 2, y: 6 },
       { t: 'exit', x: 11, y: 1, to: 'a1_clearing', spawn: 'default', style: 'door' },
       { t: 'trigger', x: 11, y: 7, run: tryLeave }
     ],
