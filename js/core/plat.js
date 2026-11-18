@@ -1080,6 +1080,35 @@
     if (ride) { player.x += (e.x - ox) * TILE; player.y += (e.y - oy) * TILE; }
     if (Math.abs(e.x - tx) < 0.05 && Math.abs(e.y - ty) < 0.05) { if (e.returning) e.go = false; else e.returning = true; }
   } };
+  /* BLUE WING (WO-DGN): a hanging lamp/chains that swings as a moving platform and
+     carries whoever stands on it. One kinds record, no new movement branches. */
+  kinds.chainplat = { touch: function (e) { if (!e.go) { e.go = true; e.ph = e.phase || 0; } }, tick: function (e, dt) {
+    if (!e.go) return;
+    var ox = e.x, oy = e.y;
+    e.ph += dt * (e.spd || 1.5);
+    e.x = e.ax + Math.sin(e.ph) * (e.sw || 2);
+    e.y = e.ay + (1 - Math.cos(e.ph)) * (e.drop || 0.25);
+    if (feetOn(e)) { player.x += (e.x - ox) * TILE; player.y += (e.y - oy) * TILE; }
+  }, draw: function (c, px, py, e) {
+    var i;
+    for (i = 1; i <= 7; i++) fr(c, px + 7, py - i * TILE, 2, 6, i & 1 ? '#6A6878' : '#9A98A8');
+    fr(c, px, py + 2, 16, 5, '#2E2C38'); fr(c, px + 1, py + 2, 14, 2, '#8A88A0');
+    fr(c, px + 2, py + 7, 12, 1, '#D8D4E8'); fr(c, px + 7, py - 2, 2, 4, '#FFC860');
+  } };
+  /* PINK WING (WO-DGN): a telegraphed crumbling floor — 0.4 s shake, then it falls
+     and respawns after 3 s. Respawn, never mining: the tile is never destroyed. */
+  kinds.dgncrumb = { tick: function (e, dt) {
+    var on;
+    if (e.bounce > 0) e.bounce = Math.max(0, e.bounce - dt);
+    if (!e.cs) { on = feetOn(e); if (on || climbing(e)) { e.cs = 1; e.ct = 0.4; e.top = on; } return; }
+    if (e.cs === 1) {
+      e.ct -= dt;
+      if (e.ct <= 0 || (e.top && e.ct < 0.2 && !feetOn(e))) { e.cs = 2; e.ct = 3; e.dead = true; }
+      return;
+    }
+    if (e.ct > 0) { e.ct -= dt; return; }
+    if (!overlapsHero(e)) { e.cs = 0; e.dead = false; e.bounce = 0.25; }
+  } };
   /* CrumblePlatform.cs: standing shakes 0.2 s (climbing 3 x 0.2), then up to 0.4 s more that ends early when you step off;
      then it falls, and after 2 s it returns once nothing overlaps it */
   kinds.crumble = { tick: function (e, dt) {
