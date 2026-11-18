@@ -3,6 +3,7 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
+  function dp(k) { return NEU.diff ? NEU.diff.f(k) : 1; }
   var ATK = {};
   var A = null, phase = 1, index = 0, current = null, signature = false;
   var TAU = Math.PI * 2;
@@ -69,7 +70,7 @@
       } else if (f === spec.events[i] && p.events[i] === 1) {
         p.events[i] = 2;
         n = shape.count;
-        if (A && A.hit) A.hit(shape, name, V(spec.speed * phaseBoost, st));
+        if (A && A.hit) A.hit(shape, name, V(spec.speed * phaseBoost * dp('bulletSpeed'), st));
       }
     }
     return f >= spec.duration;

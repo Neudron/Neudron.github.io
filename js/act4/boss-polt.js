@@ -28,6 +28,7 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
+  function dp(k) { return NEU.diff ? NEU.diff.f(k) : 1; }
 
   var wrap = document.getElementById('polt');
   if (!wrap) { NEU.polt = { open: function () {} }; return; }
@@ -468,7 +469,7 @@
     /* Six blade damage is normalized to one boss point: 900 HP at the
        kit's 0.3 s cadence is 270 s of clean hits; movement and dodging put
        real runs near the requested 4–6 minute window. */
-    var dmg = dm.mul(F) * (amount || 1) * (vuln > 0 ? 2 : 1);
+    var dmg = dm.mul(F) * (amount || 1) * (vuln > 0 ? 2 : 1) * dp('dmg');
     bossHP -= dmg;
     dm.bossHit(F, bx, by, dmg);
     if (NEU.sfx && NEU.sfx.hit) NEU.sfx.hit();
@@ -1093,12 +1094,13 @@
     if (NEU.quest) NEU.quest.lock(true);
     if (msg) msg.hidden = true;
     layout();
+    if (NEU.diff) NEU.diff.begin(); MAXHP = NEU.diff ? NEU.diff.fpick([12, 9, 6, 5, 4, 3, 1]) : 6; IFRAMES = (dm.IFRAMES || 1.1) * dp('iframes');
     t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; attackWarns = []; attackFrameAcc = 0; keys = {}; dying = 0;
-    bossMax = 900; bossHP = bossMax; phase = 1; clone = null; mode = 'fight';
+    bossMax = Math.round(900 * dp('bossHp')); bossHP = bossMax; phase = 1; clone = null; mode = 'fight';
     phaseFlash = 0; phaseFlashes = 0; flashedPhase = 0;
     px = AX + AW / 2; py = AY + AH - 70;
     F = dm.fight(px, py);
-    kit = NEU.kit ? NEU.kit.create({ F: F, box: kitBox, danmakuMovement: true,
+    kit = NEU.kit ? NEU.kit.create({ F: F, box: kitBox, danmakuMovement: true, maxHp: MAXHP, healCd: 30 * dp('healCd'), noHeal: dp('heals') <= 0,
       theme: { rim: '#2E6F62', acc: '#7FE3C4', hot: '40,150,120', hotLine: '#7FE3C4', well: '#10302A', title: 'SOUL  ACTIONS' }, adapter: {
       targets: function () {
         bossTarget.x = bx; bossTarget.y = by; bossTarget.r = 22;
