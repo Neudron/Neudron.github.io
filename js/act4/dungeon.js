@@ -292,6 +292,73 @@
   };
   var FOE = 'uUathNGXyTCEYQOW', DECOR = 'cLwbB';
   var zones = [], spawners = [], decor = [], ents = [], cracks = {}, save = null, lifts = {}, here = '', goal = '', live = null;
+  /* WO-DGN world additions, all attached to the one map (no new level, no new authority).
+     braziers are numbered globally; flags dgn_lit_<n> are saved through NEU.save.
+     water is decorative: the lever only drains it, never changes Celeste physics. */
+  var braN = 0, water = [], rest = {}, secrets = [];
+  function openFloor(rows, want, skip) {
+    var out = [], y, x, ch, row;
+    for (y = 1; y < rows.length - 1; y++) {
+      row = rows[y];
+      for (x = 2; x < row.length - 2; x++) {
+        ch = row.charAt(x);
+        if (ch !== '.') continue;
+        if (row.charAt(x - 1) !== '#' && row.charAt(x + 1) !== '#' &&
+            !(rows[y - 1] && rows[y - 1].charAt(x) === '#') && !(rows[y + 1] && rows[y + 1].charAt(x) === '#')) continue;
+        if (skip && skip(x, y)) continue;
+        out.push({ x: x, y: y });
+      }
+    }
+    var pick = [], i, at;
+    if (out.length <= want) return out;
+    for (i = 0; i < want; i++) { at = Math.floor((i + 0.5) * out.length / want); pick.push(out[at]); }
+    return pick;
+  }
+  /* WO-NEW-DGN's eight named chambers are set pieces INSIDE the one connected
+     map, not new levels: the blue/green/pink wings and their two-way corridors
+     already are the branches, and the zone spawns are the named landings. Each
+     chamber has a centrepiece with a reveal and six inspectable plaques (R1). */
+  var CHAMBERS = [
+    { id: 'bell', z: 0, ax: 26, ay: 8, flag: 'dgn_bell', kind: 'bell', centre: '* a bronze bell on a chain.',
+      reveal: '* the bell rings. every blue brazier catches.',
+      lines: ['* frayed rope, knotted by many hands.', '* the mould still smells of hot metal.', '* a notice: LOST — one small courage.', '* the clapper is cracked but true.', '* birds nested in the rafters.', '* a stair runs down into the dark.'] },
+    { id: 'library', z: 4, ax: 12, ay: 11, flag: 'dgn_book', kind: 'book', centre: '* a bookcase one inch out of line.',
+      reveal: '* the shelf slides. a hollow waits behind it.',
+      lines: ['* "Why the skeleton went to the library: it had no body."', '* a shelf of jokes, all in the same hand.', '* an index with nothing in it.', '* a bookmark a hundred years old.', '* the lamp smells of dust and ink.', '* someone wrote: READ THE UPSIDE-DOWN ONE.'] },
+    { id: 'flood', z: 6, ax: 20, ay: 16, flag: 'dgn_drain', kind: 'lever', centre: '* a lever grown stiff with mineral.',
+      reveal: '* the water withdraws. something glints on the bricks.',
+      lines: ['* the flood line is scored into the wall.', '* a drowned sign: KEEP TO THE STAIRS.', '* reeds grew indoors.', '* bubbles, then silence.', '* a stone where a handle used to be.', '* the tide never comes in anymore.'] },
+    { id: 'ossuary', z: 7, ax: 14, ay: 12, flag: 'dgn_mimic', kind: 'bone', centre: '* a chest breathing in the bone pile.',
+      reveal: '* the lid exhales. you step back; it settles.',
+      lines: ['* skulls stacked by size, not by name.', '* a ribcage used as a coat rack.', '* someone counted these twice.', '* a tiny coffin, neatly made.', '* dust that has never been disturbed.', '* the pile is warmer than the room.'] },
+    { id: 'chainbridge', z: 3, ax: 28, ay: 4, flag: 'dgn_bridge', kind: 'chain', centre: '* the lamps swing before you touch them.',
+      reveal: '* the chains find a rhythm. cross on the beat.',
+      lines: ['* a chain disappears into the ceiling.', '* lamp oil, still warm.', '* a foothold worn smooth.', '* the gap is wider than it looks.', '* chains answer the smallest push.', '* below: spikes, patient and bright.'] },
+    { id: 'forge', z: 5, ax: 20, ay: 10, flag: 'dgn_forge', kind: 'anvil', centre: '* an anvil with a worn right edge.',
+      reveal: '* the old axe remembers this weight.',
+      lines: ['* the bellows sigh on their own.', '* a quench trough, dry and cracked.', '* tongs, bent around something larger.', '* soot handprints on the wall.', '* a horseshoe for luck, long gone cold.', '* the fire has been out for years.'] },
+    { id: 'cell', z: 2, ax: 20, ay: 15, flag: 'dgn_cell', kind: 'chain', centre: '* a chained merchant, teeth intact.',
+      reveal: '* "You again. I saved you something."',
+      lines: ['* "First time? Take the small one."', '* "Back again? Then you know the drill."', '* the chain is longer than the cell.', '* a cup, a straw, a stack of IOUs.', '* a tally scratched in the wall.', '* the lock has no keyhole.'] },
+    { id: 'vault', z: 10, ax: 18, ay: 13, flag: 'dgn_vault', kind: 'brick', centre: '* a brick that sounds hollow.',
+      reveal: '* the wall gives. the vault was never locked.',
+      lines: ['* a keyhole with no key.', '* gold dust in the joints.', '* a ledger of things never spent.', '* the seal was broken from inside.', '* a dusty chair facing the door.', '* nothing here was taken.'] }
+  ];
+  function nearFloor(rows, ax, ay, want) {
+    var out = [], y, x, d, row;
+    for (y = Math.max(1, ay - 9); y < Math.min(rows.length - 1, ay + 9); y++) {
+      row = rows[y] || '';
+      for (x = Math.max(2, ax - 9); x < Math.min(row.length - 2, ax + 9); x++) {
+        if (row.charAt(x) !== '.') continue;
+        if (row.charAt(x - 1) !== '#' && row.charAt(x + 1) !== '#' &&
+            !(rows[y - 1] && rows[y - 1].charAt(x) === '#') && !(rows[y + 1] && rows[y + 1].charAt(x) === '#')) continue;
+        d = Math.abs(x - ax) + Math.abs(y - ay);
+        out.push({ x: x, y: y, d: d });
+      }
+    }
+    out.sort(function (a, b) { return a.d - b.d || a.y - b.y || a.x - b.x; });
+    return out.slice(0, want);
+  }
   /* W10: the surface hut; BED is the respawn cell every death lands on. */
   var BED = { x: 22, y: 14 }, HUT = { x0: 16, x1: 32, roof: 9, wall0: 10, wall1: 14 };
 
@@ -317,7 +384,7 @@
         if (ch === 'S') z.spawn = { x: wx, y: wy };
         else if (ch === 'k') { ents.push({ t: 'crumble', x: wx, y: wy }); cracks[wy + ',' + wx] = 'k'; }
         else if (DECOR.indexOf(ch) >= 0) decor.push({ k: ch, x: wx, y: wy, f: z.wall });
-        else if (FOE.indexOf(ch) >= 0) spawners.push({ k: ch, x: wx, y: wy, zone: id });
+        else if (FOE.indexOf(ch) >= 0) spawners.push({ k: ch, x: wx, y: wy, zone: id, rest: n % 3 === 2 });
         else if (ch === 'P') { save = { x: wx, y: wy }; ents.push({ t: 'dsave', x: wx, y: wy }); }
         else if (ch === 'n') ents.push({ t: 'sign', x: wx, y: wy, lines: SIGN[id] });
         else if (ch === 'K') ents.push({ t: 'keeper', x: wx, y: wy });
@@ -329,6 +396,58 @@
         else if (ch === '$') ents.push({ t: 'coin', x: wx, y: wy });
         else if (ch === 'l') ents.push({ t: 'lift', x: wx, y: wy, n: n });
       }
+    }
+    /* ── WO-DGN world dressing, generated from the real zone rows ─────────
+       Nothing here alters a tile the input recordings walk on: every new prop
+       is non-solid except the gimmick platforms, which sit in open upper air. */
+    for (n = 0; n < zones.length; n++) {
+      z = zones[n]; rows = ZONES[z.id];
+      /* 4-8 braziers per wing: blue d0-d5, green d6-d7, pink d8-d10. */
+      var want = z.wall === 'G' ? 3 : z.wall === 'P' ? 2 : 1;
+      var spots = openFloor(rows, want);
+      for (i = 0; i < spots.length; i++) {
+        ents.push({ t: 'brazier', x: z.x + spots[i].x, y: z.y + spots[i].y, n: ++braN, f: z.wall });
+      }
+      /* every third room is a rest room: a bench and a sign, no foe (restCalm). */
+      if (n % 3 === 2) {
+        rest[z.id] = true;
+        spots = openFloor(rows, 1, function (fx, fy) { return fy > ZH - 4; });
+        if (spots.length) {
+          ents.push({ t: 'bench', x: z.x + spots[0].x, y: z.y + spots[0].y });
+          ents.push({ t: 'sign', x: z.x + spots[0].x + 2, y: z.y + spots[0].y,
+            lines: ['* a bench, a brazier, a long breath.', '* nothing lives here. ' + kn('r') + ' resets a puzzle elsewhere.'] });
+        }
+      }
+    }
+    /* BLUE: swinging chain lamps as moving platforms, high in d3's open shaft. */
+    var blue = zones[3];
+    ents.push({ t: 'chainplat', x: blue.x + 22, y: blue.y + 3, ax: blue.x + 22, ay: blue.y + 3, sw: 2, spd: 1.2, drop: 0.2, solid: true, phase: 0 });
+    ents.push({ t: 'chainplat', x: blue.x + 28, y: blue.y + 4, ax: blue.x + 28, ay: blue.y + 4, sw: 2.5, spd: 1.4, drop: 0.25, solid: true, phase: 1.6 });
+    ents.push({ t: 'chainplat', x: blue.x + 34, y: blue.y + 3, ax: blue.x + 34, ay: blue.y + 3, sw: 2, spd: 1.1, drop: 0.15, solid: true, phase: 3.1 });
+    /* GREEN: a flooded hall and a drain lever. The water is drawn, never collided with. */
+    var green = zones[6];
+    water.push({ x: green.x + 4, y: green.y + 12, w: 32, h: 8 });
+    ents.push({ t: 'dgnlever', x: green.x + 5, y: green.y + 20 });
+    ents.push({ t: 'dgnheart', x: green.x + 33, y: green.y + 16, n: 1, req: 'dgn_drain' });
+    /* PINK: telegraphed crumbling floors above d8's lower hall. */
+    var pink = zones[8];
+    ents.push({ t: 'dgncrumb', x: pink.x + 6, y: pink.y + 7, solid: true });
+    ents.push({ t: 'dgncrumb', x: pink.x + 12, y: pink.y + 8, solid: true });
+    ents.push({ t: 'dgncrumb', x: pink.x + 18, y: pink.y + 7, solid: true });
+    /* Three hidden max-hearts, each behind a noticed secret. */
+    var lib = zones[4], vault = zones[10];
+    ents.push({ t: 'dgnsecret', x: lib.x + 22, y: lib.y + 20, flag: 'dgn_book', lines: ['* one book is upside down. behind it, a hollow.'] });
+    ents.push({ t: 'dgnheart', x: lib.x + 24, y: lib.y + 20, n: 2, req: 'dgn_book' });
+    ents.push({ t: 'dgnsecret', x: vault.x + 15, y: vault.y + 20, flag: 'dgn_vault', lines: ['* this brick sounds hollow when you knock.'] });
+    ents.push({ t: 'dgnheart', x: vault.x + 17, y: vault.y + 20, n: 3, req: 'dgn_vault' });
+    /* the eight named chambers: a centrepiece with a reveal + six inspectables */
+    for (n = 0; n < CHAMBERS.length; n++) {
+      var c = CHAMBERS[n], cz = zones[c.z], cs = nearFloor(ZONES[cz.id], c.ax, c.ay, 7);
+      if (!cs.length) continue;
+      ents.push({ t: 'dgnsecret', x: cz.x + cs[0].x, y: cz.y + cs[0].y, flag: c.flag,
+        kind: c.kind, chamber: c.id, lines: [c.centre, c.reveal] });
+      for (i = 1; i < cs.length; i++)
+        ents.push({ t: 'dgnplaque', x: cz.x + cs[i].x, y: cz.y + cs[i].y, chamber: c.id, lines: [c.lines[(i - 1) % c.lines.length]] });
     }
     /* W10 surface hut: packed-earth hut on the open grass, west of the castle. */
     for (x = HUT.x0 - 1; x <= HUT.x1 + 1; x++) g[HUT.roof][x] = 'g';
@@ -359,18 +478,39 @@
     rows: build(), spawn: zones[0].spawn, entities: ents, tileset: 'dungeon', view: 'terraria', chunked: true, hp: 6, solid: '#g',
     onOpen: function (opts) {
       live = P.level0(); here = ''; goal = opts.goal || '';
+      /* saved max-hearts raise only the LIVE cap; the template stays at 6 so
+         older suites and fresh saves keep the original contract. */
+      live.hp = 6 + (flagged('dgn_heart_1') ? 1 : 0) + (flagged('dgn_heart_2') ? 1 : 0) + (flagged('dgn_heart_3') ? 1 : 0);
       track();
     },
     onDeath: function () { toSurface(); },
-    tick: function () { track(); }
+    tick: function () { track(); restCalm(); }
   });
   def.zones = zones; def.decor = decor; def.cracks = cracks; def.spawners = spawners; def.faction = faction; def.zoneAt = zoneAt;
+  def.water = water; def.rest = rest;
   /* backward-compat aliases so legacy tests/suites that reference d0..d10 levels resolve to the one map */
   for (var _ai = 0; _ai <= 10; _ai++) P.levels['d' + _ai] = def;
 
+  /* MAP REVEAL: four-tile map cells light up around the hero as they pass. */
+  function reveal(h) {
+    var tx = Math.floor(h.x / T / 4), ty = Math.floor((h.y - 11) / T / 4), dx, dy;
+    for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++)
+      NEU.dungeon.mapSeen[(tx + dx) + ',' + (ty + dy)] = 1;
+  }
+  /* Rest rooms stay foe-free without editing dgn-foes.js or the spawner table:
+     only auto-spawned foes tied to a rest spawner are removed, and those
+     spawners never refill. Manually spawned foes (fixtures) are untouched. */
+  function restCalm() {
+    var F = NEU.dgnFoes, i, fs;
+    if (!F) return;
+    for (i = 0; i < spawners.length; i++) if (spawners[i].rest) spawners[i].cd = 1e9;
+    fs = F.foes;
+    for (i = fs.length - 1; i >= 0; i--) if (fs[i].sp && fs[i].sp.rest) fs.splice(i, 1);
+  }
   /* the zone under the hero: entering one keeps the deepest depth reached, and d3/d6/d9 open their lift */
   function track() {
     var h = P.hero(), z = zoneAt(h.x, h.y - 11), id, depth;
+    reveal(h);
     /* the open surface band is d0's: castle and hut both live there */
     if (!z && h.y - 11 < ZH * T) z = zones[0];
     id = z ? z.id : here;
@@ -403,6 +543,38 @@
     e.active = true; P.heal(6); flag('dgn_saved', 1);
   }, draw: function (c, x, y, e, now) { P.ent('checkpoint', c, x, y, e, now); } });
   kd('sign', { touch: function (e, input, melee) { if (melee) { NEU.dungeon.sign = e.lines.join(' '); talk(e.lines); } } });
+  /* TORCH MEMORY: walking past a brazier lights it permanently (WO-DGN). */
+  kd('brazier', { touch: function (e) {
+    if (flagged('dgn_lit_' + e.n)) return;
+    flag('dgn_lit_' + e.n, 1);
+  } });
+  kd('bench', { touch: function (e, input, melee) {
+    if (melee && !flagged('dgn_bench')) { flag('dgn_bench', 1); talk(['* the bench holds the warmth of everyone who sat here.']); }
+  } });
+  kd('dgnlever', { touch: function (e, input, melee) {
+    if (!melee || flagged('dgn_drain')) return;
+    flag('dgn_drain', 1);
+    talk(['* the lever groans. water slips away through the bricks.', '* something glints where the flood used to be.']);
+  } });
+  kd('dgnsecret', { touch: function (e, input, melee) {
+    if (!melee || flagged(e.flag)) return;
+    flag(e.flag, 1);
+    /* the bell's reveal lights the blue wing's braziers (R12/R15) */
+    if (e.flag === 'dgn_bell') for (var i = 0; i < ents.length; i++)
+      if (ents[i].t === 'brazier' && ents[i].f === 'B') flag('dgn_lit_' + ents[i].n, 1);
+    talk(e.lines || ['* something was hidden here.']);
+  } });
+  kd('dgnplaque', { touch: function (e, input, melee) {
+    if (melee) { NEU.dungeon.sign = e.lines.join(' '); talk(e.lines); }
+  } });
+  kd('dgnheart', { touch: function (e) {
+    if (P.replaying() || e.dead || !flagged(e.req)) return;
+    e.dead = true;
+    flag('dgn_heart_' + e.n, 1);
+    if (live) live.hp = 6 + (flagged('dgn_heart_1') ? 1 : 0) + (flagged('dgn_heart_2') ? 1 : 0) + (flagged('dgn_heart_3') ? 1 : 0);
+    P.heal(1);
+    talk(['* a life crystal. the heart can hold a little more.']);
+  } });
   kd('keeper', { touch: function (e, input, melee) {
     if (melee) talk(['* the keeper: going down? the bones do not stay dead.', '* the keeper: neither will you. you wake up at my door.']);
   } });
@@ -663,8 +835,10 @@
     return P.dungeonFall(function () { return P.open(id, opts); });
   }
 
+  /* MAP TOGGLE (WO-DGN): goes through NEU.keys routing, so a rebound key works
+     and the old key is swallowed. No screen-corner button (F-02). */
   NEU.dungeon = {
-    recordings: REC, bossOpen: false, bossLine: '', mageSign: '', sign: '', lastDeath: null,
+    mapOpen: false, mapSeen: {}, recordings: REC, bossOpen: false, bossLine: '', mageSign: '', sign: '', lastDeath: null,
     /* B3: a won mage duel hands the dungeon back safely. calmUntil is the
        foe-stun window; the shared plat hook grants player i-frames. */
     calmUntil: 0,
@@ -689,4 +863,13 @@
     bed: BED, bedPx: function () { return px(BED); },
     toSurface: toSurface
   };
+  if (window.addEventListener) window.addEventListener('keydown', function (e) {
+    if (!P.running() || P.levelId() !== 'dgn' || P.replaying() || e.repeat) return;
+    if (NEU.tboxOpen && NEU.tboxOpen()) return;
+    if (NEU.kernel && NEU.kernel.current && NEU.kernel.current() !== 'plat') return;
+    /* routed() has already turned the player's bound key into 'e' */
+    if (String(e.key).toLowerCase() !== 'e') return;
+    NEU.dungeon.mapOpen = !NEU.dungeon.mapOpen;
+    e.preventDefault();
+  });
 })();
