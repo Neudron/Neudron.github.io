@@ -220,6 +220,14 @@
     F(g, '#12081E', px + 2, py + 4, 1, 1); F(g, '#12081E', px + 13, py + 4, 1, 1);
     F(g, '#5A3E28', px + 1, py + 7, 2, 4); F(g, '#5A3E28', px + 13, py + 7, 2, 4); F(g, '#8A6040', px + 1, py + 7, 1, 4);
   }
+  /* A tuft marks a secret climb. It is never a hole: the ground stays solid
+     under it, so the eye reads "look up" rather than "danger". */
+  function grassTuft(g, px, py) {
+    F(g, '#1A2832', px + 2, py + 13, 12, 2);
+    F(g, '#4A7A66', px + 4, py + 8, 1, 6); F(g, '#4A7A66', px + 8, py + 6, 1, 8); F(g, '#4A7A66', px + 12, py + 9, 1, 5);
+    F(g, '#6D9A78', px + 3, py + 8, 1, 3); F(g, '#6D9A78', px + 7, py + 5, 1, 4); F(g, '#6D9A78', px + 11, py + 8, 1, 3);
+    F(g, '#D7E4EA', px + 2, py + 12, 3, 1); F(g, '#D7E4EA', px + 11, py + 12, 3, 1);
+  }
   /* lamp post: a 3-tile iron post with a caged lantern, standing on the tile below; the flame, halo and light pool are live (lamps).
      t = the lantern's base line. Everything is cell-relative, so it paints above its own cell (the sky is empty there). */
   function lantern(g, px, py) {
@@ -312,6 +320,7 @@
         else if (ch === '^' || ch === 'v' || ch === '<' || ch === '>') P.spike(g, px, py, ch, ICE);
         else if (ch === 'l') lantern(g, px, py);
         else if (ch === 'f') flagPole(g, px, py);
+        else if (ch === '`') grassTuft(g, px, py);
         else F(g, '#FF00FF', px, py, 16, 16);
       }
     }

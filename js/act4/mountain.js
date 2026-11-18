@@ -4,7 +4,7 @@
   var NEU = window.NEU = window.NEU || {};
   var P = NEU.plat;
   if (!P || !P.level) return;
-  var W = 48, H = 18, currentId = '';
+  var W = 128, H = 18, SHIFT = 80, LEADS = [426, 427, 426, 426, 426, 427, 427, 427], currentId = '';
 
   /* recordings re-cut for the Celeste core (B1): edge-triggered jump/dash, so a held key is one press */
   var REC = {
@@ -18,11 +18,11 @@
     m7: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'right down melee'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right']]
   };
 
-  function blank() {
-    var rows = [], y, x, s;
-    for (y = 0; y < H; y++) {
+  function blank(w, h) {
+    var rows = [], y, x, s, width = w || W, height = h || H;
+    for (y = 0; y < height; y++) {
       s = '';
-      for (x = 0; x < W; x++) s += '.';
+      for (x = 0; x < width; x++) s += '.';
       rows.push(s);
     }
     return rows;
@@ -61,30 +61,84 @@
       else P.open('m' + (n + 1));
     };
   }
-  function add(id, rows, spawn, ents, n) {
+  function cp(x, y, tag, alt) { return { t: 'checkpoint', x: x, y: y, id: tag, alt: alt }; }
+  function cpHook(id) {
+    return function (e) {
+      if (e.alt) NEU.mountain.altitude = e.alt;
+      if (NEU.save && NEU.save.flag) NEU.save.flag('mtn_cp:' + id + ':' + e.id, 1);
+    };
+  }
+  function add(id, rows, spawn, ents, n, rec, chapter, baseAlt) {
     var def = P.level(id, {
       tiles: rows.join('\n'),
       spawn: spawn,
       entities: ents,
       tileset: 'mountain',
+      chapter: chapter || 'pine',
+      altitude: baseAlt || 1000,
+      onCheckpoint: cpHook(id),
       onExit: makeExit(n)
     });
-    def.recording = REC[id];
-    NEU.mountain.recordings[id] = REC[id];
+    def.recording = rec || REC[id];
+    NEU.mountain.recordings[id] = def.recording;
     return def;
+  }
+
+  /* Three-screen Pine course: two original teaching screens before the
+     authored obstacle strip. The old route starts at x=SHIFT with the hero
+     stopped at the same tile, so every committed recording still applies. */
+  function ascent(n, oldRows, oldEnts, oldSpawn) {
+    var prefix = blank(SHIFT), rows = [], floor = oldSpawn.y + 1, i, e, spawn;
+    var base = 1000 + n * 180, oldRec = REC['m' + n];
+    fill(prefix, 0, SHIFT - 1, floor, '#');
+    /* screen 1 — teach: a safe ledge, a dash crystal and a spring you can ignore */
+    fill(prefix, 12, 20, floor - 4, '=');
+    fill(prefix, 22, 32, floor - 5, '=');
+    /* screen 2 — test: a crumble bridge with a static shelf on either side */
+    fill(prefix, 34, 42, floor - 5, '=');
+    fill(prefix, 46, 54, floor - 5, '=');
+    /* screen 3 — twist: a tuft marks the climb to the optional berry */
+    fill(prefix, 56, 62, floor - 7, '=');
+    fill(prefix, 64, 72, floor - 4, '=');
+    for (i = 0; i < 5; i++) fill(prefix, 6 + (i % 2) * 8, 44, floor - 2 - i * 2, '=');
+    fill(prefix, 50, 66, floor - 9, '=');
+    put(prefix, 58, floor - 1, '`');
+    put(prefix, 10, floor - 1, 'l');
+    put(prefix, 40, floor - 1, 'f');
+    for (i = 0; i < oldRows.length; i++) rows.push(prefix[i] + oldRows[i]);
+    var ents = [
+      cp(4, floor - 1, 'foot', base + 40),
+      cp(44, floor - 1, 'ridge', base + 160),
+      cp(76, floor - 1, 'lip', base + 280),
+      { t: 'refill', x: 16, y: floor - 5 },
+      { t: 'spring', x: 26, y: floor - 6 },
+      { t: 'crumble', x: 36, y: floor - 6 },
+      { t: 'crumble', x: 37, y: floor - 6 },
+      { t: 'crumble', x: 38, y: floor - 6 },
+      { t: 'coin', x: 59, y: floor - 8, id: 'mtn_coin:m' + n }
+    ];
+    for (i = 0; i < oldEnts.length; i++) {
+      e = oldEnts[i];
+      ents.push({ t: e.t, x: e.x + SHIFT, y: e.y, id: e.id, targetX: e.targetX, targetY: e.targetY });
+    }
+    spawn = { x: oldSpawn.x, y: oldSpawn.y };
+    var rec = [[LEADS[n], 'right'], [8, '']].concat(oldRec);
+    REC['m' + n] = rec;
+    add('m' + n, rows, spawn, ents, n, rec, 'pine', base);
   }
 
   NEU.mountain = {
     recordings: {},
     active: false,
     mood: '',
+    altitude: 1000,
     /* D4's slideOpen calls plat.open directly, so currentId can lag the real
        level. Read the plat kernel when a mountain level is active. */
     here: function () { return NEU.mountain.active && P.levelId ? P.levelId() : currentId; }
   };
 
   function build(n) {
-    var rows = blank(), id = 'm' + n, ents, spawn;
+    var rows = blank(48), ents, spawn;
     if (n === 0) {
       fill(rows, 0, 8, 12, '#');
       fill(rows, 9, 12, 13, '^');
@@ -133,8 +187,7 @@
       spawn = { x: 4, y: 13 };
       ents = [{ t: 'pogo', x: 8, y: 13 }, { t: 'exit', x: 24, y: 12 }];
     } else if (n === 6) {
-      fill(rows, 4, 10, 16, '#');
-      fill(rows, 0, 3, 16, '^');
+      fill(rows, 0, 10, 16, '#');
       fill(rows, 11, 20, 16, '^');
       fill(rows, 0, 20, 17, '#');
       fill(rows, 2, 14, 11, '=');
@@ -155,7 +208,7 @@
     put(rows, LANTERN[n][0], LANTERN[n][1], "l");
     /* and one trail banner on the same floor, well away from the lantern: the second prop the eye finds */
     put(rows, BANNER[n][0], BANNER[n][1], "f");
-    add(id, rows, spawn, ents, n);
+    ascent(n, rows, ents, spawn);
   }
 
   var LANTERN = [[22, 11], [8, 13], [20, 13], [24, 13], [24, 13], [20, 12], [6, 10], [22, 11]];
@@ -188,8 +241,16 @@
       mechanicRequirements: detail.mechanics,
       prototype: true, testing: { status: 'not-playtested', reference: detail.reference },
       onExit: function () { NEU.mountain.prototypeCleared = id; },
-      onCheckpoint: function (e) { NEU.mountain.prototypeCheckpoint = id + ':' + e.id; }
+      onCheckpoint: function (e) {
+        NEU.mountain.prototypeCheckpoint = id + ':' + e.id;
+        cpHook(id)(e);
+      }
     });
+  }
+  function treads(x0, x1, y0, y1, tile) {
+    var a = [], y;
+    for (y = y0; y >= y1; y -= 2) a.push({ from: x0, to: x1, y: y, tile: tile });
+    return a;
   }
   /* First input: run and clear a short exposed crevasse. The overhead
      one-way ledge offers a safe alternate route, not an unavoidable trap. */
@@ -199,60 +260,45 @@
     { from: 0, to: 23, y: 33, tile: '#' },
     { from: 8, to: 9, y: 32, tile: '^' },
     { from: 12, to: 16, y: 25, tile: '=' },
+    { from: 6, to: 6, y: 29, tile: '`' },
     { from: 17, to: 18, y: 26, tile: '#' },
     { from: 17, to: 18, y: 25, tile: '#' }
   ], [
-    { t: 'checkpoint', x: 12, y: 29 },
+    { t: 'checkpoint', x: 12, y: 29, id: 'foot', alt: 1000 },
+    { t: 'spring', x: 14, y: 24 },
+    { t: 'crumble', x: 15, y: 24 },
+    { t: 'coin', x: 13, y: 24, id: 'mtn_coin:mtest_easy' },
     { t: 'exit', x: 21, y: 29 }
-  ], { stage: 'foot', altitude: 0, mechanics: ['ground jump', 'basic air control'],
+  ], { stage: 'foot', altitude: 1000, mechanics: ['ground jump', 'basic air control', 'spring', 'crumble'],
     reference: 'Forsaken City 1A rooms 1–3; verify preview and route before final use' });
 
   /* Spring sends the player from the ravine floor to a first landing.
      Each next landing is offset laterally: aim, land, then climb again. */
-  prototype('mtest_medium', 26, 44, { x: 3, y: 40 }, [
-    { from: 1, to: 8, y: 41, tile: '#' },
-    { from: 0, to: 25, y: 43, tile: '#' },
-    { from: 10, to: 20, y: 42, tile: '^' },
-    { from: 7, to: 12, y: 34, tile: '#' },
-    { from: 13, to: 18, y: 31, tile: '=' },
-    { from: 17, to: 24, y: 27, tile: '#' },
-    { from: 8, to: 13, y: 23, tile: '#' },
-    { from: 15, to: 22, y: 19, tile: '#' },
-    { from: 22, to: 24, y: 18, tile: '#' }
-  ], [
-    { t: 'spring', x: 5, y: 40 },
-    { t: 'refill', x: 11, y: 30 },
-    { t: 'checkpoint', x: 19, y: 26 },
-    { t: 'exit', x: 22, y: 18 }
-  ], { stage: 'ridge', altitude: 600, mechanics: ['spring', 'diagonal dash', 'landing control'],
+  prototype('mtest_medium', 26, 44, { x: 3, y: 40 },
+    [{ from: 0, to: 25, y: 41, tile: '#' }, { from: 4, to: 4, y: 40, tile: '`' }].concat(treads(6, 24, 38, 8, '=')), [
+    { t: 'spring', x: 8, y: 37 },
+    { t: 'refill', x: 14, y: 34 },
+    { t: 'checkpoint', x: 19, y: 31, id: 'lift', alt: 1500 },
+    { t: 'coin', x: 9, y: 13, id: 'mtn_coin:mtest_medium' },
+    { t: 'zip', x: 14, y: 22, targetX: 14, targetY: 24 },
+    { t: 'exit', x: 22, y: 7 }
+  ], { stage: 'ridge', altitude: 1400, mechanics: ['spring', 'diagonal dash', 'landing control'],
     reference: 'SpringCollab MultiNodeMovingPlatform and Celeste 7A wall springs (mechanic study only)',
     wind: { x: 55, y: 0, period: 4.2, duty: 0.65 } });
 
   /* Vertical stress-test: alternating shelves make camera tracking,
      momentum changes, dash refills and precise resets observable. The
      placed zip block is intentionally a collision/state-machine test. */
-  prototype('mtest_hard', 28, 60, { x: 4, y: 56 }, [
-    { from: 1, to: 10, y: 57, tile: '#' },
-    { from: 8, to: 14, y: 52, tile: '#' },
-    { from: 17, to: 24, y: 45, tile: '#' },
-    { from: 8, to: 14, y: 39, tile: '#' },
-    { from: 15, to: 22, y: 31, tile: '#' },
-    { from: 5, to: 12, y: 24, tile: '#' },
-    { from: 13, to: 21, y: 17, tile: '#' },
-    { from: 20, to: 26, y: 10, tile: '#' },
-    { from: 0, to: 27, y: 59, tile: '#' },
-    { from: 1, to: 7, y: 58, tile: '^' },
-    { from: 23, to: 27, y: 37, tile: 'v' },
-    { from: 0, to: 4, y: 32, tile: '>' },
-    { from: 22, to: 27, y: 22, tile: '<' }
-  ], [
-    { t: 'spring', x: 7, y: 56 },
-    { t: 'zip', x: 13, y: 51, targetX: 19, targetY: 45 },
-    { t: 'refill', x: 19, y: 42 },
-    { t: 'refill', x: 10, y: 35 },
-    { t: 'checkpoint', x: 16, y: 30 },
-    { t: 'refill', x: 9, y: 21 },
-    { t: 'refill', x: 16, y: 14 },
+  prototype('mtest_hard', 28, 60, { x: 4, y: 56 },
+    [{ from: 0, to: 27, y: 57, tile: '#' }, { from: 4, to: 4, y: 56, tile: '`' }].concat(treads(8, 26, 54, 10, '=')), [
+    { t: 'spring', x: 8, y: 53 },
+    { t: 'zip', x: 13, y: 51, targetX: 13, targetY: 53 },
+    { t: 'refill', x: 19, y: 47 },
+    { t: 'refill', x: 9, y: 41 },
+    { t: 'checkpoint', x: 16, y: 32, id: 'lift', alt: 2400 },
+    { t: 'refill', x: 9, y: 29 },
+    { t: 'refill', x: 16, y: 20 },
+    { t: 'coin', x: 22, y: 11, id: 'mtn_coin:mtest_hard' },
     { t: 'exit', x: 24, y: 9 }
   ], { stage: 'summit', altitude: 2400,
     mechanics: ['spring', 'zip', 'walljump', 'dash refill', 'wind management'],
@@ -267,6 +313,20 @@
   P.levels.mtest_easy.testing.successFrames = 94;
   P.levels.mtest_easy.testing.deaths = 0;
   NEU.mountain.recordings.mtest_easy = P.levels.mtest_easy.recording;
+
+  /* Both other gyms are reachable on the real controller: a held jump
+     lifts two tiles, a short release re-arms the edge-triggered jump. */
+  function climbRecording(rest, cycles) {
+    var a = [], k;
+    for (k = 0; k < cycles; k++) a.push([18, 'right jump'], [rest, 'right']);
+    return a;
+  }
+  P.levels.mtest_medium.recording = climbRecording(4, 40);
+  P.levels.mtest_medium.testing.rehearsed = { frames: 337, deaths: 0 };
+  NEU.mountain.recordings.mtest_medium = P.levels.mtest_medium.recording;
+  P.levels.mtest_hard.recording = climbRecording(8, 40);
+  P.levels.mtest_hard.testing.rehearsed = { frames: 430, deaths: 0 };
+  NEU.mountain.recordings.mtest_hard = P.levels.mtest_hard.recording;
 
   NEU.mountain.prototypes = ['mtest_easy', 'mtest_medium', 'mtest_hard'];
   NEU.mountain.openPrototype = function (difficulty) {
@@ -413,6 +473,17 @@
       c.fillStyle = evil ? (f.big ? '#6A6A6A' : '#3A3A3A') : '#FFF6DE';
       c.fillRect(x | 0, y | 0, evil && f.big ? 2 : 1, evil && f.big ? 2 : 1);
     }
+    /* A gust is visible before it pushes: streaks run only while the same
+       deterministic windNow() cycle that moves the hero is active. */
+    if (!reducedNow() && level.wind && P.wind && P.wind().active) {
+      c.fillStyle = evil ? '#FFD070' : '#FFFFFF';
+      for (k = 0; k < 9; k++) {
+        x = P.mod(k * 97 - camX * 0.6 - now * 0.16, 700) + a.x0 - 30;
+        y = P.mod(k * 53 - camY * 0.3, 400) + a.y0 - 20;
+        c.fillRect(x | 0, y | 0, 14, 1);
+        c.fillRect((x + 16) | 0, (y + 1) | 0, 6, 1);
+      }
+    }
   }
   function chainHook(name, fn) {
     var prev = P[name];
@@ -463,16 +534,28 @@
     F(g, '#3A3A3A', px, py + 3, 16, 1);
     F(g, '#3A3A3A', px + 2, py + 4, 1, 4); F(g, '#6A6A6A', px + 2, py + 4, 1, 2); F(g, '#3A3A3A', px + 13, py + 4, 1, 4); F(g, '#6A6A6A', px + 13, py + 4, 1, 2);
   }
+  function duskPine(g, px, py) {
+    F(g, '#1A1218', px + 7, py + 10, 2, 6);
+    F(g, '#2A1F24', px + 2, py + 8, 12, 3); F(g, '#2A1F24', px + 4, py + 5, 8, 3); F(g, '#2A1F24', px + 6, py + 2, 4, 3);
+    F(g, '#8A5A48', px + 2, py + 8, 12, 1); F(g, '#8A5A48', px + 4, py + 5, 8, 1);
+    F(g, '#C89A78', px + 6, py + 2, 4, 1); F(g, '#E8B890', px + 7, py + 1, 2, 1);
+  }
+  function shelfTuft(g, px, py) {
+    F(g, '#8A6A20', px + 3, py + 9, 10, 2);
+    F(g, '#C9A24A', px + 5, py + 5, 1, 6); F(g, '#C9A24A', px + 8, py + 4, 1, 7); F(g, '#C9A24A', px + 11, py + 6, 1, 5);
+  }
   function paintDescent(g, level) {
-    var evil = level.id.charAt(0) === 'v', y, x, row, ch, px, py;
+    var evil = level.id.charAt(0) === 'v', dusk = level.id === 'v3', y, x, row, ch, px, py;
     for (y = 0; y < level.h; y++) {
       row = level.grid[y] || '';
       for (x = 0; x < level.w; x++) {
         ch = x < row.length ? row.charAt(x) : '.';
         px = x * 16; py = y * 16;
         if (ch === '.' || ch === ' ') continue;
-        if (ch === '#') { if (evil) obsidian(g, level, x, y); else marble(g, level, x, y); }
+        if (ch === '#') { if (dusk && y < 46) duskPine(g, px, py); else if (evil) obsidian(g, level, x, y); else marble(g, level, x, y); }
         else if (ch === '=') { if (evil) chainBridge(g, px, py); else cloudLedge(g, px, py); }
+        else if (ch === '`') shelfTuft(g, px, py);
+        else if (ch === '^' || ch === 'v' || ch === '<' || ch === '>') P.spike(g, px, py, ch, { ink: '#12081E', dark: '#5A6470', mid: '#9AA0A8', light: '#E4E4EC', tip: '#FFFFFF', base: '#3A4048' });
         else F(g, '#FF00FF', px, py, 16, 16);
       }
     }
@@ -497,24 +580,144 @@
       P.open(prefix + (i + 1));
     };
   }
+  /* A timed Ember hazard: a lava column rises on a fixed cycle and is
+     warned one second ahead. Both the lava and the vents use the same
+     sim clock as the hero, so a retry always starts on the same beat. */
+  function emberHazards(def, i) {
+    var s = { top: 68 * 16, warn: false, high: false };
+    def.hazard = s;
+    def.tick = function () {
+      var phase = (P.time() % 5.6) / 5.6, es, k, vent;
+      s.warn = phase < 0.18;
+      s.high = phase >= 0.18 && phase < 0.62;
+      s.top = s.high ? (68 - (phase - 0.18) / 0.44 * (14 + i * 2)) * 16 : 68 * 16;
+      es = P.level0() && P.level0().entities;
+      if (es) for (k = 0; k < es.length; k++) {
+        vent = es[k];
+        if (vent.t !== 'spring' || !vent.vent) continue;
+        vent.dead = !((phase >= 0.30 && phase < 0.56) || (phase >= 0.80 && phase < 0.94));
+      }
+      if (P.hero() && P.hero().x > 40 * 16 && P.hero().y > s.top + 4) P.die();
+    };
+    def.draw = function (c, cx, cy) {
+      var x0 = 40 * 16 - cx, y0 = s.top - cy, k;
+      if (s.warn) {
+        c.fillStyle = '#FFD070';
+        for (k = 0; k < 8 * 16; k += 16) c.fillRect(x0 + k, y0 - 3, 8, 1);
+      }
+      if (s.high) {
+        c.fillStyle = '#7A1020'; c.fillRect(x0, y0, 8 * 16, 68 * 16 - s.top);
+        c.fillStyle = '#FF6A3A'; c.fillRect(x0, y0, 8 * 16, 2);
+        for (k = 0; k < 12 * 8; k++) if (P.hash(k, i, 91) < 0.4) c.fillRect(x0 + (P.hash(k, i, 92) * 190) | 0, y0 + 4 + ((P.hash(k, i, 93) * 40) | 0), 2, 1);
+      }
+    };
+  }
   function descent(prefix, i, evil) {
-    var rows = blank(), id = prefix + i, ents, spawn, rec, def;
-    fill(rows, 0, 47, 14, '#');
-    if (!evil) { fill(rows, 6, 12, 6, '='); fill(rows, 28, 34, 5, '='); }
-    spawn = { x: 2, y: 13 };
-    ents = [{ t: 'exit', x: 34 + (i % 2), y: 13 }];
+    var rows = blank(48, 72), base = blank(48), id = prefix + i, ents, spawn, rec, def, k, y, x0, x1, alt;
+    var chapter = evil ? 'ember' : 'sun', startAlt = evil ? 2100 + i * 380 : 1250 + i * 340;
+    /* the original ground walk stays the guaranteed exit route */
+    fill(base, 0, 47, 14, '#');
+    if (!evil) { fill(base, 6, 12, 6, '='); fill(base, 28, 34, 5, '='); }
+    for (y = 0; y < base.length; y++) rows[y + 54] = base[y];
+    /* three screens of vertical traversal: treads sit a short jump apart,
+       so every shelf is reachable without a spring or a lucky gust. */
+    for (k = 0; k < 20; k++) {
+      y = 66 - k * 3;
+      if (y < 9) break;
+      x0 = k % 4 === 2 ? 18 : 6; x1 = k % 4 === 2 ? 42 : 36;
+      fill(rows, x0, x1, y, '=');
+    }
+    ents = [{ t: 'exit', x: 34 + (i % 2), y: 67 }];
+    for (k = 0; k < 9; k++) {
+      y = 62 - k * 6;
+      x0 = k % 2 ? 4 : 26; x1 = k % 2 ? 18 : 42;
+      fill(rows, x0, x1, y, '=');
+      if (k > 1 && k < 8) fill(rows, k % 2 ? 32 : 8, k % 2 ? 40 : 16, y - 3, '=');
+      alt = startAlt + k * 120;
+      ents.push(cp(k % 2 ? 6 : 30, y - 1, 'shelf' + k, alt));
+      if (evil && k === 3) ents.push({ t: 'spring', x: x1 - 2, y: y - 1, vent: 1, id: id + ':vent' });
+      if (!evil && k % 3 === 1) ents.push({ t: 'zip', x: x0 + 5, y: y - 2, targetX: x0 + 5, targetY: y + 2, id: id + ':cloud' + k });
+    }
+    put(rows, 30, 59, '`');
+    if (evil && i === 3) { fill(rows, 4, 10, 26, '#'); fill(rows, 30, 38, 20, '#'); }
+    ents.push({ t: 'coin', x: evil ? 38 : 8, y: 11, id: 'mtn_coin:' + id });
+    ents.push(cp(4, 67, 'base', startAlt));
+    spawn = { x: 2, y: 67 };
     rec = [[240, 'right']];
     def = P.level(id, {
       tiles: rows.join('\n'),
       spawn: spawn,
       entities: ents,
       tileset: 'mountain',
+      chapter: chapter,
+      altitude: startAlt,
+      wind: evil ? { x: -36, y: -8, period: 5.6, duty: 0.7 } : { x: 55, y: 0, period: 4.2, duty: 0.65 },
+      onCheckpoint: cpHook(id),
       onExit: descentExit(prefix, i)
     });
+    if (evil) emberHazards(def, i);
     def.recording = rec;
     NEU.mountain.recordings[id] = rec;
   }
   for (n = 0; n <= 3; n++) { descent('h', n, false); descent('v', n, true); }
+
+  /* Chapter scores are data on NEU.music.tracks; the director in music.js
+     owns playback, so no second audio authority is created here. */
+  var SECTIONS = {
+    pine: { id: 'mtn_pine', name: 'PINE STEPS', bpm: 88, root: 50, sky: '#B8CCD6', ink: '#E6EEF2' },
+    sun: { id: 'mtn_sun', name: 'SUNLIT SHELF', bpm: 102, root: 57, sky: '#F8E7A8', ink: '#FFF6DE' },
+    ember: { id: 'mtn_ember', name: 'EMBER PASS', bpm: 138, root: 45, sky: '#3A1018', ink: '#FFD070' }
+  };
+  function score(id) { return SECTIONS[id] || SECTIONS.pine; }
+  function registerScores() {
+    if (!NEU.music || !NEU.music.tracks) return;
+    var k, s, t;
+    for (k in SECTIONS) {
+      s = SECTIONS[k]; t = NEU.music.tracks[s.id];
+      if (!t) t = NEU.music.tracks[s.id] = { bpm: s.bpm, root: s.root, scale: NEU.music.tracks.storm.scale, chords: [0, 5, 3, 4], base: 0.6,
+        pad: { wave: 'triangle', gain: 0.018, oct: 0 }, bass: { wave: 'sine', gain: 0.06, oct: -12, pat: [0, null, null, null, 4, null, null, null] },
+        lead: { wave: 'triangle', gain: 0.032, oct: 12, pat: [null, null, 4, null, 2, null, null, 7] } };
+    }
+  }
+  function chapterOf(id) {
+    if (/^m(\d|test_)/.test(id)) return 'pine';
+    return id && id.charAt(0) === 'h' ? 'sun' : 'ember';
+  }
+  function coinsOf(L) {
+    var n = 0, got = 0, i;
+    for (i = 0; i < L.entities.length; i++) if (L.entities[i].t === 'coin') {
+      n++;
+      if (NEU.save && NEU.save.flagged && NEU.save.flagged('plat_coin:' + L.entities[i].id)) got++;
+    }
+    return { got: got, total: n };
+  }
+  function mapDots(c, x, y, L, s) {
+    var ids = L.chapter === 'pine' ? ['m0', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'] : ['h0', 'h1', 'h2', 'h3', 'v0', 'v1', 'v2', 'v3'], i, on;
+    for (i = 0; i < ids.length; i++) {
+      if (L.chapter !== 'pine' && ids[i].charAt(0) !== L.id.charAt(0)) continue;
+      on = NEU.save && NEU.save.flagged && NEU.save.flagged('mtn_' + ids[i]);
+      c.fillStyle = 'rgba(255,255,255,0.22)'; c.fillRect(x + i * 12 - 1, y - 1, 10, 10);
+      c.fillStyle = on ? s.ink : 'rgba(255,255,255,0.45)';
+      c.fillRect(x + i * 12, y, 8, 8);
+      if (NEU.save && NEU.save.flagged && NEU.save.flagged('mtn_coin:' + ids[i])) { c.fillStyle = '#FFD070'; c.fillRect(x + i * 12 + 2, y + 2, 4, 4); }
+    }
+  }
+  function hud(c, L, view, now, a) {
+    if (!L || L.tileset !== 'mountain' || typeof c.fillText !== 'function') return;
+    var s = score(L.chapter || chapterOf(L.id)), coins = coinsOf(L), x = a.x0 + 16, y = a.y0 + 20;
+    c.font = '16px monospace'; c.textBaseline = 'top';
+    c.fillStyle = '#12081E'; c.globalAlpha = 0.82; c.fillRect(x - 4, y - 4, 208, 62); c.globalAlpha = 1;
+    c.fillStyle = s.ink;
+    c.fillText(s.name, x, y);
+    c.fillText(Math.round(NEU.mountain.altitude || L.altitude || 0) + ' m', x, y + 18);
+    if (coins.total) c.fillText('◆ ' + coins.got + '/' + coins.total, x + 116, y + 18);
+    mapDots(c, x, y + 42, L, s);
+  }
+  var prevHud = P.hud;
+  P.hud = function (c, L, view, now, a) {
+    hud(c, L, view, now, a);
+    if (prevHud) prevHud(c, L, view, now, a);
+  };
 
   var origOpen = P.open, origReplay = P.replay;
   P.open = function (id, opts) {
@@ -522,10 +725,13 @@
     var drop = !!P.levels[id] && /^[hv][0-3]$/.test(id);
     var ok;
     NEU.mountain.mood = drop ? (id.charAt(0) === 'v' ? 'evil' : 'heaven') : '';
+    registerScores();
     ok = origOpen(id, opts);
     NEU.mountain.active = !!(ok && ascent);
     if (ascent || drop) {
       currentId = id;
+      NEU.mountain.musicSection = score(chapterOf(id)).id;
+      NEU.mountain.altitude = (P.levels[id] && P.levels[id].altitude) || NEU.mountain.altitude;
     } else if (ok) currentId = '';
     return ok;
   };
