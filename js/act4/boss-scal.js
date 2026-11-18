@@ -1166,6 +1166,7 @@
      out, or at once when a proximity fuse reaches the soul. Its onEnd runs
      after the list is rebuilt, so the ring it drops is not lost. */
   function moveBullets(dt) {
+    var bs = dp('bulletSpeed');
     var keep = [], fire = [];
     for (var i = 0; i < bullets.length; i++) {
       var b = bullets[i];
@@ -1194,7 +1195,7 @@
         var ou = Math.min(1, b.age / b.orb.T), oa = b.orb.a0 + b.orb.w * b.age;
         var orr = b.orb.r0 + (b.orb.r1 - b.orb.r0) * ou;
         b.x = b.orb.cx + Math.cos(oa) * orr; b.y = b.orb.cy + Math.sin(oa) * orr;
-      } else { b.x += b.vx * dt; b.y += b.vy * dt; }
+      } else { b.x += b.vx * dt * bs; b.y += b.vy * dt * bs; }
       /* a bouncing bolt (the Cataclysm rocket) turns off each wall it meets,
          for as many bounces as it has */
       if (b.bounce > 0 && (b.x < AX || b.x > AX + AW || b.y < AY || b.y > AY + AH)) {
