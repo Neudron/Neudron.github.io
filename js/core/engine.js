@@ -1374,6 +1374,7 @@
       if (NEU.activeMinigame === 'deck' && NEU.deck && NEU.deck.close) { NEU.deck.close(); return; }
       var ce = document.getElementById('confirmExit');
       if (ce) { ce.remove(); return; }
+      if (NEU.menu && NEU.menu.pause && !busy) { NEU.menu.pause(); return; }
       return;
     }
     if (e.key === 'x' || e.key === 'X') {
@@ -1650,6 +1651,7 @@
   NEU.engine = {
     register: register, alias: alias, tileset: tileset, decor: decor, enter: enter, leave: leave, resume: resume, go: go,
     confirmExit: confirmExit,
+    clearKeys: function () { keys = {}; if (physical) physical.heldKeys = {}; },
     where: function () { return room ? { room: currentArea || room.id, spawn: room.__spawn } : null; },
     get running() { return running; },
     get room() { return room ? room.id : null; },

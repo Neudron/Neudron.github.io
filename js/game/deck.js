@@ -153,7 +153,7 @@
     { id: 'woods', title: 'the woods',
       meta: 'adventure · unfinished business',
       a: '#C2405F', b: '#1A0A12', ink: '#FF6B4A', hi: '#FFD08A',
-      run: function () { return NEU.act4 && NEU.act4.open(); } },
+      run: function () { return NEU.menu && NEU.menu.title ? NEU.menu.title() : NEU.act4 && NEU.act4.open(); } },
 
     { id: 'skele', title: 'skeleton simulator',
       meta: '0.2 hrs on record · 340 GB',
