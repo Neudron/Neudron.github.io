@@ -21,7 +21,13 @@
     e0: '#4A2A14', e1: '#6A3A1C', e2: '#8A4A24', e3: '#A85E2C', e4: '#C47A32', e5: '#D8925A',
     g0: '#3A3A14', g1: '#5A5A1E', g2: '#7A7A2A', g3: '#A89A3A', g4: '#C8B44A', g5: '#E6D27A',
     b0: '#2A1A0C', b1: '#3A2410', b2: '#5C3A18', b3: '#8A5A28', b4: '#A87038', b5: '#C8904A',
-    k0: '#1A1020', k1: '#4A2A4A', k2: '#A8506A', k3: '#E89060', k4: '#F8C890'
+    k0: '#1A1020', k1: '#4A2A4A', k2: '#A8506A', k3: '#E89060', k4: '#F8C890',
+    /* golden-hour ground materials. stepped, never an alpha gradient */
+    r0: '#5A2A12', r1: '#8A3A18', r2: '#B05424', r3: '#D07634', r4: '#E89850',
+    m0: '#3A3A2A', m1: '#5A5640', m2: '#7A7454', m3: '#9A9068', m4: '#B8AE84',
+    s0: '#3A3428', s1: '#5A5240', s2: '#7A7058', s3: '#9A8E70', s4: '#B8AC8C',
+    dg0: '#6A4A18', dg1: '#8A6A2A', dg2: '#A8853A', dg3: '#C8A34A',
+    sun: '#FFD9A0'
   };
 
   function A() { return NEU.roomArt; }
@@ -56,7 +62,16 @@
     return r.charAt(x);
   }
   function isPath(ch) { return ch === ',' || ch === '='; }
-  function isFloor(ch) { return ch === '.' || ch === ',' || ch === '='; }
+  function isFloor(ch) { return ch === '.' || ch === ',' || ch === '=' || ch === 'd' || ch === 'r' || ch === 'm' || ch === 's'; }
+  /* room.sites is authored in rooms-s.js. One lookup per baked tile. */
+  function siteAt(room, x, y) {
+    var z = (room && room.sites) || [], i, s;
+    for (i = 0; i < z.length; i++) {
+      s = z[i];
+      if (x >= s.x0 && x < s.x0 + s.w && y >= s.y0 && y < s.y0 + s.h) return s;
+    }
+    return null;
+  }
 
   /* ── bake helpers ─────────────────────────────────────────────── */
   /* 2px checker cells along one edge of a tile: the dither between two tones */
@@ -89,8 +104,12 @@
     return hs(x, y, 7) < 0.14 ? 1 : 0;
   }
   function baseOf(room, x, y) {
-    var ch = tk(room, x, y);
+    var ch = tk(room, x, y), s = siteAt(room, x, y), m = s ? s.mat : 'd';
     if (isPath(ch)) return C.e4;
+    if (m === 'r') return C.r2;
+    if (m === 'm') return C.m2;
+    if (m === 's') return C.s2;
+    if (m === 'd') return C.dg1;
     return sandTone(room, x, y) ? C.sd3 : C.sd4;
   }
 
@@ -135,8 +154,108 @@
       }
     }
   }
+  function speckle(g, room, x, y, px, py, a, b, n, seed) {
+    var i, k;
+    for (i = 0; i < n; i++) {
+      k = hs(x, y, seed + i);
+      rc(g, px + ((hs(x, y, seed + 20 + i) * 15) | 0),
+         py + ((hs(x, y, seed + 40 + i) * 15) | 0),
+         1 + (k > 0.82 ? 1 : 0), 1, k < 0.5 ? a : b);
+    }
+  }
+  /* dry grass over packed earth: two grass tones, a stone and a footprint
+     every few tiles. Never one flat fill. */
+  function dryGrassTile(g, room, x, y, px, py) {
+    var tone = hs(x, y, 900) < 0.3, i, fx, fy;
+    rc(g, px, py, T, T, tone ? C.dg0 : C.dg1);
+    for (i = 0; i < 3; i++) rc(g,
+      px + ((hs(x, y, 910 + i) * 12) | 0), py + ((hs(x, y, 920 + i) * 12) | 0),
+      3 + ((hs(x, y, 930 + i) * 3) | 0), 1, i & 1 ? C.dg2 : C.dg3);
+    if ((x + y) % 2 === 0) tuft(g, px + 2 + ((hs(x, y, 940) * 7) | 0), py + 7, hs(x, y, 941));
+    if (hs(x, y, 950) < 0.22) {
+      fx = px + ((hs(x, y, 951) * 11) | 0); fy = py + ((hs(x, y, 952) * 11) | 0);
+      rc(g, fx, fy, 3, 2, C.s2); rc(g, fx, fy, 2, 1, C.s3);
+    }
+    if ((x * 3 + y) % 5 === 0) {
+      fx = px + ((hs(x, y, 960) * 10) | 0); fy = py + ((hs(x, y, 961) * 10) | 0);
+      rc(g, fx, fy, 2, 1, C.e0); rc(g, fx + 3, fy + 1, 2, 1, C.e0);
+    }
+    speckle(g, room, x, y, px, py, C.g0, C.g3, 3, 970);
+  }
+  /* red laterite: stepped patches, hairline cracks, warm east-facing rim */
+  function lateriteTile(g, room, x, y, px, py) {
+    var tone = hs(x, y, 1000) < 0.42, i, fx, fy;
+    rc(g, px, py, T, T, tone ? C.r1 : C.r2);
+    for (i = 0; i < 3; i++) {
+      fx = px + ((hs(x, y, 1010 + i) * 11) | 0); fy = py + ((hs(x, y, 1020 + i) * 12) | 0);
+      rc(g, fx, fy, 4, 2, i === 1 ? C.r3 : C.r0);
+      if (i === 1) rc(g, fx, fy, 3, 1, C.r4);
+    }
+    if ((x + y) % 3 === 0) {
+      fx = px + ((hs(x, y, 1030) * 11) | 0); fy = py + ((hs(x, y, 1031) * 11) | 0);
+      rc(g, fx, fy, 5, 1, C.r0); rc(g, fx + 4, fy + 1, 1, 2, C.r0);
+    }
+    if (hs(x, y, 1040) < 0.2) tuft(g, px + 4, py + 8, hs(x, y, 1041));
+    speckle(g, room, x, y, px, py, C.r0, C.r3, 4, 1050);
+  }
+  /* cracked mud near the waterhole: stepped panels, dark seams, reeds */
+  function mudTile(g, room, x, y, px, py) {
+    var tone = hs(x, y, 1100) < 0.35, i, fx, fy;
+    rc(g, px, py, T, T, tone ? C.m1 : C.m2);
+    rc(g, px + 2, py + 2, 6, 5, C.m3);
+    rc(g, px + 9, py + 8, 5, 5, tone ? C.m3 : C.m1);
+    rc(g, px + 2, py + 2, 5, 1, C.m4);
+    for (i = 0; i < 3; i++) {
+      fx = px + ((hs(x, y, 1110 + i) * 13) | 0); fy = py + ((hs(x, y, 1120 + i) * 13) | 0);
+      rc(g, fx, fy, 1 + ((hs(x, y, 1130 + i) * 4) | 0), 1, C.m0);
+    }
+    if ((x + y) % 3 === 0) tuft(g, px + 3 + ((hs(x, y, 1140) * 6) | 0), py + 7, hs(x, y, 1141));
+    if ((x * 2 + y) % 7 === 0) {
+      fx = px + ((hs(x, y, 1150) * 10) | 0); fy = py + ((hs(x, y, 1151) * 10) | 0);
+      rc(g, fx, fy, 2, 1, C.m0); rc(g, fx + 3, fy + 1, 2, 1, C.m0);
+    }
+    speckle(g, room, x, y, px, py, C.m0, C.m4, 3, 1160);
+  }
+  /* stone at the station: 8px flags with grout, warm low-light highlight */
+  function stoneTile(g, room, x, y, px, py) {
+    var sx, sy, a;
+    for (sy = 0; sy < 2; sy++) for (sx = 0; sx < 2; sx++) {
+      a = (x + sx + y + sy + ((hs(x * 2 + sx, y * 2 + sy, 1200) * 3) | 0)) & 1;
+      rc(g, px + sx * 8, py + sy * 8, 8, 8, a ? C.s1 : C.s2);
+      rc(g, px + sx * 8, py + sy * 8 + 7, 8, 1, C.s0);
+      rc(g, px + sx * 8 + 7, py + sy * 8, 1, 8, C.s0);
+      rc(g, px + sx * 8, py + sy * 8, 7, 1, C.s3);
+      if (hs(x * 2 + sx, y * 2 + sy, 1210) < 0.3)
+        rc(g, px + sx * 8 + 2, py + sy * 8 + 3, 2, 1, C.s4);
+    }
+  }
+  /* Natural edges. Same solid tile, different silhouette: rock strata,
+     thorn tangles, a dry-river bank, tall grass, or the kraal's one fence. */
+  function edgeOverlay(g, px, py, edge, x, y) {
+    var i, fx, fy;
+    if (edge === 'rock') {
+      for (i = 0; i < 3; i++) {
+        fx = px + ((hs(x, y, 1300 + i) * 10) | 0); fy = py + ((hs(x, y, 1310 + i) * 11) | 0);
+        rc(g, fx, fy, 6, 3, C.s1); rc(g, fx, fy, 5, 1, C.s3); rc(g, fx + 1, fy + 2, 4, 1, C.s0);
+      }
+      rc(g, px + 2, py + 12, 12, 1, C.s2);
+    } else if (edge === 'thorn') {
+      for (i = 0; i < 5; i++) {
+        fx = px + 2 + ((hs(x, y, 1320 + i) * 12) | 0); fy = py + 4 + ((hs(x, y, 1330 + i) * 9) | 0);
+        rc(g, fx, fy, 4, 1, C.g0); rc(g, fx + 1, fy - 2, 1, 3, C.g1); rc(g, fx + 3, fy - 1, 1, 2, C.g0);
+      }
+      rc(g, px + 6, py + 1, 1, 4, C.b0);
+    } else if (edge === 'grass') {
+      for (i = 0; i < 3; i++) tuft(g, px + 1 + i * 5, py + 6 + ((hs(x, y, 1340 + i) * 3) | 0), hs(x, y, 1350 + i));
+    } else if (edge === 'fence') {
+      rc(g, px + 2, py + 2, 2, 12, C.b3); rc(g, px + 2, py + 2, 1, 12, C.b5);
+      rc(g, px + 9, py + 2, 2, 12, C.b2); rc(g, px + 9, py + 2, 1, 12, C.b4);
+      rc(g, px, py + 5, 16, 2, C.b4); rc(g, px, py + 5, 16, 1, C.b5);
+      rc(g, px, py + 11, 16, 2, C.b3);
+    }
+  }
   /* an earth bank. Top face, lip, strata front, drips. */
-  function wallTile(g, room, x, y, px, py) {
+  function wallTile(g, room, x, y, px, py, edge) {
     var openS = isFloor(tk(room, x, y + 1)), openE = isFloor(tk(room, x + 1, y)), openW = isFloor(tk(room, x - 1, y));
     var topN = tk(room, x, y - 1) !== '#';
     var th = openS ? 6 : T, i, k, cx;
@@ -177,6 +296,7 @@
       rc(g, px, py + T - 2, T, 2, C.b3);
       rc(g, px, py + T - 1, T, 1, C.b2);
     }
+    if (edge) edgeOverlay(g, px, py, edge, x, y);
   }
   /* station: tiled floor and wall, 8x8 tiles with grout */
   function stationTile(g, room, x, y, px, py, wall) {
@@ -241,6 +361,22 @@
     rc(g, bn + 4, bb + 5, 3, 6, '#3A2410'); rc(g, bn + 29, bb + 5, 3, 6, '#3A2410');
     rc(g, bn + 4, bb + 5, 1, 6, '#5C3A18');
     g.globalAlpha = 0.25; rc(g, bn + 6, bb + 11, 36, 2, '#000000'); g.globalAlpha = 1;
+    /* one continuous rail line across the platform: sleepers first, then
+       the two steel rails on top, so it reads in a single glance */
+    var rx, rw, ry = oy + 6 * T + 8;
+    for (rx = 0; rx < 11 * T; rx += 12) {
+      rc(g, ox + rx, ry, 8, 14, '#3A2410');
+      rc(g, ox + rx, ry, 8, 1, '#6A4A20');
+    }
+    /* short spans: the bake gate rejects single fillRects wider than 64px */
+    for (rx = 0; rx < 11 * T; rx += 48) {
+      rw = Math.min(48, 11 * T - rx);
+      rc(g, ox + rx, ry + 2, rw, 2, '#141014');
+      rc(g, ox + rx, ry + 2, rw, 1, '#9A8E70');
+      rc(g, ox + rx, ry + 10, rw, 2, '#141014');
+      rc(g, ox + rx, ry + 10, rw, 1, '#9A8E70');
+    }
+    for (rx = 0; rx < 11 * T; rx += 24) rc(g, ox + rx + 4, ry + 3, 1, 1, '#12081E');
   }
 
   /* ── the dusk sky and the cliff around the room ─────────────────── */
@@ -354,16 +490,21 @@
     cv.vz = { ox: ox, oy: oy };
     if (!g) return cv;
     g.imageSmoothingEnabled = false;
-    var x, y, ch2, px, py, i, k, es, e, n, fl;
+    var x, y, ch2, px, py, i, i2, k, es, e, n, fl, site;
     drawSky(g, ox, oy, cw, station, room);
     drawCliff(g, ox, oy, cw, ch, station, rw, rh);
     for (y = 0; y < room.h; y++) {
       for (x = 0; x < room.w; x++) {
         ch2 = tk(room, x, y);
         px = ox + x * T; py = oy + y * T;
+        site = siteAt(room, x, y);
         if (station || inStation(room, x, y)) { stationTile(g, room, x, y, px, py, ch2 === '#'); continue; }
-        if (ch2 === '#') wallTile(g, room, x, y, px, py);
+        if (ch2 === '#') wallTile(g, room, x, y, px, py, site ? site.edge : 'bank');
         else if (isPath(ch2)) pathTile(g, room, x, y, px, py);
+        else if (ch2 === 'd') dryGrassTile(g, room, x, y, px, py);
+        else if (ch2 === 'r') lateriteTile(g, room, x, y, px, py);
+        else if (ch2 === 'm') mudTile(g, room, x, y, px, py);
+        else if (ch2 === 's') stoneTile(g, room, x, y, px, py);
         else sandTile(g, room, x, y, px, py);
       }
     }
@@ -407,6 +548,45 @@
       }
     } else {
       stationDecor(g, ox, oy);
+    }
+    if (!station && room.stationZones) {
+      /* the merged village carries one station interior, not a second room:
+         its sign, bench and rail line must be drawn in the same bake */
+      for (i = 0; i < room.stationZones.length; i++) {
+        k = room.stationZones[i];
+        stationDecor(g, ox + k.x0 * T, oy + k.y0 * T);
+      }
+    }
+    if (!station) {
+      /* Golden hour. Low sun in the west: three stepped warm bands, then
+         the two light sources baked into the floor (pool and fire). */
+      g.fillStyle = C.sun;
+      for (x = 0; x < room.w; x++) {
+        k = 1 - x / room.w;
+        g.globalAlpha = k > 0.66 ? 0.06 : k > 0.33 ? 0.04 : 0.02;
+        g.fillRect(ox + x * T, oy, T, rh);
+      }
+      g.globalAlpha = 1;
+      es = room.sites || [];
+      for (i = 0; i < es.length; i++) {
+        if (!es[i].light) continue;
+        k = es[i].light.r;
+        px = ox + es[i].light.x * T + 8; py = oy + es[i].light.y * T + 8;
+        g.fillStyle = es[i].light.col;
+        /* short spans: the bake gate rejects fillRects wider than 64px */
+        g.globalAlpha = 0.16;
+        for (x = -k / 2; x < k / 2; x += 48) {
+          i2 = Math.min(48, k / 2 - x);
+          g.fillRect(px + x, py - k / 4, i2, k / 2);
+        }
+        g.globalAlpha = 0.12;
+        for (x = -k / 3; x < k / 3; x += 48) {
+          i2 = Math.min(48, k / 3 - x);
+          g.fillRect(px + x, py - k / 6, i2, k / 3);
+        }
+        g.globalAlpha = 0.10; g.fillRect(px - k / 6, py - k / 8, k / 3, k / 4);
+      }
+      g.globalAlpha = 1;
     }
     /* the dusk wash on the top of the room: stepped, never a gradient */
     g.fillStyle = C.k3;
@@ -452,16 +632,16 @@
     for (i = 0; i < o.length; i += 2) g.fillRect(o[i], o[i + 1], 1, 1);
   }
   function castShadow(g, ax, ay, pw) {
-    var x0 = ax - Math.round(pw * 0.3), w = Math.round(pw * 1.9);
+    /* Long shadow east: the low sun is behind the west edge of the frame. */
+    var x0 = ax - Math.round(pw * 0.28), w = Math.round(pw * 2.6);
     g.save();
     g.globalCompositeOperation = 'destination-over';
     g.fillStyle = '#000000';
-    g.globalAlpha = 0.25;
-    g.fillRect(x0 + 6, ay - 1, w - 10, 1);
-    g.fillRect(x0, ay, w, 1);
-    g.fillRect(x0 + 10, ay + 1, w - 24, 1);
-    g.globalAlpha = 0.3;
-    g.fillRect(ax - Math.round(pw * 0.25), ay - 1, Math.round(pw * 0.5), 2);
+    g.globalAlpha = 0.30; g.fillRect(ax - Math.round(pw * 0.25), ay - 1, Math.round(pw * 0.6), 2);
+    g.globalAlpha = 0.24; g.fillRect(x0, ay, Math.round(w * 0.55), 1);
+    g.globalAlpha = 0.18; g.fillRect(x0 + 6, ay + 1, Math.round(w * 0.72), 1);
+    g.globalAlpha = 0.12; g.fillRect(x0 + 14, ay + 2, w - 18, 1);
+    g.globalAlpha = 0.07; g.fillRect(x0 + 26, ay + 3, Math.max(1, w - 34), 1);
     g.restore();
   }
   function ln(R, x0, y0, x1, y1, c, t) {
@@ -659,11 +839,135 @@
       R(x - 2, -h - 2, 20, 1, '#3A2410');
     }
   }
+  /* ── the village landmarks. Each one reads as a silhouette at a glance. */
+  function pGateposts(R) {
+    var i, x;
+    for (i = 0; i < 2; i++) {
+      x = i ? 16 : -18;
+      R(x, -36, 8, 36, '#7A4A1C'); R(x, -36, 2, 36, '#A87038');
+      R(x + 6, -36, 2, 36, '#3A2410'); R(x - 2, -38, 12, 3, '#5C3A18');
+      R(x - 2, -38, 10, 1, '#C8904A');
+      R(x + 2, -33, 1, 1, '#C4323A'); R(x + 4, -31, 1, 1, '#8AB0FF'); R(x + 1, -28, 1, 1, '#FFE35A');
+      R(x + 5, -26, 1, 1, '#E8DCC0'); R(x + 2, -24, 1, 1, '#C4323A');
+    }
+    R(-18, -38, 42, 2, '#8A5A28'); R(-18, -38, 40, 1, '#C8904A');
+    for (x = -14; x < 22; x += 3) {
+      R(x, -36, 1, 4 + ((hs(x, 1, 1400) * 4) | 0), '#5C3A18');
+      R(x, -34, 1, 1, ((x / 3) & 1) ? '#C4323A' : '#FFE35A');
+    }
+  }
+  function pMarket(R) {
+    var i, x, y, cols = ['#C4323A', '#8AB0FF', '#FFE35A'];
+    for (i = 0; i < 3; i++) {
+      x = -28 + i * 19;
+      R(x + 1, -30, 3, 30, '#5C3A18'); R(x + 14, -30, 3, 30, '#3A2410');
+      for (y = 0; y < 7; y++) R(x + y - 3, -36 + y, 22 - y * 2, 2, cols[i]);
+      R(x - 4, -29, 26, 2, cols[i]); R(x - 4, -29, 26, 1, '#E8DCC0');
+      R(x, -27, 18, 12, '#2A1A0C'); R(x + 1, -26, 16, 9, '#5C3A18');
+      R(x + 2, -25, 5, 6, '#C8904A'); R(x + 9, -24, 4, 5, '#A85E2C');
+      R(x + 2, -14, 6, 5, '#8A4A24'); R(x + 10, -14, 6, 5, '#A86828');
+    }
+    for (i = 0; i < 6; i++) R(-26 + i * 10, -7, 5, 4, i & 1 ? '#8A5A28' : '#5C3A18');
+  }
+  function pFireRing(R) {
+    var i, a;
+    for (i = 0; i < 9; i++) {
+      a = i / 9 * 6.2832;
+      R(Math.round(Math.cos(a) * 13) - 2, Math.round(Math.sin(a) * 5) - 2, 4, 3, i & 1 ? C.s2 : C.s1);
+    }
+    A().blob(R, 0, -3, 9, 3, '#1A0E08'); A().blob(R, 0, -4, 6, 2, '#8A3A10');
+    A().blob(R, 0, -6, 4, 4, '#E85A1A'); A().blob(R, -1, -7, 2, 3, '#FFD34A');
+    R(-11, -18, 3, 16, '#3A2410'); R(8, -18, 3, 16, '#3A2410');
+    A().blob(R, 0, -19, 11, 5, '#3A2410'); A().blob(R, 0, -20, 9, 3, '#8A5A28');
+    R(-1, -24, 2, 4, '#A87038');
+    for (i = 0; i < 5; i++) R(-8 + i * 4, -29 - ((hs(i, 1, 1410) * 4) | 0), 2, 2, '#5A524A');
+  }
+  function pWaterhole(R) {
+    var i, a, x;
+    A().blob(R, 0, -8, 24, 8, '#4A3A22'); A().blob(R, 0, -8, 21, 6, C.m1);
+    A().blob(R, 0, -9, 19, 5, '#1A3A4A'); A().blob(R, -3, -10, 12, 2, '#2E5A6A');
+    R(-16, -11, 8, 1, '#8FD0D8'); R(4, -9, 6, 1, '#8FD0D8');
+    for (i = 0; i < 10; i++) {
+      a = i / 10 * 6.2832;
+      R(Math.round(Math.cos(a) * 26) - 2, Math.round(Math.sin(a) * 9), 4, 1, i & 1 ? C.m3 : C.m0);
+    }
+    for (i = 0; i < 9; i++) {
+      x = i ? (-24 + i * 6) : -20;
+      R(x, -16 - ((hs(i, 1, 1420) * 3) | 0), 1, 12, C.g1);
+      R(x - 1, -17, 1, 4, C.g3);
+    }
+    for (i = 0; i < 4; i++) R(-12 + i * 8, -2, 3, 1, C.m0);
+  }
+  function pLoom(R) {
+    var i;
+    R(-14, -32, 3, 32, '#5C3A18'); R(11, -32, 3, 32, '#3A2410');
+    R(-16, -33, 30, 3, '#8A5A28'); R(-16, -33, 28, 1, '#C8904A');
+    for (i = 0; i < 9; i++) R(-12 + i * 3, -29, 1, 20, i & 1 ? '#C4323A' : '#FFE35A');
+    for (i = 0; i < 5; i++) R(-14, -27 + i * 5, 27, 1, i & 1 ? '#E8DCC0' : '#8A1E26');
+    R(-10, -9, 20, 6, '#5C3A18'); R(-10, -9, 20, 1, '#C8904A');
+    for (i = 0; i < 7; i++) R(-8 + i * 3, -7, 2, 2, ['#C4323A', '#8AB0FF', '#FFE35A'][i % 3]);
+    R(13, -14, 8, 10, '#8A4A24'); R(14, -15, 6, 2, '#C8904A');
+  }
+  function pMidden(R) {
+    var i, x;
+    for (i = 0; i < 16; i++) {
+      x = -19 + ((hs(i, 1, 1430) * 36) | 0);
+      A().blob(R, x, -2 - ((hs(i, 2, 1430) * 6) | 0), 4, 2, i & 1 ? '#E8DCC0' : '#A89878');
+    }
+    A().blob(R, 0, -10, 12, 5, '#8A7A58'); A().blob(R, 0, -11, 10, 3, '#C8B898');
+    R(-1, -14, 3, 10, '#3A2410'); R(-2, -15, 5, 2, '#5C3A18');
+    for (i = 0; i < 5; i++) {
+      R(-2 + i * 4, -16 - ((hs(i, 3, 1440) * 3) | 0), 1, 5, '#8A5A28');
+      R(-3 + i * 4, -18, 3, 2, i & 1 ? '#C4323A' : '#FFE35A');
+    }
+  }
+  function pPaintedWall(R) {
+    var i, x;
+    R(-26, -30, 52, 30, '#8A5A28'); R(-26, -30, 52, 2, '#C8904A');
+    R(-26, -2, 52, 2, '#3A2410');
+    for (i = 0; i < 9; i++) {
+      x = -22 + i * 5;
+      R(x, -26, 3, 8, i % 3 === 0 ? '#C4323A' : '#E8DCC0');
+      R(x + 1, -27, 2, 2, '#3A2410');
+      R(x, -16, 3, 3, i & 1 ? '#B05424' : '#F0D48A');
+    }
+    R(-26, -11, 52, 1, '#3A2410');
+    for (i = 0; i < 6; i++) R(-24 + i * 9, -8, 5, 2, i & 1 ? '#E8DCC0' : '#B05424');
+    R(-8, -18, 16, 16, '#5C3A18'); R(-6, -16, 12, 12, '#2A1A0C');
+  }
+  function pStair(R) {
+    var i, hw;
+    for (i = 0; i < 22; i++) {
+      hw = Math.round(15 * Math.pow(1 - i / 22, 0.75)) + 1;
+      R(-hw, -i, hw * 2, 1, i < 6 ? C.r3 : C.r2);
+      R(-hw, -i, 3, 1, C.r4);
+      if (i % 4 === 3) R(-hw + 3, -i, hw * 2 - 3, 1, C.r0);
+    }
+    R(-3, -23, 6, 2, C.r4); R(-1, -24, 2, 1, C.sun);
+    for (i = 0; i < 5; i++) R(-12 + i * 5, -2, 2, 2, C.r0);
+  }
+  function pWindPoles(R) {
+    var i, x;
+    for (i = 0; i < 3; i++) {
+      x = -18 + i * 18;
+      R(x, -40 - (i === 1 ? 4 : 0), 3, 40 + (i === 1 ? 4 : 0), '#5C3A18');
+      R(x, -40, 1, 40, '#A87038'); R(x + 2, -40, 1, 40, '#3A2410');
+      R(x - 10, -38, 22, 2, '#8A5A28');
+      R(x - 16, -36, 14, 3, i === 1 ? '#C4323A' : '#E8DCC0');
+      R(x - 16, -36, 14, 1, '#FFFFFF');
+      R(x + 2, -32, 12, 2, i === 2 ? '#8AB0FF' : '#FFE35A');
+    }
+    R(-22, -2, 44, 2, C.b2);
+  }
   var PROPS = {
     acacia: [48, 40, pAcacia], hut: [44, 38, pHut], well: [38, 32, pWell], baobab: [40, 52, pBaobab],
     kraal: [64, 16, pKraal], stall: [40, 38, pStall], mound: [30, 30, pMound], stool: [26, 16, pStool],
     deadtree: [50, 58, pDeadTree], brokensign: [44, 42, pBrokenSign], rustcar: [64, 34, pRustCar],
-    dunecrest: [84, 32, pDuneCrest], roofs: [100, 34, pRoofs]
+    dunecrest: [84, 32, pDuneCrest], roofs: [100, 34, pRoofs],
+    /* the thirteen village landmarks, all palette-drawn here */
+    gateposts: [40, 40, pGateposts], market: [64, 42, pMarket], firering: [40, 28, pFireRing],
+    waterhole: [52, 24, pWaterhole], loom: [38, 36, pLoom], midden: [44, 30, pMidden],
+    paintedwall: [64, 40, pPaintedWall], stair: [44, 36, pStair], windpoles: [52, 44, pWindPoles]
   };
   var spr = {};
   function propSprite(v) {
@@ -746,20 +1050,61 @@
         }
       }
       g.globalAlpha = 1;
-      g.fillStyle = '#F4E2A8';
-      for (i = 0; i < 12; i++) {
-        wy = 14 + Math.round(hs(i, 1, 700) * (rh - 28)) + (hold ? 0 : (Math.floor(t / 500 + i) & 1));
-        p0 = (i * 53 + t * 0.02) % 320;
-        kk0 = Math.floor((vl - p0) / 320);
-        kk1 = Math.floor((vr - p0) / 320);
-        for (k = kk0; k <= kk1; k++) {
-          wx = Math.round(p0 + k * 320);
-          if (wx < vl || wx >= vr) continue;
-          g.fillRect(ox + wx * S, oy + wy * S, S, S);
+      /* stepped heat shimmer over the grass: 3 palette steps, no blur */
+      g.fillStyle = C.e5; g.globalAlpha = 0.07;
+      for (i = 0; i < 3; i++) {
+        wy = Math.round(rh * 0.45) + i * 5;
+        p0 = (i * 19 + step) % 52;
+        for (k = Math.floor((vl - p0) / 52) - 1; k * 52 + p0 < vr; k++) {
+          wx = k * 52 + p0;
+          if (wx + 20 < vl || wx > vr) continue;
+          g.fillRect(ox + Math.round(Math.max(wx, vl)) * S, oy + wy * S,
+            Math.round(Math.min(wx + 20, vr) - Math.max(wx, vl)) * S, S);
+        }
+      }
+      g.globalAlpha = 1;
+      /* ambient life, tied to the sim clock (d.now). Reduced motion holds
+         every pose at t=0: no bird flap, no sway, no crossing dust devil. */
+      var sites = room.sites || [], px, py, fl, dr, bx, by, bird, x, z, seed;
+      var flip = hold ? 0 : (Math.floor(t / 400) & 1);  /* 2.5 Hz, under 3 Hz */
+      for (z = 0; z < sites.length; z++) {
+        if (!sites[z].amb || !roomAreaVisible(room, sites[z], vl, vr)) continue;
+        seed = z * 37;
+        if (sites[z].amb === 'birds') {
+          for (i = 0; i < 3; i++) {
+            bird = Math.floor(t / 900 + i * 3) % 12;
+            bx = sites[z].x0 * T + 8 + ((hs(i, z, 1500) * sites[z].w * T) | 0);
+            by = sites[z].y0 * T - 18 - i * 6 - bird * 2;
+            if (bx < vl || bx > vr) continue;
+            fl = flip && !hold;
+            rc(g, ox + bx * S, oy + by * S, S, S, '#12081E');
+            rc(g, ox + (bx - 2) * S, oy + (by - (fl ? 1 : 0)) * S, 2 * S, S, '#12081E');
+            rc(g, ox + (bx + 1) * S, oy + (by - (fl ? 1 : 0)) * S, 2 * S, S, '#12081E');
+          }
+        } else if (sites[z].amb === 'smoke') {
+          for (i = 0; i < 4; i++) {
+            dr = hold ? 0 : (Math.floor(t / 700 + i) & 3);
+            px = sites[z].x0 * T + sites[z].w * T / 2 + (dr - 1) * 2;
+            py = sites[z].y0 * T + sites[z].h * T / 2 - 22 - i * 5;
+            rc(g, ox + px * S, oy + py * S, 2 * S, 2 * S, i & 1 ? '#5A524A' : '#7A7268');
+          }
+        } else if (sites[z].amb === 'devil') {
+          dr = hold ? 0 : (Math.floor(t / 2600) % 9);
+          px = sites[z].x0 * T + 8 + dr * T;
+          py = sites[z].y0 * T + sites[z].h * T - 12;
+          if (px >= vl && px <= vr) {
+            g.globalAlpha = 0.5;
+            rc(g, ox + px * S, oy + py * S, 5 * S, 12 * S, C.sd3);
+            rc(g, ox + (px + 1) * S, oy + (py - 3) * S, 3 * S, 4 * S, C.sd4);
+            g.globalAlpha = 1;
+          }
         }
       }
     }
   });
+  function roomAreaVisible(room, site, vl, vr) {
+    return site.x0 * T < vr && (site.x0 + site.w) * T > vl;
+  }
 
   NEU.savannaLook = { bake: bake, paints: paints, T: T, MX: MX, MY: MY, props: PROPS,
     propSprite: propSprite, horizonHeight: horizonHeight };

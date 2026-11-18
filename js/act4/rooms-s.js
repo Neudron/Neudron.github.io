@@ -12,7 +12,8 @@
 
   E.tileset('savanna', {
     solid: '#',
-    colours: { '#': '#8A5A28', '.': '#E2B84A', ',': '#C47A32', '=': '#A86828' }
+    colours: { '#': '#8A5A28', '.': '#E2B84A', ',': '#C47A32', '=': '#A86828',
+      d: '#8A8A32', r: '#B05424', m: '#7A7454', s: '#7A7058' }
   });
   E.tileset('station', {
     solid: '#',
@@ -22,11 +23,20 @@
   function say(c, lines) { c.say(lines, 'narr'); }
   function keyName(def) { return NEU.keys ? NEU.keys.label(def) : def; }
 
-  function box(w, h) {
-    var rows = [], y, x, s;
+  /* A clearing, not a yard. Interior is one ground material; the rim is
+     broken earth/rock/thorn with cut corners and a few open gaps, so no
+     two areas read as the same fenced rectangle. Never spans a path. */
+  function footprint(w, h, seed, mat) {
+    var rows = [], y, x, s, edge, inside = mat || '.';
     for (y = 0; y < h; y++) {
       s = '';
-      for (x = 0; x < w; x++) s += (y === 0 || x === 0 || y === h - 1 || x === w - 1) ? '#' : '.';
+      for (x = 0; x < w; x++) {
+        edge = (x === 0 || y === 0 || x === w - 1 || y === h - 1);
+        if (!edge || (x <= 1 && y <= 1) || (x >= w - 2 && y <= 1) ||
+            (x <= 1 && y >= h - 2) || (x >= w - 2 && y >= h - 2) ||
+            ((x * 5 + y * 3 + seed * 7) % 11) === 0) s += inside;
+        else s += '#';
+      }
       rows.push(s);
     }
     return rows.join('\n');
@@ -79,10 +89,10 @@
     if (NEU.chase && NEU.chase.bind) NEU.chase.bind(r);
     return r;
   }
-  function addBox(id, spawns, ents, enter) {
+  function addBox(id, spawns, ents, enter, w, h, seed, mat) {
     room(id, {
       tileset: 'savanna',
-      tiles: box(11, 9),
+      tiles: footprint(w || 11, h || 9, seed || 1, mat || '.'),
       spawns: spawns,
       entities: dress(ents),
       onEnter: enter || null
@@ -536,11 +546,11 @@
     if (c.flagged('s1_seen')) return;
     c.flag('s1_seen', 1);
     say(c, ['golden grass. the heat sits on it and does not blink.']);
-  });
+  }, 13, 9, 1, '.');
 
   room('s2_well', {
     tileset: 'savanna',
-    tiles: ['######', '#....#', '#....#', '#....#', '######'].join('\n'),
+    tiles: footprint(9, 7, 11, 'm'),
     spawns: {
       west: { x: 1, y: 2, face: 'right' },
       east: { x: 4, y: 2, face: 'left' },
@@ -572,7 +582,7 @@
     prop('stall', 8, 6),
     prop('stall', 2, 6),
     { t: 'sign', x: 7, y: 2, lines: ['mats, beads, and nothing with a price.'] }
-  ], function () { if (NEU.snail) NEU.snail.arrive('s3'); });
+  ], function () { if (NEU.snail) NEU.snail.arrive('s3'); }, 12, 10, 2, '.');
 
   addBox('s4_shade', sp('south', 'east', 'north'), [
     gate('south', 's1_gate', 'north'),
@@ -580,18 +590,18 @@
     gate('north', 's10_shells', 'south'),
     prop('acacia', 3, 6),
     { t: 'sign', x: 7, y: 6, lines: ['shade. the only architecture the trees agreed to.'] }
-  ]);
+  ], null, 14, 11, 3, 'd');
 
   addBox('s5_baobab', sp('west', 'east'), [
     gate('west', 's2_well', 'east'),
     gate('east', 's8_hearth', 'west'),
     prop('baobab', 5, 2),
     { t: 'sign', x: 5, y: 6, lines: ['a tree older than the argument about who planted it.'] }
-  ]);
+  ], null, 11, 12, 4, 'r');
 
   room('s6_kraal', {
     tileset: 'savanna',
-    tiles: ['#######', '#.....#', '#.....#', '#.....#', '#.....#', '#.....#', '#######'].join('\n'),
+    tiles: footprint(10, 8, 12, 'd'),
     spawns: { west: { x: 1, y: 3, face: 'right' }, south: { x: 3, y: 5, face: 'up' } },
     entities: dress([
       { t: 'block', x: 2, y: 2, push: true },
@@ -619,7 +629,7 @@
     gate('north', 's13_wind', 'south'),
     prop('well', 4, 6),
     { t: 'sign', x: 7, y: 6, lines: ['a pool with no water and a great deal of mud.'] }
-  ]);
+  ], null, 12, 11, 5, 'm');
 
   var hearth = [];
   function lightHearth(c, n) {
@@ -641,7 +651,7 @@
   }
   room('s8_hearth', {
     tileset: 'savanna',
-    tiles: ['#########', '#.......#', '#.......#', '#.......#', '#.......#', '#########'].join('\n'),
+    tiles: footprint(9, 6, 13, '.'),
     spawns: { west: { x: 1, y: 3, face: 'right' } },
     entities: dress([
       { t: 'brazier', x: 1, y: 1, n: 0, run: function (c) { lightHearth(c, 0); } },
@@ -675,12 +685,12 @@
     gate('south', 's3_market', 'north'),
     gameNpc(3, 3, 'beads'),
     { t: 'sign', x: 7, y: 3, lines: ['three beads. the board names the key. press it once for each.'] }
-  ]);
+  ], null, 15, 9, 6, 'r');
   addBox('s10_shells', sp('south'), [
     gate('south', 's4_shade', 'north'),
     gameNpc(3, 3, 'shells'),
     { t: 'sign', x: 7, y: 3, lines: ['three shells. the pea is under the middle one.'] }
-  ]);
+  ], null, 13, 10, 7, '.');
   addBox('s11_elder', sp('north', 'south'), [
     gate('north', 's6_kraal', 'south'),
     gate('south', 's14_station', 'north'),
@@ -688,11 +698,11 @@
     prop('stool', 6, 5),
     { t: 'npc', x: 4, y: 5, colour: '#5C3A18',
       lines: ['the elder is asleep in the shade.', 'the shade is doing all the work.'] }
-  ], function () { if (NEU.snail) NEU.snail.arrive('s11'); });
+  ], function () { if (NEU.snail) NEU.snail.arrive('s11'); }, 11, 10, 8, '.');
 
   room('s14_station', {
     tileset: 'station',
-    tiles: box(11, 9),
+    tiles: footprint(11, 9, 14, 's'),
     spawns: sp('north'),
     entities: [
       { t: 'savannafloor', x: 0, y: 0 },
@@ -716,12 +726,163 @@
     gate('east', 'x0_foyer', 'west'),
     prop('mound', 6, 4),
     { t: 'sign', x: 3, y: 3, lines: ['a mound. the termites are not taking visitors.'] }
-  ]);
+  ], null, 13, 8, 9, 'r');
   addBox('s13_wind', sp('south'), [
     gate('south', 's7_pool', 'north'),
     gameNpc(3, 3, 'wind'),
     { t: 'sign', x: 5, y: 5, lines: ['hold the key the grass names until the line is full.'] },
     prop('acacia', 7, 3)
+  ], null, 14, 9, 10, 'd');
+
+  /* One source of truth for how an area looks. rooms-s owns the choice;
+     look-savanna only draws it. mat is the footprint's ground char. */
+  var V_STYLE = {
+    s1_gate: { mat: '.', edge: 'rock', mark: 'gateposts', mx: 6, my: 3, amb: 'birds' },
+    s2_well: { mat: 'm', edge: 'bank', mark: 'well', mx: 4, my: 3, amb: '' },
+    s3_market: { mat: '.', edge: 'thorn', mark: 'market', mx: 6, my: 4, amb: 'birds' },
+    s4_shade: { mat: 'd', edge: 'grass', mark: 'acacia', mx: 7, my: 5, amb: 'birds' },
+    s5_baobab: { mat: 'r', edge: 'rock', mark: '', mx: 5, my: 5, amb: '' },
+    s6_kraal: { mat: 'd', edge: 'fence', mark: 'kraal', mx: 5, my: 3, amb: 'birds' },
+    s7_pool: { mat: 'm', edge: 'bank', mark: 'waterhole', mx: 6, my: 5, amb: 'birds',
+      light: [6, 5, 72, '#8FD0D8'] },
+    s8_hearth: { mat: '.', edge: 'rock', mark: 'firering', mx: 4, my: 3, amb: 'smoke',
+      light: [4, 3, 84, '#FFB050'] },
+    s9_beads: { mat: 'r', edge: 'thorn', mark: 'loom', mx: 7, my: 4, amb: '' },
+    s10_shells: { mat: '.', edge: 'bank', mark: 'midden', mx: 6, my: 5, amb: 'birds' },
+    s11_elder: { mat: '.', edge: 'grass', mark: 'paintedwall', mx: 8, my: 4, amb: '' },
+    s12_termite: { mat: 'r', edge: 'rock', mark: 'stair', mx: 9, my: 4, amb: '' },
+    s13_wind: { mat: 'd', edge: 'grass', mark: 'windpoles', mx: 7, my: 4, amb: 'devil' },
+    s14_station: { mat: 's', edge: 'rock', mark: '', mx: 5, my: 5, amb: '' }
+  };
+
+  /* Flavour only. No story beat, no spoiler: one line per object, and a
+     few NPCs who say something new on a second talk (R1, R4). Placed on
+     free interior tiles so reach.mjs can prove every one is touchable. */
+  function fillFlavour(id, lines, talkers) {
+    var def = VDEFS[id], rows = def.tiles.split('\n'), w = rows[0].length, h = rows.length;
+    var used = {}, cands = [], i, key, x, y, c, n = 0, total = lines.length + (talkers || []).length;
+    var protectedCells = [], j, dx, dy, near;
+    function take(px, py) { used[px + ',' + py] = 1; }
+    for (key in (def.spawns || {})) protectedCells.push([def.spawns[key].x, def.spawns[key].y]);
+    for (i = 0; i < (def.entities || []).length; i++) {
+      var e = def.entities[i];
+      take(e.x, e.y);
+      /* Keep flavour out of arm's reach of any puzzle piece or door: a
+         sign next to a block steals the push key. */
+      if (e.t === 'exit' || e.t === 'block' || e.t === 'plate' || e.t === 'brazier' || e.t === 'altar')
+        protectedCells.push([e.x, e.y]);
+    }
+    for (y = 1; y < h - 1; y++) for (x = 1; x < w - 1; x++) {
+      near = false;
+      for (j = 0; j < protectedCells.length; j++) {
+        dx = Math.abs(x - protectedCells[j][0]); dy = Math.abs(y - protectedCells[j][1]);
+        if (dx <= 1 && dy <= 1) { near = true; break; }
+      }
+      if (!used[x + ',' + y] && !near) cands.push([x, y]);
+    }
+    function next() {
+      if (!cands.length || n >= total) return null;
+      /* even spread over the candidate list, not a row of identical signs */
+      var at = Math.min(cands.length - 1, Math.floor((n + 0.5) * cands.length / total));
+      n++;
+      return cands.splice(at, 1)[0];
+    }
+    for (i = 0; i < lines.length; i++) {
+      c = next();
+      if (c) def.entities.push({ t: 'sign', x: c[0], y: c[1], lines: [lines[i]] });
+    }
+    for (i = 0; i < (talkers || []).length; i++) {
+      c = next();
+      if (!c) break;
+      (function (flag, first, second) {
+        def.entities.push({ t: 'npc', x: c[0], y: c[1], colour: '#C8904A',
+          run: function (cx) {
+            if (cx.flagged(flag)) say(cx, [second]);
+            else { cx.flag(flag, 1); say(cx, [first]); }
+          } });
+      })('s_talk_' + id + '_' + i, talkers[i][0], talkers[i][1]);
+    }
+  }
+  fillFlavour('s1_gate', [
+    'two posts, carved by people who were in a hurry.',
+    'beads click when the wind bothers them.',
+    'the road in is the road out. the village just looks bigger.',
+    'a gourd hangs from the left post. it is empty.',
+    'someone tied a knot here and forgot why.',
+    'the ground is packed hard where everyone stops to look.'
+  ], [['the posts were painted before the path was paved.', 'now the paint is only on the shaded side.']]);
+  fillFlavour('s2_well', [
+    'the bucket is lighter than it looks.', 'a wet ring, darker by the minute.',
+    'the rope has been spliced twice.', 'the stone on the plate is not the first one tried.',
+    'a cup sits on the rim. nobody claims it.', 'the mud here remembers every foot.'
+  ], [['the well is older than the plates.', 'the plates are younger, and louder.']]);
+  fillFlavour('s3_market', [
+    'three awnings, three colours, no prices.', 'the red one has the best shade.',
+    'crates of nothing, stacked with care.', 'a basket upside down, waiting for rain that never comes.',
+    'beads strung on a wire instead of string.', 'trade here is mostly news.'
+  ], [['the blue awning was a bet.', 'it lost. the colour stayed.']]);
+  fillFlavour('s4_shade', [
+    'the acacia shades half the village and knows it.', 'three people asleep and one pretending.',
+    'a lowered branch makes a bench for nobody in particular.', 'roots lift the ground like knuckles.',
+    'birds argue in the canopy, then leave.', 'the shade moves all day and nobody follows it.'
+  ], [
+    ['the old baobab has a hollow at its foot. something in there catches the light.',
+     'i looked once. i did not take it.'],
+    ['this is the only shade that has ever agreed with me.', 'the shade has moved. i have not.']
+  ]);
+  /* R5: the baobab's hollow. The s4 NPC above hints at it. */
+  VDEFS.s5_baobab.entities.push({ t: 'pickup', x: 3, y: 2, item: 's_hollow_charm',
+    lines: ['a carved bean, warm from the hollow. it means nothing to anyone else.'] });
+  fillFlavour('s5_baobab', [
+    'a tree older than the argument about who planted it.',
+    'the trunk could hold a house, if the house were small.', 'a hollow at the foot, dark and cool.',
+    'the bark is smooth where hands have rubbed it.', 'branches like roots, pointing at nothing.',
+    'the tree keeps the heat out and the stories in.'
+  ]);
+  fillFlavour('s6_kraal', [
+    'thorns make a fence that needs no mending.', 'the cattle know which side of the gate is dinner.',
+    'two stones, two plates. the lesson repeats.', 'a horn scraped on the post, lower each year.',
+    'dust hangs where the herd has passed.', 'the fence is the only straight line in the village.'
+  ], [['the cattle came first. the fence was an apology.', 'the fence is still apologising.']]);
+  fillFlavour('s7_pool', [
+    'water, finally, and every animal knows it.', 'reeds mark the edge that mud would hide.',
+    'tracks cross and cross again.', 'a hoofprint filled with sky.',
+    'the pool is shallower than it looks from here.', 'dragonflies hold still for exactly one second.'
+  ], [['the waterhole moves the whole village closer.', 'it moves away again by evening.']]);
+  fillFlavour('s8_hearth', [
+    'three fires, left to right, and the stone on its plate.', 'the pot has been mended more than once.',
+    'smoke goes west, then thinks better of it.', 'ash keeps the shape of last night\'s fire.',
+    'a ring of stones, none of them matching.', 'someone left a spoon on the flat stone.'
+  ], [['the fire is the reason everyone stops here.', 'the fire does not care. it burns anyway.']]);
+  fillFlavour('s9_beads', [
+    'a loom strung with thread and small glass.', 'three colours, one cord, no pattern written down.',
+    'the bead board names the key.', 'a finished strand, slightly crooked.',
+    'loose beads in a gourd, counted by eye.', 'the loom creaks when the wind finds it.'
+  ]);
+  fillFlavour('s10_shells', [
+    'a midden of shells, stacked by someone patient.', 'wind chimes hang from a crooked pole.',
+    'the chimes only agree once an hour.', 'cowries, bleached white on top and brown underneath.',
+    'a shell with a hole worn smooth.', 'the pile is older than the huts.'
+  ], [['the chimes were a gift. the wind is the gift that keeps giving.', 'the wind gave back a headache.']]);
+  fillFlavour('s11_elder', [
+    'a painted wall, refreshed every season.', 'the elder sleeps where the paint is brightest.',
+    'a stool pulled close to the wall.', 'the figures on the wall walk left, always.',
+    'red ochre, white chalk, no blue.', 'the hut is cool even at this hour.'
+  ], [['i paint the wall so the stories stay facing the right way.', 'i may have mixed up left and right.']]);
+  fillFlavour('s12_termite', [
+    'a mound taller than the hut behind it.', 'stairs cut into the hard clay.',
+    'the termites are not taking visitors.', 'the mound is cool on the shady side.',
+    'a crack runs down like a dried river.', 'someone carved a mark at the top and stopped.'
+  ], [['the mound is older than anyone who claims it.', 'the mark at the top is newer. i made it.']]);
+  fillFlavour('s13_wind', [
+    'poles with cloth strips, all pointing west.', 'the cloth says hold, then says nothing.',
+    'a dust devil crosses when nobody watches.', 'the grass here leans even on still days.',
+    'one strip is red and never stops.', 'the poles hum lower than the chimes.'
+  ], [['the wind never repeats itself. that is the whole trick.', 'it just repeated itself. i am not counting that.']]);
+  fillFlavour('s14_station', [
+    'one rail line, straight through the platform.', 'the sign hangs from two chains.',
+    'a bench worn smooth in the middle.', 'the snail goes where you have already stood.',
+    'stone underfoot, cooler than the village dust.', 'nothing stops here on purpose.'
   ]);
 
   villageBuild = false;
@@ -758,7 +919,9 @@
   ];
   function vGrid() {
     var rows = [], y;
-    for (y = 0; y < V_H; y++) rows.push(new Array(V_W + 1).join('#'));
+    /* open dry grassland between clearings, not a wall of brown filler:
+       the winding paths and the broken clearing rims are the only edges */
+    for (y = 0; y < V_H; y++) rows.push(new Array(V_W + 1).join('d'));
     return rows;
   }
   function vCarve(rows, path) {
@@ -819,7 +982,7 @@
   }
   function mergeVillage() {
     var rows = vGrid(), ids = Object.keys(V_ORIGIN), i, k, id, o, def, es, e, copy,
-        key, s, map, spawns = {}, areas = [], ents = [], rowsOf;
+        key, s, map, st, spawns = {}, areas = [], ents = [], sites = [], rowsOf;
     for (i = 0; i < ids.length; i++) vStamp(rows, ids[i]);
     /* A door in a wall is solid; open the wall cell it used to occupy. */
     for (i = 0; i < ids.length; i++) {
@@ -841,6 +1004,13 @@
       areas.push({ id: id, x0: o[0], y0: o[1], x1: o[0] + rowsOf[0].length - 1,
         y1: o[1] + rowsOf.length - 1, spawn: id + '_' + V_LAND[id],
         onEnter: id === 's11_elder' ? elderEnter : def.onEnter });
+      st = V_STYLE[id];
+      sites.push({ id: id, x0: o[0], y0: o[1], w: rowsOf[0].length, h: rowsOf.length,
+        mat: st.mat, edge: st.edge, amb: st.amb,
+        light: st.light ? { x: o[0] + st.light[0], y: o[1] + st.light[1],
+          r: st.light[2], col: st.light[3] } : null });
+      if (st.mark) ents.push({ t: 'savannaprop', v: st.mark,
+        x: o[0] + st.mx, y: o[1] + st.my });
       map = {};
       for (key in (def.spawns || {})) map[key] = id + '_' + key;
       /* Small harnesses boot this file with a tileset/register-only engine
@@ -862,7 +1032,7 @@
     return {
       tileset: 'savanna', tiles: rows.join('\n'),
       stationZones: [{ x0: 36, y0: 62, x1: 46, y1: 70 }],
-      spawns: spawns, areas: areas,
+      sites: sites, spawns: spawns, areas: areas,
       entities: [{ t: 'savannafloor', x: 0, y: 0 },
                  { t: 'savannafx', x: 1, y: 74, roomSpan: true }].concat(ents),
       solved: villageSolved,
