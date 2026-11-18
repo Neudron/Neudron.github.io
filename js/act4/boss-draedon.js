@@ -71,8 +71,16 @@
     /* keep the arena floor above the floating TP strip (#tphud: bottom 24px + 80px tall + 8px gap)
        Only when the strip is shown; jsdom boots without tphud.js. */
     var strip = document.getElementById('tphud');
+    if (strip && !strip.__vjWatch && typeof MutationObserver !== 'undefined') {
+      strip.__vjWatch = true;
+      new MutationObserver(function () { if (!wrap.hidden && !strip.hidden) layout(); })
+        .observe(strip, { attributes: true, attributeFilter: ['hidden'] });
+    }
     var floor = strip && !strip.hidden ? 112 : 44;
-    if (box.AY + box.AH > h - floor) box.AH = Math.max(300, h - floor - box.AY) | 0;
+    /* the dm.hud YOU panel needs 72px above the strip; no strip in jsdom,
+       so keep the old geometry there and leave the recorded hashes alone */
+    var reserve = strip && !strip.hidden ? 72 : 0;
+    if (box.AY + box.AH + reserve > h - floor) box.AH = Math.max(300, h - floor - reserve - box.AY) | 0;
     boss.x = box.AX + box.AW / 2;
     boss.y = box.AY + 72;
     bodyY = box.AY + box.AH - 32;
@@ -320,10 +328,8 @@
         countEl.textContent = txt;
       }
     }
-    if (hudEl) {
-      txt = 'HP ' + hp;
-      if (txt !== lastHud) { hudEl.textContent = txt; lastHud = txt; }
-    }
+    /* the dm.hud YOU panel replaces the corner HP text */
+    if (hudEl && !hudEl.hidden) hudEl.hidden = true;
     state.mode = mode;
     state.phase = phase;
     state.hp = hp;
@@ -503,6 +509,10 @@
     else band(F.x - 8, F.y - 8, 16, 16, '#FF00FF');
     if (shieldOn && mode === 'nuke' && art()) art().shield(ctx, F.x, F.y, tsec());
     if (kit) kit.draw(ctx);
+    if (NEU.danmaku && NEU.danmaku.hud) {
+      NEU.danmaku.hud(ctx, F, { w: w, h: h, AY: box.AY, AH: box.AH,
+        hp: hp, max: MAX, php: playerHp, pmax: 6, phase: phase, name: 'draedon' });
+    }
     if (flash && !REDUCE) band(0, 0, w, h, '#FFFFFF');
   }
   function frameOnce() {

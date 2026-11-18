@@ -95,6 +95,11 @@
        Only when the strip is actually shown: jsdom boots without tphud.js
        and must keep the original arena geometry. */
     var strip = document.getElementById('tphud');
+    if (strip && !strip.__vjWatch && typeof MutationObserver !== 'undefined') {
+      strip.__vjWatch = true;
+      new MutationObserver(function () { if (!wrap.hidden && !strip.hidden) layout(); })
+        .observe(strip, { attributes: true, attributeFilter: ['hidden'] });
+    }
     var floor = strip && !strip.hidden ? 112 : 44;
     var over = AY + AH + 72 - (innerHeight - floor);
     if (over > 0) AH = Math.max(300, AH - over) | 0;
@@ -1046,7 +1051,8 @@
     }
 
     if (line && nowMs - lineT < 5000) {
-      var ty = (AY - 16) | 0;
+      /* 8px of gap below the 16px line, clear of the arena frame */
+      var ty = (AY - 24) | 0;
       var hudTop = Math.min(AY + AH + 24, innerHeight - 52) | 0;
       if (ty + 16 > hudTop) ty = (hudTop - 16) | 0;
       if (ty < 32) ty = 32;

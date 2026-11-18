@@ -43,8 +43,12 @@
   function hidePop() { pop.hidden = true; if (msg) msg.classList.remove('is-low'); }
   function showPop(win, secs) {
     pop.className = 'bh__pop ' + (win ? 'bh__pop--win' : 'bh__pop--lose');
+    /* centre the card in the arena, not at a viewport percentage where it
+       straddles the top frame line; tighten the pixel font's wide cells so
+       "29.6 s" no longer reads as "29. 6 s". */
+    if (AH > 0) pop.style.top = ((AY + AH / 2) | 0) + 'px';
     pop.innerHTML = '<b class="bh__pop-t">' + (win ? 'you made it' : 'so close') + '</b> ' +
-      '<b class="bh__pop-n">' + secs.toFixed(1) + ' s</b> ' +
+      '<b class="bh__pop-n" style="letter-spacing:-.06em">' + secs.toFixed(1) + ' s</b> ' +
       '<span class="bh__pop-s">' + (win ? 'survived the whole clock' : 'left to win') + '</span>';
     pop.hidden = false;
     if (msg) msg.classList.add('is-low');
