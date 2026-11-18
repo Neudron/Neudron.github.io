@@ -63,8 +63,16 @@
     /* keep the arena floor above the floating TP strip (#tphud: bottom 24px + 80px tall + 8px gap)
        Only when the strip is shown; jsdom boots without tphud.js. */
     var strip = document.getElementById('tphud');
+    if (strip && !strip.__vjWatch && typeof MutationObserver !== 'undefined') {
+      strip.__vjWatch = true;
+      new MutationObserver(function () { if (!wrap.hidden && !strip.hidden) layout(); })
+        .observe(strip, { attributes: true, attributeFilter: ['hidden'] });
+    }
     var floor = strip && !strip.hidden ? 112 : 44;
-    if (box.AY + box.AH > h - floor) box.AH = Math.max(300, h - floor - box.AY) | 0;
+    /* the dm.hud YOU panel needs 72px above the strip; no strip in jsdom,
+       so keep the old geometry there and leave the recorded hashes alone */
+    var reserve = strip && !strip.hidden ? 72 : 0;
+    if (box.AY + box.AH + reserve > h - floor) box.AH = Math.max(300, h - floor - reserve - box.AY) | 0;
     if (mode === 'select' && ctx) drawBackdrop();
   }
   function centerPlayer() {
@@ -405,6 +413,16 @@
     if (NEU.danmaku && NEU.danmaku.soul) NEU.danmaku.soul.draw(ctx, F.x, F.y, false);
     drawBar();
     if (kit) kit.draw(ctx);
+    /* The art bar above is the mech's; the player needs the YOU panel too.
+       panelOnly keeps that custom bar and draws just dm.hud's player readout. */
+    if (NEU.danmaku && NEU.danmaku.hud) {
+      var pm = initialId && mechs[initialId];
+      NEU.danmaku.hud(ctx, F, { w: window.innerWidth || 800, h: window.innerHeight || 600,
+        AY: box.AY, AH: box.AH, panelOnly: true,
+        hp: pm ? pm.hp : MAX, max: MAX,
+        php: playerHp, pmax: 6, phase: phase || 1,
+        name: initialId ? LABEL[initialId] : 'exo mech' });
+    }
   }
   function keysEl() {
     var list = document.getElementsByClassName('exo__keys');
@@ -460,7 +478,7 @@
       buttons[n].style.borderWidth = '4px';
       buttons[n].style.borderColor = n === sel ? '#FFD34E' : '#3A4450';
       buttons[n].style.background = '#05070A';
-      buttons[n].style.color = n === sel ? '#FFD34E' : '#8A98A8';
+      buttons[n].style.color = n === sel ? '#FFD34E' : '#D7DEE8';
       if (cv) paintIcon(cv, buttons[n].getAttribute('data-mech'), n === sel);
     }
   }

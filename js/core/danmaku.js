@@ -521,6 +521,10 @@
     var d = Math.max(0, F.clock - F.hudAt); F.hudAt = F.clock;
     if (r > F.chip) F.chip = r;
     else if (F.clock - F.hitAt > 0.4) F.chip = Math.max(r, F.chip - d * 0.6);
+    /* panelOnly: fights with their own boss bar still use the YOU panel.
+       The bar, name and percentage are skipped; the player panel and the
+       screen-reader line below are shared. */
+    if (!o.panelOnly) {
     var bw = barW(o.w), bx = ((o.w - bw) / 2) | 0, by = 36;
     ctx.fillStyle = '#05050A'; ctx.fillRect(bx - 4, by - 4, bw + 8, 20);
     ctx.fillStyle = '#5A5468'; ctx.fillRect(bx - 2, by - 2, bw + 4, 16);
@@ -537,6 +541,7 @@
     var glx = (o.glitch && !still) ? ((Math.floor(F.clock * 2) & 1) ? 2 : -2) : 0;
     ctx.textAlign = 'left'; ctx.fillText(o.name, bx + glx, by - 24);
     ctx.textAlign = 'right'; ctx.fillText(Math.ceil(r * 100) + '%', bx + bw, by - 24);
+    }
 
     var pw = Math.min(300, o.w - 64), ph = 48;
     var px = ((o.w - pw) / 2 + 12) | 0;

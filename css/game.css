@@ -48,6 +48,11 @@
   font: 400 16px/1.5 var(--font, monospace); color: var(--text); }
 .menu__note, .menu__keys { margin: 8px 0 0; font: 400 16px/1.5 var(--font, monospace); color: var(--dim); }
 .menu__note:empty { display: none; }
+@media (max-height: 800px) {
+  .menu__win { padding: 20px; }
+  .menu__screen { gap: 4px; margin: 12px 0 8px; }
+  .menu__act, .menu__tier { min-height: 40px; padding: 6px 12px; }
+}
 .menu.is-calm *, .menu.is-calm *::before, .menu.is-calm *::after { transition: none !important; animation: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .menu, .menu * { transition: none !important; animation: none !important; }
@@ -1108,7 +1113,7 @@ html.rm .tphud__hp { animation: none !important; }
 .draedon[hidden] { display: none !important; }
 .draedon canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .draedon__vuln {
-  position: absolute; top: 16px; left: 0; right: 0; margin: 0;
+  position: absolute; top: 64px; left: 0; right: 0; margin: 0;
   text-align: center; font: 400 32px/1 var(--font, monospace); pointer-events: none;
 }
 .draedon__bang {
