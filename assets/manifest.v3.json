@@ -2,12 +2,15 @@
   "schema": "neu-v3-asset-inventory/1",
   "baseline": "bbb4331e9ded30a9160bee3d087d6f08cc3479eb",
   "status": "RIGHTS_PENDING",
-  "rights_note": "Non-commercial fan project. No rightsholder licence or redistribution right is claimed for franchise art; these folders are rights-review queues, not evidence of permission.",
+  "rights_note": "Non-commercial fan project. No rightsholder licence or redistribution right is claimed for franchise art; these folders are rights-review queues, not evidence of permission. Availability online is not a licence; screenshots and search hits are research links, not permission. Prior rights correction is preserved: no set below is CLEARED.",
+  "tag_vocabulary": ["APPROVED", "RIGHTS_PENDING", "GENERATED_UNREVIEWED", "REJECTED"],
   "fields": [
     "asset_id",
     "scene_id",
     "source",
+    "source_url",
     "license",
+    "use_terms",
     "status",
     "dimensions",
     "frame_count",
@@ -17,58 +20,164 @@
     "atlas",
     "compression",
     "author",
+    "modification",
+    "attribution",
+    "redistribution",
     "review_status"
   ],
   "groups": [
     {
       "id": "existing-calamity",
       "prefix": "img/act4/calamity/",
+      "files": 59,
+      "author": "Calamity Team (CalamityModPublic contributors); proprietary owner Azafure, LLC",
+      "source_url": "https://github.com/CalamityTeam/CalamityModPublic (branch 1.4.4, commit 1a8cebd); terms: https://github.com/CalamityTeam/CalamityModPublic/blob/1.4.4/LICENSE.md",
       "license": null,
+      "use_terms": "Proprietary / 'Other', all rights reserved to Azafure, LLC. Source may be used as reference only; lifted code must credit 'Azafure, LLC'. The Calamity Mod 'cannot be redistributed in any form or in any location' (Steam Workshop is the only official host). Music owned by respective composers. No asset licence granted.",
+      "modification": "Byte-for-byte copies under the mod's own filenames; tRNS added 2026-11-09 to five NPC sheets whose palette index 0 is background.",
+      "attribution": "img/act4/CREDITS.md creator index; per-sheet source paths in js/data/sheets.js",
+      "redistribution": "NOT permitted. No rightsholder licence.",
+      "dimensions": null,
+      "frame_count": null,
+      "pivot": null,
       "status": "RIGHTS_PENDING",
-      "author": "Calamity Team (CalamityModPublic contributors)"
+      "note": "Per-file w/h/frames live in img/act4/sheets.json. Pivot, palette and alpha per file not recorded -> null."
     },
     {
       "id": "existing-terraria",
       "prefix": "img/act4/terraria/",
+      "files": 42,
+      "author": "Re-Logic; HD texture pack by Andras Suller",
+      "source_url": null,
+      "source_note": "HD Textures v0.16.5-1.4.5 by Andras Suller, Terraria forums thread 'High definition version of all textures up to Terraria 1.4.5'; exact thread URL not recorded in CREDITS.md or VISUAL_IMPROVEMENT_RESEARCH.md. Item icons are separate wiki rips, exact URL not recorded.",
       "license": null,
+      "use_terms": "Terraria assets (c) Re-Logic. No reuse or redistribution licence located. A free texture-pack download is a source, not a licence.",
+      "modification": "Tiles/walls re-encoded from the pack's own RGBA, pixel-identical 2026-11-09; tRNS added to NPC/projectile sheets so palette index 0 is transparent; item icons untrimmed rips with alpha already present.",
+      "attribution": "img/act4/CREDITS.md creator index",
+      "redistribution": "Not redistributed as a pack; no rightsholder licence.",
+      "dimensions": null,
+      "frame_count": null,
+      "pivot": null,
       "status": "RIGHTS_PENDING",
-      "author": "Re-Logic; HD pack by Andras Suller"
+      "note": "Dimensions, frames, pivot not recorded at folder level -> null."
     },
     {
       "id": "existing-deltarune",
       "prefix": "img/act4/deltarune/",
+      "files": 19,
+      "author": "Toby Fox",
+      "source_url": null,
+      "source_note": "Extracted Deltarune Chapters 1-3 atlas art. Research links only (NOT permission): https://github.com/ThatsYar/Deltarune-Source-Code (extracted dump, 'for fan games', no licence field) and https://code.deltarune.wiki. Exact extraction source URL for the shipped crops not recorded.",
       "license": null,
+      "use_terms": "Deltarune assets (c) Toby Fox. No licence granted. Hosted extracted dumps are rights-review only.",
+      "modification": "Cropped from the chapters' own atlases; tvtime/ sheets are raw extracted frames; sr-*.png rips are gitignored and not shipped.",
+      "attribution": "img/act4/CREDITS.md creator index",
+      "redistribution": "NOT permitted outside this non-commercial project; no rightsholder licence.",
+      "dimensions": null,
+      "frame_count": null,
+      "pivot": null,
       "status": "RIGHTS_PENDING",
-      "author": "Toby Fox"
+      "note": "deltarune/equip-icons.png provenance still unknown within this set -> null fields, no approval."
     },
     {
       "id": "existing-undertale",
       "prefix": "img/act4/undertale/",
+      "files": 7,
+      "author": "Toby Fox",
+      "source_url": null,
+      "source_note": "Undertale sprite rips (spr_*, bg_*), exact extraction URL not recorded. UndertaleModTool (https://github.com/UnderminersTeam/UndertaleModTool/) is GPL code for a tool, not permission to reuse the extracted art. img/act123/ (11 Undertale sheets) ships too but is not covered by this group.",
       "license": null,
+      "use_terms": "Undertale assets (c) Toby Fox. No licence granted.",
+      "modification": "Trimmed/re-mapped onto the site's palette; armchair.png regenerated 2026-11-09 (shipped file had been a corrupted placeholder).",
+      "attribution": "img/act4/CREDITS.md creator index",
+      "redistribution": "NOT permitted; no rightsholder licence.",
+      "dimensions": null,
+      "frame_count": null,
+      "pivot": null,
       "status": "RIGHTS_PENDING",
-      "author": "Toby Fox"
+      "note": "Dimensions, frames, pivot not recorded at folder level -> null."
     },
     {
       "id": "existing-vfx",
       "prefix": "img/act4/vfx/",
+      "files": 26,
+      "author": "Will Tice / unTied Games (Super Pixel Effects Gigapack, free tier); BDragon (free tier)",
+      "source_url": null,
+      "source_note": "Gigapack source zip _sources/gigapack.zip is local and gitignored; no exact public source URL recorded for either pack.",
       "license": null,
+      "use_terms": "Gigapack free tier: bundle in a game with attribution ('Super Pixel Effects Gigapack - Will Tice / unTied Games'); do not reupload. BDragon free tier: non-commercial use with attribution. These are third-party free-tier terms, not rightsholder clearance, and are recorded without an exact source URL or owner sign-off.",
+      "modification": "Re-sliced from the packs' horizontal rows into the site's vertical-strip convention; FxHoly is row 2 of sheet 00 re-sliced and cropped.",
+      "attribution": "img/act4/CREDITS.md (Will Tice / unTied Games; BDragon)",
+      "redistribution": "Bundling with attribution per free tier; no standalone reupload.",
+      "dimensions": null,
+      "frame_count": null,
+      "pivot": null,
       "status": "RIGHTS_PENDING",
-      "author": "Will Tice / unTied Games; BDragon"
+      "note": "Free-tier terms exist but no exact public source URL or owner sign-off on file -> not APPROVED."
     },
     {
       "id": "existing-tiles",
       "prefix": "img/act4/tiles/",
+      "files": 6,
+      "author": "Toby Fox (atlas crops); site palette remap",
+      "source_url": null,
+      "source_note": "Crops from Deltarune atlases; exact extraction URL not recorded.",
       "license": null,
+      "use_terms": "Toby Fox atlas crops (c) Toby Fox. No licence granted.",
+      "modification": "Atlases picked from the Deltarune atlases and re-mapped onto the site's own palette; witch-face.png is a crop of the TownNPC witch portrait.",
+      "attribution": "img/act4/CREDITS.md creator index",
+      "redistribution": "NOT permitted; no rightsholder licence.",
+      "dimensions": null,
+      "frame_count": null,
+      "pivot": null,
       "status": "RIGHTS_PENDING",
-      "author": "Toby Fox (atlas crops); site palette remap"
+      "note": "Dimensions, frames, pivot not recorded at folder level -> null."
     },
     {
       "id": "existing-audio",
       "prefix": "audio/act4/",
+      "files": 6,
+      "author": "Site-owned / owner-authorized (claim recorded in CREDITS.md; not independently verified in this visual audit)",
+      "source_url": null,
       "license": null,
+      "use_terms": "Out of visual-dependency scope; retained in the manifest for completeness. No ripped soundtrack is claimed.",
+      "modification": null,
+      "attribution": "img/act4/CREDITS.md creator index",
+      "redistribution": "No claim made in this audit.",
+      "dimensions": null,
+      "frame_count": null,
+      "pivot": null,
       "status": "RIGHTS_PENDING",
-      "author": "Site-owned / owner-authorized"
+      "note": "Not a visual dependency; owner-authorized claim not independently verified."
     }
   ],
+  "audit": {
+    "date": "2026-11-19",
+    "work_order": "W9-ASSETS",
+    "method": "Truthful audit of tracked, shipped dependencies. Availability online is not a licence; screenshots and search hits are research links, not permission. No licence or approval invented. Unknown dimensions, pivots and frame counts recorded as null, not guessed.",
+    "tag_counts": {
+      "APPROVED": 0,
+      "RIGHTS_PENDING": 7,
+      "GENERATED_UNREVIEWED": 0,
+      "REJECTED": 0,
+      "unit": "manifest group (7 groups, 165 tracked files)"
+    },
+    "generated_assets": "None shipped. plans/neu-v3/IMAGE_PROMPTS.md are prompts, not generated output; generated assets remain blocked. GENERATED_UNREVIEWED count is 0.",
+    "dist_shipping": "VERIFIED: scripts/build.mjs copies every tracked file under img/ and audio/ except .md (via git ls-files), so all RIGHTS_PENDING groups currently ship in dist/. scripts/verify-dist.mjs allowlist accepts img/audio paths and does not exclude queues. No build exclusion is configured. Rights-pending assets DO enter dist today.",
+    "must_replace_before_release": [
+      "img/act4/calamity/ (59)",
+      "img/act4/terraria/ (42)",
+      "img/act4/deltarune/ (19)",
+      "img/act4/undertale/ (7) and img/act123/ (11)",
+      "img/act4/tiles/ (6)",
+      "img/act4/vfx/ (26) until exact public source URL and terms sign-off",
+      "img/act4/witch-face.png (TownNPC witch crop)"
+    ],
+    "coverage_gaps": [
+      "Root img/ files (Sans_sprite.webp, totem.webp, annoying-dog.gif, cat.gif and site-authored SVGs) are shipped but are not rows in this manifest or CREDITS.md; attribution not audited.",
+      "Exact source URLs unknown for Terraria HD pack, Undertale/Deltarune rips, VFX packs and tiles -> null, not guessed.",
+      "Per-file pivot/palette/alpha not recorded anywhere; per-file w/h/frames only in img/act4/sheets.json."
+    ]
+  },
   "prompts_ref": "plans/neu-v3/IMAGE_PROMPTS.md"
 }

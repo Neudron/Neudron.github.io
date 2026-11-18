@@ -16,3 +16,5 @@ Priority: current original/cleared art -> existing project art cleanup -> explic
 - https://github.com/InfernumTeam/InfernumMode (reference only until asset usage permission documented)
 
 Generated assets remain blocked until actual rendered output, alpha/palette cleanup, code integration, gameplay screenshot and owner approval. The V3 image prompts in `IMAGE_PROMPTS.md` are **not** generated art.
+
+W9-ASSETS audit (2026-11-19): the per-set truthfulness ledger lives in `assets/manifest.v3.json` (`audit` block) and `img/act4/CREDITS.md`; counts per tag and release blockers in `scripts/v3/out/W9-ASSETS/AUDIT.md`. No set is APPROVED; availability online is not a licence.
