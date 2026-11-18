@@ -285,47 +285,81 @@
 
   /* ── the bake (decision 2 + 3) ───────────────────────────────────── */
   var T = 16;
-
+  /* W1: hard ceiling for every canvas this module allocates. A room wider
+     than 256 tiles used to ask for a single 5792px backing store; browsers
+     silently cap or discard those, so clamp here and record the attempt.
+     Room painting moves to 512px chunks (bakeChunk) before this guard fires. */
+  var ALLOC_CAP = 4096;
+  var allocStats = { made: 0, over: 0, maxSide: 0 };
   function mkCanvas(w, h) {
+    w = Math.max(1, w | 0); h = Math.max(1, h | 0);
+    if (w > ALLOC_CAP || h > ALLOC_CAP) {
+      allocStats.over++;
+      if (window.console && console.warn) console.warn('[neu] canvas capped at ' + ALLOC_CAP + 'px: ' + w + 'x' + h);
+      w = Math.min(w, ALLOC_CAP); h = Math.min(h, ALLOC_CAP);
+    }
+    allocStats.made++;
+    if (w > allocStats.maxSide) allocStats.maxSide = w;
+    if (h > allocStats.maxSide) allocStats.maxSide = h;
     var c = document.createElement('canvas');
-    c.width = Math.max(1, w | 0); c.height = Math.max(1, h | 0);
+    c.width = w; c.height = h;
     return c;
   }
 
-  /* g: 2d context of a canvas at 1px per world unit. */
-  function bakeRoom(room, ts, tsName) {
-    var W = room.w * T, H = room.h * T;
-    var cv = mkCanvas(W, H);
-    var g = cv.getContext && cv.getContext('2d');
-    if (!g) return null;
+  /* Paint one tile rect into g. ox/oy are the canvas origin in world pixels;
+     every tile and neighbour is read in WORLD coordinates, so a tile on a
+     chunk seam is framed identically to the same tile in a full-room bake. */
+  function paintRect(g, room, ts, tsName, ox, oy, x0, y0, w, h) {
     var z = zone(tsName), p = palette(tsName, ts);
+    var x1 = Math.min(room.w, x0 + w), y1 = Math.min(room.h, y0 + h);
     function at(x, y) {
       if (x < 0 || y < 0 || y >= room.h) return '#';
       var r = room.grid[y];
       return x >= r.length ? '#' : r[x];
     }
     function solid(x, y) { return !ts || ts.solid.indexOf(at(x, y)) >= 0; }
-    function rect(c, x, y, w, h) { g.fillStyle = c; g.fillRect(x, y, w, h); }
+    function rect(c, x, y, rw, rh) { g.fillStyle = c; g.fillRect(x - ox, y - oy, rw, rh); }
 
     var x, y;
     /* pass 1: floors (under everything, so a face can overhang them) */
-    for (y = 0; y < room.h; y++) for (x = 0; x < room.w; x++) {
+    for (y = y0; y < y1; y++) for (x = x0; x < x1; x++) {
       if (solid(x, y)) continue;
       floorCell(g, rect, p, z, material(at(x, y), ts), x, y, at);
     }
     /* pass 2: contact shadows on floors under walls / beside walls */
-    for (y = 0; y < room.h; y++) for (x = 0; x < room.w; x++) {
+    for (y = y0; y < y1; y++) for (x = x0; x < x1; x++) {
       if (solid(x, y)) continue;
       var px0 = x * T, py0 = y * T;
       if (solid(x, y - 1)) { g.globalAlpha = 0.55; rect(p.shadow, px0, py0, T, 4); g.globalAlpha = 0.3; rect(p.shadow, px0, py0 + 4, T, 2); g.globalAlpha = 1; }
       if (solid(x - 1, y)) { g.globalAlpha = 0.35; rect(p.shadow, px0, py0, 2, T); g.globalAlpha = 1; }
       if (solid(x + 1, y)) { g.globalAlpha = 0.35; rect(p.shadow, px0 + T - 2, py0, 2, T); g.globalAlpha = 1; }
     }
-    /* pass 3: walls — caps and faces */
-    for (y = 0; y < room.h; y++) for (x = 0; x < room.w; x++) {
+    /* pass 3: walls — caps and faces. Neighbours are read past x1/y1, so a
+       face at the last tile of a chunk still sees the cell across the seam. */
+    for (y = y0; y < y1; y++) for (x = x0; x < x1; x++) {
       if (!solid(x, y)) continue;
       wallCell(g, rect, p, z, material(at(x, y), ts), x, y, solid);
     }
+  }
+
+  /* g: 2d context of a canvas at 1px per world unit. Small rooms keep the
+     single bake — one blit per frame — and the ceiling guard protects them. */
+  function bakeRoom(room, ts, tsName) {
+    var cv = mkCanvas(room.w * T, room.h * T);
+    var g = cv.getContext && cv.getContext('2d');
+    if (!g) return null;
+    paintRect(g, room, ts, tsName, 0, 0, 0, 0, room.w, room.h);
+    return cv;
+  }
+
+  /* Oversized rooms bake lazily, 32 tiles (512 native px) at a time. */
+  var CHUNK = 32;
+  function bakeChunk(room, ts, tsName, cx, cy) {
+    var x0 = cx * CHUNK, y0 = cy * CHUNK;
+    var cv = mkCanvas(CHUNK * T, CHUNK * T);
+    var g = cv.getContext && cv.getContext('2d');
+    if (!g) return null;
+    paintRect(g, room, ts, tsName, x0 * T, y0 * T, x0, y0, CHUNK, CHUNK);
     return cv;
   }
 
@@ -1065,6 +1099,8 @@
 
   NEU.engineLook = {
     zone: zone, palette: palette, material: material, bakeRoom: bakeRoom,
+    bakeChunk: bakeChunk, CHUNK: CHUNK,
+    ALLOC_CAP: ALLOC_CAP, allocStats: allocStats, mkCanvas: mkCanvas,
     drawAnimated: drawAnimated, stamp: stamp, shadow: shadow,
     surround: surround, surroundTiles: surroundTiles,
     drawPlayer: drawPlayer, playerRows: function (f, p, b) { return playerRows(f, p, b).slice(); }, walkPhase: walkPhase,
