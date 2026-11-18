@@ -22,6 +22,7 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
+  function dp(k) { return NEU.diff ? NEU.diff.f(k) : 1; }
   function kn(d) { return NEU.keys ? NEU.keys.label(d) : d; }
 
   /* THE tuning table. scal-attacks.js (loaded first) reads NEU.scal.TUNE at
@@ -2414,6 +2415,7 @@
         kn('x') + ' dash &middot; ' + kn('Shift') + ' focus &middot; ' + kn('c') + ' menu &middot; esc to leave';
     }
     layout();
+    if (NEU.diff) NEU.diff.begin(); MAXHP = NEU.diff ? NEU.diff.fpick([16, 12, 8, 7, 6, 4, 1]) : 8; IFRAMES = (dm.IFRAMES || 1.1) * dp('iframes'); HEAL_CD = 30 * dp('healCd');
     t = 0; hp = MAXHP; inv = 0; dropBullets(); keys = {}; booms = []; flashAt = -9;
     shownInv = null; bannerTxt = ''; endPh(); setPh(0);
     rage = 0; tp = 0; shieldT = 0;
