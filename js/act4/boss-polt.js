@@ -91,8 +91,12 @@
       AY = ((innerHeight - AH) / 2 + 20) | 0;
     }
     /* the kit HUD (tab 18 + box 48, 24 under the arena) must clear the
-       floating TP strip (#tphud: bottom 24px + 80px tall, plus an 8px gap) */
-    var over = AY + AH + 72 - (innerHeight - 112);
+       floating TP strip (#tphud: bottom 24px + 80px tall, plus an 8px gap)
+       Only when the strip is actually shown: jsdom boots without tphud.js
+       and must keep the original arena geometry. */
+    var strip = document.getElementById('tphud');
+    var floor = strip && !strip.hidden ? 112 : 44;
+    var over = AY + AH + 72 - (innerHeight - floor);
     if (over > 0) AH = Math.max(300, AH - over) | 0;
     arenaCache = {};
     kitBox.AX = AX; kitBox.AY = AY; kitBox.AW = AW; kitBox.AH = AH;   /* the C strip follows resizes */
