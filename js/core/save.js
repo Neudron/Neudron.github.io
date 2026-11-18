@@ -311,11 +311,12 @@
       return { ok: true, why: '' };
     },
     newGame: function () {
-      var flags = mem.flags;
-      NEU.save.wipe();
-      Object.keys(flags).forEach(function (k) { if (k.indexOf('opt_') === 0) mem.flags[k] = flags[k]; });
-      write(true);
-      return mem;
+      var next = blank();
+      next.stamp = mem.stamp;
+      Object.keys(mem.flags).forEach(function (k) {
+        if (k.indexOf('opt_') === 0) next.flags[k] = mem.flags[k];
+      });
+      return NEU.save.apply(next);
     },
     playtime: function () { return Math.max(0, Number(mem.flags.t_play) || 0); },
 
