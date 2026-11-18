@@ -6,6 +6,7 @@
 
   function create(opts) {
     opts = opts || {};
+    var MAXH = opts.maxHp || 6, HEALCD = opts.healCd || 30;
     var F = opts.F || (NEU.danmaku && NEU.danmaku.fight ? NEU.danmaku.fight(0, 0) : { x: 0, y: 0, fx: 0, fy: -1, swings: [] });
     var box = opts.box || { AX: 0, AY: 0, AW: 800, AH: 600 };
     var adapter = opts.adapter || {};
@@ -25,7 +26,7 @@
     var charge = false, chargeT = 0, meleeCd = 0, rangedCd = 0, healCd = 0;
     /* hold Z this long and the release also swings a charged melee arc */
     var CHARGE_FULL = 1.0;
-    var shots = [], swings = [], beam = null, dash = null, hp = 6, casts = [];
+    var shots = [], swings = [], beam = null, dash = null, hp = MAXH, casts = [];
     var grazePts = 8 / 250, grazePad = 8, playerR = 4;
     var GRAZE_TEXT = 'GRAZE';
 
@@ -64,7 +65,7 @@
       return tp;
     }
     function drainTp() { var e = tpEvents; tpEvents = []; return e; }
-    function heal(n) { hp = Math.min(6, hp + n); }
+    function heal(n) { hp = Math.min(MAXH, hp + n); }
     function melee() {
       if (meleeCd > 0 || opts.noMelee) return;
       var it = item(equipped('melee'));
@@ -134,8 +135,8 @@
     /* what a row looks like and whether it can be used now */
     function rowState(row) {
       var d = row.data, st = d && d.stats || {}, fx = d && d.fx, cost = (st.tp || 0) / 100, pct = Math.round(cost * 100);
-      if (row.kind === 'heal-free') return { icon: 'heal', col: '#5CF08C', cost: 0, ok: healCd <= 0 && hp < 6, tag: 'FREE',
-        why: healCd > 0 ? 'WAIT ' + Math.ceil(healCd) + 's' : 'HP FULL' };
+      if (row.kind === 'heal-free') return { icon: 'heal', col: '#5CF08C', cost: 0, ok: !opts.noHeal && healCd <= 0 && hp < MAXH, tag: 'FREE',
+        why: opts.noHeal ? 'NO HEALS' : healCd > 0 ? 'WAIT ' + Math.ceil(healCd) + 's' : 'HP FULL' };
       if (row.kind === 'consumable') return { icon: 'heal', col: '#5CF08C', cost: 0, ok: true,
         tag: 'x' + (NEU.save && NEU.save.count ? NEU.save.count(d.id) : 1), why: '' };
       if (!d) return { icon: 'buster', col: '#5A5668', cost: 0, ok: false, tag: '', why: 'EMPTY' };
@@ -149,8 +150,8 @@
       if (!row) return;
       if (!rowState(row).ok) { stripShake = performance.now(); sfx('tick'); return; }
       if (row.kind === 'heal-free') {
-        if (healCd > 0 || hp >= 6) return;
-        heal(2); healCd = 30; stripOpen = false; return;
+        if (healCd > 0 || hp >= MAXH || opts.noHeal) return;
+        heal(2); healCd = HEALCD; stripOpen = false; return;
       }
       def = row.data;
       if (!def) return;
@@ -308,13 +309,13 @@
         ctx.textAlign = 'right'; ctx.fillStyle = st.ok ? T.acc : '#6A6480'; ctx.fillText(st.ok ? st.tag : st.why, bx + bw - 24, y + 2); ctx.textAlign = 'left';
         if (rows[i].kind === 'heal-free' && healCd > 0) {
           ctx.fillStyle = '#1A3A24'; ctx.fillRect(bx + 80, y + 21, 128, 3);
-          ctx.fillStyle = '#5CF08C'; ctx.fillRect(bx + 80, y + 21, Math.round(128 * (1 - healCd / 30)), 3);
+          ctx.fillStyle = '#5CF08C'; ctx.fillRect(bx + 80, y + 21, Math.round(128 * (1 - healCd / HEALCD)), 3);
         }
       }
       fy = by + 28 + rows.length * rowH + 4;
       ctx.fillStyle = T.well; ctx.fillRect(bx + 16, fy, bw - 32, 2);
       ctx.fillStyle = '#C0BCC8'; ctx.fillText('HP', bx + 24, fy + 14);
-      for (i = 0; i < 6; i++) stamp(ctx, HEART, bx + 66 + i * 16, fy + 22, 2, i < hp ? T.soul : '#2A1A20');
+      for (i = 0; i < MAXH; i++) stamp(ctx, HEART, bx + 66 + i * 16, fy + 22, 2, i < hp ? T.soul : '#2A1A20');
       ctx.textAlign = 'right'; ctx.fillStyle = T.acc; ctx.fillText('TP ' + (tp >= 1 ? 'MAX' : Math.floor(tp * 100) + '%'), bx + bw - 24, fy + 14);
       gx = bx + 24; gy = fy + 40; gw = bw - 48; cw = gw / cells; fill = tp * cells;
       st = rowState(rows[stripSel] || rows[0]); cost = st.ok ? st.cost : 0; blink = reduce ? 1 : (Math.floor(now / 260) % 2 ? 1 : 0.55);
@@ -403,7 +404,7 @@
     function cooldowns() {
       var m = item(equipped('melee')), r = item(equipped('ranged'));
       var ms = (m && m.stats && m.stats.cd) || 0.3, rs = (r && r.stats && r.stats.cd) || 1;
-      return { melee: cdFrac(meleeCd, ms), ranged: cdFrac(rangedCd, rs), heal: cdFrac(healCd, 30) };
+      return { melee: cdFrac(meleeCd, ms), ranged: cdFrac(rangedCd, rs), heal: cdFrac(healCd, HEALCD) };
     }
 
     var api = {
@@ -419,7 +420,7 @@
       get charge() { return charge ? Math.min(1, chargeT / CHARGE_FULL) : 0; },
       get hp() { return hp; },
       /* a host that owns the HP (the dungeon) writes it in so HEAL and the strip read true */
-      set hp(v) { hp = Math.max(0, Math.min(6, Number(v) || 0)); }
+      set hp(v) { hp = Math.max(0, Math.min(MAXH, Number(v) || 0)); }
     };
     /* The TP bar shows the newest kit while its fight (or the dungeon) is live. */
     api._mini = NEU.activeMinigame || '';
