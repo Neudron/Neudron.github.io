@@ -779,10 +779,14 @@
   }
 
   function finishSeq() {
+    var snapC = NEU.kernel && NEU.kernel.bridge ? NEU.kernel.bridge() : null;
     seq = null;
     if (warnEl) warnEl.hidden = true;
     close();
-    if (NEU.cards && NEU.cards.open) NEU.cards.open();
+    if (NEU.cards && NEU.cards.open) {
+      if (NEU.engineTrans && NEU.engineTrans.enterMode) NEU.engineTrans.enterMode('mode:cards', function () { NEU.cards.open(); }, { before: snapC });
+      else NEU.cards.open();
+    }
   }
 
   function provoke() {
