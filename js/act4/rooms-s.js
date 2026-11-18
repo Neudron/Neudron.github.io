@@ -911,7 +911,38 @@
     [[9, 50], [12, 50], [12, 52], [20, 52]], [[30, 52], [32, 52], [32, 65], [13, 65], [12, 65]],
     [[3, 38], [1, 38]], [[63, 24], [66, 24]]
   ];
-  var V_W = 69, V_H = 75;
+  /* W2-SAV: new ground east and south of the authored fourteen. The outer
+     trail braids around the well, baobab and termite mound; ridges break
+     sightlines; one lookout and two dead ends that point back to the spine. */
+  var V_W = 84, V_H = 88;
+  /* Thorn banks / laterite ridges, as inclusive [x0,y0,x1,y1] rectangles.
+     Painted on open 'd' infill ONLY, before the guaranteed paths are carved,
+     so no door, plate, spawn, altar or chase cell can be sealed. */
+  var V_BANKS = [
+    [13, 44, 15, 52], [4, 56, 12, 57],          /* well braid */
+    [31, 44, 34, 52], [31, 56, 34, 61], [16, 60, 19, 61], /* baobab braid */
+    [17, 32, 19, 38], [32, 32, 35, 38],         /* two crosslinks */
+    [46, 28, 50, 31],                            /* termite laterite ridge */
+    [52, 34, 58, 35], [60, 41, 66, 42], [52, 52, 57, 53], /* broken midground */
+    [60, 76, 61, 84], [70, 76, 71, 84]           /* lookout frame */
+  ];
+  /* Braided outer trails, crosslinks and dead ends. Carved after V_PATHS and
+     after the banks, so each one is a guaranteed open route. */
+  var V_MAZE_PATHS = [
+    [[9, 42], [2, 42], [2, 58], [14, 58], [18, 58], [18, 50]], /* outer west braid */
+    [[32, 52], [32, 60], [48, 60], [48, 84], [56, 84], [56, 76]], /* east braid + lookout */
+    [[39, 32], [48, 32], [48, 28], [51, 28]],   /* crosslink to the termite approach */
+    [[2, 58], [2, 63]], [[56, 84], [64, 84]]     /* dead ends */
+  ];
+  /* Static, no quest state. A landmark at the lookout and a sign at each dead
+     end, so the way back is legible from the place you were told you had
+     reached. No origin: these belong to the field, not to an area's count. */
+  var V_FIELD_ENTS = [
+    prop('dunecrest', 55, 76),
+    { t: 'sign', x: 2, y: 63, lines: ['a bank with no way through. the trail you came on is the way back.'] },
+    { t: 'sign', x: 64, y: 84, lines: ['the lookout ends here. west, then north, gets you to the well.'] },
+    { t: 'sign', x: 56, y: 76, lines: ['from up here the roofs line up. the mound is the far one.'] }
+  ];
   var V_PUZZLES = [
     { id: 's2_well', plates: [[7, 50]] },
     { id: 's6_kraal', plates: [[39, 36], [39, 38]] },
@@ -938,6 +969,20 @@
         rows[y] = rows[y].substring(0, x) + ',' + rows[y].substring(x + 1);
       }
       if (path.length === 1) break;
+    }
+  }
+  /* Paint a ridge only where the ground is still open 'd'. Area floors,
+     doors, plates, spawns and earlier carved paths are never overwritten. */
+  function vBank(rows, r) {
+    var x, y, row;
+    for (y = r[1]; y <= r[3]; y++) {
+      if (y < 0 || y >= rows.length) continue;
+      row = rows[y];
+      for (x = r[0]; x <= r[2]; x++) {
+        if (x < 0 || x >= row.length || row.charAt(x) !== 'd') continue;
+        rows[y] = row.substring(0, x) + '#' + row.substring(x + 1);
+        row = rows[y];
+      }
     }
   }
   function vStamp(rows, id) {
@@ -993,7 +1038,11 @@
         vCarve(rows, [[o[0] + e.x, o[1] + e.y]]);
       }
     }
+    /* Banks first, then every guaranteed route: the paths always win, so a
+       ridge can never be the only thing standing between a spawn and a door. */
+    for (i = 0; i < V_BANKS.length; i++) vBank(rows, V_BANKS[i]);
     for (i = 0; i < V_PATHS.length; i++) vCarve(rows, V_PATHS[i]);
+    for (i = 0; i < V_MAZE_PATHS.length; i++) vCarve(rows, V_MAZE_PATHS[i]);
     for (i = 0; i < ids.length; i++) {
       id = ids[i]; o = V_ORIGIN[id]; def = VDEFS[id];
       for (key in (def.spawns || {})) {
@@ -1034,7 +1083,8 @@
       stationZones: [{ x0: 36, y0: 62, x1: 46, y1: 70 }],
       sites: sites, spawns: spawns, areas: areas,
       entities: [{ t: 'savannafloor', x: 0, y: 0 },
-                 { t: 'savannafx', x: 1, y: 74, roomSpan: true }].concat(ents),
+                 { t: 'savannafx', x: 1, y: V_H - 1, roomSpan: true }]
+                .concat(ents).concat(V_FIELD_ENTS),
       solved: villageSolved,
       onSolved: function (c) {
         c.markSolved('s_village');

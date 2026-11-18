@@ -14,8 +14,11 @@
   if (!KK) return;
 
   var T = 16, MX = 6, MY = 4;
+  /* A baked floor is tiled into CHUNK-px canvases so no backing canvas ever
+     crosses the 4096px cap (s0_sand is 362 tiles = 5984px wide). */
+  var CHUNK = 2048;
   var INK = '#12081E';
-  var paints = {};
+  var paints = {}, bakes = {};
   var C = {
     sd0: '#6A4A20', sd1: '#8A6430', sd2: '#B08440', sd3: '#C89A4A', sd4: '#E2B84A', sd5: '#F0D48A',
     e0: '#4A2A14', e1: '#6A3A1C', e2: '#8A4A24', e3: '#A85E2C', e4: '#C47A32', e5: '#D8925A',
@@ -503,18 +506,45 @@
     }
     return false;
   }
-  function bake(room) {
-    var hit = paints[room.id];
-    if (hit) return hit;
-    var ox = MX * T, oy = MY * T, rw = room.w * T, rh = room.h * T;
-    var cw = rw + 2 * ox, ch = rh + 2 * oy;
-    var cv = mk(cw, ch);
-    var g = cv.getContext && cv.getContext('2d');
-    var station = room.tileset === 'station';
-    paints[room.id] = cv;
-    cv.vz = { ox: ox, oy: oy };
-    if (!g) return cv;
-    g.imageSmoothingEnabled = false;
+  /* Static field dressing. All positions come from hs(), so the wash lines,
+     distant crowns and broken wall caps hold still under reduced motion by
+     construction — no clock, no sway, nothing to freeze. */
+  function drawFieldArt(g, room, ox, oy) {
+    var x, y, px, py, k;
+    g.fillStyle = C.sd5; g.globalAlpha = 0.07;
+    for (y = 0; y < room.h; y += 3) for (x = 0; x < room.w; x += 6) {
+      if (hs(x, y, 1700) > 0.34) continue;
+      px = ox + x * T + ((hs(x, y, 1710) * 10) | 0);
+      py = oy + y * T + ((hs(x, y, 1720) * 12) | 0);
+      k = 10 + ((hs(x, y, 1730) * 26) | 0);
+      g.fillRect(px, py, k, 2);
+    }
+    g.globalAlpha = 1;
+    /* distant acacia crowns above the ridge; the lean is baked in */
+    for (x = 2; x < room.w; x += 7) {
+      if (hs(x, 0, 1800) > 0.32) continue;
+      px = ox + x * T + 4; py = oy - 12 - ((hs(x, 0, 1810) * 5) | 0);
+      rc(g, px, py, 1, 8, '#2A1830');
+      rc(g, px - 4, py, 10, 2, '#3A2038');
+      rc(g, px - 2, py - 2, 6, 2, '#3A2038');
+      rc(g, px + 4, py + 4, 5, 1, '#4A2A40');
+    }
+    /* broken caps on walls that face open ground */
+    for (y = 1; y < room.h - 1; y++) for (x = 1; x < room.w - 1; x++) {
+      if (tk(room, x, y) !== '#' || !isFloor(tk(room, x, y + 1))) continue;
+      if (hs(x, y, 1900) > 0.12) continue;
+      px = ox + x * T; py = oy + y * T;
+      rc(g, px + ((hs(x, y, 1910) * 9) | 0), py, 6, 2, C.b3);
+      rc(g, px + 2, py - 2, 2, 2, C.b2);
+    }
+  }
+
+  /* Paint into one clipped chunk. Every helper still draws in full-room bake
+     coordinates (px = ox + tile*T); the caller translates the chunk context by
+     -px0/-py0, so a tile straddling an edge is clipped and finished by its
+     neighbour. No paint code below needs to know the floor is tiled. */
+  function paintRoom(g, room, ox, oy, cw, ch, station) {
+    var rw = room.w * T, rh = room.h * T;
     var x, y, ch2, px, py, i, i2, k, es, e, n, fl, site;
     drawSky(g, ox, oy, cw, station, room);
     drawCliff(g, ox, oy, cw, ch, station, rw, rh);
@@ -613,6 +643,7 @@
       }
       g.globalAlpha = 1;
     }
+    if (!station) drawFieldArt(g, room, ox, oy);
     /* the dusk wash on the top of the room: stepped, never a gradient */
     g.fillStyle = C.k3;
     for (x = 0; x < room.w; x++) {
@@ -620,7 +651,39 @@
       g.globalAlpha = 0.06; g.fillRect(ox + x * T, oy + 10, T, 12);
     }
     g.globalAlpha = 1;
-    return cv;
+  }
+
+  /* One bake = a grid of <=CHUNK-px canvases covering the whole padded room.
+     Chunks tile [0,cw)x[0,ch) exactly, including the sky/cliff margins. */
+  function bake(room) {
+    var hit = bakes[room.id];
+    if (hit) return hit;
+    var ox = MX * T, oy = MY * T, rw = room.w * T, rh = room.h * T;
+    var cw = rw + 2 * ox, ch = rh + 2 * oy;
+    var station = room.tileset === 'station';
+    var set = { id: room.id, ox: ox, oy: oy, cw: cw, ch: ch, chunks: [] };
+    var x0, y0, cw2, ch2, cv, g, chunk;
+    for (y0 = 0; y0 < ch; y0 += CHUNK) {
+      for (x0 = 0; x0 < cw; x0 += CHUNK) {
+        cw2 = Math.min(CHUNK, cw - x0); ch2 = Math.min(CHUNK, ch - y0);
+        cv = mk(cw2, ch2);
+        g = cv.getContext && cv.getContext('2d');
+        chunk = { cv: cv, px0: x0, py0: y0, w: cw2, h: ch2 };
+        set.chunks.push(chunk);
+        if (!g) continue;
+        /* Identity for the first chunk: skip it so tiny rooms also bake under
+           minimal 2D stubs that implement save/restore but not translate. */
+        if (x0 || y0) { g.save(); g.translate(-x0, -y0); }
+        paintRoom(g, room, ox, oy, cw, ch, station);
+        if (x0 || y0) g.restore();
+      }
+    }
+    bakes[room.id] = set;
+    /* Back-compat: callers that only inspect paints[id] see the first chunk.
+       Drawing uses the full set; s0_sand needs three 2048px chunks, not one
+       5984px canvas. */
+    paints[room.id] = set.chunks.length ? set.chunks[0].cv : null;
+    return set;
   }
 
   /* blit only what the screen can see */
@@ -630,17 +693,22 @@
     draw: function (g, e, d) {
       var room = roomOf(d);
       if (!room || !room.grid) return;
-      var cv = bake(room), S = d.S || 1;
-      var vz = cv.vz || { ox: MX * T, oy: MY * T };
-      var dx = Math.round(d.sx - (e.x + 0.5) * T * S - vz.ox * S);
-      var dy = Math.round(d.sy - (e.y + 1) * T * S - vz.oy * S);
+      var set = bake(room), S = d.S || 1;
+      var dx = Math.round(d.sx - (e.x + 0.5) * T * S - set.ox * S);
+      var dy = Math.round(d.sy - (e.y + 1) * T * S - set.oy * S);
       var W = (g.canvas && g.canvas.width) || 4096, H = (g.canvas && g.canvas.height) || 4096;
-      var x0 = Math.max(0, Math.floor(-dx / S)), y0 = Math.max(0, Math.floor(-dy / S));
-      var x1 = Math.min(cv.width, Math.ceil((W - dx) / S)), y1 = Math.min(cv.height, Math.ceil((H - dy) / S));
-      if (x1 <= x0 || y1 <= y0) return;
-      var sm = g.imageSmoothingEnabled;
+      var sm = g.imageSmoothingEnabled, chunks = set.chunks;
+      var i, c, cdx, cdy, x0, y0, x1, y1;
       g.imageSmoothingEnabled = false;
-      g.drawImage(cv, x0, y0, x1 - x0, y1 - y0, dx + x0 * S, dy + y0 * S, (x1 - x0) * S, (y1 - y0) * S);
+      for (i = 0; i < chunks.length; i++) {
+        c = chunks[i];
+        cdx = dx + c.px0 * S; cdy = dy + c.py0 * S;
+        x0 = Math.max(0, Math.floor(-cdx / S)); y0 = Math.max(0, Math.floor(-cdy / S));
+        x1 = Math.min(c.w, Math.ceil((W - cdx) / S)); y1 = Math.min(c.h, Math.ceil((H - cdy) / S));
+        if (x1 <= x0 || y1 <= y0) continue;
+        g.drawImage(c.cv, x0, y0, x1 - x0, y1 - y0,
+          cdx + x0 * S, cdy + y0 * S, (x1 - x0) * S, (y1 - y0) * S);
+      }
       g.imageSmoothingEnabled = sm;
     }
   });
@@ -1131,6 +1199,6 @@
     return site.x0 * T < vr && (site.x0 + site.w) * T > vl;
   }
 
-  NEU.savannaLook = { bake: bake, paints: paints, T: T, MX: MX, MY: MY, props: PROPS,
-    propSprite: propSprite, horizonHeight: horizonHeight };
+  NEU.savannaLook = { bake: bake, paints: paints, bakes: bakes, CHUNK: CHUNK,
+    T: T, MX: MX, MY: MY, props: PROPS, propSprite: propSprite, horizonHeight: horizonHeight };
 })();
