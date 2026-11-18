@@ -294,9 +294,10 @@
     /* street numbers */
     P(366, 26, 1, 3, '#C8A04A'); P(368, 26, 2, 1, '#C8A04A'); P(369, 27, 1, 2, '#C8A04A');
 
-    /* side walls and the parapet over the canal */
-    sideWall(P, 0, 48, 144, 1); sideWall(P, 400, 48, 144, -1);
-    P(0, 48, 16, 2, '#07070C'); P(400, 48, 16, 2, '#07070C');
+    /* side wall and the parapet over the canal. The east wall fell outside
+       this street's clip; a capped bollard will end its last lamp instead. */
+    sideWall(P, 0, 48, 144, 1);
+    P(0, 48, 16, 2, '#07070C');
 
     /* the north pavement */
     slabs(P, 16, 48, 384, 46, 3);
@@ -343,6 +344,11 @@
     puddle(P, 332, 104, 7, 2, '#FFC878');
     puddle(P, 40, 160, 6, 2, null);
     puddle(P, 120, 126, 5, 2, null);
+    /* the last lamp's pool ends on a capped bollard inside D1's own clip,
+       not on the hard edge where this street is cut into the one-map room */
+    P(393, 45, 6, 1, '#FFD890'); P(392, 46, 8, 2, '#07070C'); P(393, 46, 6, 1, '#3A3848');
+    P(394, 48, 4, 17, '#0A0910'); P(395, 48, 1, 17, '#2A2836');
+    P(391, 64, 10, 2, '#0A0910');
   }
 
   /* the neon crescent and star above the stall */
@@ -834,9 +840,13 @@
     paintD1(clipTo(P, 0, 16, 0, 400));
     paintD2(clipTo(P, 384, 32, 400, 688));
     paintD3(clipTo(P, 672, 0, 688, 1072));
-    /* the alley-square seam: three drawn steps on its two cells */
+    /* street-alley seam: one tile of kerb drops the street's pavement to
+       the alley floor, the same stepped treatment as the square seam */
     var cols = ['#4A4458', '#3A3448', '#2E2A3A'];
-    for (var i = 0; i < 3; i++) P(672 + i * 11, 112 + i * 5, 11, 16 - i * 5, cols[i]);
+    for (var i = 0; i < 3; i++) P(400, 64 + i * 5, 16, 6, cols[i]);
+    P(400, 64, 16, 1, '#5A5668');
+    /* the alley-square seam: three drawn steps on its two cells */
+    for (i = 0; i < 3; i++) P(672 + i * 11, 112 + i * 5, 11, 16 - i * 5, cols[i]);
     /* the alley's south wall, under its last two rows (the street has its parapet) */
     P(400, 192, 288, 32, '#0C0C0E');
   }
