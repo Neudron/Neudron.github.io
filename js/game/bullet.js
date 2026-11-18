@@ -216,6 +216,7 @@
     ctx.imageSmoothingEnabled = false;
     var ar = dm.arena(w, h, 640, 360, 22);
     AW = ar.AW; AH = ar.AH; AX = ar.AX; AY = ar.AY;
+    AY = Math.max(96, AY - 80) | 0; if (AY + AH > h - 184) AH = (h - 184 - AY) | 0;
     BAX = AX; BAW = AW; squeezeBox();
     F.x =Math.min(Math.max(F.x, AX + 12), AX + AW - 12);
     F.y = Math.min(Math.max(F.y, AY + 12), AY + AH - 12);

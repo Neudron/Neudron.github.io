@@ -49,7 +49,8 @@
 .menu__note, .menu__keys { margin: 8px 0 0; font: 400 16px/1.5 var(--font, monospace); color: var(--dim); }
 .menu__note:empty { display: none; }
 @media (max-height: 800px) {
-  .menu__win { padding: 20px; }
+  .menu__win { padding: 16px; }
+  .menu__keys { margin-top: 4px; }
   .menu__screen { gap: 4px; margin: 12px 0 8px; }
   .menu__act, .menu__tier { min-height: 40px; padding: 6px 12px; }
 }
