@@ -2538,7 +2538,7 @@
       return;
     }
     if (tvBroken && NEU.quiz) {
-      NEU.quiz.open(); return;
+      if (NEU.engineTrans && NEU.engineTrans.enterMode) NEU.engineTrans.enterMode('mode:quiz', function () { NEU.quiz.open(); }); else NEU.quiz.open(); return;
     }
     if (docked || docking) {
       /* Once it is in, the television is just a way back to the menu. */

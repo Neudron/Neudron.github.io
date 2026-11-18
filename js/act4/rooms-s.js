@@ -1012,7 +1012,10 @@
       gate('north', 'x1_spiral', 'south'),
       { t: 'npc', x: 5, y: 4, colour: '#20C8D0',
         run: function (c) {
-          if (NEU.exo && NEU.exo.open) NEU.exo.open();
+          if (NEU.exo && NEU.exo.open) {
+            if (NEU.engineTrans && NEU.engineTrans.enterMode) NEU.engineTrans.enterMode('mode:boss', function () { NEU.exo.open(); }, { look: '#061418' });
+            else NEU.exo.open();
+          }
           else c.say(['the arena door is shut.']);
         } },
       { t: 'sign', x: 3, y: 6,

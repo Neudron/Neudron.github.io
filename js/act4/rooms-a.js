@@ -1747,7 +1747,8 @@
           tries++;
           if (!NEU.tboxOpen || !NEU.tboxOpen() || tries > 60) {
             clearInterval(wait);
-            NEU.scal.open();
+            if (NEU.engineTrans && NEU.engineTrans.enterMode) NEU.engineTrans.enterMode('mode:boss', function () { NEU.scal.open(); }, { look: '#280204' });
+            else NEU.scal.open();
           }
         }, 250);
       }, 320);
