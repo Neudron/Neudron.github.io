@@ -452,6 +452,9 @@
 
   addEventListener('keydown', function (e) {
     if (wrap.hidden) return;
+    /* A higher overlay owns the keyboard. */
+    if ((NEU.settings && NEU.settings.open_) ||
+        (NEU.menu && NEU.menu.active) || (NEU.dummy && NEU.dummy.active)) return;
     if (entering) { e.preventDefault(); return; }  /* the room is still fading out underneath */
     if (taken) { e.preventDefault(); return; }   /* the soup is made: nothing to cancel, the pot is handing the room back */
     if (e.key === 'Escape') { e.preventDefault(); close(); if (NEU.engine) NEU.engine.enter('h3_trip', 'in'); return; }

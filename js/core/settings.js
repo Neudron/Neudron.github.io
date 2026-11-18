@@ -650,11 +650,26 @@
 
   /* The panel's focusables. Disabled ones are skipped: a trap that wraps
      to one eats Tabs silently. A radiogroup is ONE tab stop (its picked
-     option has tabIndex 0); arrows move inside it. */
+     option has tabIndex 0); arrows move inside it.
+
+     ONLY VISIBLE CONTROLS. The five panes all live in the DOM at once;
+     four are [hidden] (display:none). Focusing into a hidden pane is a
+     no-op in every engine, so Tab from the last control of the visible
+     pane — reduce particles, in Config — used to "land" on the hidden
+     keybinds reset and sit there, eating every later Tab. Walk up from
+     each candidate and drop anything under a hidden ancestor. */
   function focusables() {
     var all = panel.querySelectorAll('button:not(:disabled):not([tabindex="-1"]), input:not(:disabled)');
-    var out = [], i;
-    for (i = 0; i < all.length; i++) out.push(all[i]);
+    var out = [], i, node, hidden;
+    for (i = 0; i < all.length; i++) {
+      hidden = false;
+      node = all[i];
+      while (node && node !== panel) {
+        if (node.hidden === true) { hidden = true; break; }
+        node = node.parentNode;
+      }
+      if (!hidden) out.push(all[i]);
+    }
     /* jsdom returns selector-list matches grouped by selector rather
        than in document order, which would wrap the trap backwards.
        Sort explicitly so the order is the same in every engine. */

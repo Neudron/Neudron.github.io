@@ -1097,6 +1097,9 @@
 
   addEventListener('keydown', function (e) {
     if (!open_) return;
+    /* Settings opened over the show owns every key, including Tab. */
+    if ((NEU.settings && NEU.settings.open_) ||
+        (NEU.menu && NEU.menu.active) || (NEU.dummy && NEU.dummy.active)) return;
     /* "Leave Quiz?" owns the keyboard while it is up. */
     if (document.getElementById('confirmExit')) return;
     if (phaseKey(e)) { e.preventDefault(); return; }

@@ -613,6 +613,9 @@
       (function (n) {
         b.addEventListener('click', function () { if (seq) return; sel = n; render(); confirm(); });
       })(i);
+      /* Same shop component as the stall, so icons, prices, effects and
+         TEST controls read the same way at both merchants. */
+      if (NEU.shopkit && (mode === 'buy' || mode === 'sell')) NEU.shopkit.decorate(b, row, mode, { prefix: '* ' });
       menuEl.appendChild(b);
     }
     /* the purse, always on the menu: you cannot shop blind */
@@ -623,34 +626,22 @@
   }
 
   function buy(id) {
-    var def;
-    def = NEU.items && NEU.items.get ? NEU.items.get(id) : null;
-    if (!def || !KINDS[def.kind] || !(def.price > 0) || !NEU.save) return false;
-    if (def.kind !== 'heal' && NEU.save.count(id) > 0) {
-      say('* you already carry that.');
+    var def = NEU.items && NEU.items.get ? NEU.items.get(id) : null;
+    if (!NEU.shopkit) return false;
+    if (!NEU.shopkit.buy(id)) {
+      say(NEU.save && def && NEU.save.coins() < def.price ? '* not enough coins.' : '* you already carry that.');
       return false;
     }
-    if (NEU.save.coins() < def.price || !NEU.save.spend(def.price)) {
-      say('* not enough coins.');
-      return false;
-    }
-    NEU.save.give(id);
-    say('* bought. ' + def.name + '.');
+    say('* bought. ' + (def ? def.name : id) + '.');
     return true;
   }
 
   function sell(id) {
-    var def, pay;
-    def = NEU.items && NEU.items.get ? NEU.items.get(id) : null;
-    if (!def || !KINDS[def.kind] || !NEU.save || NEU.save.count(id) < 1) return false;
-    if (isEquipped(id)) {
-      say('* equipped. unequip first.');
-      return false;
-    }
-    pay = def.sell || 0;
-    NEU.save.take(id);
-    NEU.save.addCoins(pay);
-    say('* sold. ' + pay + ' coins.');
+    var def = NEU.items && NEU.items.get ? NEU.items.get(id) : null;
+    if (!NEU.shopkit) return false;
+    if (isEquipped(id)) { say('* equipped. unequip first.'); return false; }
+    if (!NEU.shopkit.sell(id)) { say('* nothing to sell.'); return false; }
+    say('* sold. ' + (def ? (def.sell || 0) : 0) + ' coins.');
     return true;
   }
 
@@ -729,6 +720,9 @@
     if (beaten) say('* you again. the cards remember you.');
     else if (met) say('* you return. the shelves have not moved.');
     else say('* a stone shop. the mage waits.');
+    var persona = document.getElementById('magePersona');
+    if (persona) persona.textContent = beaten ? 'he sells. you buy. he remembers the cards.' :
+      met ? 'still shelves. still dust. he still sells.' : 'a stone shop, and the cards';
     render();
     draw();
   }

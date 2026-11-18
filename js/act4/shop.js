@@ -32,11 +32,20 @@
     { id: 'buy', label: 'BUY' }, { id: 'talk', label: 'TALK' }, { id: 'sell', label: 'SELL' },
     { id: 'more', label: 'MORE' }, { id: 'exit', label: 'EXIT' }
   ];
+  /* First line on the first talk, a different one on every talk after —
+     the merchant remembers you (Temmie changes after college). */
   var TALK = [
     'he says the canal is not a canal. he is sure of it.',
     'the weather here is always about to rain. he has stopped being disappointed by it.',
     'do not ask him about the axe. he will tell you about the axe.'
   ];
+  var TALK_AGAIN = [
+    'still not a canal. he has drawn you a diagram.',
+    'still about to rain. he has stopped bringing an umbrella.',
+    'he changes the subject to the axe before you can ask.'
+  ];
+  var PERSONA = 'a gold-hatted seller with a dry joke for every shelf';
+  var PERSONA_HANDED = 'a gold-hatted seller who is out of the axe, but never out of advice';
   var MORE = [
     'rusty. bent. yours.',
     'the other half of the map is the half you need.',
@@ -95,6 +104,13 @@
 
   function say(msg) {
     if (sayEl) sayEl.textContent = msg || '';
+  }
+
+  function personaLine() {
+    var h = wrap.querySelector('.shop__persona');
+    if (!h) return;
+    h.textContent = PERSONA + ' \u00b7 ' +
+      (NEU.save && NEU.save.has('axe') ? PERSONA_HANDED : 'the stall is open.');
   }
 
   function ease(u) { u = u < 0 ? 0 : (u > 1 ? 1 : u); return u * u * (3 - 2 * u); }
@@ -310,6 +326,7 @@
     list = rowsFor();
     if (sel >= list.length || sel < 0) sel = 0;
     if (goldEl) goldEl.textContent = (NEU.save ? NEU.save.coins() : 0) + 'g';
+    personaLine();
     if (keysEl) keysEl.textContent = '↑↓ choose · Z select · X back';
     hadFocus = boardEl.contains(document.activeElement);
     boardEl.innerHTML = '';
@@ -331,6 +348,9 @@
         /* A row that takes focus becomes the cursor. Enter acts on the row the
            player can see focused, so Tab cannot leave the cursor behind. */
         b.addEventListener('focus', function () { if (sel !== n) { sel = n; markSel(); } });
+        /* One shared shop component for both merchants: icon, one-line
+           effect, keyboard tooltip with numbers and comparison, TEST. */
+        if (NEU.shopkit && (mode === 'buy' || mode === 'sell')) NEU.shopkit.decorate(b, list[n], mode);
         boardEl.appendChild(b);
       })(i);
     }
@@ -355,34 +375,27 @@
   }
 
   function buy(id) {
-    var def;
-    if (!NEU.save) return false;
-    if (id === 'recall') {
-      if (NEU.save.has('recall')) { say('you already have it. the rest is atmosphere.'); return false; }
-      NEU.save.give('recall');
-      if (NEU.quest) NEU.quest.mark('a4_recall');
+    var def = NEU.items && NEU.items.get ? NEU.items.get(id) : null;
+    var recalled = id === 'recall';
+    var ok = NEU.shopkit ? NEU.shopkit.buy(id) : false;
+    if (!ok) {
+      say(recalled && NEU.save && NEU.save.has('recall') ? 'you already have it. the rest is atmosphere.' :
+          NEU.save && def && NEU.save.coins() < def.price ? 'not enough coins.' : 'you already carry that.');
+      return false;
+    }
+    if (recalled) {
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
       say('you take the Recall Potion. he does not stop you.');
-      return true;
-    }
-    def = NEU.items && NEU.items.get ? NEU.items.get(id) : null;
-    if (!def || !KINDS[def.kind] || !(def.price > 0)) return false;
-    if (def.kind !== 'heal' && NEU.save.count(id) > 0) { say('you already carry that.'); return false; }
-    if (NEU.save.coins() < def.price || !NEU.save.spend(def.price)) { say('not enough coins.'); return false; }
-    NEU.save.give(id);
-    say('bought. ' + def.name + '.');
+    } else say('bought. ' + (def ? def.name : id) + '.');
     return true;
   }
 
   function sell(id) {
-    var def, pay;
-    def = NEU.items && NEU.items.get ? NEU.items.get(id) : null;
-    if (!def || !KINDS[def.kind] || !NEU.save || NEU.save.count(id) < 1) return false;
-    if (isEquipped(id)) { say('equipped. unequip first.'); return false; }
-    pay = def.sell || 0;
-    NEU.save.take(id);
-    NEU.save.addCoins(pay);
-    say('sold. ' + pay + ' coins.');
+    var def = NEU.items && NEU.items.get ? NEU.items.get(id) : null;
+    if (!NEU.shopkit) return false;
+    if (!NEU.save || isEquipped(id)) { say('equipped. unequip first.'); return false; }
+    if (!NEU.shopkit.sell(id)) { say('nothing to sell.'); return false; }
+    say('sold. ' + (def ? (def.sell || 0) : 0) + ' coins.');
     return true;
   }
 
@@ -394,7 +407,7 @@
     if (mode === 'main') {
       if (row.id === 'buy') enter('buy', 'what will you buy?');
       else if (row.id === 'sell') enter('sell', 'what will you sell?');
-      else if (row.id === 'talk') { say(TALK[talkI % TALK.length]); talkI++; render(); }
+      else if (row.id === 'talk') { say(talkI === 0 ? TALK[0] : TALK_AGAIN[(talkI - 1) % TALK_AGAIN.length]); talkI++; render(); }
       else if (row.id === 'more') { say(MORE[moreI % MORE.length]); moreI++; render(); }
       else close();
       return;
@@ -507,7 +520,8 @@
   addEventListener('keydown', function (e) {
     if (e.key === 'Tab') {
       if (wrap.hidden || !active) return;
-      if (NEU.settings && NEU.settings.open_) return;
+      if ((NEU.settings && NEU.settings.open_) ||
+          (NEU.menu && NEU.menu.active) || (NEU.dummy && NEU.dummy.active)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       var els = Array.prototype.slice.call(wrap.querySelectorAll('button:not(:disabled)'));
@@ -520,6 +534,9 @@
 
   addEventListener('keydown', function (e) {
     if (wrap.hidden || !active || e === openedBy) return;
+    /* A higher overlay owns the keyboard while it is open. */
+    if ((NEU.settings && NEU.settings.open_) ||
+        (NEU.menu && NEU.menu.active) || (NEU.dummy && NEU.dummy.active)) return;
     /* the stall is modal: no key reaches the fight or the room under it */
     e.stopImmediatePropagation();
     if (anim) { e.preventDefault(); return; }

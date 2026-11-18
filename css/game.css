@@ -1,5 +1,144 @@
 /* game.css — Act IV UI that came after style.css hit its size cap. */
 
+/* ═══ main menu, shared shop rows, practice room (menu-shop) ═══
+   All three sit BELOW .tbox (96): the menu at 93, just under
+   settings (94), and the shop rows inside .shop (76)/.mage (76).
+   Font sizes stay on the 16px grid. Semantic tokens only. */
+
+/* ── in-game main menu ─────────────────────────────────────────── */
+.menu {
+  position: fixed; inset: 0; z-index: 93;
+  display: grid; place-items: center; padding: 24px;
+  background: rgba(8, 8, 11, 0.82);
+}
+.menu[hidden] { display: none !important; }
+.menu__win {
+  width: min(560px, 100%); max-height: calc(100dvh - 48px); overflow: auto;
+  box-sizing: border-box; padding: 32px;
+  background: #12081E; border: 4px solid var(--edge); border-radius: 8px;
+  box-shadow: inset 0 0 0 2px #1A1024;
+}
+.menu__head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.menu__title { margin: 0; font: 700 48px/1.1 var(--font, monospace); color: var(--text); letter-spacing: 4px; }
+.menu__ver { font: 400 16px/1 var(--font, monospace); color: var(--dim); }
+.menu__screen { display: flex; flex-direction: column; gap: 8px; margin: 24px 0 16px; }
+.menu__h { margin: 0 0 8px; font: 400 16px/1.5 var(--font, monospace); color: var(--dim); }
+.menu__act, .menu__tier {
+  display: flex; align-items: center; gap: 16px; width: 100%;
+  min-height: 48px; padding: 8px 16px; box-sizing: border-box;
+  font: 400 16px/1.5 var(--font, monospace); text-align: left;
+  color: var(--text); background: #1A1024;
+  border: 2px solid var(--edge); border-radius: 4px;
+  cursor: pointer;
+}
+.menu__act::before { content: '\25B6'; color: var(--accent); font-size: 16px; }
+.menu__act:hover, .menu__act:focus-visible,
+.menu__tier:hover, .menu__tier:focus-visible {
+  outline: 3px solid var(--accent); outline-offset: 2px;
+  background: #2A1E3A; color: var(--text);
+}
+.menu__primary { border-color: var(--accent); background: #2A1E3A; }
+.menu__danger { border-color: #E23B55; color: #FFB0A0; }
+.menu__danger::before { content: '\2716'; }
+.menu__back::before { content: '\2190'; }
+.menu__tier { flex-direction: column; align-items: flex-start; gap: 4px; }
+.menu__tier-name { font: 700 16px/1.2 var(--font, monospace); }
+.menu__tier-fx { font: 400 16px/1.3 var(--font, monospace); color: var(--dim); }
+.menu__file { display: flex; flex-direction: column; gap: 4px; margin: 0 0 8px;
+  font: 400 16px/1.5 var(--font, monospace); color: var(--text); }
+.menu__note, .menu__keys { margin: 8px 0 0; font: 400 16px/1.5 var(--font, monospace); color: var(--dim); }
+.menu__note:empty { display: none; }
+.menu.is-calm *, .menu.is-calm *::before, .menu.is-calm *::after { transition: none !important; animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .menu, .menu * { transition: none !important; animation: none !important; }
+}
+
+/* ── one readable shop row, shared by the stall and the mage ──── */
+.shop__persona { margin: 0; font: 400 16px/1.5 var(--font, monospace); color: var(--shop-dim, var(--dim)); }
+/* The stock board is a flex column with gap 0; without flex:none the rows
+   shrink to fit its max-height and their two lines overlap each other. */
+.shop__board .shop__row, .mage__row { flex: 0 0 auto; }
+.shop__board { max-height: 240px; overflow-y: auto; }
+.shopkit__icon {
+  flex: none; width: 32px; height: 32px;
+  image-rendering: pixelated;
+}
+/* The stock .shop__row is a 3-column grid (heart, name, price). The shared
+   component adds an icon, an effect line and TEST, so switch those rows to
+   a two-line flex: icon / name / price / TEST, then the effect beneath. */
+.shop__row, .mage__row {
+  display: flex !important; flex-wrap: wrap; align-content: center;
+  align-items: center; gap: 4px 8px;
+  min-height: 48px;
+}
+.shop__row .shopkit__icon, .mage__row .shopkit__icon { margin-right: 0; }
+.shop__p { margin-left: auto; }
+.shopkit__fx { flex: 1 1 100%; order: 5; }
+.shopkit__test { order: 4; }
+.shopkit__fx {
+  flex: 1 1 auto; min-width: 0;
+  font: 400 16px/1.4 var(--font, monospace);
+  color: var(--shop-dim, var(--dim));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.shopkit__test {
+  flex: none; min-height: 32px; padding: 0 8px;
+  font: 400 16px/1 var(--font, monospace);
+  color: var(--shop-gold, #E4C46A); background: #1A1024;
+  border: 2px solid var(--edge); border-radius: 4px; cursor: pointer;
+}
+.shopkit__test:hover, .shopkit__test:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.shopkit__tip {
+  /* Viewport-fixed: the board is a scroll container, so an absolutely
+     positioned child to its right is clipped before it can be read. */
+  position: fixed; z-index: 95; left: 8px; top: 8px;
+  width: max-content; max-width: 280px;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 16px; box-sizing: border-box;
+  background: #0A0810; border: 2px solid var(--edge); border-radius: 4px;
+  font: 400 16px/1.4 var(--font, monospace); color: var(--text);
+  pointer-events: none;
+}
+.shopkit__tip[hidden] { display: none; }
+.shopkit__tip-name { color: var(--shop-gold, #E4C46A); }
+.shopkit__tip-kind, .shopkit__tip-desc, .shopkit__tip-cmp { color: var(--dim); }
+.shopkit__tip.is-in { animation: shopkit-in .18s ease-out; }
+@keyframes shopkit-in { from { opacity: 0; } to { opacity: 1; } }
+.shop__row, .mage__row { position: relative; }
+.shop__tip, .shopkit__tip { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .shopkit__tip, .shopkit__test { transition: none !important; animation: none !important; }
+}
+
+/* ── free weapon practice room ────────────────────────────────── */
+.dummy {
+  position: fixed; inset: 0; z-index: 93;
+  display: grid; place-items: center; padding: 24px;
+  background: rgba(8, 8, 11, 0.88);
+}
+.dummy[hidden] { display: none !important; }
+.dummy__win {
+  width: min(640px, 100%); box-sizing: border-box; padding: 16px;
+  background: #12081E; border: 4px solid var(--edge); border-radius: 8px;
+  text-align: center;
+}
+.dummy__h { margin: 0 0 8px; font: 700 32px/1.2 var(--font, monospace); }
+.dummy__scene { display: block; width: 100%; height: auto; image-rendering: pixelated; border: 2px solid var(--edge); }
+.dummy__name, .dummy__read, .dummy__result, .dummy__keys {
+  margin: 8px 0; font: 400 16px/1.5 var(--font, monospace); color: var(--text);
+}
+.dummy__result { color: var(--shop-gold, #E4C46A); min-height: 24px; }
+.dummy__exit, .dummy__hit {
+  min-height: 48px; margin: 8px 4px; padding: 8px 16px;
+  font: 400 16px/1 var(--font, monospace); color: var(--text);
+  background: #1A1024; border: 2px solid var(--edge); border-radius: 4px; cursor: pointer;
+}
+.dummy__hit { border-color: var(--accent); background: #2A1E3A; }
+.dummy button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .dummy, .dummy * { animation: none !important; transition: none !important; }
+}
+
 /* Rap battle (js/act4/rhythm.js). His lines go in a Deltarune box at
    the bottom, left-aligned with a * bullet, never in the middle. */
 .fnf__msg {
@@ -819,13 +958,13 @@ html.rm .tphud__hp { animation: none !important; }
   width: min(1000px, 100%, calc((100dvh - 380px) * 16 / 9 + 48px));
   min-width: min(100%, 360px);
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;
-  grid-template-areas: "top top" "scene scene" "board say" "bar bar";
+  grid-template-areas: "top top" "persona persona" "scene scene" "board say" "bar bar";
   align-content: start; padding: 16px; max-height: none;
 }
 .shop__top { grid-area: top; }
 .shop__scene {
   grid-area: scene; justify-self: center; display: block;
-  width: min(100%, calc((100dvh - 380px) * 16 / 9)); height: auto; aspect-ratio: 16 / 9;
+  width: min(100%, calc((100dvh - 520px) * 16 / 9)); height: auto; aspect-ratio: 16 / 9;
   background: #0A0810; border: 4px solid var(--shop-line); box-sizing: border-box;
   image-rendering: pixelated;
 }
@@ -841,7 +980,7 @@ html.rm .tphud__hp { animation: none !important; }
 @media (max-width: 640px) {
   .shop { padding: 8px; place-items: start center; }
   .shop__win { width: 100%; padding: 8px; gap: 8px; grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "top" "scene" "say" "board" "bar"; }
+    grid-template-areas: "top" "persona" "scene" "say" "board" "bar"; }
   .shop__scene { width: 100%; }
   .shop__say { min-height: 96px; padding: 8px; }
   .shop__board { max-height: 184px; }

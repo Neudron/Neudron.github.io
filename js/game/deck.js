@@ -153,7 +153,12 @@
     { id: 'woods', title: 'the woods',
       meta: 'adventure · unfinished business',
       a: '#C2405F', b: '#1A0A12', ink: '#FF6B4A', hi: '#FFD08A',
-      run: function () { return NEU.act4 && NEU.act4.open(); } },
+      /* The story game opens through its own Play/Config/Save menu;
+         the endless titles launch straight into their scene. */
+      run: function () {
+        if (NEU.menu) return NEU.menu.open('root');
+        return NEU.act4 && NEU.act4.open();
+      } },
 
     { id: 'skele', title: 'skeleton simulator',
       meta: '0.2 hrs on record · 340 GB',
@@ -340,6 +345,9 @@
 
   addEventListener('keydown', function (e) {
     if (!open_) return;
+    /* Settings (or a menu opened on top) owns the keyboard while up. */
+    if ((NEU.settings && NEU.settings.open_) ||
+        (NEU.menu && NEU.menu.active) || (NEU.dummy && NEU.dummy.active)) return;
     if (e.key === 'Escape')     { e.preventDefault(); close(); return; }
     if (e.key === 'ArrowLeft')  { e.preventDefault(); pick(sel - 1); return; }
     if (e.key === 'ArrowRight') { e.preventDefault(); pick(sel + 1); return; }

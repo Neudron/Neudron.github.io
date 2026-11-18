@@ -289,7 +289,7 @@
   </div>
   <div class="mage__head">
     <span class="mage__name">THE MAGE</span>
-    <span class="mage__sub">a stone shop, and the cards</span>
+    <span class="mage__sub" id="magePersona">a stone shop, and the cards</span>
   </div>
   <div class="mage__art">
     <canvas id="mageCanvas" width="320" height="192"></canvas>
@@ -312,6 +312,7 @@
       <h2 class="shop__h">the stall</h2>
       <span class="shop__gold" id="shopGold">0g</span>
     </div>
+    <p class="shop__persona" id="shopPersona"></p>
     <p class="shop__say" id="shopSay"></p>
     <div class="shop__board" id="shopBoard" role="list"></div>
     <div class="shop__bar">
@@ -631,6 +632,11 @@
 <script src="js/act4/cart.js"></script>
 <script src="js/act4/elevator.js"></script>
 <script src="js/act4/inventory.js"></script>
+<!-- one shared shop component + the free practice room, after inventory.js
+     because their item icons reuse NEU.itemIcon; both merchants read them
+     at open time, so loading here keeps every existing script order intact. -->
+<script src="js/act4/shopkit.js"></script>
+<script src="js/act4/dummy.js"></script>
 <script src="js/core/tphud.js"></script>
 <script src="js/game/deck.js"></script>
 <!-- after every scene, before settings: like touch.js it polls the
@@ -640,6 +646,9 @@
 <!-- samples nothing until the dev console asks; dev.js exposes it -->
 <script src="js/core/perf.js"></script>
 <script src="js/core/settings.js"></script>
+<!-- the in-game Play/Config/Save menu: after settings and save, so it can
+     reuse their panels and the difficulty table without a second store. -->
+<script src="js/core/menu.js"></script>
 <!-- after every scene: it polls them to decide which buttons to show -->
 <script src="js/core/touch.js"></script>
 <script src="js/core/dev.js"></script>
