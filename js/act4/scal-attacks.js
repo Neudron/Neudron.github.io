@@ -18,6 +18,7 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
+  function dp(k) { return NEU.diff ? NEU.diff.f(k) : 1; }
   var TAU = Math.PI * 2, TF = 1 / 60;
 
   var A = null;            /* the adapter boss-scal.js hands in with attach() */
@@ -2361,7 +2362,7 @@
     cur = null;
     G.beam = null;
     if (A.over()) { G.wait = Infinity; return; }
-    G.wait = TIMING[G.last] && TIMING[G.last].big ? tune().gapBig : tune().gap;
+    G.wait = Math.round((TIMING[G.last] && TIMING[G.last].big ? tune().gapBig : tune().gap) * dp('gap'));
   }
   /* the next attack after the gap. A phase gate that landed while an attack
      ran (G.pendN) starts its transition here, never in the middle of one. */
