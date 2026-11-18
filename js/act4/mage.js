@@ -627,6 +627,9 @@
 
   function buy(id) {
     var def = NEU.items && NEU.items.get ? NEU.items.get(id) : null;
+    /* The mage stocks melee/ranged/spell/heal only. shopkit.buy also knows
+       the stall's free Recall Potion, which must never be sold here. */
+    if (!def || !KINDS[def.kind] || !(def.price > 0)) return false;
     if (!NEU.shopkit) return false;
     if (!NEU.shopkit.buy(id)) {
       say(NEU.save && def && NEU.save.coins() < def.price ? '* not enough coins.' : '* you already carry that.');
@@ -638,6 +641,7 @@
 
   function sell(id) {
     var def = NEU.items && NEU.items.get ? NEU.items.get(id) : null;
+    if (!def || !KINDS[def.kind]) return false;
     if (!NEU.shopkit) return false;
     if (isEquipped(id)) { say('* equipped. unequip first.'); return false; }
     if (!NEU.shopkit.sell(id)) { say('* nothing to sell.'); return false; }
