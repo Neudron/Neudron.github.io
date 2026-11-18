@@ -1053,22 +1053,58 @@
     solid: '#',
     colours: { '#': '#1A1E24', '.': '#1A1E24', ',': '#12383C', '=': '#E2C04A' }
   });
+  /* 30x17 cells = 480x272 world units. The view is 20x12 cells at the
+     engine's floor scale, so both rooms fill the frame at 1280x720 and
+     1920x1080 instead of sitting as a stub in the void. */
+  var EXO_W = 30, EXO_H = 17;
+  function exoFloor(rows) { return rows.join('\n'); }
+  /* the hall: lit spine on row 8, stair approach up column 15, a hazard
+     band before the arena door, and four pillars that break the void. */
   function exoHall() {
-    return [
-      '###########',
-      '#.........#',
-      '#.........#',
-      '#.........#',
-      '#=========#',
-      '#.........#',
-      '#.........#',
-      '#.........#',
-      '###########'
-    ].join('\n');
+    var rows = [], y, x, s, wall;
+    for (y = 0; y < EXO_H; y++) {
+      s = '';
+      for (x = 0; x < EXO_W; x++) {
+        wall = (x === 0 || y === 0 || x === EXO_W - 1 || y === EXO_H - 1);
+        if (wall) s += '#';
+        else if (y === 8) s += ',';
+        else if (x === 15 && y < 8) s += ',';
+        else if (y === 9 && x > 9 && x < 20) s += '=';
+        else if ((x === 5 || x === 6) && y >= 3 && y <= 5) s += '#';
+        else if ((x === 23 || x === 24) && y >= 3 && y <= 5) s += '#';
+        else if ((x === 5 || x === 6) && y >= 11 && y <= 13) s += '#';
+        else if ((x === 23 || x === 24) && y >= 11 && y <= 13) s += '#';
+        else s += '.';
+      }
+      rows.push(s);
+    }
+    return exoFloor(rows);
   }
+  /* the shaft base: an open well walled in steel, hazard bands where the
+     stair leaves the floor, one doorway south. */
+  function exoShaft() {
+    var rows = [], y, x, s, wall;
+    for (y = 0; y < EXO_H; y++) {
+      s = '';
+      for (x = 0; x < EXO_W; x++) {
+        wall = (x === 0 || y === 0 || x === EXO_W - 1 || y === EXO_H - 1);
+        if (wall) s += '#';
+        else if (x === 15 && y > 8) s += ',';
+        else if (y === 13 && x > 7 && x < 23) s += '=';
+        else if (y === 4 && x > 9 && x < 21) s += '=';
+        else if ((x === 7 || x === 23) && y > 3 && y < 14) s += '#';
+        else if ((y === 3 || y === 14) && x > 7 && x < 23) s += '#';
+        else s += '.';
+      }
+      rows.push(s);
+    }
+    return exoFloor(rows);
+  }
+  function exoBase() { return [{ t: 'exofloor', x: 0, y: 0 }]; }
   function exoDress(ents) {
-    return [{ t: 'exofloor', x: 0, y: 0 }, { t: 'exoprop', v: 'eye', x: 1, y: 2 },
-      { t: 'exoprop', v: 'holo', x: 8, y: 3 }].concat(ents);
+    return exoBase().concat([
+      { t: 'exoprop', v: 'eye', x: 1, y: 2 },
+      { t: 'exoprop', v: 'holo', x: 20, y: 2 }], ents);
   }
 
   var spiralOn = false, spiralStep = 0, spiralT = 0, spiralUi = null, spiralOff = null;
@@ -1172,15 +1208,24 @@
   /* D8: the foyer and the arena are one hall. Both ids keep their name for
      saves, reach checks and older suites, but share one definition. */
   function hallSpawns() {
-    var o = sp('west', 'east', 'north', 'south');
-    o.stair = { x: 5, y: 2, face: 'down' };
-    return o;
+    return {
+      west: { x: 1, y: 8, face: 'right' },
+      east: { x: 28, y: 8, face: 'left' },
+      north: { x: 15, y: 1, face: 'down' },
+      south: { x: 15, y: 15, face: 'up' },
+      stair: { x: 15, y: 2, face: 'down' }
+    };
+  }
+  function term(x, y, lines, extra) {
+    var e = { t: 'exoterm', x: x, y: y, lines: lines }, k;
+    for (k in extra || {}) e[k] = extra[k];
+    return e;
   }
   function hallEnts() {
     return exoDress([
-      gate('west', 's12_termite', 'east'),
-      gate('north', 'x1_spiral', 'south'),
-      { t: 'npc', x: 5, y: 4, colour: '#20C8D0',
+      { t: 'exit', x: 0, y: 8, to: 's12_termite', spawn: 'east', style: 'arch' },
+      { t: 'exit', x: 15, y: 0, to: 'x1_spiral', spawn: 'south', style: 'stairs' },
+      { t: 'npc', x: 15, y: 6, colour: '#20C8D0',
         run: function (c) {
           if (NEU.exo && NEU.exo.open) {
             if (NEU.engineTrans && NEU.engineTrans.enterMode) NEU.engineTrans.enterMode('mode:boss', function () { NEU.exo.open(); }, { look: '#061418' });
@@ -1188,8 +1233,39 @@
           }
           else c.say(['the arena door is shut.']);
         } },
-      { t: 'sign', x: 3, y: 6,
-        lines: ['steel, a stair and a door. the chair at the top has already turned.'] }
+      { t: 'sign', x: 12, y: 12,
+        lines: ['steel, a stair and a door. the chair at the top has already turned.'] },
+      { t: 'save', x: 17, y: 12 },
+      /* lab floor: terminals, cable runs, warning lamps. Logs only. */
+      term(1, 5, ['* LOG 117: coolant loop three whistles in b flat.',
+        '* filed under: not a fault.']),
+      term(1, 11, ['* canteen rota. the coffee machine has seniority.',
+        '* do not unplug it. do not ask why.']),
+      term(1, 14, ['* HAZARD: plates past the yellow line are live.',
+        '* the yellow does not mean walk slowly. it means walk.']),
+      term(27, 14, ['* LOG 000: this terminal was never installed.',
+        '* someone left it plugged in anyway.'], {
+        run: function (c) {
+          if (NEU.save && NEU.save.flagged('x_log_secret')) {
+            c.say(['* the log is still here. it has not found a purpose either.']);
+            return;
+          }
+          c.flag('x_log_secret', 1);
+          c.say(['* LOG 000 opens: a maintenance note addressed to nobody.',
+            '* "if you are reading this, the stair worked."']);
+        } }),
+      { t: 'exoprop', v: 'rack', x: 2, y: 3 },
+      { t: 'exoprop', v: 'rack', x: 2, y: 13 },
+      { t: 'exoprop', v: 'tank', x: 27, y: 3 },
+      { t: 'exoprop', v: 'tank', x: 27, y: 13 },
+      { t: 'exoprop', v: 'cable', x: 9, y: 15 },
+      { t: 'exoprop', v: 'cable', x: 10, y: 15 },
+      { t: 'exoprop', v: 'cable', x: 11, y: 15 },
+      { t: 'exoprop', v: 'cable', x: 12, y: 15 },
+      { t: 'exoprop', v: 'warn', x: 8, y: 3 },
+      { t: 'exoprop', v: 'warn', x: 21, y: 3 },
+      { t: 'exoprop', v: 'warn', x: 8, y: 13 },
+      { t: 'exoprop', v: 'warn', x: 21, y: 13 }
     ]);
   }
   function hallEnter(c) {
@@ -1204,10 +1280,41 @@
   });
   E.register('x1_spiral', {
     tileset: 'exo',
-    tiles: exoHall(),
-    spawns: { south: { x: 5, y: 7, face: 'up' } },
-    entities: exoDress([
-      { t: 'exit', x: 5, y: 8, to: 'x0_foyer', spawn: 'north', style: 'stairs' }
+    tiles: exoShaft(),
+    spawns: { south: { x: 15, y: 15, face: 'up' } },
+    entities: exoBase().concat([
+      { t: 'exit', x: 15, y: 16, to: 'x0_foyer', spawn: 'north', style: 'stairs' },
+      { t: 'save', x: 12, y: 9 },
+      { t: 'sign', x: 18, y: 9,
+        lines: ['the stair turns around a column. the floor is a long way down.'] },
+      term(9, 6, ['* SHAFT LOG: twelve turns, one chair.',
+        '* the rail is older than the shaft. nobody knows why.']),
+      term(9, 10, ['* SAFETY: keep hands inside the rail.',
+        '* the drop is longer than it looks from here.']),
+      term(21, 6, ['* LIFT CONTROL: out of order since the last climb.',
+        '* use the stair. the stair is not out of order.']),
+      term(21, 10, ['* WARNING: climbing is monitored.',
+        '* not that anyone is watching.'], {
+        run: function (c) {
+          if (NEU.save && NEU.save.flagged('x_shaft_secret')) {
+            c.say(['* still under the console. still unlisted.']);
+            return;
+          }
+          c.flag('x_shaft_secret', 1);
+          c.say(['* under the console, a switch marked "do not press".',
+            '* it has already been pressed. the label is newer than the switch.']);
+        }
+      }),
+      { t: 'exoprop', v: 'rack', x: 9, y: 5 },
+      { t: 'exoprop', v: 'tank', x: 21, y: 5 },
+      { t: 'exoprop', v: 'warn', x: 8, y: 8 },
+      { t: 'exoprop', v: 'warn', x: 22, y: 8 },
+      { t: 'exoprop', v: 'cable', x: 12, y: 15 },
+      { t: 'exoprop', v: 'cable', x: 13, y: 15 },
+      { t: 'exoprop', v: 'cable', x: 14, y: 15 },
+      { t: 'exoprop', v: 'cable', x: 16, y: 15 },
+      { t: 'exoprop', v: 'cable', x: 17, y: 15 },
+      { t: 'exoprop', v: 'cable', x: 18, y: 15 }
     ]),
     onEnter: function () { if (NEU.house) NEU.house.open(); }
   });

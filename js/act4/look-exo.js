@@ -12,8 +12,10 @@
   var STEEL = ['#0A0C10', '#14181E', '#232A33', '#3A4450', '#5A6878', '#8A98A8', '#C5D0D8', '#EEF3F6'];
 
   function reduced() {
-    try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
-    catch (e) { return false; }
+    try {
+      if (NEU.motion && NEU.motion.reduced) return !!NEU.motion.reduced();
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) { return false; }
   }
   function mk(w, h) {
     var c = document.createElement('canvas');
@@ -133,46 +135,96 @@
     px(g, x, y, w, 1, '#8A9098');
     px(g, x, y + h - 1, w, 1, '#5A6A78');
   }
-  function holo(g, x, y) {
-    px(g, x, y, 10, 14, '#103038');
-    px(g, x + 1, y + 2, 8, 2, '#20C8D0');
-    px(g, x + 1, y + 6, 6, 2, '#20C8D0');
-    px(g, x + 1, y + 10, 8, 2, '#48E0E8');
+  function holo(g, x, y, S) {
+    S = S || 1;
+    px(g, x, y, 10 * S, 14 * S, '#103038');
+    px(g, x + 1 * S, y + 2 * S, 8 * S, 2 * S, '#20C8D0');
+    px(g, x + 1 * S, y + 6 * S, 6 * S, 2 * S, '#20C8D0');
+    px(g, x + 1 * S, y + 10 * S, 8 * S, 2 * S, '#48E0E8');
   }
-  function eye(g, x, y, on) {
-    px(g, x, y, 6, 4, '#1A1E24');
-    px(g, x + 1, y + 1, 4, 2, on ? '#E02020' : '#3A1010');
+  function eye(g, x, y, on, S) {
+    S = S || 1;
+    px(g, x, y, 6 * S, 4 * S, '#1A1E24');
+    px(g, x + 1 * S, y + 1 * S, 4 * S, 2 * S, on ? '#E02020' : '#3A1010');
   }
-  function rack(g, x, y, t) {
-    px(g, x, y, 16, 32, '#12161C');
-    px(g, x, y, 16, 1, '#232A33');
-    px(g, x, y, 1, 32, '#232A33');
-    px(g, x + 15, y, 1, 32, '#0A0C10');
-    px(g, x, y + 31, 16, 1, '#0A0C10');
-    var tog = reduced() ? 0 : Math.floor((t || 0) / 500) % 4;
-    for (var r = 0; r < 6; r++) {
-      var ry = y + 4 + r * 4;
-      px(g, x + 2, ry, 12, 1, '#1A1E24');
-      px(g, x + 3, ry + 1, 2, 2, (r === tog) ? '#E6C15A' : '#3BE2C8');
-      px(g, x + 7, ry + 1, 2, 2, ((r + 1) % 4 === tog) ? '#E6C15A' : '#3BE2C8');
-      px(g, x + 11, ry + 1, 2, 2, '#3BE2C8');
+  function rack(g, x, y, t, S) {
+    var r, ry, tog;
+    S = S || 1;
+    px(g, x, y, 16 * S, 32 * S, '#12161C');
+    px(g, x, y, 16 * S, 1 * S, '#232A33');
+    px(g, x, y, 1 * S, 32 * S, '#232A33');
+    px(g, x + 15 * S, y, 1 * S, 32 * S, '#0A0C10');
+    px(g, x, y + 31 * S, 16 * S, 1 * S, '#0A0C10');
+    tog = reduced() ? 0 : Math.floor((t || 0) / 500) % 4;
+    for (r = 0; r < 6; r++) {
+      ry = y + (4 + r * 4) * S;
+      px(g, x + 2 * S, ry, 12 * S, 1 * S, '#1A1E24');
+      px(g, x + 3 * S, ry + 1 * S, 2 * S, 2 * S, (r === tog) ? '#E6C15A' : '#3BE2C8');
+      px(g, x + 7 * S, ry + 1 * S, 2 * S, 2 * S, ((r + 1) % 4 === tog) ? '#E6C15A' : '#3BE2C8');
+      px(g, x + 11 * S, ry + 1 * S, 2 * S, 2 * S, '#3BE2C8');
     }
   }
-  function tank(g, x, y, t) {
-    px(g, x, y, 24, 4, '#3A4450');
-    px(g, x + 2, y, 20, 1, '#8A98A8');
-    px(g, x, y + 36, 24, 4, '#14181E');
-    px(g, x + 2, y + 36, 20, 1, '#3A4450');
-    var p = g.globalAlpha;
+  function tank(g, x, y, t, S) {
+    var p, b0, b1, b2;
+    S = S || 1;
+    px(g, x, y, 24 * S, 4 * S, '#3A4450');
+    px(g, x + 2 * S, y, 20 * S, 1 * S, '#8A98A8');
+    px(g, x, y + 36 * S, 24 * S, 4 * S, '#14181E');
+    px(g, x + 2 * S, y + 36 * S, 20 * S, 1 * S, '#3A4450');
+    p = g.globalAlpha;
     g.globalAlpha = 0.25;
-    px(g, x + 2, y + 4, 20, 32, '#20C8D0');
+    px(g, x + 2 * S, y + 4 * S, 20 * S, 32 * S, '#20C8D0');
     g.globalAlpha = p;
-    var b0 = reduced() ? 8 : (30 - Math.floor(((t || 0) + 0) / 40) % 28);
-    var b1 = reduced() ? 16 : (30 - Math.floor(((t || 0) + 300) / 50) % 28);
-    var b2 = reduced() ? 24 : (30 - Math.floor(((t || 0) + 700) / 45) % 28);
-    px(g, x + 6, y + 4 + b0, 2, 2, '#EEF3F6');
-    px(g, x + 14, y + 4 + b1, 2, 2, '#EEF3F6');
-    px(g, x + 10, y + 4 + b2, 2, 2, '#EEF3F6');
+    b0 = reduced() ? 8 : (30 - Math.floor(((t || 0) + 0) / 40) % 28);
+    b1 = reduced() ? 16 : (30 - Math.floor(((t || 0) + 300) / 50) % 28);
+    b2 = reduced() ? 24 : (30 - Math.floor(((t || 0) + 700) / 45) % 28);
+    px(g, x + 6 * S, y + (4 + b0) * S, 2 * S, 2 * S, '#EEF3F6');
+    px(g, x + 14 * S, y + (4 + b1) * S, 2 * S, 2 * S, '#EEF3F6');
+    px(g, x + 10 * S, y + (4 + b2) * S, 2 * S, 2 * S, '#EEF3F6');
+  }
+  /* a lab terminal: cabinet, dead or live screen, keypad. `lit` keeps a
+     readable panel; the blink is 0.7 s so it stays under 3 Hz. */
+  function term(g, x, y, S, t, lit) {
+    var w, h, x0, y0, on, i;
+    S = S || 1;
+    w = 14 * S; h = 20 * S;
+    x0 = (x - 7 * S) | 0; y0 = (y - h) | 0;
+    on = lit !== undefined ? lit : (reduced() ? 1 : (((t || 0) / 700) | 0) % 2);
+    px(g, x0, y0, w, h, '#0A0C10');
+    px(g, x0 + S, y0 + S, w - 2 * S, h - 2 * S, '#232A33');
+    px(g, x0 + S, y0 + S, 2 * S, h - 2 * S, '#3A4450');
+    px(g, x0 + 2 * S, y0 + 2 * S, w - 4 * S, 8 * S, '#103038');
+    px(g, x0 + 2 * S, y0 + 2 * S, w - 4 * S, 1 * S, '#0A2A30');
+    for (i = 0; i < 3; i++) {
+      px(g, x0 + 3 * S, y0 + (4 + i * 2) * S, (w - (8 + i * 2) * S), 1 * S,
+        on ? (i === 2 ? '#48E0E8' : '#20C8D0') : '#12383C');
+    }
+    px(g, x0 + 2 * S, y0 + 11 * S, w - 4 * S, 6 * S, '#14181E');
+    px(g, x0 + 3 * S, y0 + 12 * S, 3 * S, 2 * S, on ? '#3BE2C8' : '#1A8A90');
+    px(g, x0 + 7 * S, y0 + 12 * S, 3 * S, 2 * S, on ? '#E2C04A' : '#8A6A20');
+    px(g, x0 + 2 * S, y0 + 15 * S, w - 4 * S, 1 * S, '#3A4450');
+    px(g, x0 + S, y0 + h - S, w - 2 * S, 1 * S, '#5A6878');
+  }
+  /* a cable run: two conduits and three floor ties. Walkable floor paint. */
+  function cable(g, x, y, S) {
+    var i;
+    S = S || 1;
+    px(g, x - 8 * S, y - 3 * S, 16 * S, 3 * S, '#0A0C10');
+    px(g, x - 8 * S, y - 3 * S, 16 * S, 1 * S, '#232A33');
+    px(g, x - 7 * S, y - 2 * S, 14 * S, 1 * S, '#20C8D0');
+    px(g, x - 7 * S, y - S, 14 * S, 1 * S, '#E2C04A');
+    for (i = -1; i <= 1; i++) px(g, x + i * 6 * S, y - 3 * S, 1 * S, 3 * S, '#3A4450');
+  }
+  /* a caged warning lamp. 0.4 s on, 0.4 s off; reduced motion leaves it lit. */
+  function warn(g, x, y, S, t) {
+    var on;
+    S = S || 1;
+    on = reduced() ? 1 : ((Math.floor((t || 0) / 400) % 2) === 0);
+    px(g, x - 2 * S, y - 14 * S, 4 * S, 6 * S, '#0A0C10');
+    px(g, x - S, y - 13 * S, 2 * S, 4 * S, on ? '#FF8A6A' : '#5A0C10');
+    px(g, x - S, y - 13 * S, 2 * S, 1 * S, on ? '#FFFFFF' : '#3A1010');
+    px(g, x - 2 * S, y - 9 * S, 4 * S, 1 * S, '#3A4450');
+    px(g, x - 2 * S, y - 6 * S, 4 * S, 2 * S, '#232A33');
   }
   /* the 32x40 deck-view Draedon is the boss sprite at half size */
   function draedon(g, x, y, face, u) {
@@ -225,36 +277,76 @@
   function paintSpiral(g, st) {
     var cw = (g.canvas && g.canvas.width) || 160, ch = (g.canvas && g.canvas.height) || 96;
     var u = Math.max(1, Math.round(cw / 160)), climb = st.climb || 0, face = st.face | 0;
-    var cx = cw >> 1, colW = 24 * u, R0 = 44 * u, n = 12, i, a, sx, sy, sc, ww, front, y, k;
+    var cx = cw >> 1, colW = 22 * u, R0 = 46 * u, n = 12;
+    var i, a, xx, yy, ww, hh, y, k, x;
     var order = [], o0 = (climb * 8) | 0, o1 = (climb * 20) | 0, o2 = (climb * 36) | 0;
+    var yBase = ch - 9 * u, ySpan = ch - 30 * u;
+    function disc(c0, d0, rx, ry, col) {
+      blob(function (qx, qy, qw, qh, qc) { px(g, qx, qy, qw, qh, qc); }, c0, d0, rx, ry, col);
+    }
     try { g.imageSmoothingEnabled = false; } catch (e0) {}
-    px(g, 0, 0, cw, ch, '#0A0C10');
-    for (y = -((o1 % (48 * u))); y < ch; y += 48 * u) {
-      px(g, 0, y, cw, 1, '#20C8D0');
-      px(g, 0, y + 1, cw, 1, '#103038');
-      px(g, 0, y - 1, cw, 1, '#0F1A20');
+    /* depth first: fog bands, wall ribs, cables and the drop behind the
+       stair. Each layer scrolls at its own rate as the climb advances. */
+    px(g, 0, 0, cw, ch, '#05070A');
+    for (y = -((o2 * u) % (44 * u)); y < ch; y += 44 * u) {
+      px(g, 0, y, cw, 3 * u, '#0E1218');
+      px(g, 0, y + 10 * u, cw, 1, '#0B1016');
+      px(g, 0, y + 26 * u, cw, 1, '#0C1016');
+    }
+    for (k = 0; k < 6; k++) {
+      x = (k * cw / 5) | 0;
+      for (y = -((o1 * u) % (32 * u)); y < ch; y += 32 * u) {
+        px(g, x, y, u, 18 * u, '#101820');
+        px(g, x + u, y, 1, 18 * u, '#0A0E14');
+      }
     }
     for (k = 0; k < 4; k++) {
-      px(g, (k * cw / 3) | 0, 0, 1, ch, '#14181E');
-      px(g, ((k * cw / 3) | 0) + 1, 0, 1, ch, '#0E1216');
+      x = (cx + (k - 2) * 34 * u + 9 * u) | 0;
+      px(g, x, 0, u, ch - 12 * u, '#232A33');
+      px(g, x + u, 0, 1, ch - 12 * u, '#12161C');
+      for (y = -((o0 * u) % (14 * u)); y < ch - 12 * u; y += 14 * u) {
+        px(g, x - u, y, 3 * u, 1, '#3A4450');
+      }
+    }
+    /* the drop: a well under the stair with a lit floor far below */
+    for (y = ch - 46 * u; y < ch - 4 * u; y += 3 * u) {
+      hh = 1 - (ch - 4 * u - y) / (42 * u);
+      if (hh < 0) hh = 0;
+      ww = Math.round((cx - 8 * u) * (0.3 + hh * 0.6));
+      px(g, cx - ww, y, ww * 2, 3 * u, y < ch - 26 * u ? '#070A0E' : '#04060A');
+    }
+    disc(cx, ch - 8 * u, 10 * u, 3 * u, '#0A1E22');
+    px(g, cx - 5 * u, ch - 9 * u, 10 * u, 1, '#0E4A50');
+    px(g, cx - 2 * u, ch - 9 * u, 4 * u, 1, '#20C8D0');
+    /* the near-side rail: it is the thing that sells the height */
+    px(g, cx + R0 + 6 * u, 6 * u, u, ch - 14 * u, '#5A6878');
+    px(g, cx + R0 + 7 * u, 6 * u, 1, ch - 14 * u, '#2A3038');
+    for (y = 10 * u; y < ch - 10 * u; y += 8 * u) {
+      px(g, cx + R0 + 3 * u, y, 4 * u, 1, '#5A6878');
     }
     for (i = 0; i < n; i++) {
       a = (i * 30 + climb * 30) * Math.PI / 180;
       order.push({ i: i, a: a, s: Math.sin(a) });
     }
-    function step(o) {
-      var front = o.s > 0, ww = (front ? 48 : 34) * u / 2 | 0, hh = (front ? 6 : 4) * u;
-      var xx = (cx + Math.cos(o.a) * R0) | 0;
-      var yy = (ch - 10 * u - o.i * ((ch - 36 * u) / n)) | 0;
-      px(g, xx - ww, yy, ww * 2, hh, front ? '#0A0C10' : '#06080C');
-      px(g, xx - ww + 1, yy + 1, ww * 2 - 2, hh - 1, front ? '#3A4450' : '#1A2028');
-      px(g, xx - ww + 1, yy + 1, ww * 2 - 2, 1, front ? '#8A98A8' : '#3A4450');
-      px(g, xx - ww + 1, yy + hh - 1, ww * 2 - 2, 1, front ? '#232A33' : '#0E1216');
-      if (front) {
-        px(g, xx - ww + 2, yy - 3 * u, 1, 3 * u, '#5A6878');
-        px(g, xx + ww - 3, yy - 3 * u, 1, 3 * u, '#5A6878');
-        px(g, xx - ww + 2, yy - 3 * u, ww * 2 - 4, 1, '#5A6878');
-        px(g, xx - 2 * u, yy + hh, 4 * u, 1, '#20C8D0');
+    /* steps shrink with height and real depth: near treads wide, far thin */
+    function step(q) {
+      var fr = q.s > 0, depth = q.i / n;
+      var sw = Math.round((fr ? (52 - depth * 16) : (32 - depth * 10)) * u / 2);
+      var sh = (fr ? 6 : 4) * u;
+      var qx = (cx + Math.cos(q.a) * R0) | 0;
+      var qy = (yBase - q.i * ySpan / n) | 0;
+      if (fr) qy += 2 * u;
+      px(g, qx - sw, qy + sh, sw * 2, 2 * u, '#04060A');
+      px(g, qx - sw, qy, sw * 2, sh, fr ? '#0A0C10' : '#06080C');
+      px(g, qx - sw + 1, qy + 1, sw * 2 - 2, sh - 1, fr ? '#3A4450' : '#1A2028');
+      px(g, qx - sw + 1, qy + 1, sw * 2 - 2, 1, fr ? '#8A98A8' : '#3A4450');
+      px(g, qx - sw + 1, qy + sh - 1, sw * 2 - 2, 1, fr ? '#232A33' : '#0E1216');
+      if (fr) {
+        px(g, qx - sw + 2, qy - 3 * u, 1, 3 * u, '#5A6878');
+        px(g, qx + sw - 3, qy - 3 * u, 1, 3 * u, '#5A6878');
+        px(g, qx - sw + 2, qy - 3 * u, sw * 2 - 4, 1, '#5A6878');
+        px(g, qx - 2 * u, qy + sh, 4 * u, 1, '#20C8D0');
+        px(g, qx - sw + 1, qy + 1, 2 * u, 2 * u, '#C5D0D8');
       }
     }
     for (i = 0; i < n; i++) if (order[i].s <= 0) step(order[i]);
@@ -276,8 +368,8 @@
     /* #8A9098 arm marker shifts with climb so the stair reads as turning */
     px(g, cx + (face % 3 - 1) * 6 * u - 4 * u, 22 * u - (climb % 3) * 2 * u, 8 * u, 2, '#8A9098');
     stripes(g, 0, ch - 4 * u, cw, 4 * u);
-    eye(g, 4 * u, 4 * u, eyeOn(st.t || 0));
-    eye(g, cw - 10 * u, 4 * u, eyeOn(st.t || 0));
+    eye(g, 4 * u, 4 * u, eyeOn(st.t || 0), u);
+    eye(g, cw - 10 * u, 4 * u, eyeOn(st.t || 0), u);
     st.parallax = [o0, o1, o2];
   }
 
@@ -1194,14 +1286,29 @@
     interactive: function () { return false; },
     width: function () { return 16; },
     draw: function (g, e, d) {
-      var x = d.sx, y = d.sy, face = e.face || 4;
+      var x = d.sx, y = d.sy, face = e.face || 4, S = d.S || 1;
       try { g.imageSmoothingEnabled = false; } catch (e3) {}
-      if (e.v === 'holo') holo(g, x - 5, y - 14);
-      else if (e.v === 'eye') eye(g, x - 3, y - 8, eyeOn(e.t || 0));
+      if (e.v === 'holo') holo(g, x - 5 * S, y - 14 * S, S);
+      else if (e.v === 'eye') eye(g, x - 3 * S, y - 8 * S, eyeOn(e.t || 0), S);
       else if (e.v === 'chair' || e.v === 'draedon') draedon(g, x, y + 2, face, 1);
-      else if (e.v === 'rack') rack(g, x - 8, y - 32, e.t || 0);
-      else if (e.v === 'tank') tank(g, x - 12, y - 40, e.t || 0);
-      else px(g, x - 8, y - 16, 16, 16, '#FF00FF');
+      else if (e.v === 'rack') rack(g, x - 8 * S, y - 32 * S, e.t || 0, S);
+      else if (e.v === 'tank') tank(g, x - 12 * S, y - 40 * S, e.t || 0, S);
+      else if (e.v === 'cable') cable(g, x, y, S);
+      else if (e.v === 'warn') warn(g, x, y, S, d.now || 0);
+      else px(g, x - 8 * S, y - 16 * S, 16 * S, 16 * S, '#FF00FF');
     }
+  });
+  /* a terminal is pressed, never consumed: its log is flavour, and a run
+     hook (the secret) wins over the fixed lines just like an npc's. */
+  KK.kind('exoterm', {
+    interactive: function () { return true; },
+    fire: function (e, sys) {
+      if (NEU.tboxOpen && NEU.tboxOpen()) return;
+      if (typeof e.run === 'function') { e.run(sys.api); return; }
+      sys.say(e.lines || ['* no signal.'], 'narr');
+    },
+    draw: function (g, e, d) { term(g, d.sx, d.sy, d.S || 1, d.now || 0); },
+    width: function () { return 14; },
+    light: function () { return { r: 16, col: '#20C8D0', glow: 0.16 }; }
   });
 })();
