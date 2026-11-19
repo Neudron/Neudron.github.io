@@ -1,12 +1,21 @@
 #!/usr/bin/env node
 /* gate.mjs — one command for the whole local gate.
+   Usage: node scripts/gate.mjs [--changed] [--all] [--base REF]
+   No flag = --all (full gate). --changed runs the fixed smoke set plus
+   suites affected by `git diff --name-only REF`; PASS results are cached
+   by git blob hashes, node version, env and suite hash. --all disables cache.
    Suites read source, not dist, so they overlap check / check-world /
    build→verify instead of waiting on them. First non-zero gate kills the
    rest; one summary block at the end. run-all.mjs stays authoritative for
    suite pass/fail; this file is only the parallel wrapper. */
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  SMOKE_SUITES, changedFiles, select, keyFor, cacheGet, record,
+} from '../tests/affected.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NODE = process.execPath;
@@ -63,19 +72,50 @@ async function buildAndVerify() {
 }
 
 const t0 = Date.now();
+const args = process.argv.slice(2);
+const ALL = args.includes('--all') || !args.includes('--changed');
+const baseFlag = args.indexOf('--base');
+const BASE = baseFlag >= 0 ? args[baseFlag + 1] : (process.env.NEU_BASE || 'HEAD');
+const resultFile = path.join(os.tmpdir(), 'neu-gate-results-' + process.pid + '.json');
+
+let changed = [], affected = [], keys = {}, cached = [], runnable = [], suites = null;
+if (!ALL) {
+  changed = changedFiles(BASE);
+  affected = select(changed);
+  for (const s of affected) {
+    const k = keyFor(s);
+    keys[s] = k;
+    if (cacheGet(s, k)) cached.push(s); else runnable.push(s);
+  }
+  suites = [...SMOKE_SUITES, ...runnable];
+}
+
+const suiteEnv = { NEU_SKIP_CHECK: '1' };
+if (suites) suiteEnv.NEU_SUITES = suites.join(',');
+if (!ALL) suiteEnv.NEU_RESULTS_FILE = resultFile;
+
 const jobs = {
   check: runStep(NODE, [path.join(ROOT, 'scripts', 'check.mjs')]),
   'check-world': runStep(NODE, [path.join(ROOT, 'scripts', 'check-world.mjs')]),
   'build+verify': buildAndVerify(),
-  suites: runStep(NODE, [path.join(ROOT, 'tests', 'run-all.mjs')], { NEU_SKIP_CHECK: '1' }),
+  suites: runStep(NODE, [path.join(ROOT, 'tests', 'run-all.mjs')], suiteEnv),
 };
 const names = Object.keys(jobs);
 const results = {};
 await Promise.all(names.map(async n => { results[n] = await jobs[n]; }));
 
 const wall = (Date.now() - t0) / 1000;
+if (!ALL) {
+  let suiteResults = {};
+  try { suiteResults = JSON.parse(fs.readFileSync(resultFile, 'utf8')); } catch {}
+  record(suiteResults, keys);
+  fs.rmSync(resultFile, { force: true });
+}
 let bad = 0;
 console.log('\n' + '═'.repeat(52));
+if (!ALL) {
+  console.log(`changed: ${changed.length} file(s) since ${BASE}, ${affected.length} affected, ${cached.length} cached, ${suites.length} suites run`);
+}
 for (const n of names) {
   const r = results[n];
   const ok = r.code === 0 && !r.killed;
