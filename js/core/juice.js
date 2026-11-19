@@ -57,6 +57,14 @@
   var customNoShake = false, customNoFlash = false;
   var customNoHitstop = false, customNoParticles = false;
 
+  /* ── one accessibility surface, pushed here by settings.js ─────────
+     The save file is the only store; these are just its live copies.
+     particleCap is the active-particle ceiling (500 full, ~160 low).
+     photosensitive zeroes shake, shrinks flashes and drops decoration;
+     it never touches a telegraph or a hit tell. 0.5 = the normal overlay
+     brightness, 0 turns every full-screen overlay off. */
+  var particleCap = 500, overlayIntensity = 0.5, photosensitive = false;
+
   /* ── trauma ─────────────────────────────────────────────────────*/
   var trauma = 0, DECAY = 1.5;
   var MAXX = 14, MAXY = 10, MAXROLL = 0.045;
@@ -87,6 +95,14 @@
 
   /* ── flash ──────────────────────────────────────────────────────*/
   var flashUntil = 0, flashCol = '#FFFFFF', flashFrom = 0;
+  /* WCAG 2.2 SC 2.3.1: no more than three opposing luminance changes in
+     any one second. Count accepted flashes in a sliding 1 s window, so a
+     burst of boss deaths cannot strobe the page. */
+  var flashTimes = [], flashCount = 0;
+  function canFlash(now) {
+    while (flashTimes.length && now - flashTimes[0] >= 1000) flashTimes.shift();
+    return flashTimes.length < 3;
+  }
 
   /* ── the tiers ──────────────────────────────────────────────────
      Tuned so a full boss death is roughly 5x a pickup, and a pickup is
@@ -127,7 +143,7 @@
   function hit(tier, opts) {
     var t = TIER[tier] || TIER.small;
     opts = opts || {};
-    var noShake = reduced || customNoShake || shakeScale <= 0;
+    var noShake = reduced || photosensitive || customNoShake || shakeScale <= 0;
     var noFlash = calmFlash || customNoFlash;
     /* Recorded even when shake is gated off, so `bias` always describes
        the last hit. A hit with no direction clears it. */
@@ -139,10 +155,12 @@
       trauma = Math.min(1, trauma + (opts.shake != null ? opts.shake : t.shake) * shakeScale);
       buzz(tier);
     }
-    if (!noFlash && t.flash) {
+    if (!noFlash && t.flash && canFlash(performance.now())) {
       flashUntil = performance.now() + t.flash * 1000;
       flashFrom = t.flash * 1000;
       flashCol = opts.colour || '#FFFFFF';
+      flashTimes.push(performance.now());
+      flashCount++;
     }
     /* Hit-stop survives reduced-motion at a third the length: it does
        not move anything, and removing it entirely takes the weight out
@@ -171,7 +189,7 @@
 
   function begin(ctx, w, h) {
     step(performance.now());
-    if (trauma <= 0 || reduced || customNoShake) return false;
+    if (trauma <= 0 || reduced || photosensitive || customNoShake) return false;
     var s = amount();
     /* A directed hit leans the x and y offsets toward its impact. The
        mix is a weighted average, not an addition: the waves keep
@@ -199,9 +217,20 @@
     var now = performance.now();
     if (now >= flashUntil || calmFlash || customNoFlash) return;
     var k = (flashUntil - now) / flashFrom;
-    ctx.globalAlpha = Math.min(0.55, k * 0.55);
+    /* 0.5 is the shipped brightness, so the slider's middle is neutral
+       while its left end is a real off. Never above 0.55 (0.28 with the
+       photosensitivity opt-in). */
+    var a = Math.min(photosensitive ? 0.28 : 0.55, k * (photosensitive ? 0.28 : 0.55)) *
+            Math.min(2, overlayIntensity * 2);
+    if (a <= 0) return;
+    ctx.globalAlpha = a;
     ctx.fillStyle = flashCol;
-    ctx.fillRect(0, 0, w, h);
+    if (photosensitive) {
+      /* two slim bands instead of a full-screen wash: the tell stays,
+         the combined flashing area drops under the WCAG allowance. */
+      var band = Math.max(2, Math.round(h * 0.04));
+      ctx.fillRect(0, 0, w, band); ctx.fillRect(0, h - band, w, band);
+    } else ctx.fillRect(0, 0, w, h);
     ctx.globalAlpha = 1;
   }
 
@@ -236,22 +265,58 @@
      looks like an impact wherever it happens. Pooled because a boss
      fight can spawn several hundred and allocating them per hit is
      how a 60fps canvas becomes a 40fps one. */
-  var POOL = 260, parts = [], pi = 0;
+  var POOL = 500, parts = [], pi = 0;
   for (var i = 0; i < POOL; i++) parts.push({ life: 0 });
 
-  function burst(x, y, n, col, spd) {
+  /* Priority 0 is decoration and goes first; 2 is the feedback the player
+     needs in order to act. One pool, per-family ceilings: a collision
+     storm cannot starve a hit tell, and ambient dust cannot fill the cap. */
+  var FAM = {
+    ambient:    { cap: 40,  prio: 0 },
+    dust:       { cap: 40,  prio: 0 },
+    afterimage: { cap: 24,  prio: 0 },
+    impact:     { cap: 260, prio: 1 },
+    hit:        { cap: 500, prio: 2 },
+    telegraph:  { cap: 500, prio: 2 },
+    bullet:     { cap: 500, prio: 2 }
+  };
+  function active() {
+    var n = 0;
+    for (var k = 0; k < POOL; k++) if (parts[k].life > 0) n++;
+    return n;
+  }
+  function burst(x, y, n, col, spd, family) {
     if (reduced || customNoParticles) return;
     n = n || 8; spd = spd || 130;
-    for (var k = 0; k < n; k++) {
-      var p = parts[pi++ % POOL];
-      var a = Math.random() * Math.PI * 2;
-      var v = spd * (0.4 + Math.random() * 0.9);
+    family = family || 'impact';
+    var f = FAM[family] || FAM.impact, k, p, a, v, room = 0, same = 0;
+    for (k = 0; k < POOL; k++) {
+      if (parts[k].life <= 0) continue;
+      room++;
+      if (parts[k].f === family) same++;
+    }
+    /* The photosensitivity opt-in removes decoration, not tells. */
+    if ((photosensitive && f.prio === 0) || f.cap <= same) return;
+    room = particleCap - room;
+    if (room <= 0 && f.prio === 0) return;
+    if (room <= 0) for (k = 0; k < POOL && room < n; k++) {
+      /* Never retire gameplay feedback to make room for more feedback of
+         the same tier; decoration and generic impact debris go first. */
+      if (parts[k].life > 0 && parts[k].prio < f.prio) { parts[k].life = 0; room++; }
+    }
+    n = Math.min(n, room, f.cap - same);
+    if (n <= 0) return;
+    for (k = 0; k < n; k++) {
+      p = parts[pi++ % POOL];
+      a = Math.random() * Math.PI * 2;
+      v = spd * (0.4 + Math.random() * 0.9);
       p.x = x; p.y = y;
       p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v - 40;
       p.life = 0.32 + Math.random() * 0.38;
       p.max = p.life;
       p.c = col || '#EDE7DE';
       p.s = 2 + ((Math.random() * 2) | 0);
+      p.f = family; p.prio = f.prio;
     }
   }
 
@@ -274,7 +339,7 @@
      For the page itself, which is not a canvas. Same trauma source, so
      a hit that shakes the fight also shakes the page if both are up. */
   function shakeEl(el, tier) {
-    if (!el || reduced || customNoShake) return;
+    if (!el || reduced || photosensitive || customNoShake) return;
     hit(tier || 'medium');
     el.classList.remove('is-shook');
     void el.offsetWidth;
@@ -289,7 +354,7 @@
      not the shake gate, exactly like burst() above. */
   function popEl(el) {
     if (!el) return;
-    var spark = !reduced && !customNoParticles;
+    var spark = !reduced && !photosensitive && !customNoParticles;
     el.classList.remove('is-pop', 'is-burst');
     void el.offsetWidth;
     el.classList.add('is-pop');
@@ -397,7 +462,23 @@
     setNoFlash: function (on) { customNoFlash = !!on; },
     setNoHitstop: function (on) { customNoHitstop = !!on; },
     setNoParticles: function (on) { customNoParticles = !!on; },
-    get noShake() { return customNoShake; },
+    setParticleCap: function (n) {
+      n = +n;
+      particleCap = isFinite(n) ? Math.max(0, Math.min(POOL, Math.round(n))) : POOL;
+    },
+    setOverlayIntensity: function (v) {
+      v = +v;
+      overlayIntensity = isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
+    },
+    setPhotosensitive: function (on) { photosensitive = !!on; },
+    get photosensitive() { return photosensitive; },
+    get overlayIntensity() { return overlayIntensity; },
+    get particleCap() { return particleCap; },
+    get poolSize() { return POOL; },
+    activeParticles: active,
+    get flashCount() { return flashCount; },
+    get flashTimes() { return flashTimes.slice(); },
+    get noShake() { return customNoShake || photosensitive; },
     /* Every flash gate in the game reads this one: the switch OR calm flashing. */
     get noFlash() { return customNoFlash || calmFlash; },
     get noHitstop() { return customNoHitstop; },
@@ -409,6 +490,10 @@
     get calmFlash() { return calmFlash; },
     tiers: TIER,
     /* tests + the dev console */
-    _reset: function () { trauma = 0; bias = { x: 0, y: 0 }; freezeUntil = 0; flashUntil = 0; }
+    _reset: function () {
+      trauma = 0; bias = { x: 0, y: 0 }; freezeUntil = 0; flashUntil = 0;
+      flashTimes = []; flashCount = 0;
+      for (var k = 0; k < POOL; k++) parts[k].life = 0;
+    }
   };
 })();

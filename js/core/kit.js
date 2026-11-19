@@ -11,6 +11,11 @@
     var box = opts.box || { AX: 0, AY: 0, AW: 800, AH: 600 };
     var adapter = opts.adapter || {};
     var tp = 0, shield = false, stripOpen = false, stripSel = 0, stripAt = 0, stripShake = -1e9;
+    /* TP bar ghosts. Deltarune's obj_tensionbar_Draw_0: apparent chases the
+       real value by 20 internal units a frame, current follows apparent
+       after 15 frames. TP ceiling here is 250 units, so 20/250 = 0.08. */
+    var TP_UNITS = 250, TP_CHASE = 20 / TP_UNITS;
+    var tpApp = 0, tpCur = 0, tpChange = 0, gaugeLast = 0, gaugeCv = null, gaugeCtx = null;
     /* strip colours: Scal's brimstone by default, a fight passes its own */
     var th = opts.theme || {};
     var T = { rim: th.rim || '#8C1A22', acc: th.acc || '#FF9E30', hot: th.hot || '192,20,10', hotLine: th.hotLine || '#FF3A1A',
@@ -65,6 +70,32 @@
       return tp;
     }
     function drainTp() { var e = tpEvents; tpEvents = []; return e; }
+    /* Advance the two displayed values by n 60 Hz frames. Called from the
+       strip's draw (real time, not the fight's 0.2x slow-motion dt) and
+       directly by tests. */
+    function stepGauge(n) {
+      n = Math.max(0, Math.min(8, Math.round(Number(n) || 0)));
+      while (n-- > 0) {
+        var diff = tp - tpApp, d, step, ad;
+        if (Math.abs(diff) < TP_CHASE) tpApp = tp;
+        else tpApp += diff > 0 ? TP_CHASE : -TP_CHASE;
+        d = (tpApp - tpCur) * TP_UNITS;
+        ad = Math.abs(d);
+        if (ad < 1e-6) { tpChange = 0; continue; }
+        if (++tpChange <= 15) continue;
+        if (ad < 3) step = ad;
+        else {
+          step = 2;
+          if (ad > 10) step += 2;
+          if (ad > 25) step += 3;
+          if (ad > 50) step += 4;
+          if (ad > 100) step += 5;
+        }
+        step = Math.min(step, ad);
+        tpCur += (d > 0 ? step : -step) / TP_UNITS;
+        if (Math.abs(tpApp - tpCur) < 3 / TP_UNITS) tpCur = tpApp;
+      }
+    }
     function heal(n) { hp = Math.min(MAXH, hp + n); }
     function melee() {
       if (meleeCd > 0 || opts.noMelee) return;
@@ -269,14 +300,58 @@
       ctx.fillStyle = col;
       for (r = 0; r < rows.length; r++) for (c = 0; c < rows[r].length; c++) if (rows[r][c] === '#') ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
     }
+    /* The gauge is painted on a cached strip so the cell slits and the two
+       phase gates can be CUT OUT with destination-out, as Deltarune does
+       with bm_subtract, without punching holes in the fight behind it.
+       Without a 2D context the same geometry is painted as dark slits. */
+    function paintGauge(g, w, cost, blink, sub) {
+      var cells = 25, cw = w / cells;
+      var curX = Math.max(0, Math.min(w, Math.round(tpCur * w)));
+      var appX = Math.max(0, Math.min(w, Math.round(tpApp * w)));
+      var gold = tp >= 1 ? '#FFD200' : T.acc, i, x, ad;
+      if (appX < curX) {                      /* spend: red/blue undershoot */
+        g.fillStyle = gold; g.fillRect(0, 0, appX, 12);
+        g.fillStyle = '#E0405A'; g.fillRect(appX, 0, curX - appX, 12);
+        g.fillStyle = '#3A72D0'; g.fillRect(appX, 0, Math.min(3, curX - appX), 12);
+      } else if (appX > curX) {               /* gain: white overshoot */
+        g.fillStyle = '#FFFFFF'; g.fillRect(curX, 0, appX - curX, 12);
+        g.fillStyle = gold; g.fillRect(0, 0, curX, 12);
+      } else { g.fillStyle = gold; g.fillRect(0, 0, curX, 12); }
+      ad = Math.min(curX, appX);
+      g.fillStyle = 'rgba(255,255,255,0.28)'; g.fillRect(0, 0, ad, 3);
+      g.fillStyle = 'rgba(90,0,0,0.35)'; g.fillRect(0, 9, ad, 3);
+      if (cost > 0 && blink > 0 && tpCur > cost) {
+        x = Math.max(0, Math.round((tpCur - cost) * w));
+        g.globalAlpha = blink * 0.85;
+        g.fillStyle = '#FFFFFF'; g.fillRect(x, 0, curX - x, 12);
+        g.globalAlpha = 1;
+      }
+      g.fillStyle = sub ? '#000000' : '#050104';
+      if (sub) g.globalCompositeOperation = 'destination-out';
+      for (i = 1; i < cells; i++) {
+        x = Math.round(i * cw) - 1;
+        if (x > 0 && x < w) g.fillRect(x, 0, 2, 12);
+      }
+      /* phase gates at 0.35 / 0.65, the same numbers the boss bar uses */
+      for (i = 0; i < 2; i++) g.fillRect(Math.round(w * (i ? 0.65 : 0.35)) - 1, 0, 3, 12);
+      if (sub) g.globalCompositeOperation = 'source-over';
+      if (tp >= 1) {                          /* plated gold at MAX */
+        g.fillStyle = '#FFF3B0'; g.fillRect(0, 0, w, 2);
+        g.fillStyle = '#B87900'; g.fillRect(0, 10, w, 2);
+      }
+    }
+
     /* Scal's TP menu, shared: double rim, title tab, icon + name + cost per row,
        stepped highlight with the bobbing soul, HP hearts, TP gauge that previews
        the selected cost. Drops in with a small overshoot; reduced motion skips it. */
     function drawStrip(ctx) {
       var now = performance.now(), u = Math.min(1, (now - stripAt) / 140), reduce = !!(NEU.juice && NEU.juice.reduced);
+      if (!gaugeLast) gaugeLast = now;
+      stepGauge((now - gaugeLast) * 60 / 1000);
+      gaugeLast = now;
       var rows = stripItems(), rowH = 40, bw = Math.min(box.AW - 48, 464) | 0, bh = rowH * rows.length + 132;
       var bx = (box.AX + (box.AW - bw) / 2) | 0, by = (box.AY + Math.max(40, (box.AH - bh) / 2) - (reduce ? 0 : (1 - u) * 24)) | 0;
-      var ease = 1 + 0.12 * Math.sin(u * Math.PI) * (1 - u), i, st, y, sel, tw, fy, cells = 25, gx, gy, gw, cw, fill, cost, blink, c0, c1, on, spend;
+      var ease = 1 + 0.12 * Math.sin(u * Math.PI) * (1 - u), i, st, y, sel, tw, fy, gx, gy, gw, cost, blink, c0, c1;
       if (now - stripShake < 180 && !reduce) bx += Math.round(Math.sin((now - stripShake) * 0.12) * 4);
       ctx.fillStyle = 'rgba(4,0,2,' + (0.62 * u).toFixed(2) + ')'; ctx.fillRect(box.AX, box.AY, box.AW, box.AH);
       ctx.save();
@@ -317,18 +392,23 @@
       ctx.fillStyle = '#C0BCC8'; ctx.fillText('HP', bx + 24, fy + 14);
       for (i = 0; i < MAXH; i++) stamp(ctx, HEART, bx + 66 + i * 16, fy + 22, 2, i < hp ? T.soul : '#2A1A20');
       ctx.textAlign = 'right'; ctx.fillStyle = T.acc; ctx.fillText('TP ' + (tp >= 1 ? 'MAX' : Math.floor(tp * 100) + '%'), bx + bw - 24, fy + 14);
-      gx = bx + 24; gy = fy + 40; gw = bw - 48; cw = gw / cells; fill = tp * cells;
-      st = rowState(rows[stripSel] || rows[0]); cost = st.ok ? st.cost : 0; blink = reduce ? 1 : (Math.floor(now / 260) % 2 ? 1 : 0.55);
+      gx = bx + 24; gy = fy + 40; gw = bw - 48;
+      st = rowState(rows[stripSel] || rows[0]); cost = st.ok ? st.cost : 0;
+      blink = reduce ? 1 : (Math.floor(now / 260) % 2 ? 1 : 0.55);
       ctx.fillStyle = T.well; ctx.fillRect(gx - 2, gy - 2, gw + 2, 16);
-      for (i = 0; i < cells; i++) {
-        c0 = Math.round(gx + i * cw); c1 = Math.round(gx + (i + 1) * cw) - 2;
-        on = i < Math.floor(fill + 1e-6); spend = cost > 0 && on && i >= Math.floor((tp - cost) * cells + 1e-6);
-        ctx.fillStyle = '#1E0E06'; ctx.fillRect(c0, gy, c1 - c0, 12);
-        if (on) {
-          ctx.fillStyle = spend ? 'rgba(255,240,208,' + blink + ')' : (tp >= 1 ? '#FFD040' : T.acc); ctx.fillRect(c0, gy, c1 - c0, 12);
-          ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(c0, gy, c1 - c0, 3);
-          ctx.fillStyle = 'rgba(90,0,0,0.35)'; ctx.fillRect(c0, gy + 9, c1 - c0, 3);
-        }
+      if (!gaugeCv || gaugeCv.width !== gw) {
+        gaugeCv = typeof document !== 'undefined' && document.createElement ? document.createElement('canvas') : null;
+        if (gaugeCv) { gaugeCv.width = Math.max(1, gw); gaugeCv.height = 12; }
+        gaugeCtx = gaugeCv && gaugeCv.getContext ? gaugeCv.getContext('2d') : null;
+      }
+      if (gaugeCtx) {
+        gaugeCtx.clearRect(0, 0, gaugeCv.width, 12);
+        paintGauge(gaugeCtx, gw, cost, blink, true);
+        ctx.drawImage(gaugeCv, gx, gy);
+      } else {
+        ctx.save(); ctx.translate(gx, gy);
+        paintGauge(ctx, gw, cost, blink, false);
+        ctx.restore();
       }
       var kn = function (d) { return NEU.keys && NEU.keys.label ? NEU.keys.label(d) : d; };
       ctx.textAlign = 'left'; ctx.fillStyle = '#8A8598'; ctx.fillText(kn('z') + ' use  ·  ' + kn('x') + ' back', bx + 24, fy + 64);
@@ -410,6 +490,8 @@
     var api = {
       keydown: keydown, keyup: keyup, tick: tick, draw: draw,
       addTp: addTp, graze: graze, hit: hit, cooldowns: cooldowns, drainTp: drainTp,
+      stepGauge: stepGauge, paintGauge: paintGauge,
+      get gauge() { return { current: tpCur, apparent: tpApp, target: tp, chase: TP_CHASE, units: TP_UNITS }; },
       get tp() { return tp; },
       get stripOpen() { return stripOpen; },
       get slow() { return stripOpen ? 0.2 : 1; },
