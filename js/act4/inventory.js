@@ -160,7 +160,7 @@
     box.innerHTML = '<div class="inv__top"><div class="inv__soul" aria-hidden="true"></div><div class="inv__tabs" role="tablist"><button type="button" class="inv__tab" data-tab="0">ITEMS</button><button type="button" class="inv__tab" data-tab="1">EQUIP</button></div><span class="inv__coins"></span></div>'
       + '<div class="inv__loadout" aria-label="Equipped gear"></div>'
       + '<div class="inv__body">'
-      + '<section class="inv__equipped"><h2>CATEGORIES</h2><div class="inv__slots"></div></section>'
+      + '<section class="inv__equipped"><h2><span class="glyph__copy">CATEGORIES</span></h2><div class="inv__slots"></div></section>'
       + '<section class="inv__inventory"><h2 class="inv__heading">ITEMS</h2><ul class="inv__list" role="listbox" aria-label="Items"></ul></section>'
       + '<section class="inv__stats"><h2>STATS</h2><div class="inv__statlines"></div></section></div>'
       + '<footer class="inv__footer"><p class="inv__hint" hidden></p></footer>'
@@ -372,6 +372,10 @@
     box.className = 'inv' + (equip ? ' is-equip' : '') + anim;
     cats.hidden = stats.hidden = prev.hidden = !equip;
     box.querySelector('.inv__heading').textContent = equip ? (opened ? CATS[cat].label : 'CATEGORY') : 'ITEMS';
+    var heading = box.querySelector('.inv__heading');
+    var categories = box.querySelector('.inv__equipped h2');
+    if (NEU.glyph && !categories.querySelector('.glyph__shape')) NEU.glyph.put(categories, 'grid', categories.textContent);
+    if (NEU.glyph) NEU.glyph.put(heading, equip ? 'grid' : 'bag', heading.textContent);
     if (equip) {
       html = '';
       for (i = 0; i < CATS.length; i++) {

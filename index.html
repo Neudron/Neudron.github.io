@@ -276,7 +276,7 @@
     <p class="mage__warnSub">a spell cast at the mage is answered in cards</p>
   </div>
   <div class="mage__head">
-    <span class="mage__name">THE MAGE</span>
+    <span class="mage__name"><span class="glyph__copy">THE MAGE</span><span data-glyph-slot="player"></span></span>
     <span class="mage__sub" id="magePersona">a stone shop, and the cards</span>
   </div>
   <div class="mage__art">
@@ -339,12 +339,12 @@
 </div>
 
 <!-- ═══ objectives ═════════════════════════════════════════════════ -->
-<button class="quest__t" id="questToggle" aria-expanded="false">objectives</button>
+<button class="quest__t" id="questToggle" aria-expanded="false"><span class="glyph__copy">objectives</span><span data-glyph-slot="list"></span></button>
 <aside class="quest" id="quest" aria-label="Objectives">
   <button class="quest__x" id="questClose" aria-label="Close objectives">&#215;</button>
   <!-- Placeholder only; quest.js overwrites it from STEPS.length on
        first render, so this number never needs hand-updating. -->
-  <h2 class="quest__h">objectives <span class="quest__n" id="questTally">0/16</span></h2>
+  <h2 class="quest__h"><span class="glyph__copy">objectives </span><span data-glyph-slot="list"></span> <span class="quest__n" id="questTally">0/16</span></h2>
   <ul class="quest__l" id="questList"></ul>
 </aside>
 
@@ -354,7 +354,7 @@
      text has to be selectable, readable and reflowable. -->
 <div class="deck" id="deck" hidden aria-label="neu deck">
   <div class="deck__bar">
-    <span class="deck__brand">neu deck</span>
+    <span class="deck__brand"><span class="glyph__copy">neu deck</span><span data-glyph-slot="deck"></span></span>
     <span class="deck__stat">
       <span class="deck__wifi" aria-hidden="true">&#9679;&#9679;&#9679;</span>
       <span id="deckClock">--:--</span>
@@ -364,12 +364,12 @@
   </div>
 
   <div class="deck__body">
-    <h2 class="deck__h">library</h2>
+    <h2 class="deck__h"><span class="glyph__copy">library</span><span data-glyph-slot="list"></span></h2>
     <ul class="deck__shelf" id="deckShelf" role="listbox" aria-label="games"></ul>
     <div class="deck__sel">
       <h3 class="deck__t" id="deckTitle"></h3>
       <p class="deck__m" id="deckMeta"></p>
-      <button class="deck__play" id="deckPlay">&#9656; play</button>
+      <button class="deck__play" id="deckPlay"><span class="glyph__copy">&#9656; play</span><span data-glyph-slot="open"></span></button>
       <p class="deck__err" id="deckErr" hidden role="alert"></p>
     </div>
   </div>

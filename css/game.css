@@ -829,6 +829,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%; image-rendering: pixelated;
 }
 .inv__list li.is-equipped span::after { content: '  EQUIPPED'; color: #FF9E30; }
+html.neu-hints-off:not(.rm) .inv__list li.is-equipped span::after { content: '  ✓'; }
 .inv__icon { flex: none; width: 32px; height: 32px; padding: 4px; box-sizing: content-box; background: rgba(255, 255, 255, 0.06); image-rendering: pixelated; }
 .inv__desc { min-height: 48px; margin-top: 16px; padding: 16px; color: #C0BCC8; }
 .inv__list .inv__kind { margin-left: auto; }

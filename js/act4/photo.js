@@ -110,7 +110,8 @@
     rr(g, 118, 8, 2, 14, '#DCCDAE'); rr(g, 200, 8, 2, 14, '#DCCDAE');
     g.fillStyle = '#2A2A3A';
     g.font = '16px "Determination Mono"';
-    g.fillText('PLACES', 133, 19);
+    if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(g, 'camera', 126, 6);
+    else g.fillText('PLACES', 133, 19);
   }
   function photoWoods(g, x, y) {
     rr(g, x, y, 56, 56, '#0E1630');

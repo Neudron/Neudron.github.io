@@ -327,7 +327,27 @@
     if (sel >= list.length || sel < 0) sel = 0;
     if (goldEl) goldEl.textContent = (NEU.save ? NEU.save.coins() : 0) + 'g';
     personaLine();
-    if (keysEl) keysEl.textContent = '↑↓ choose · Z select · X back';
+    if (keysEl) {
+      keysEl.textContent = '↑↓ choose · Z select · X back';
+      if (NEU.glyph) {
+        keysEl.textContent = '';
+        var copy = document.createElement('span');
+        copy.className = 'glyph__copy';
+        copy.innerHTML = '↑↓ choose · <kbd data-k="z"></kbd> select · <kbd data-k="x"></kbd> back';
+        keysEl.appendChild(copy);
+        copy.querySelector('[data-k=z]').textContent = NEU.glyph.key('z');
+        copy.querySelector('[data-k=x]').textContent = NEU.glyph.key('x');
+        var labels = [['↑↓', ''], [NEU.glyph.key('z'), 'z'], [NEU.glyph.key('x'), 'x']];
+        for (var k = 0; k < labels.length; k++) {
+          var cap = document.createElement('kbd');
+          cap.className = 'glyph__shape glyph__key';
+          cap.setAttribute('aria-hidden', 'true');
+          if (labels[k][1]) cap.setAttribute('data-k', labels[k][1]);
+          cap.textContent = labels[k][0];
+          keysEl.appendChild(cap);
+        }
+      }
+    }
     hadFocus = boardEl.contains(document.activeElement);
     boardEl.innerHTML = '';
     for (i = 0; i < list.length; i++) {

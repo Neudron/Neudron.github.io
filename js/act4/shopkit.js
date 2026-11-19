@@ -135,6 +135,14 @@
     line.textContent = mode === 'sell'
       ? 'sells for ' + (d.sell || 0) + 'g'
       : 'buy ' + (d.price || 0) + 'g \u00b7 sells for ' + (d.sell || 0) + 'g';
+    if (NEU.glyph) {
+      NEU.glyph.put(line, 'coin', line.textContent);
+      var price = document.createElement('span');
+      price.className = 'glyph__shape glyph__key';
+      price.setAttribute('aria-hidden', 'true');
+      price.textContent = mode === 'sell' ? String(d.sell || 0) : (d.price || 0) + '/' + (d.sell || 0);
+      line.appendChild(price);
+    }
     tip.appendChild(line);
 
     for (k in st) {
@@ -194,6 +202,7 @@
     fx = document.createElement('span');
     fx.className = 'shopkit__fx';
     fx.textContent = opts.prefix && d && d.kind !== 'heal' ? opts.prefix + effect(d) : effect(d);
+    if (NEU.glyph && d && d.kind === 'heal') NEU.glyph.put(fx, 'heart', fx.textContent);
     b.appendChild(fx);
 
     tip = tooltip(d, mode);
@@ -227,6 +236,7 @@
       test.type = 'button';
       test.className = 'shopkit__test';
       test.textContent = 'TEST';
+      if (NEU.glyph) NEU.glyph.put(test, 'target', test.textContent);
       test.setAttribute('aria-label', 'Test ' + d.name + ' in the practice room, free');
       test.addEventListener('click', function (e) {
         e.stopPropagation();
