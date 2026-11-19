@@ -61,6 +61,24 @@
 }
 /* Child `font:` shorthands reset ligature settings; re-apply after them. */
 .menu * { font-variant-ligatures: none; font-feature-settings: "liga" 0, "dlig" 0; }
+/* Three save slots. The label wraps instead of clipping a long group or
+   tier name; the two actions stay at least 40px tall on a 720p screen. */
+.menu__slot { display: flex; flex-direction: column; gap: 8px; padding: 8px 0;
+  border-top: 1px dotted rgba(244, 244, 244, 0.3); }
+.menu__slot-h { font: 400 16px/1.5 var(--font, monospace); color: var(--dim); overflow-wrap: anywhere; }
+.menu__slot-b { display: flex; gap: 8px; }
+.menu__act.menu__mini { flex: 1 1 0; width: auto; min-height: 40px;
+  justify-content: center; padding: 6px 10px; }
+.menu__io { width: 100%; box-sizing: border-box; min-height: 128px; padding: 8px;
+  resize: vertical; font: 400 16px/1.5 var(--font, monospace); color: var(--text);
+  background: #0C0614; border: 2px solid var(--edge); border-radius: 4px; }
+.menu__io:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+@media (max-height: 800px) {
+  /* One row per slot at 720p so Back stays on screen, not below a scroll. */
+  .menu__slot { flex-direction: row; align-items: center; }
+  .menu__slot-h { flex: 1 1 auto; }
+  .menu__slot-b { flex: 0 0 176px; }
+}
 
 /* ── one readable shop row, shared by the stall and the mage ──── */
 .shop__persona { margin: 0; font: 400 16px/1.5 var(--font, monospace); color: var(--shop-dim, var(--dim)); }
@@ -569,6 +587,9 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   color: #C9CED8;
   font-size: 16px;
 }
+
+/* The difficulty slider's live one-liner. Accent, not a new token. */
+.sett__lbl small.sett__fx { color: var(--accent); }
 
 .sett__dots {
   flex: 1 1 auto;
