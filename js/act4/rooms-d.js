@@ -51,7 +51,7 @@
        `colours` stays as the fallback and MUST NOT be deleted. It is what
        let every room ship before the art existed, and it is what renders if
        a sheet 404s. `o` is solid ground under a prop. */
-    src: 'img/act4/tiles/city.png',
+    src: 'img/act4/original/tiles/city.png',
     rects: { '#': [0, 0], '|': [16, 0], '.': [32, 0], ',': [48, 0], '=': [64, 0], '_': [80, 0], '+': [96, 0] },
     solid: '#|+o',
     colours: { '#': '#0E1018', '|': '#1A1D28', '.': '#141824',
@@ -59,7 +59,7 @@
   });
   E.tileset('home', {
     /* As above: look-city.js paints the corridors; this is the fallback. */
-    src: 'img/act4/tiles/home.png',
+    src: 'img/act4/original/tiles/home.png',
     rects: { '#': [0, 0], '|': [16, 0], '.': [32, 0], ',': [48, 0], '_': [64, 0], '+': [80, 0] },
     solid: '#|+o',
     /* Grey. Only grey. The one warm thing in the whole zone is the

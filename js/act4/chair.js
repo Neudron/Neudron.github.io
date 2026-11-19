@@ -140,7 +140,7 @@
     art = { sky: bakeSky(), far: bakeClouds(true), near: bakeClouds(false), cards: {} };
     if (typeof Image !== 'undefined') {
       chairImg = new Image();
-      chairImg.src = 'img/act4/undertale/armchair.png';
+      chairImg.src = 'img/act4/original/undertale/armchair.png';
     }
   }
   function scrollTo(img, y, off) {

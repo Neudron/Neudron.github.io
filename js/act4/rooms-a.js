@@ -80,7 +80,7 @@
        `colours` stays as the fallback and MUST NOT be deleted. It is what
        let every room ship before the art existed, and it is what renders if
        a sheet 404s. */
-    src: 'img/act4/tiles/woods.png',
+    src: 'img/act4/original/tiles/woods.png',
     rects: { '#': [0, 0], '~': [16, 0], '.': [32, 0], ',': [48, 0], '=': [64, 0], '|': [80, 0], '_': [96, 0], '+': [112, 0] },
     /* w  black stream (solid)   T  the foot of a big tree (solid)
        m  moss / the unswept track (walkable). All three are painted by
@@ -103,7 +103,7 @@
        `colours` stays as the fallback and MUST NOT be deleted. It is what
        let every room ship before the art existed, and it is what renders if
        a sheet 404s. */
-    src: 'img/act4/tiles/castle.png',
+    src: 'img/act4/original/tiles/castle.png',
     rects: { '#': [0, 0], '|': [16, 0], '.': [32, 0], ',': [48, 0], '=': [64, 0], '_': [80, 0], '+': [96, 0],
              'A': [112, 0] },
     /* D  dais (walkable)   d  the dais's front step (walkable)
