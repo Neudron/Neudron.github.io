@@ -31,7 +31,7 @@
     colours: { '#': '#2A2118', '.': '#3A2A1C', ',': '#5A4030', '=': '#1A1410' }
   });
 
-  function say(c, lines) { c.say(lines, 'narr'); }
+  function say(c, lines, cue) { c.say(lines, 'narr', cue); }
   function keyName(def) { return NEU.keys ? NEU.keys.label(def) : def; }
 
   /* A clearing, not a yard. Interior is one ground material; the rim is
@@ -575,14 +575,14 @@
       { t: 'exit', x: 3, y: 4, to: 's1_gate', spawn: 'south', style: 'arch' },
       { t: 'exit', x: 5, y: 2, to: 's5_baobab', spawn: 'west', locked: 'solved:s2_well', style: 'door',
         lines: ['a gate of sticks.', 'it opens when the stone sits on the plate.'] },
-      { t: 'sign', x: 4, y: 1, lines: ['one stone. one plate. push it right.'] }
+      { t: 'sign', x: 4, y: 1, textlessCue: 'block', lines: ['one stone. one plate. push it right.'] }
     ]),
     onEnter: function (c) {
       if (c.flagged('s2_seen')) return;
       c.flag('s2_seen', 1);
       say(c, ['one stone, one plate.',
               'press ' + keyName('z') + ' to push it.',
-              'press ' + keyName('r') + ' if you hate the result.']);
+              'press ' + keyName('r') + ' if you hate the result.'], ['block', 'key:z', 'key:r']);
     },
     onSolved: function (c) { c.markSolved('s2_well'); }
   });
@@ -624,14 +624,14 @@
       { t: 'exit', x: 0, y: 3, to: 's3_market', spawn: 'east', style: 'arch' },
       { t: 'exit', x: 3, y: 6, to: 's11_elder', spawn: 'north', style: 'arch' },
       prop('kraal', 3, 1),
-      { t: 'sign', x: 5, y: 3, lines: ['two stones. two plates. one push each, to the right.'] }
+      { t: 'sign', x: 5, y: 3, textlessCue: 'plate', lines: ['two stones. two plates. one push each, to the right.'] }
     ]),
     onEnter: function (c) {
       if (NEU.snail) NEU.snail.arrive('s6');
       if (c.flagged('s6_seen')) return;
       c.flag('s6_seen', 1);
       say(c, ['two lanes. the well was the lesson. this is the same lesson twice.',
-              'press ' + keyName('r') + ' to put the stones back.']);
+              'press ' + keyName('r') + ' to put the stones back.'], ['plate', 'key:r']);
     },
     onSolved: function (c) { c.markSolved('s6_kraal'); }
   });
@@ -673,7 +673,7 @@
       { t: 'block', x: 2, y: 3, push: true },
       { t: 'plate', x: 3, y: 3 },
       { t: 'exit', x: 8, y: 3, to: 's5_baobab', spawn: 'east', style: 'arch' },
-      { t: 'sign', x: 6, y: 2, lines: ['three fires, left to right, and the stone on its plate.'] }
+      { t: 'sign', x: 6, y: 2, textlessCue: 'fire', lines: ['three fires, left to right, and the stone on its plate.'] }
     ]),
     solved: function (c) { return !!c.flagged('s8_lit') && !!c.entHere(3, 3, 'block'); },
     onReset: function () { hearth = []; if (NEU.save) NEU.save.flag('s8_lit', 0); },
@@ -682,7 +682,7 @@
       if (c.flagged('s8_seen')) return;
       c.flag('s8_seen', 1);
       say(c, ['light them from the left. then push the stone.',
-              'press ' + keyName('r') + ' if the fires go out and you would like them to mean it.']);
+              'press ' + keyName('r') + ' if the fires go out and you would like them to mean it.'], ['fire', 'key:r']);
     }
   });
 
@@ -697,7 +697,7 @@
   addBox('s9_beads', sp('south'), [
     gate('south', 's3_market', 'north'),
     gameNpc(3, 3, 'beads'),
-    { t: 'sign', x: 7, y: 3, lines: ['three beads. the board names the key. press it once for each.'] }
+    { t: 'sign', x: 7, y: 3, textlessCue: 'key', lines: ['three beads. the board names the key. press it once for each.'] }
   ], null, 15, 9, 6, 'r');
   addBox('s10_shells', sp('south'), [
     gate('south', 's4_shade', 'north'),

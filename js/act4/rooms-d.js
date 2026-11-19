@@ -464,7 +464,7 @@
         return;
       }
       c.say(['a chalk circle on the ground, drawn by someone in a hurry.',
-             'it wants a potion. it is quite specific about which.'], 'narr');
+             'it wants a potion. it is quite specific about which.'], 'narr', ['potion']);
       return;
     }
     c.say(['you drink it standing in the circle, which is what the circle wanted.',
