@@ -73,7 +73,14 @@
     announce = el('p', 'menu__note');
     announce.setAttribute('aria-live', 'polite');
     win.appendChild(announce);
-    win.appendChild(el('p', 'menu__keys', '\u2191\u2193 choose \u00b7 Enter confirm \u00b7 Esc back'));
+    var legend = el('p', 'menu__keys', '↑↓ choose · Enter confirm · Esc back');
+    if (NEU.glyph) {
+      legend.innerHTML = '<span class="glyph__copy">↑↓ choose · Enter confirm · Esc back</span>' +
+        '<kbd class="glyph__shape glyph__key" aria-hidden="true">↑↓</kbd> ' +
+        '<kbd class="glyph__shape glyph__key" aria-hidden="true">Enter</kbd> ' +
+        '<kbd class="glyph__shape glyph__key" aria-hidden="true">Esc</kbd>';
+    }
+    win.appendChild(legend);
     box.appendChild(win);
     document.body.appendChild(box);
     box._body = body;
@@ -206,7 +213,12 @@
         b.type = 'button';
         b.setAttribute('role', 'option');
         b.appendChild(el('b', 'menu__tier-name', NEU.diff.name ? NEU.diff.name(n) : id));
-        b.appendChild(el('span', 'menu__tier-fx', FX[id] || FALLBACK_FX));
+        var desc = el('span', 'menu__tier-fx', FX[id] || FALLBACK_FX);
+        if (NEU.glyph) {
+          desc.classList.add('glyph__copy');
+          b.appendChild(NEU.glyph.meter(n + 1));
+        }
+        b.appendChild(desc);
         b.addEventListener('click', function () { chooseTier(id); });
         box._body.appendChild(b);
       })(ids[i], i);

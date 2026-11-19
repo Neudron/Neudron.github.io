@@ -258,7 +258,18 @@
       rg.value = String(v);
       rg.setAttribute('aria-valuetext', NEU.diff && NEU.diff.name ? NEU.diff.name(v) : String(v));
     }
-    if (fx) fx.textContent = diffFx(v === undefined ? (NEU.diff ? NEU.diff.index() : 2) : v);
+    var tier = v === undefined ? (NEU.diff ? NEU.diff.index() : 2) : v;
+    if (fx) {
+      fx.textContent = diffFx(tier);
+      if (NEU.glyph) {
+        var copy = document.createElement('span');
+        copy.className = 'glyph__copy';
+        copy.textContent = fx.textContent;
+        fx.textContent = '';
+        fx.appendChild(NEU.glyph.meter(tier + 1));
+        fx.appendChild(copy);
+      }
+    }
   }
 
   /* Three choices, one of them picked: a radiogroup of buttons, arrow
