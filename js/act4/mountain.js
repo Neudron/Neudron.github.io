@@ -328,11 +328,133 @@
   P.levels.mtest_hard.testing.rehearsed = { frames: 430, deaths: 0 };
   NEU.mountain.recordings.mtest_hard = P.levels.mtest_hard.recording;
 
-  NEU.mountain.prototypes = ['mtest_easy', 'mtest_medium', 'mtest_hard'];
+  NEU.mountain.prototypes = ['mtest_easy', 'mtest_medium', 'mtest_hard', 'mtest_springs', 'mtest_start', 'mtest_flags'];
   NEU.mountain.openPrototype = function (difficulty) {
     var id = 'mtest_' + difficulty;
     return NEU.mountain.prototypes.indexOf(id) >= 0 && P.open(id);
   };
+
+  /*
+   * Phase 1 reference-informed rooms. Original geometry only: scale, mechanic
+   * vocabulary and room envelopes were studied, never tiles, sprites, map bins
+   * or music. Phase 0 rights gate is NOT PASSED — no 1:1 accuracy is claimed.
+   */
+  var PROVENANCE = 'reference-informed, original implementation';
+  function claim(id) { P.levels[id].provenance = PROVENANCE; }
+  function record(id, rec, frames) {
+    var def = P.levels[id];
+    def.recording = rec;
+    def.testing.status = 'simulated-route-passed';
+    def.testing.successFrames = frames;
+    def.testing.deaths = 0;
+    NEU.mountain.recordings[id] = rec;
+  }
+
+  /* 7C 02 Springs envelope (95x31 source tiles). Springs, crumbling bridge,
+     a downward gust and a touch switch that opens the gate to the exit. */
+  prototype('mtest_springs', 48, 34, { x: 2, y: 29 }, [
+    { from: 0, to: 13, y: 30, tile: '#' },
+    { from: 17, to: 47, y: 30, tile: '#' },
+    { from: 0, to: 47, y: 33, tile: '#' },
+    { from: 14, to: 16, y: 32, tile: '^' },
+    { from: 6, to: 20, y: 27, tile: '=' },
+    { from: 40, to: 40, y: 29, tile: '`' }
+  ], [
+    { t: 'checkpoint', x: 4, y: 29, id: 'foot', alt: 1000 },
+    { t: 'refill', x: 6, y: 26 },
+    { t: 'spring', x: 9, y: 26 },
+    { t: 'crumble', x: 14, y: 30 },
+    { t: 'crumble', x: 15, y: 30 },
+    { t: 'crumble', x: 16, y: 30 },
+    { t: 'coin', x: 18, y: 26, id: 'mtn_coin:mtest_springs' },
+    { t: 'barrier', x: 24, y: 29, sw: 1, id: 'mtest_springs:switch' },
+    { t: 'barrier', x: 32, y: 28, gate: 1, solid: true, id: 'mtest_springs:gate0' },
+    { t: 'barrier', x: 32, y: 29, gate: 1, solid: true, id: 'mtest_springs:gate1' },
+    { t: 'exit', x: 44, y: 29 }
+  ], { stage: 'foot', altitude: 1000, mechanics: ['spring', 'falling block', 'downwind', 'touch switch'],
+    reference: 'Celestial 7C 02 Springs room envelope and mechanic set; original layout',
+    wind: { x: 0, y: 55, period: 4.2, duty: 0.55, phase: 0.6 } });
+  claim('mtest_springs');
+  record('mtest_springs', [[260, 'right']], 219);
+  /* A switch is one kinds-free state change on the level itself: the marker
+     entity is touched in tick, the gate entity stops being solid, art is drawn
+     in draw. No second authority and no engine change. */
+  (function () {
+    var def = P.levels.mtest_springs;
+    def.tick = function () {
+      var L = P.level0(), s = P.state, i, e, sw = null, on;
+      if (!L || !s) return;
+      for (i = 0; i < L.entities.length; i++) {
+        e = L.entities[i];
+        if (e.sw) sw = e;
+      }
+      if (!sw || sw.on) return;
+      on = Math.abs(s.x - (sw.x + 0.5) * 16) < 22 && Math.abs(s.y - (sw.y + 1) * 16) < 24;
+      if (!on) return;
+      sw.on = true;
+      for (i = 0; i < L.entities.length; i++) if (L.entities[i].gate) L.entities[i].dead = true;
+      if (NEU.juice && NEU.juice.hit) NEU.juice.hit('light');
+    };
+    def.draw = function (c, cx, cy) {
+      var L = P.level0(), i, e, x, y;
+      if (!L) return;
+      for (i = 0; i < L.entities.length; i++) {
+        e = L.entities[i];
+        if (!e.sw) continue;
+        x = (e.x * 16 - cx) | 0; y = (e.y * 16 - cy) | 0;
+        c.fillStyle = '#12081E'; c.fillRect(x, y + 2, 16, 14);
+        c.fillStyle = e.on ? '#3DDC97' : '#FFCF4A'; c.fillRect(x + 2, y + 4, 12, 10);
+        c.fillStyle = e.on ? '#C8FFE4' : '#FFF0A0'; c.fillRect(x + 5, y + 6, 6, 6);
+      }
+    };
+  }());
+
+  /* 7A a-00 Start envelope (86x23 source tiles). Three named spawn points
+     and one gold collectible above the main walking line. */
+  prototype('mtest_start', 48, 26, { x: 10, y: 21 }, [
+    { from: 0, to: 47, y: 22, tile: '#' },
+    { from: 28, to: 36, y: 19, tile: '=' },
+    { from: 39, to: 47, y: 12, tile: '=' },
+    { from: 16, to: 16, y: 21, tile: '`' }
+  ], [
+    { t: 'checkpoint', x: 4, y: 21, id: 'base', alt: 1200 },
+    { t: 'checkpoint', x: 32, y: 18, id: 'ledge', alt: 1320 },
+    { t: 'checkpoint', x: 42, y: 11, id: 'perch', alt: 1450 },
+    { t: 'coin', x: 35, y: 18, id: 'mtn_golden:mtest_start' },
+    { t: 'exit', x: 45, y: 21 }
+  ], { stage: 'foot', altitude: 1200, mechanics: ['spawn points', 'golden collectible', 'camera focus'],
+    reference: 'Celestial 7A a-00 envelope (3 spawns + golden); original layout',
+    camera: { focusY: 0.55 } });
+  claim('mtest_start');
+  record('mtest_start', [[220, 'right']], 182);
+
+  /* 7A g-03 Flags 5-1 envelope (262x407 source tiles). Six named summit
+     checkpoints on a chunked vertical stage with a gusting crosswind. */
+  var FLAGS = [
+    { id: 'flag5', x: 4, alt: 3000 }, { id: 'flag4', x: 10, alt: 3300 },
+    { id: 'flag3', x: 16, alt: 3600 }, { id: 'flag2', x: 22, alt: 3900 },
+    { id: 'flag1', x: 28, alt: 4200 }, { id: 'summit', x: 34, alt: 4500 }
+  ];
+  var flagEnts = [], kf;
+  for (kf = 0; kf < FLAGS.length; kf++) flagEnts.push({ t: 'checkpoint', x: FLAGS[kf].x, y: 85, id: FLAGS[kf].id, alt: FLAGS[kf].alt });
+  flagEnts.push({ t: 'coin', x: 20, y: 72, id: 'mtn_coin:mtest_flags' });
+  flagEnts.push({ t: 'exit', x: 38, y: 85 });
+  prototype('mtest_flags', 40, 90, { x: 2, y: 85 }, [
+    { from: 0, to: 39, y: 86, tile: '#' },
+    { from: 0, to: 0, y: 0, tile: '#' },
+    { from: 39, to: 39, y: 0, tile: '#' },
+    { from: 6, to: 14, y: 76, tile: '=' },
+    { from: 22, to: 30, y: 64, tile: '=' },
+    { from: 8, to: 16, y: 50, tile: '=' },
+    { from: 24, to: 32, y: 36, tile: '=' },
+    { from: 10, to: 18, y: 22, tile: '=' },
+    { from: 18, to: 18, y: 85, tile: '`' }
+  ], flagEnts, { stage: 'summit', altitude: 3000, mechanics: ['six named flags', 'crosswind', 'chunked vertical stage'],
+    reference: 'Celestial 7A g-03 flag sequence and envelope; original layout',
+    wind: { x: -36, y: 0, period: 5.6, duty: 0.7, phase: 3.2 },
+    camera: { focusY: 0.61 } });
+  claim('mtest_flags');
+  record('mtest_flags', [[280, 'right']], 187);
 
   /* Heaven is gold and cloud. Evil is crimson and ash. Four screens each. */
   var EX = 160, INK = '#12081E';
@@ -721,7 +843,7 @@
 
   var origOpen = P.open, origReplay = P.replay;
   P.open = function (id, opts) {
-    var ascent = !!P.levels[id] && (/^m[0-7]$/.test(id) || /^mtest_(easy|medium|hard)$/.test(id));
+    var ascent = !!P.levels[id] && (/^m[0-7]$/.test(id) || /^mtest_(easy|medium|hard|springs|start|flags)$/.test(id));
     var drop = !!P.levels[id] && /^[hv][0-3]$/.test(id);
     var ok;
     NEU.mountain.mood = drop ? (id.charAt(0) === 'v' ? 'evil' : 'heaven') : '';
