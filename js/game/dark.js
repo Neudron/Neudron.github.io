@@ -942,7 +942,13 @@
     ctx.fillStyle = col || CYAN;
     ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('press ' + (NEU.keys ? NEU.keys.label('z') : 'z').toUpperCase(), x, y);
+    var key = (NEU.keys ? NEU.keys.label('z') : 'z').toUpperCase();
+    if (NEU.glyph && NEU.glyph.compact()) {
+      ctx.strokeStyle = ctx.fillStyle;
+      var width = Math.ceil(ctx.measureText(key).width) + 8;
+      ctx.strokeRect(Math.round(x - width / 2), Math.round(y - 16), width, 20);
+      ctx.fillText(key, x, y);
+    } else ctx.fillText('press ' + key, x, y);
     ctx.textAlign = 'left';
   }
 

@@ -305,7 +305,8 @@
     c.fillStyle = '#4A3E5E'; c.fillRect(px, py, pw, 1); c.fillRect(px, py + ph - 1, pw, 1);
     c.fillRect(px, py, 1, ph); c.fillRect(px + pw - 1, py, 1, ph);
     c.font = FONT; c.textAlign = 'left'; c.textBaseline = 'top';
-    c.fillStyle = '#C8BCE0'; c.fillText('MAP  ' + (NEU.keys ? NEU.keys.label('e') : 'e'), px + 5, py + 5);
+    c.fillStyle = '#C8BCE0'; if (NEU.glyph && NEU.glyph.compact()) { NEU.glyph.draw(c, 'map', px + 5, py + 5); c.fillText(NEU.glyph.key('e'), px + 25, py + 5); }
+    else c.fillText('MAP  ' + (NEU.keys ? NEU.keys.label('e') : 'e'), px + 5, py + 5);
     for (j = 0; j < rows; j++) for (i = 0; i < cols; i++) {
       key = i + ',' + j;
       if (!seen[key]) continue;

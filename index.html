@@ -98,9 +98,9 @@
 
 <!-- Spatial continuity: once the sword is above the fold you have no
      idea where it went. This points at it. -->
-<div class="swcue" id="swordCue" aria-hidden="true">
+<div class="swcue" id="swordCue" role="img" aria-label="the sword is up there">
   <img src="img/sword.svg" alt="" width="11" height="28">
-  <span>up there</span>
+  <span class="glyph__copy" aria-hidden="true">up there</span><span data-glyph-slot="arrow"></span>
 </div>
 
 <!-- the sword. position is js, attitude is js, the art is a 12x30 svg. -->
@@ -129,8 +129,8 @@
      far end is already aiming.</p>
   <p>Thirty seconds. That's the whole ask.</p>
   <p><button class="btn" id="bhStart">step in</button></p>
-  <p class="panel__note">arrows or <kbd data-k="w,a,s,d">wasd</kbd> &middot; <kbd data-k="x">x</kbd> to dash &middot; <kbd data-k="Shift">shift</kbd> to focus &middot;
-     lose every heart and you're out</p>
+  <p class="panel__note">arrows or <kbd class="glyph__key" data-k="w,a,s,d">wasd</kbd> &middot; <kbd class="glyph__key" data-k="x">x</kbd><span class="glyph__copy"> to dash</span> &middot; <kbd class="glyph__key" data-k="Shift">shift</kbd><span class="glyph__copy"> to focus</span> &middot;
+     <span class="glyph__copy">lose every heart and you're out</span><span data-glyph-slot="heart"></span></p>
 
   <!-- Only when you are actually carrying it. The blue blaster in
        there charges what is in your hands and nothing else, so the
@@ -151,7 +151,7 @@
 <div class="bh" id="bh" hidden>
   <canvas id="bhCanvas"></canvas>
   <div class="bh__msg" id="bhMsg" hidden></div>
-  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &middot; <kbd data-k="x">x</kbd> dash &middot; <kbd data-k="Shift">shift</kbd> focus &middot; survive <span id="bhDuration">20</span>s</p>
+  <p class="bh__keys">arrows / <kbd class="glyph__key" data-k="w,a,s,d">wasd</kbd> &middot; <kbd class="glyph__key" data-k="x">x</kbd><span class="glyph__copy"> dash</span> &middot; <kbd class="glyph__key" data-k="Shift">shift</kbd><span class="glyph__copy"> focus</span> &middot; <span class="glyph__copy">survive </span><span id="bhDuration">20</span>s</p>
 </div>
 <!-- The HP is drawn on the canvas, which a screen reader cannot read.
      This line carries the same number as text, and only the bullet-hell
@@ -192,7 +192,7 @@
 <!-- ═══ after the light ════════════════════════════════════════════ -->
 <div class="dk" id="dk" hidden>
   <canvas id="dkCanvas"></canvas>
-  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> to interact</p>
+  <p class="bh__keys">arrows / <kbd class="glyph__key" data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd class="glyph__key" data-k="z">z</kbd><span class="glyph__copy"> to interact</span></p>
 </div>
 
 <!-- ═══ tenna ══════════════════════════════════════════════════════
@@ -225,7 +225,7 @@
     </div>
   </div>
   <canvas class="quiz__fx" id="quizFx" aria-hidden="true"></canvas>
-  <p class="bh__keys">a b c d &nbsp;&middot;&nbsp; or 1 2 3 4 &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> to answer &nbsp;&middot;&nbsp; esc to leave</p>
+  <p class="bh__keys">a b c d &nbsp;&middot;&nbsp; or 1 2 3 4 &nbsp;&middot;&nbsp; <kbd class="glyph__key" data-k="z">z</kbd><span class="glyph__copy"> to answer</span> &nbsp;&middot;&nbsp; <span class="glyph__copy">esc to leave</span><kbd class="glyph__shape glyph__key" aria-hidden="true">Esc</kbd></p>
 </div>
 
 <!-- ═══ exo mechs ══════════════════════════════════════════════════ -->
@@ -238,7 +238,7 @@
   </div>
   <p class="exo__vuln" id="exoVuln" aria-live="polite"></p>
   <p class="exo__hud" id="exoHud"></p>
-  <p class="exo__keys"><kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> strike &nbsp;&middot;&nbsp; <kbd data-k="x">x</kbd> dash &nbsp;&middot;&nbsp; 1 2 3 to choose</p>
+  <p class="exo__keys"><kbd class="glyph__key" data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd class="glyph__key" data-k="z">z</kbd><span class="glyph__copy"> strike</span> &nbsp;&middot;&nbsp; <kbd class="glyph__key" data-k="x">x</kbd><span class="glyph__copy"> dash</span> &nbsp;&middot;&nbsp; 1 2 3<span class="glyph__copy"> to choose</span></p>
 </div>
 
 <!-- ═══ draedon ════════════════════════════════════════════════════ -->
@@ -255,7 +255,7 @@
 <div class="polt" id="polt" hidden aria-label="polterghast">
   <canvas id="poltCanvas"></canvas>
   <div class="bh__msg" id="poltMsg" hidden></div>
-  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> to strike &nbsp;&middot;&nbsp; <kbd data-k="x">x</kbd> to dash &nbsp;&middot;&nbsp; <kbd data-k="Shift">shift</kbd> to focus</p>
+  <p class="bh__keys">arrows / <kbd class="glyph__key" data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd class="glyph__key" data-k="z">z</kbd><span class="glyph__copy"> to strike</span> &nbsp;&middot;&nbsp; <kbd class="glyph__key" data-k="x">x</kbd><span class="glyph__copy"> to<span class="glyph__copy"> dash</span></span> &nbsp;&middot;&nbsp; <kbd class="glyph__key" data-k="Shift">shift</kbd><span class="glyph__copy"> to<span class="glyph__copy"> focus</span></span></p>
 </div>
 <div class="plat" id="plat" hidden><canvas id="platCanvas"></canvas></div>
 <div class="bolt" id="bolt" hidden><canvas id="boltCanvas" width="640" height="360"></canvas></div>
@@ -264,7 +264,7 @@
 <div class="fnf" id="fnf" hidden aria-label="rap battle">
   <canvas id="fnfCanvas"></canvas>
   <div class="fnf__msg" id="fnfMsg" role="status" hidden></div>
-  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; hit them when they land</p>
+  <p class="bh__keys">arrows / <kbd class="glyph__key" data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <span class="glyph__copy">hit them when they land</span><span data-glyph-slot="note"></span></p>
 </div>
 
 <!-- ═══ the mage ═════════════════════════════════════════════════════ -->
@@ -284,7 +284,7 @@
     <div class="mage__menu" id="mageMenu" role="listbox" aria-label="shop menu"></div>
     <div class="mage__box">
       <p class="mage__say" id="mageSay"></p>
-      <p class="mage__keys">arrows move &middot; <kbd data-k="z">z</kbd> choose &middot; <kbd data-k="x">x</kbd> back &middot; <kbd data-k="c">c</kbd> cast brimstone</p>
+      <p class="mage__keys">arrows<span class="glyph__copy"> move</span> &middot; <kbd class="glyph__key" data-k="z">z</kbd><span class="glyph__copy"> choose</span> &middot; <kbd class="glyph__key" data-k="x">x</kbd><span class="glyph__copy"> back</span> &middot; <kbd class="glyph__key" data-k="c">c</kbd><span class="glyph__copy"> cast brimstone</span></p>
     </div>
   </div>
 </div>
@@ -333,7 +333,7 @@
      this is the only surface they draw on. -->
 <div class="eng" id="eng" hidden>
   <canvas id="engCanvas"></canvas>
-  <p class="bh__keys">arrows / <kbd data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> to interact &nbsp;&middot;&nbsp; esc to leave</p>
+  <p class="bh__keys">arrows / <kbd class="glyph__key" data-k="w,a,s,d">wasd</kbd> &nbsp;&middot;&nbsp; <kbd class="glyph__key" data-k="z">z</kbd><span class="glyph__copy"> to interact</span> &nbsp;&middot;&nbsp; <span class="glyph__copy">esc to leave</span><kbd class="glyph__shape glyph__key" aria-hidden="true">Esc</kbd></p>
 </div>
 
 <!-- ═══ objectives ═════════════════════════════════════════════════ -->
@@ -372,7 +372,7 @@
     </div>
   </div>
 
-  <p class="bh__keys">&larr; &rarr; to browse &nbsp;&middot;&nbsp; <kbd data-k="z">z</kbd> to play &nbsp;&middot;&nbsp; esc to put it down</p>
+  <p class="bh__keys">&larr; &rarr;<span class="glyph__copy"> to browse</span> &nbsp;&middot;&nbsp; <kbd class="glyph__key" data-k="z">z</kbd><span class="glyph__copy"> to play</span> &nbsp;&middot;&nbsp; <span class="glyph__copy">esc to put it down</span><kbd class="glyph__shape glyph__key" aria-hidden="true">Esc</kbd></p>
 </div>
 
 <!-- swipes down on every pet -->
