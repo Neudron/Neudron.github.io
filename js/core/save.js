@@ -422,6 +422,7 @@
     apply: function (s) {
       mem = normalise(s);
       if (NEU.quest && NEU.quest.restore) NEU.quest.restore(mem.quest);
+      if (NEU.settings && NEU.settings.apply) NEU.settings.apply();
       write(true);
       return mem;
     },
@@ -432,6 +433,7 @@
       var st = store();
       try { if (st) st.removeItem(KEY); } catch (e) {}
       if (NEU.quest && NEU.quest.reset) NEU.quest.reset();
+      if (NEU.settings && NEU.settings.apply) NEU.settings.apply();
       return mem;
     },
 

@@ -39,6 +39,7 @@
   var K_SHAKEPCT = 'opt_shakePct';  /* 0..100, default 100              */
   var K_FLASH = 'opt_noFlash';
   var K_TEXT  = 'opt_largeText';
+  var K_HINTS = 'opt_hints';
   var K_STOP  = 'opt_hitstop';      /* on = juice skips the held frame   */
   var K_PART  = 'opt_particles';    /* on = juice spawns no debris       */
   var K_RELAX = 'opt_relaxedQuiz';  /* on = the quiz gives twice the time */
@@ -96,6 +97,7 @@
       if (NEU.juice.setPhotosensitive) NEU.juice.setPhotosensitive(state(K_PHOTOSENS));
     }
     document.documentElement.classList.toggle('text-lg', !!state(K_TEXT));
+    document.documentElement.classList.toggle('neu-hints-off', !state(K_HINTS));
     /* Music reads the flag itself. Sound effects (sans.js) read this
        attribute, so they need no import from this file. */
     document.documentElement.dataset.muted = state(K_MUTE) ? '1' : '';
@@ -344,6 +346,7 @@
     if (NEU.save) {
       NEU.save.flag(K_SHAKEPCT, 100); NEU.save.flag(K_SHAKE, 0); NEU.save.flag(K_STOP, 0);
       NEU.save.flag(K_PART, 0); NEU.save.flag(K_TEXT, 0); NEU.save.flag(K_RELAX, 0);
+      NEU.save.flag(K_HINTS, 0);
       NEU.save.flag(K_PHOTOSENS, 0); NEU.save.flag(K_PARTCAP, 500); NEU.save.flag(K_OVERLAY, 50);
     }
     apply(); refresh();
@@ -627,6 +630,7 @@
     st.textContent = deviceLine();
     pA11y.appendChild(st);
 
+    pA11y.appendChild(row('settHints', 'show hints', '', function (on) { set(K_HINTS, on); }));
     pA11y.appendChild(row('settPhotosens', 'photosensitivity',
         'flashes capped at three a second, no screen shake, no afterimages. warnings stay.',
         function (on) { set(K_PHOTOSENS, on); }));
@@ -692,6 +696,7 @@
     if (!panel) return;
     var rows = [
       ['settText',  state(K_TEXT)],
+      ['settHints', state(K_HINTS)],
       ['settSound', !state(K_MUTE)],
       ['settHitstop',   state(K_STOP)],
       ['settParticles', state(K_PART)],
@@ -701,7 +706,10 @@
     ];
     for (var i = 0; i < rows.length; i++) {
       var el = document.getElementById(rows[i][0]);
-      if (el) el.setAttribute('aria-checked', String(!!rows[i][1]));
+      if (el) {
+        el.setAttribute('aria-checked', String(!!rows[i][1]));
+        if (el.id === 'settHints' && el._sync) el._sync();
+      }
     }
     var m = document.getElementById('settMusic');
     if (m) m.value = String(num(K_MUSIC, 55));
@@ -1021,6 +1029,7 @@
     calmAll: calmAll, defaults: defaults,
     warnFlash: warnFlash, hideNote: hideNote,
     get text() { return state(K_TEXT); },
+    get hints() { return state(K_HINTS); },
     get hitstop() { return state(K_STOP); },
     get particles() { return state(K_PART); },
     get photosensitive() { return state(K_PHOTOSENS); },
