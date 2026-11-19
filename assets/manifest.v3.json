@@ -3,6 +3,11 @@
   "baseline": "bbb4331e9ded30a9160bee3d087d6f08cc3479eb",
   "status": "RIGHTS_PENDING",
   "rights_note": "Non-commercial fan project. No rightsholder licence or redistribution right is claimed for franchise art; these folders are rights-review queues, not evidence of permission. Availability online is not a licence; screenshots and search hits are research links, not permission. Prior rights correction is preserved: no set below is CLEARED.",
+  "dist_rights_policy": {
+    "excluded_prefixes": ["img/act4/calamity/", "img/act4/terraria/", "img/act4/deltarune/", "img/act4/undertale/", "img/act4/tiles/", "img/act4/vfx/"],
+    "shipped_prefix": "img/act4/original/",
+    "note": "Rights queues stay in source only. scripts/build.mjs excludes them from dist and scripts/verify-dist.mjs fails if any queue path or file enters. Generated originals ship in their place."
+  },
   "tag_vocabulary": ["APPROVED", "RIGHTS_PENDING", "GENERATED_UNREVIEWED", "REJECTED"],
   "fields": [
     "asset_id",
@@ -26,6 +31,24 @@
     "review_status"
   ],
   "groups": [
+    {
+      "id": "generated-originals",
+      "prefix": "img/act4/original/",
+      "files": 159,
+      "author": "Original pixel-art replacements generated in-repo for this site (W9/WB art generators)",
+      "source_url": null,
+      "license": null,
+      "use_terms": "Original work generated for this site; no third-party rightsholder licence is claimed. Owner-directed replacement for the six rights queues below. Not human-art-reviewed.",
+      "modification": "Deterministic regeneration at the exact source filenames, dimensions and frame grids; 159 files mirror the queues 1:1.",
+      "attribution": "Generated under img/act4/original/; no external asset licence.",
+      "redistribution": "Ships in dist/ as the Act IV art.",
+      "dimensions": "per-file, identical to the corresponding rights-queue source",
+      "frame_count": "per-file, identical to the corresponding rights-queue source",
+      "pivot": null,
+      "status": "GENERATED_UNREVIEWED",
+      "dist": "shipped",
+      "note": "Owner decision: generate originals first, block the queues from dist second. Status stays unreviewed until a human signs off; no APPROVED or licence claim is invented."
+    },
     {
       "id": "existing-calamity",
       "prefix": "img/act4/calamity/",
@@ -158,12 +181,12 @@
     "tag_counts": {
       "APPROVED": 0,
       "RIGHTS_PENDING": 7,
-      "GENERATED_UNREVIEWED": 0,
+      "GENERATED_UNREVIEWED": 1,
       "REJECTED": 0,
-      "unit": "manifest group (7 groups, 165 tracked files)"
+      "unit": "manifest group (8 groups: 159 generated originals + 165 tracked rights/audio files)"
     },
-    "generated_assets": "None shipped. plans/neu-v3/IMAGE_PROMPTS.md are prompts, not generated output; generated assets remain blocked. GENERATED_UNREVIEWED count is 0.",
-    "dist_shipping": "VERIFIED: scripts/build.mjs copies every tracked file under img/ and audio/ except .md (via git ls-files), so all RIGHTS_PENDING groups currently ship in dist/. scripts/verify-dist.mjs allowlist accepts img/audio paths and does not exclude queues. No build exclusion is configured. Rights-pending assets DO enter dist today.",
+    "generated_assets": "159 original PNGs generated under img/act4/original/{calamity,terraria,deltarune,undertale,tiles,vfx}/, mirrored 1:1 by filename with identical PNG dimensions. They replace the six rights queues at runtime and ship in dist/.",
+    "dist_shipping": "FIXED: scripts/build.mjs skips the six img/act4 rights queues when copying tracked assets; scripts/verify-dist.mjs fails if any queue file or queue path string enters dist/. Originals under img/act4/original/ are allowed and ship. Out-of-scope rights-pending items (img/act123/, img/act4/witch-face.png, root img/ franchise files) still ship and need owner decision; no original replacements exist for them.",
     "must_replace_before_release": [
       "img/act4/calamity/ (59)",
       "img/act4/terraria/ (42)",
