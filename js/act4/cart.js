@@ -71,7 +71,7 @@
       canvas.height = 270;
       var hint = document.createElement('p');
       hint.className = 'cart__hint';
-      hint.innerHTML = 'lanes <span data-k="a"></span>/<span data-k="d"></span>/←→  jump <span data-k="z"></span>/<span data-k="e"></span>/<span data-k="w"></span>/space/↑';
+      hint.innerHTML = '<span class="glyph__copy">lanes </span><span class="glyph__shape" aria-hidden="true">↔</span> <span data-k="a"></span>/<span data-k="d"></span>/←→  <span class="glyph__copy">jump </span><span class="glyph__shape" aria-hidden="true">↑</span> <span data-k="z"></span>/<span data-k="e"></span>/<span data-k="w"></span>/space/↑';
       overlay.appendChild(canvas);
       overlay.appendChild(hint);
       document.body.appendChild(overlay);

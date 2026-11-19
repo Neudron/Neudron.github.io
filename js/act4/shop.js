@@ -114,6 +114,7 @@
     if (!h) return;
     h.textContent = PERSONA + ' \u00b7 ' +
       (NEU.save && NEU.save.has('axe') ? PERSONA_HANDED : 'the stall is open.');
+    if (NEU.glyph) NEU.glyph.put(h, 'player', h.textContent);
   }
 
   function ease(u) { u = u < 0 ? 0 : (u > 1 ? 1 : u); return u * u * (3 - 2 * u); }
@@ -361,6 +362,10 @@
         b.setAttribute('role', 'option');
         name = document.createElement('b');
         name.textContent = list[n].name;
+        if (NEU.glyph && mode === 'main') {
+          var symbols = { buy: 'coin', sell: 'bag', talk: 'talk', more: 'list', exit: 'door' };
+          NEU.glyph.put(name, symbols[list[n].id] || 'list', name.textContent);
+        }
         price = document.createElement('span');
         price.className = 'shop__p';
         price.textContent = list[n].price;

@@ -179,7 +179,7 @@
     g.fillStyle = '#2A2A3A';
     g.font = '16px "Determination Mono"';
     lbl = p.id === 'savanna' ? 'village' : p.id;
-    g.fillText(lbl, x + 2, y + p.h - 6);
+    if (!(NEU.glyph && NEU.glyph.compact())) g.fillText(lbl, x + 2, y + p.h - 6);
     /* pin */
     rr(g, x + (p.w >> 1) - 2, y - 2, 4, 4, '#8A0C14');
     rr(g, x + (p.w >> 1) - 2, y - 2, 2, 2, '#C8202C');
@@ -213,10 +213,13 @@
       overlay.hidden = true;
       canvas = document.createElement('canvas');
       canvas.id = 'photoCanvas';
+      canvas.setAttribute('role', 'img');
+      canvas.setAttribute('aria-label', 'PLACES: ' + names().join(', '));
       canvas.width = W;
       canvas.height = H;
       mark = document.createElement('p');
       mark.id = 'photoMark';
+      mark.setAttribute('role', 'status');
       mark.className = 'photo__mark';
       closeK = document.createElement('p');
       closeK.className = 'photo__hint';

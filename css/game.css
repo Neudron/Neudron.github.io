@@ -236,6 +236,7 @@ html.neu-hints-off:not(.rm) .glyph__copy {
 html.neu-hints-off:not(.rm) .glyph__key { padding: 0 .25em; border: 1px solid currentColor; }
 html.neu-hints-off:not(.rm) .glyph__shape.glyph__key { width: auto; height: auto; }
 html.neu-hints-off:not(.rm) .glyph__meter { width: auto; }
+html.neu-hints-off:not(.rm) .shop__row > b > .glyph__shape { width: 1.5em; height: 1.5em; }
 .glyph__meter > i {
   display: inline-block; width: .375em; height: .375em; margin-inline-end: .125em;
   border: 1px solid currentColor; border-radius: 50%;
