@@ -271,7 +271,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .deck__tile.is-on .deck__cap { color: #ff0; padding-left: 24px; }
 .deck__soul {
   position: absolute; left: 0; top: 142px; width: 16px; height: 16px;
-  background: url(../img/act4/original/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
   image-rendering: pixelated;
 }
 
@@ -739,7 +739,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   background-position: 6px 6px, calc(100% - 6px) 6px, 6px calc(100% - 6px), calc(100% - 6px) calc(100% - 6px);
 }
 .inv__top { display: flex; align-items: flex-end; gap: 16px; border-bottom: 2px solid #3A1016; }
-.inv__soul { flex: none; width: 48px; height: 48px; background: url(../img/act4/original/deltarune/tvtime/soul.png) 0 0 / 200% 100% no-repeat; image-rendering: pixelated; }
+.inv__soul { flex: none; width: 48px; height: 48px; background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100% no-repeat; image-rendering: pixelated; }
 .inv__tabs { display: flex; align-items: flex-end; gap: 16px; margin-left: auto; }
 /* the tabs sit on the rule like the strip's title tab */
 .inv__tab {
@@ -767,7 +767,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .inv__slots { display: grid; gap: 8px; }
 .inv__slot { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 4px 8px; padding: 4px 8px; min-height: 48px; cursor: pointer; }
 /* Category icons: the 48x16 Deltarune strip (sword, arrow, star) shown at 2x. */
-.inv__sym { flex: none; width: 32px; height: 32px; background: url(../img/act4/original/deltarune/equip-icons.png) 0 0 / 96px 32px no-repeat; image-rendering: pixelated; }
+.inv__sym { flex: none; width: 32px; height: 32px; background: url(../img/act4/deltarune/equip-icons.png) 0 0 / 96px 32px no-repeat; image-rendering: pixelated; }
 .inv__sym.sym-ranged { background-position: -32px 0; }
 .inv__sym.sym-spell { background-position: -64px 0; }
 .inv__slotbody { display: contents; }
@@ -807,7 +807,7 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .inv__list li { position: relative; display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 4px 8px 4px 48px; cursor: pointer; }
 .inv__list li.is-sel::before {
   content: ''; position: absolute; left: 8px; top: 50%; width: 32px; height: 32px; margin-top: -16px;
-  background: url(../img/act4/original/deltarune/tvtime/soul.png) 0 0 / 200% 100%; image-rendering: pixelated;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%; image-rendering: pixelated;
 }
 .inv__list li.is-equipped span::after { content: '  EQUIPPED'; color: #FF9E30; }
 .inv__icon { flex: none; width: 32px; height: 32px; padding: 4px; box-sizing: content-box; background: rgba(255, 255, 255, 0.06); image-rendering: pixelated; }

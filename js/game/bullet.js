@@ -114,7 +114,7 @@
   var GB_W = 43, GB_H = 57;
   var gb = null, gbBlue = null, gbTint = '';
   function sheet() {
-    if (!gb) { gb = new Image(); gb.src = 'img/act4/original/undertale/gasterblaster.png'; }
+    if (!gb) { gb = new Image(); gb.src = 'img/act4/undertale/gasterblaster.png'; }
     if (gbTint !== PAL.elec && gb.complete && gb.naturalWidth) {
       gbTint = PAL.elec;
       gbBlue = document.createElement('canvas');

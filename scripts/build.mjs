@@ -50,34 +50,13 @@ const FILES = [
   'llms.txt', 'humans.txt', 'manifest.json', 'apple-touch-icon.png', 'icon-512.png'
 ];
 const DIRS = ['fonts', 'img', 'audio', '.well-known'];
-/* Every rights-pending image stays in source only. Generated replacements
-   under img/act4/original/ are the only art the public artifact ships. The
-   adapter also catches unowned HTML/CSS paths (tests/ and index.html are not
-   owned by this work order) so a missed source edit cannot leak a queue URL. */
-const RIGHTS_QUEUES = ['calamity', 'terraria', 'deltarune', 'undertale', 'tiles', 'vfx'];
-const QUEUES = RIGHTS_QUEUES.join('|');
-const RIGHTS_FILE_RE = new RegExp(
-  '^img/act4/(?:' + QUEUES + ')/' +
-  '|^img/act4/witch-face\\.png$' +
-  '|^img/act123/' +
-  '|^img/(?:Sans_sprite\\.webp|totem\\.webp|annoying-dog\\.gif|cat\\.gif)$'
-);
-const RIGHTS_SRC_RE = new RegExp(
-  'img/act4/(?!original/)(?:' + QUEUES + ')/' +
-  '|img/act4/witch-face\\.png' +
-  '|img/act123/' +
-  '|img/(?:Sans_sprite\\.webp|totem\\.webp|annoying-dog\\.gif|cat\\.gif)', 'g'
-);
-const repoint = (s) => s.replace(RIGHTS_SRC_RE, function (m) {
-  if (m.indexOf('img/act123/') === 0 || m.indexOf('img/act4/') === 0) {
-    if (m === 'img/act4/witch-face.png') return 'img/act4/original/witch-face.png';
-    return 'img/act4/original/' + m.slice(m.startsWith('img/act123/') ? 4 : 'img/act4/'.length);
-  }
-  return 'img/act4/original/root/' + m.slice('img/'.length);
-});
-function assertRightsClean(label, s) {
-  const hits = s.match(RIGHTS_SRC_RE);
-  if (hits) throw new Error(label + ' still references rights-pending art: ' + [...new Set(hits)].join(', '));
+/* Owner decision: ship the original game art from its rights-review queues.
+   AI-generated replacements were removed from the repo; assert no stale
+   img/act4/original/ path survives into the public artifact. */
+const GENERATED_ORIGINAL_RE = /img\/act4\/original\//;
+function assertNoGeneratedOriginal(label, s) {
+  if (GENERATED_ORIGINAL_RE.test(s))
+    throw new Error(label + ' still references removed AI-generated art: img/act4/original/');
 }
 
 async function concat(files) {
@@ -128,24 +107,23 @@ async function writeAsset(dir, name, bytes) {
 async function main() {
   let html = await read('index.html');
   assertBundleCoverage(html);
-  html = repoint(html);
-  assertRightsClean('index.html', html);
+  assertNoGeneratedOriginal('index.html', html);
 
   await fs.rm(DIST, { recursive: true, force: true });
   await fs.mkdir(path.join(DIST, 'assets'), { recursive: true });
   await fs.mkdir(path.join(DIST, 'css'), { recursive: true });
 
   /* code split at the two seams the browser needs */
-  const gameSrc = repoint(await concat(GAME));
-  assertRightsClean('game bundle', gameSrc);
+  const gameSrc = await concat(GAME);
+  assertNoGeneratedOriginal('game bundle', gameSrc);
   const gameMin = (await transform(gameSrc, { minify: true, target: 'es2018', legalComments: 'none' })).code;
   const gameName = 'game.' + hash(gameMin) + '.js';
   await writeAsset('assets', gameName, gameMin);
 
   const prelude = await read('scripts/prelude.js');
-  const shellSrc = repoint('window.__NEU_GAME_URL__ = "assets/' + gameName + '";\n' +
-    prelude + '\n;\n' + await concat(SHELL));
-  assertRightsClean('shell bundle', shellSrc);
+  const shellSrc = 'window.__NEU_GAME_URL__ = "assets/' + gameName + '";\n' +
+    prelude + '\n;\n' + await concat(SHELL);
+  assertNoGeneratedOriginal('shell bundle', shellSrc);
   const shellMin = (await transform(shellSrc, { minify: true, target: 'es2018', legalComments: 'none' })).code;
   const shellName = 'shell.' + hash(shellMin) + '.js';
   await writeAsset('assets', shellName, shellMin);
@@ -171,8 +149,8 @@ async function main() {
 
   /* css keeps its own directory so ../fonts and ../img still resolve */
   for (const [src, out] of [['css/style.css', 'style'], ['css/game.css', 'game']]) {
-    const css = repoint((await transform(await read(src), { loader: 'css', minify: true })).code);
-    assertRightsClean(src, css);
+    const css = (await transform(await read(src), { loader: 'css', minify: true })).code;
+    assertNoGeneratedOriginal(src, css);
     await writeAsset('css', out + '.' + hash(css) + '.css', css);
   }
   const styleName = (await fs.readdir(path.join(DIST, 'css'))).find((f) => f.startsWith('style.'));
@@ -189,8 +167,8 @@ async function main() {
       if (!f) continue;
       /* notes stay on GitHub, never in dist (AGENTS.md) */
       if (/\.md$/i.test(f)) continue;
-      /* rights-pending art never ships; originals under img/act4/original/ do */
-      if (RIGHTS_FILE_RE.test(f)) continue;
+      /* game-art queues ship; removed AI-generated art must not */
+      if (/^img\/act4\/original\//.test(f)) throw new Error('AI-generated art in source tree: ' + f);
       await fs.mkdir(path.dirname(path.join(DIST, f)), { recursive: true });
       await fs.cp(path.join(ROOT, f), path.join(DIST, f));
     }

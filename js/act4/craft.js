@@ -38,8 +38,8 @@
   var trayEl = document.getElementById('craftTray');
   var outEl  = document.getElementById('craftOut');
   var sayEl  = document.getElementById('craftSay');
-  var MUSH = 'img/act4/original/terraria/mushroom.png';
-  var SOUL = 'img/act4/original/undertale/soul.png';
+  var MUSH = 'img/act4/terraria/mushroom.png';
+  var SOUL = 'img/act4/undertale/soul.png';
 
   /* 3x3, row-major. null = empty, 'M' = mushroom. */
   var grid = [null,null,null, null,null,null, null,null,null];
