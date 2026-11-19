@@ -22,6 +22,12 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
+  /* The live page loads core/boss.js; a lone-file harness keeps the old
+     identity behaviour, so recorded Medium traces do not move. */
+  var ident = function (n) { return n; };
+  var B = NEU.boss || { open: function (n) { return n; }, close: function () {},
+    hp: ident, hit: ident, iframes: ident, healCd: ident,
+    heals: function () { return true; } };
   function kn(d) { return NEU.keys ? NEU.keys.label(d) : d; }
 
   /* THE tuning table. scal-attacks.js (loaded first) reads NEU.scal.TUNE at
@@ -64,7 +70,7 @@
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
   var rage = 0, tp = 0, shieldT = 0;
   var rageMode = 0, rageModeT = 0;
-  var stripOpen = false, stripSel = 0, stripAt = 0, healCd = 0, healToast = 0;
+  var stripOpen = false, stripSel = 0, stripAt = 0, healCd = 0, healToast = 0, healsOn = true;
   var meleeCd = 0, grazeAt = -9;
   var STRIP_SCALE = 0.2, MELEE_DMG = 6, MELEE_R = 56, FIRE_DMG = 4;
   var MINI_N = 4, MINI_DMG = 1, MINI_SPEED = 160, MINI_LIFE = 1.2;
@@ -1466,7 +1472,7 @@
   function damageTarget(kind, ref, amount) {
     /* Returns true when the strike landed (a melee's +1 % TP needs it). */
     /* dev `dmg` multiplier (dev.js); absent or 1 is the normal fight */
-    var eff = amount * (rageMode ? 2 : 1) * ((NEU.cheat && NEU.cheat.dmgMul) || 1);
+    var eff = B.hit(amount) * (rageMode ? 2 : 1) * ((NEU.cheat && NEU.cheat.dmgMul) || 1);
     if (kind === 'seeker') {
       if (!NEU.scalSeekers || !NEU.scalSeekers.hit(ref.x, ref.y, 0)) return false;
       if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
@@ -2059,9 +2065,9 @@
   };
   var STRIP = [
     { name: 'HEAL', icon: 'heal', col: '#5CF08C', cost: 0,
-      ok: function () { return hp < MAXHP && healCd <= 0; },
+      ok: function () { return healsOn && hp < MAXHP && healCd <= 0; },
       tag: function () { return 'FREE'; },
-      why: function () { return healCd > 0 ? 'WAIT ' + Math.ceil(healCd) + 's' : 'HP FULL'; } },
+      why: function () { return !healsOn ? 'NO HEALS' : healCd > 0 ? 'WAIT ' + Math.ceil(healCd) + 's' : 'HP FULL'; } },
     { name: 'BRIMSTONE', fx: 'beam', icon: 'buster', col: '#FF6A2A', cost: 0.5,
       ok: function () { return tp >= 0.5; },
       tag: function () { return '50% TP'; },
@@ -2393,6 +2399,8 @@
   /* the hint row, looked up once per open: the draw loop used to query it every frame */
   var keysHint = null;
   function open() {
+    /* one tier latch for the whole fight; health and phase stay here */
+    B.open('scal');
     /* a retry starts from a clean attack machine: the last attempt's beam,
        warnings and flares must not draw through the intro. startLead()
        builds the fresh one once the intro is over. */
@@ -2415,6 +2423,8 @@
     }
     layout();
     t = 0; hp = MAXHP; inv = 0; dropBullets(); keys = {}; booms = []; flashAt = -9;
+    IFRAMES = B.iframes(dm.IFRAMES || 1.1);
+    HEAL_CD = B.healCd(30); healsOn = B.heals();
     shownInv = null; bannerTxt = ''; endPh(); setPh(0);
     rage = 0; tp = 0; shieldT = 0;
     rageMode = 0; rageModeT = 0;
@@ -2429,7 +2439,7 @@
        filling it. Every phase gate in damageTarget is a FRACTION of bossMax,
        so they rescale for free, and core/music.js takes hpMax from the first
        reading per fight. */
-    bossMax = 783; bossHP = bossMax; phase = 1; held = false; shotsFired = 0;
+    bossMax = B.hp(783); bossHP = bossMax; phase = 1; held = false; shotsFired = 0;
     pvx = 0; pvy = 0;
     /* dev `skip` to a phase (dev.js): start the boss at a share of its HP,
        once, so the next fight starts full again */
@@ -2471,6 +2481,7 @@
     if (NEU.kernel) NEU.kernel.push('scal');
   }
   function close() {
+    B.close('scal');
     active = false; running = false; dying = 0; stripOpen = false; breakT = -1;
     cineOff();
     if (NEU.talk && NEU.talk.close) NEU.talk.close();

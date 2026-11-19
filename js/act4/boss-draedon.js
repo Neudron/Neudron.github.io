@@ -7,6 +7,12 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
+  /* The live page loads core/boss.js; a lone-file harness keeps identity
+     values so the recorded Medium frames do not move. */
+  var ident = function (n) { return n; };
+  var B = NEU.boss || { open: function (n) { return n; }, close: function () {},
+    hp: ident, playerHp: ident, hit: ident, iframes: ident, gap: ident, tele: ident,
+    healCd: ident, heals: function () { return true; } };
   var wrap = document.getElementById('draedon');
   if (!wrap) {
     NEU.draedon = { open: function () {}, state: {} };
@@ -29,6 +35,13 @@
     PrecisionBlast: { duration: 90, warn: 27, hit: 54, shape: 'line' },
     PissedLaser: { duration: 90, warn: 27, hit: 54, shape: 'line' }
   };
+  /* the telegraph lead and the breath after a strike are the tier's knobs;
+     the hit frame itself is the warned shape and never moves. */
+  function specOf(name) {
+    var s = SPECS[name];
+    return { duration: s.hit + Math.round((s.duration - s.hit) * B.gap(1)),
+             warn: Math.round(B.tele(s.warn)), hit: s.hit, shape: s.shape };
+  }
   var DIG = {
     0: ['111', '101', '101', '101', '111'],
     1: ['010', '110', '010', '010', '111'],
@@ -119,7 +132,7 @@
     if (sig) {
       if (!cur || cur.name !== 'PissedLaser') begin('PissedLaser');
     } else if (!cur) startCycle();
-    spec = SPECS[cur.name];
+    spec = specOf(cur.name);
     if (cur.f === spec.warn) tele = makeShape(spec);
     if (cur.f === spec.hit) haz = tele;
     cur.f++;
@@ -195,7 +208,8 @@
   function ensureKit() {
     if (!NEU.kit) return;
     kit = NEU.kit.create({
-      F: F, box: box,
+      F: F, box: box, maxHp: playerHp,
+      healCd: B.healCd(30), noHeal: !B.heals(),
       adapter: {
         targets: function () { return [boss]; },
         damage: function (t, n) { damage(n); },
@@ -206,8 +220,9 @@
   function resetFight() {
     mode = 'fight';
     phase = 1;
+    MAX = B.hp(100);
     hp = MAX;
-    playerHp = 6;
+    playerHp = B.playerHp(6);
     iframe = 0;
     sig = false;
     haze = 0;
@@ -231,6 +246,7 @@
   }
   function damage(n) {
     if (mode !== 'fight' || !(n > 0) || !vulnerableNow()) return false;
+    n = B.hit(n);
     if (cur && cur.name === 'PissedLaser') {
       hp -= n;
       if (hp <= 0) beginNuke();
@@ -254,7 +270,7 @@
   }
   function hurtPlayer(n) {
     if ((NEU.cheat && NEU.cheat.god) || mode !== 'fight' || iframe > 0) return;   /* dev `god on` (dev.js) */
-    iframe = 60;
+    iframe = Math.round(B.iframes(60));
     playerHp -= n || 1;
     if (NEU.juice) NEU.juice.hit('medium');
     if (playerHp <= 0) resetFight();
@@ -580,6 +596,7 @@
     if (kit && kit.keyup) kit.keyup(k);
   }
   function open() {
+    B.open('draedon');
     wrap.hidden = false;
     layout();
     resetFight();
@@ -589,6 +606,7 @@
     publish();
   }
   function close() {
+    B.close('draedon');
     if (NEU.kernel && NEU.kernel.current() === 'draedon') NEU.kernel.pop();
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('draedon', -1);
     musicPhase = -1;

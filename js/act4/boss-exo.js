@@ -8,6 +8,12 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
+  /* The live page loads core/boss.js; a lone-file harness keeps identity
+     values so the recorded Medium frames do not move. */
+  var ident = function (n) { return n; };
+  var B = NEU.boss || { open: function (n) { return n; }, close: function () {},
+    hp: ident, playerHp: ident, hit: ident, healCd: ident,
+    heals: function () { return true; } };
   var wrap = document.getElementById('exo');
   if (!wrap) { NEU.exo = { open: function () {}, state: {} }; return; }
   var cv = document.getElementById('exoCanvas');
@@ -204,6 +210,7 @@
   }
   function resetFight() {
     var n, id;
+    MAX = B.hp(1000);
     overdriveOpen = false;
     compSummoned = false;
     finSummoned = false;
@@ -212,7 +219,7 @@
     gateSeen.b = 0;
     gateSeen.c = 0;
     if (NEU.exoCombos) NEU.exoCombos.clear();
-    playerHp = 6;
+    playerHp = B.playerHp(6);
     fightFrame = 0;
     acc = 0;
     for (n = 0; n < ORDER.length; n++) {
@@ -232,6 +239,7 @@
   function damage(id, n) {
     var m = mechs[id];
     if (mode !== 'fight' || !m || !m.alive || !(n > 0)) return false;
+    n = B.hit(n);
     if (id === 'thanatos' && !ventsOpen()) return false;
     if (id === initialId && shielded()) return false;
     if (id === 'thanatos' && !overdriveOpen) m.hp = Math.max(1, m.hp - n);
@@ -271,7 +279,8 @@
   function ensureKit() {
     if (kit || !NEU.kit) return;
     kit = NEU.kit.create({
-      F: F, box: box,
+      F: F, box: box, maxHp: B.playerHp(6),
+      healCd: B.healCd(30), noHeal: !B.heals(),
       adapter: {
         targets: targets,
         damage: function (t, n) {
@@ -540,6 +549,7 @@
     if (kit && kit.keyup) kit.keyup(k);
   }
   function open() {
+    B.open('exo');
     wrap.hidden = false;
     mode = 'select';
     held = {};
@@ -557,6 +567,7 @@
     publish();
   }
   function close() {
+    B.close('exo');
     mode = 'select';
     if (NEU.kernel && NEU.kernel.current() === 'exo') NEU.kernel.pop();
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('exo', -1);
