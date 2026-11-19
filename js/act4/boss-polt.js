@@ -562,7 +562,7 @@
       '#tvRestored{position:fixed;top:0;left:0;right:0;bottom:0;z-index:95;display:flex;',
       'align-items:center;justify-content:center;background:#000;overflow:hidden;}',
       '#tvRestored .tvRestored__title{position:relative;z-index:2;color:#fff;letter-spacing:2px;',
-      'font-family:"Determination Sans",monospace;font-size:96px;}',
+      'font-family:"Pixelify Sans",ui-monospace,monospace;font-size:96px;}',
       '#tvRestored .tvRestored__sheen{position:absolute;top:0;bottom:0;width:96px;left:-96px;',
       'background:linear-gradient(90deg,rgba(0,0,0,0),#F4F6FA,rgba(0,0,0,0));',
       'animation:tvSheen 2.4s steps(6) 1;}',
@@ -601,7 +601,7 @@
     }
     var title = document.createElement('div');
     title.className = 'tvRestored__title';
-    title.style.fontFamily = '"Determination Sans", monospace';
+    title.style.fontFamily = '"Pixelify Sans", ui-monospace, monospace';
     title.style.fontSize = '96px';
     title.textContent = 'THE TV IS RESTORED';
     card.appendChild(title);

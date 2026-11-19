@@ -10,6 +10,7 @@
   position: fixed; inset: 0; z-index: 93;
   display: grid; place-items: center; padding: 24px;
   background: rgba(8, 8, 11, 0.82);
+  font-variant-ligatures: none;
 }
 .menu[hidden] { display: none !important; }
 .menu__win {
@@ -58,6 +59,8 @@
 @media (prefers-reduced-motion: reduce) {
   .menu, .menu * { transition: none !important; animation: none !important; }
 }
+/* Child `font:` shorthands reset ligature settings; re-apply after them. */
+.menu * { font-variant-ligatures: none; font-feature-settings: "liga" 0, "dlig" 0; }
 
 /* ── one readable shop row, shared by the stall and the mage ──── */
 .shop__persona { margin: 0; font: 400 16px/1.5 var(--font, monospace); color: var(--shop-dim, var(--dim)); }
