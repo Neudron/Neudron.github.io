@@ -41,12 +41,15 @@
   var COL = { bone: '#EDE7DE', soul: '#E23B55', dim: '#8A8598',
               ecto: '#7FE3C4', ectoHi: '#C4FFF0', red: '#E04A6B', void_: '#04060A' };
 
-  /* one look per phase (index = phase): the field and rim shift so the
-     escalation reads from the arena before the health bar */
+  /* VIP-04: one full look per phase (index = phase). Every saturated pixel
+     the phase changes reads from here, not from a draw-time ad-hoc hex. */
   var PHASE_LOOK = [null,
-    { field: '#070A14', rim: COL.bone },
-    { field: '#061418', rim: COL.ecto },
-    { field: '#14070E', rim: COL.red }];
+    { field: '#070A14', rim: COL.bone, fog: '#0E1A3C', hudFrame: COL.bone, vignette: '#8AB4FF' },
+    { field: '#061418', rim: COL.ecto, fog: '#158039', hudFrame: COL.ecto, vignette: '#7FE3C4' },
+    { field: '#14070E', rim: COL.red, fog: '#5A0A1E', hudFrame: COL.red, vignette: '#E04A6B' }];
+  /* the boss bar name is part of the phase presentation, not a static label */
+  var BOSS_NAMES = ['', 'POLTERGHAST', 'NECROGHAST', 'NECROPLASM'];
+  var SIG_FRAMES = 360;                   /* 6 s signature, expressed in frames */
   /* One authority for the phase gates: the damage check and the HUD ticks
      both read this table, so the bar can never disagree with the fight. */
   var PHASE_GATES = [1, 0.65, 0.35];
@@ -87,6 +90,9 @@
      pause or a death holds it and open()/close() wipe it */
   var warnAt = 0, chargePath = null, vuln = 0, sig = 0, sigDone = false, sigRing = 0, sigSpin = 0;
   var phaseFlash = 0, phaseFlashes = 0, flashedPhase = 0;
+  /* VIP-04: the ordered phase transition. seq is non-null from the gate until
+     the playable beat at f90; dim is the blackout alpha, lifting by f90. */
+  var seq = null, dim = 0;
   /* VIP-05: boss movement driven by named attacks through the adapter.
      moveIntent is consumed in update; bossHidden hides only the body sprite. */
   var moveIntent = null, bossHidden = false;
@@ -333,6 +339,7 @@
     dm.tick(F, dt, 1 - Math.min(1, Math.max(0, Math.hypot(px - bx, py - by) - 40) / 260));
     if (kit) { kit.hp = hp; kit.tick(dt); }
     tickAttacks(dt);
+    stepTransition();
 
     /* him — Plantera-like chase, faster each phase */
     var chase = [0, 1.0, 1.7, 2.6][phase];
@@ -392,15 +399,16 @@
       }
     }
 
-    /* his own cadence */
+    /* his own cadence — silent while the phase blackout plays, so the
+       only new shots are the transition's two telegraphed dart rings */
     nextFire -= dt;
-    if (nextFire <= 0 && charging <= 0) {
+    if (!seq && nextFire <= 0 && charging <= 0) {
       if (phase === 1) { spread(6, 150, COL.ecto, 4); nextFire = 1.5; }
       else if (phase === 2) { spread(7, 190, COL.ectoHi, 4); nextFire = 1.15; }
       else { spread(clone ? 8 : 10, 210, COL.red, 5); nextFire = phase === 3 ? 7 : 2; }
     }
     nextCharge -= dt;
-    if (nextCharge <= 0 && charging <= 0) {
+    if (!seq && nextCharge <= 0 && charging <= 0) {
       glow = 0.9;
       if (t < 6) say('* red means it is about to move.');   /* the first charge explains itself */
       nextCharge = [0, 5.5, 4.2, 3.4][phase];
@@ -452,7 +460,7 @@
 
   /* the signature at 1 HP: the kill is held until this has been survived */
   function startSig() {
-    sig = 6; sigRing = 0; sigSpin = 0;
+    sig = SIG_FRAMES / 60; sigRing = 0; sigSpin = 0;   /* VIP-04: 360f */
     if (NEU.poltAtk) NEU.poltAtk.signature();
     say('* it makes one last thing of itself.');
   }
@@ -538,24 +546,11 @@
     var killing = bossHP <= 0;
     if (killing) bossHP = 1;
     var pct = bossHP / bossMax;
-    if (pct <= PHASE_GATES[2] && phase < 3) {
-      phase = 3;
-      pulsePhase();
-      if (NEU.poltAtk) NEU.poltAtk.phase(phase);
-      hooks.forEach(function (h) { h.free = false; });
-      clone = { x: bx, y: by, t: 2 };
-      say("* it makes another one of itself.");
-      if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(3);
-      if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', phase);
-    } else if (pct <= PHASE_GATES[1] && phase < 2) {
-      phase = 2;
-      pulsePhase();
-      if (NEU.poltAtk) NEU.poltAtk.phase(phase);
-      hooks.forEach(function (h) { h.free = true; h.t = 1.5; });
-      say("* the hooks let go.");
-      if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(2);
-      if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', phase);
-    }
+    /* one gate authority: the transition owns the lock, not this hit */
+    if (!seq && pct <= PHASE_GATES[2] && phase < 3)
+      beginTransition(3, "* it makes another one of itself.");
+    else if (!seq && pct <= PHASE_GATES[1] && phase < 2)
+      beginTransition(2, "* the hooks let go.");
     if (killing) startSig();
   }
 
@@ -693,6 +688,46 @@
     return NEU.sheetDraw(ctx, key, x, y, {
       scale: scale, glowKeys: glowKeys, rot: rot, frame: frame, now: performance.now()
     });
+  }
+
+  /* ── VIP-04 ordered phase presentation ───────────────────────────
+     finish outgoing shots safely -> lock phase -> health/readout alteration
+     -> boss body reaction -> arena response -> playable next state. The seq
+     clock owns all six beats; reduced motion collapses them to a hard cut. */
+  var TRS = (NEU.poltAtk && NEU.poltAtk.transition) ? NEU.poltAtk.transition.stats() : null;
+  var TR_CLOSE = TRS ? TRS.close : 36, TR_KICK = TRS ? TRS.kick : 90;
+
+  function applyPhase(to, msg) {
+    phase = to;
+    pulsePhase();                          /* body reaction: one white frame */
+    if (!sig && NEU.poltAtk) NEU.poltAtk.phase(to);
+    hooks.forEach(function (h) { h.free = to === 2; if (to === 2) h.t = 1.5; });
+    if (to === 3) clone = { x: bx, y: by, t: 2 };
+    if (msg) say(msg);
+    if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(to);
+    if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', to);
+  }
+  function beginTransition(to, msg) {
+    REDUCE_MOTION = liveReduced();
+    if (REDUCE_MOTION) { applyPhase(to, msg); return; }   /* hard cut, no flash/shake */
+    seq = { f: 0, to: to, msg: msg, stage: 'finish' };
+    dim = 0.6;                             /* blackout peaks at 0.6 alpha */
+    if (NEU.poltAtk && NEU.poltAtk.transition) NEU.poltAtk.transition.start(to);
+    say(msg);
+  }
+  function stepTransition() {
+    if (!seq) return;
+    var f = seq.f;
+    if (f === 12) { applyPhase(seq.to, null); seq.stage = 'lock'; }
+    if (f === 36) seq.stage = 'settle';
+    if (NEU.poltAtk && NEU.poltAtk.transition)
+      NEU.poltAtk.transition.step(f, { x: bx, y: by, tx: px, ty: py, aw: AW, ah: AH });
+    dim = f < TR_CLOSE ? 0.6 : 0.6 * (TR_KICK - f) / (TR_KICK - TR_CLOSE);
+    if (dim < 0) dim = 0;
+    if (f >= TR_KICK) {                    /* large kick + hit-stop on the playable beat */
+      if (!REDUCE_MOTION && NEU.juice) NEU.juice.hit('large', { dx: px - bx, dy: py - by });
+      seq = null; dim = 0;
+    } else seq.f++;
   }
 
   /* one white frame per phase (0.4 s, under 3 Hz). Reduced motion
@@ -838,7 +873,7 @@
       }
     }
     if (phase === 2) {
-      var fogBase = '#158039', fogTop = '#7FE3C4';
+      var fogBase = PHASE_LOOK[2].fog, fogTop = PHASE_LOOK[2].vignette;
       ctx.fillStyle = fogBase; ctx.globalAlpha = 0.22;
       for (x = 0; x < W; x += 64) {
         y = H - 18 - (((Math.sin((x + tt * 8) * 0.03) + 1) * 4) | 0);
@@ -888,6 +923,31 @@
     ctx.fillRect(AX - 3, AY - 3, AW + 6, 3); ctx.fillRect(AX - 3, AY + AH, AW + 6, 3);
     ctx.fillRect(AX - 3, AY, 3, AH); ctx.fillRect(AX + AW, AY, 3, AH);
   }
+  /* phase vignette: a tinted edge band, static under reduced motion */
+  function drawVignette() {
+    var look = PHASE_LOOK[phase] || PHASE_LOOK[1], w = 22;
+    ctx.globalAlpha = REDUCE_MOTION ? 0.16 : 0.12 + 0.04 * Math.sin(t * 1.6);
+    ctx.fillStyle = look.vignette;
+    ctx.fillRect(AX | 0, AY | 0, AW | 0, w);
+    ctx.fillRect(AX | 0, AY + AH - w | 0, AW | 0, w);
+    ctx.fillRect(AX | 0, AY | 0, w, AH | 0);
+    ctx.fillRect(AX + AW - w | 0, AY | 0, w, AH | 0);
+    ctx.globalAlpha = 1;
+  }
+  /* the 36f closing ring that reads the phase change before the bar does */
+  function drawCloseRing() {
+    if (!seq || seq.f >= TR_CLOSE) return;
+    var look = PHASE_LOOK[seq.to] || PHASE_LOOK[1], u = seq.f / TR_CLOSE;
+    var inset = u * Math.min(AW, AH) * 0.5;
+    var x = AX + inset, y = AY + inset, w = AW - 2 * inset, h = AH - 2 * inset;
+    if (w <= 0 || h <= 0) return;
+    ctx.globalAlpha = 0.9; ctx.fillStyle = look.vignette;
+    ctx.fillRect(x | 0, y | 0, w | 0, 3);
+    ctx.fillRect(x | 0, y + h - 3 | 0, w | 0, 3);
+    ctx.fillRect(x | 0, y | 0, 3, h | 0);
+    ctx.fillRect(x + w - 3 | 0, y | 0, 3, h | 0);
+    ctx.globalAlpha = 1;
+  }
 
   /* baked tint of one sheet frame: the silhouette flooded with a colour
      (source-atop keeps the alpha), cached per frame and colour. The clone
@@ -936,6 +996,7 @@
     frame();
     liveArena();
     bossAura();
+    drawVignette();
 
     /* chains first, behind everything */
     drawLegs();
@@ -1080,10 +1141,24 @@
     if (NEU.juice) NEU.juice.end(ctx, shook);
     if (NEU.juice) NEU.juice.overlay(ctx, innerWidth, innerHeight);
 
+    /* VIP-04 arena response: the closing ring and the 0.6 blackout sit
+       above the fight but under the readout, so the bar stays legible. */
+    drawCloseRing();
+    if (dim > 0) {
+      ctx.globalAlpha = dim; ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, innerWidth, innerHeight); ctx.globalAlpha = 1;
+    }
+
     if (kit) kit.draw(ctx);
-    dm.hud(ctx, F, { w: innerWidth, h: innerHeight, AY: AY, AH: AH, name: 'polterghast',
+    dm.hud(ctx, F, { w: innerWidth, h: innerHeight, AY: AY, AH: AH, name: BOSS_NAMES[phase],
                      hp: bossHP, max: bossMax, ticks: PHASE_GATES.slice(1),
                      php: hp, pmax: MAXHP, phase: phase });
+    /* phase-coloured HUD frame rule, drawn here because danmaku.js belongs
+       to the readability owner and stays untouched */
+    var fLook = PHASE_LOOK[phase] || PHASE_LOOK[1];
+    var fbw = dm.barW ? dm.barW(innerWidth) : 480;
+    ctx.globalAlpha = 0.85; ctx.fillStyle = fLook.hudFrame;
+    ctx.fillRect(((innerWidth - fbw) / 2) | 0, 30, fbw | 0, 2); ctx.globalAlpha = 1;
 
     /* the label sits outside the shake and outside the arena: on the
        boss-bar row, right-aligned under the bar, on a dark plate (AA) */
@@ -1165,6 +1240,7 @@
     if (NEU.diff) NEU.diff.begin(); MAXHP = NEU.diff ? NEU.diff.fpick([12, 9, 6, 5, 4, 3, 1]) : 6; IFRAMES = (dm.IFRAMES || 1.1) * dp('iframes');
     t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; attackWarns.length = 0; attackFrameAcc = 0; keys = {}; dying = 0;
     moveIntent = null; bossHidden = false;
+    seq = null; dim = 0;                   /* VIP-04: no bar/timer/blackout survives a replay */
     if (NEU.poltFx) NEU.poltFx.clear();   /* replay starts with no stale warning */
     bossMax = Math.round(900 * dp('bossHp')); bossHP = bossMax; phase = 1; clone = null; mode = 'fight';
     phaseFlash = 0; phaseFlashes = 0; flashedPhase = 0;
@@ -1201,6 +1277,7 @@
     if (NEU.kernel && NEU.kernel.current() === 'polt') NEU.kernel.pop();
     warnAt = 0; charging = 0; vuln = 0; sig = 0; chargePath = null;
     moveIntent = null; bossHidden = false;
+    seq = null; dim = 0;
     stopRise();
     if (NEU.poltAtk) NEU.poltAtk.reset();
     attackWarns.length = 0;
@@ -1245,6 +1322,14 @@
                get iframe() { return inv; },
                get php() { return hp; },
                get gates() { return PHASE_GATES.slice(); },
+               /* VIP-04 phase-presentation proof surfaces */
+               get names() { return BOSS_NAMES.slice(); },
+               get look() { return PHASE_LOOK[phase]; },
+               get dim() { return dim; },
+               get signatureFrames() { return SIG_FRAMES; },
+               get transition() {
+                 return seq ? { f: seq.f, to: seq.to, stage: seq.stage, dim: dim } : null;
+               },
                /* the player-damage funnel, so tests can drive one hit exactly */
                hit: function (dx, dy) { return hurt(dx, dy); },
                /* Replay tests use the same cooldown and phase checks as a weapon strike. */
@@ -1260,6 +1345,7 @@
                  return { vulnerable: vuln > 0, chargePath: chargePath, sig: sig > 0,
                           attack: NEU.poltAtk ? NEU.poltAtk.current() : null,
                           flashes: phaseFlashes, warns: attackWarns.length, shots: bullets.length,
+                          stage: seq ? seq.stage : 'play', transition: !!seq, dim: dim,
                           hooks: hooks.map(function (h) { return { x: h.x, y: h.y, warn: !!h.warn }; }) };
                },
                /* the shared feel state (core/danmaku.js), for tests */

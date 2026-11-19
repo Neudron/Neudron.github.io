@@ -148,6 +148,41 @@
   ATK.PhantomOrbit = function (st) { return attack(st, 'PhantomOrbit'); };
   ATK.DesperationAttack = function (st) { return attack(st, 'DesperationAttack'); };
 
+  /* ── VIP-04 PhaseTransition ──────────────────────────────────────
+     The two dart rings that play under the blackout. One authority, driven
+     by the boss's transition frame so the visuals and the hitboxes share a
+     clock. Both rings keep a 24f telegraph even under reduced motion. */
+  var TR = { close: 36, kick: 90, dimDone: 90, sigFrames: 360,
+             ring1: { count: 16, gap: 3 }, ring2: { count: 20, gap: 0 } };
+  var trans = null;
+  function transStart(to) { trans = { to: clamp(to | 0, 1, 3), f: 0, sent: 0 }; }
+  function transRing(st, cfg, a, name, speed, doHit) {
+    var shape = { kind: 'ring', x: st.x, y: st.y, a: a,
+      r: D(160, st), spread: 0, len: 0, count: cfg.count, gap: cfg.gap,
+      phase: trans.to, telegraphFrames: TELE_MIN };
+    if (!doHit && A && A.warn) A.warn(shape);
+    else if (A && A.hit) A.hit(shape, name, speed);
+  }
+  function transStep(f, st) {
+    if (!trans) return;
+    var aim = Math.atan2(st.ty - st.y, st.tx - st.x), sp = V(14 * dp('bulletSpeed'), st);
+    /* ring 1: 16 darts, a 3-dart gap centred on the player's bearing */
+    if (f === 0) transRing(st, TR.ring1, aim - 9.5 * TAU / 16, 'PhaseTransition', sp, false);
+    if (f === 24) transRing(st, TR.ring1, aim - 9.5 * TAU / 16, 'PhaseTransition', sp, true);
+    /* ring 2: 20 darts, half a step rotated off ring 1 */
+    if (f === 24) transRing(st, TR.ring2, aim + TAU / 40, 'PhaseTransition', sp, false);
+    if (f === 48) transRing(st, TR.ring2, aim + TAU / 40, 'PhaseTransition', sp, true);
+    trans.f = f; trans.sent = f >= 48 ? 2 : f >= 24 ? 1 : 0;
+    if (f >= TR.kick) trans = null;
+  }
+  function transStats() {
+    return { close: TR.close, kick: TR.kick, dimDone: TR.dimDone,
+             sigFrames: TR.sigFrames,
+             ring1: { count: TR.ring1.count, gap: TR.ring1.gap },
+             ring2: { count: TR.ring2.count, gap: TR.ring2.gap },
+             active: trans ? trans.f : -1 };
+  }
+
   function start(which, sig) {
     phase = clamp(which | 0, 1, 3); index = 0; signature = !!sig;
     current = { name: signature ? 'DesperationAttack' : CYCLES[phase][index], f: 0, p: {} };
@@ -173,7 +208,7 @@
     step: tickFrame,
     phase: function (n) { phase = clamp(n | 0, 1, 3); index = 0; signature = false; current = { name: CYCLES[phase][0], f: 0, p: {} }; },
     signature: function () { start(phase, true); },
-    reset: function () { current = null; index = 0; signature = false; },
+    reset: function () { current = null; index = 0; signature = false; trans = null; },
     cycles: function () { return CYCLES; },
     /* Lead of every attack, in 60 Hz frames. The warn issues at
        events[i]-lead and the hit at events[i]. */
@@ -187,6 +222,8 @@
       return out;
     },
     caps: function () { return CAP; },
+    /* VIP-04: the transition ring authority, stepped by boss-polt's clock. */
+    transition: { start: transStart, step: transStep, stats: transStats },
     records: ATK,
     D: D,
     V: V,
