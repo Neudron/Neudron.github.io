@@ -75,9 +75,9 @@
   if (sayEl) wrap.querySelector('.shop__win').insertBefore(canvas, sayEl);
   var g = canvas.getContext ? canvas.getContext('2d') : null;
   var axeImg = new Image();
-  axeImg.src = 'img/act4/terraria/axe.png';
+  axeImg.src = 'img/act4/original/terraria/axe.png';
   var plantImg = new Image();
-  plantImg.src = 'img/act4/undertale/plant.png';
+  plantImg.src = 'img/act4/original/undertale/plant.png';
 
   var sel = 0;
   var mode = 'main';

@@ -301,7 +301,7 @@
         /* Re-setting src restarts an animated gif from frame one.
            The cache-buster is what forces that; without it the browser
            reuses the decoded image and a looping gif never resets. */
-        img.src = 'img/cat.gif?' + Date.now();
+        img.src = 'img/act4/original/root/cat.gif?' + Date.now();
         box.classList.remove('is-on', 'is-pop');
         void box.offsetWidth;              // reflow, so the animation replays
         box.classList.add('is-on');

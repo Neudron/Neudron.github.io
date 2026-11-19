@@ -401,25 +401,25 @@
     /* Act I (index.html <img>s, sans.js): Undertale spr_sans_d_0 /
        spr_sans_shrug1_0 / spr_sans_sleep_0 trimmed 25x32 -> 23x30, and
        spr_face_sans_0 trimmed 40x40 -> 36x33. img/act123 cap: 400 kB. */
-    sansIdle:  { src: 'img/act123/sans-idle.png',  w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
-    sansShrug: { src: 'img/act123/sans-shrug.png', w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
-    sansSleep: { src: 'img/act123/sans-sleep.png', w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
-    sansFace:  { src: 'img/act123/sans-face.png',  w: 36, h: 33, frames: 1, fw: 36, fh: 33, fps: 0 },
+    sansIdle:  { src: 'img/act4/original/act123/sans-idle.png',  w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
+    sansShrug: { src: 'img/act4/original/act123/sans-shrug.png', w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
+    sansSleep: { src: 'img/act4/original/act123/sans-sleep.png', w: 23, h: 30, frames: 1, fw: 23, fh: 30, fps: 0 },
+    sansFace:  { src: 'img/act4/original/act123/sans-face.png',  w: 36, h: 33, frames: 1, fw: 36, fh: 33, fps: 0 },
     /* Act II (dark.js). YOU: Undertale spr_mainchara{d,u,l,r}, 20x30.
        cols = down, up, left, right; rows = steps (l/r have 2 in the
        game, repeated). Frame comes from distance walked, so fps 0. */
-    youWalk:    { src: 'img/act123/you-walk.png',    w: 80, h: 120, frames: 4, cols: 4, fw: 20, fh: 30, fps: 0 },
+    youWalk:    { src: 'img/act4/original/act123/you-walk.png',    w: 80, h: 120, frames: 4, cols: 4, fw: 20, fh: 30, fps: 0 },
     /* Deltarune ch1 bg_darkdoor_open floor (40x40 crop, tiles),
        ch2 spr_shortcut_door, ch1 bg_darktiles1 hole + pebbles. */
-    darkFloor:  { src: 'img/act123/dark-floor.png',  w: 40, h: 40,  frames: 1, fw: 40, fh: 40, fps: 0 },
-    darkDoor:   { src: 'img/act123/dark-door.png',   w: 36, h: 52,  frames: 1, fw: 36, fh: 52, fps: 0 },
-    darkDebris: { src: 'img/act123/dark-debris.png', w: 40, h: 72,  frames: 2, fw: 40, fh: 36, fps: 0 },
+    darkFloor:  { src: 'img/act4/original/act123/dark-floor.png',  w: 40, h: 40,  frames: 1, fw: 40, fh: 40, fps: 0 },
+    darkDoor:   { src: 'img/act4/original/act123/dark-door.png',   w: 36, h: 52,  frames: 1, fw: 36, fh: 52, fps: 0 },
+    darkDebris: { src: 'img/act4/original/act123/dark-debris.png', w: 40, h: 72,  frames: 2, fw: 40, fh: 36, fps: 0 },
     /* Act III sleep room (index.html <img>s, game.css rug): the floor
        lamp cut from bg_sansroom, spr_bookshelf, and bg_sansroom's
        7x10 carpet repeat. */
-    sleepLamp:  { src: 'img/act123/sleep-lamp.png',  w: 17, h: 43,  frames: 1, fw: 17, fh: 43, fps: 0 },
-    sleepShelf: { src: 'img/act123/sleep-shelf.png', w: 52, h: 57,  frames: 1, fw: 52, fh: 57, fps: 0 },
-    sleepRug:   { src: 'img/act123/sleep-rug.png',   w: 7,  h: 10,  frames: 1, fw: 7,  fh: 10, fps: 0 },
+    sleepLamp:  { src: 'img/act4/original/act123/sleep-lamp.png',  w: 17, h: 43,  frames: 1, fw: 17, fh: 43, fps: 0 },
+    sleepShelf: { src: 'img/act4/original/act123/sleep-shelf.png', w: 52, h: 57,  frames: 1, fw: 52, fh: 57, fps: 0 },
+    sleepRug:   { src: 'img/act4/original/act123/sleep-rug.png',   w: 7,  h: 10,  frames: 1, fw: 7,  fh: 10, fps: 0 },
 
     /* Gigapack bursts (unTied, attribution) — one-shot strips for boss
        impacts and the finale, re-sliced from the pack's horizontal rows

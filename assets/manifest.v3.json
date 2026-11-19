@@ -4,9 +4,10 @@
   "status": "RIGHTS_PENDING",
   "rights_note": "Non-commercial fan project. No rightsholder licence or redistribution right is claimed for franchise art; these folders are rights-review queues, not evidence of permission. Availability online is not a licence; screenshots and search hits are research links, not permission. Prior rights correction is preserved: no set below is CLEARED.",
   "dist_rights_policy": {
-    "excluded_prefixes": ["img/act4/calamity/", "img/act4/terraria/", "img/act4/deltarune/", "img/act4/undertale/", "img/act4/tiles/", "img/act4/vfx/"],
+    "excluded_prefixes": ["img/act4/calamity/", "img/act4/terraria/", "img/act4/deltarune/", "img/act4/undertale/", "img/act4/tiles/", "img/act4/vfx/", "img/act123/"],
+    "excluded_files": ["img/act4/witch-face.png", "img/Sans_sprite.webp", "img/totem.webp", "img/annoying-dog.gif", "img/cat.gif"],
     "shipped_prefix": "img/act4/original/",
-    "note": "Rights queues stay in source only. scripts/build.mjs excludes them from dist and scripts/verify-dist.mjs fails if any queue path or file enters. Generated originals ship in their place."
+    "note": "All rights-pending art stays in source only: six Act IV queues, img/act123/, the witch crop and four root franchise images. scripts/build.mjs excludes every path above from dist and repoints unowned HTML/CSS URLs; scripts/verify-dist.mjs fails on any rights-pending file or path string in dist. Generated originals under img/act4/original/ are the only replacements and ship."
   },
   "tag_vocabulary": ["APPROVED", "RIGHTS_PENDING", "GENERATED_UNREVIEWED", "REJECTED"],
   "fields": [
@@ -34,16 +35,16 @@
     {
       "id": "generated-originals",
       "prefix": "img/act4/original/",
-      "files": 159,
-      "author": "Original pixel-art replacements generated in-repo for this site (W9/WB art generators)",
+      "files": 175,
+      "author": "Original pixel-art replacements generated in-repo for this site (scripts/v3/gen-art/{calamity,duo,terraria,vfx,wire}.mjs)",
       "source_url": null,
       "license": null,
-      "use_terms": "Original work generated for this site; no third-party rightsholder licence is claimed. Owner-directed replacement for the six rights queues below. Not human-art-reviewed.",
-      "modification": "Deterministic regeneration at the exact source filenames, dimensions and frame grids; 159 files mirror the queues 1:1.",
+      "use_terms": "Original work generated for this site; no third-party rightsholder licence is claimed. Owner-directed replacement for all rights-pending image art. Not human-art-reviewed.",
+      "modification": "Deterministic regeneration at the source basenames and pixel dimensions: 159 Act IV queue mirrors plus 11 img/act123/ PNGs, witch-face.png and four root franchise images (WebP/GIF frames encoded bitexactly from generated PNG rasters).",
       "attribution": "Generated under img/act4/original/; no external asset licence.",
       "redistribution": "Ships in dist/ as the Act IV art.",
-      "dimensions": "per-file, identical to the corresponding rights-queue source",
-      "frame_count": "per-file, identical to the corresponding rights-queue source",
+      "dimensions": "per-file, identical to the corresponding rights-pending source (PNG/WebP/GIF headers read programmatically)",
+      "frame_count": "Act IV sheets and animated WebP/GIF replacements match the source frame count; still sprites are single frame",
       "pivot": null,
       "status": "GENERATED_UNREVIEWED",
       "dist": "shipped",
@@ -176,30 +177,32 @@
   ],
   "audit": {
     "date": "2026-11-19",
-    "work_order": "W9-ASSETS",
+    "work_order": "W9-ASSETS / WB-ARTWIRE",
     "method": "Truthful audit of tracked, shipped dependencies. Availability online is not a licence; screenshots and search hits are research links, not permission. No licence or approval invented. Unknown dimensions, pivots and frame counts recorded as null, not guessed.",
     "tag_counts": {
       "APPROVED": 0,
       "RIGHTS_PENDING": 7,
       "GENERATED_UNREVIEWED": 1,
       "REJECTED": 0,
-      "unit": "manifest group (8 groups: 159 generated originals + 165 tracked rights/audio files)"
+      "unit": "manifest group (8 groups: 175 generated originals + 165 tracked rights/audio files)"
     },
-    "generated_assets": "159 original PNGs generated under img/act4/original/{calamity,terraria,deltarune,undertale,tiles,vfx}/, mirrored 1:1 by filename with identical PNG dimensions. They replace the six rights queues at runtime and ship in dist/.",
-    "dist_shipping": "FIXED: scripts/build.mjs skips the six img/act4 rights queues when copying tracked assets; scripts/verify-dist.mjs fails if any queue file or queue path string enters dist/. Originals under img/act4/original/ are allowed and ship. Out-of-scope rights-pending items (img/act123/, img/act4/witch-face.png, root img/ franchise files) still ship and need owner decision; no original replacements exist for them.",
+    "generated_assets": "175 originals under img/act4/original/: 159 PNG mirrors of the six Act IV queues plus 11 img/act123/ PNGs, witch-face.png and four root WebP/GIF images, generated by scripts/v3/gen-art/{calamity,duo,terraria,vfx,wire}.mjs at the source basenames, dimensions, frame counts and transparency. Byte-identical on repeated generation. All are GENERATED_UNREVIEWED, never CLEARED.",
+    "dist_shipping": "ZERO rights-pending art in dist. scripts/build.mjs excludes all six Act IV queues, img/act123/, witch-face.png and the four root franchise files, and repoints unowned HTML/CSS URLs to generated originals; scripts/verify-dist.mjs fails on any rights-pending file or path string in dist and requires the generated replacements. The source queues remain on GitHub as rights-review material only.",
     "must_replace_before_release": [
-      "img/act4/calamity/ (59)",
-      "img/act4/terraria/ (42)",
-      "img/act4/deltarune/ (19)",
-      "img/act4/undertale/ (7) and img/act123/ (11)",
-      "img/act4/tiles/ (6)",
-      "img/act4/vfx/ (26) until exact public source URL and terms sign-off",
-      "img/act4/witch-face.png (TownNPC witch crop)"
+      "img/act4/calamity/ (59) — replaced and excluded",
+      "img/act4/terraria/ (42) — replaced and excluded",
+      "img/act4/deltarune/ (19) — replaced and excluded",
+      "img/act4/undertale/ (7) — replaced and excluded",
+      "img/act123/ (11) — replaced and excluded",
+      "img/act4/tiles/ (6) — replaced and excluded",
+      "img/act4/vfx/ (26) — replaced and excluded",
+      "img/act4/witch-face.png (TownNPC witch crop) — replaced and excluded",
+      "img/Sans_sprite.webp, img/totem.webp, img/annoying-dog.gif, img/cat.gif — replaced and excluded"
     ],
     "coverage_gaps": [
-      "Root img/ files (Sans_sprite.webp, totem.webp, annoying-dog.gif, cat.gif and site-authored SVGs) are shipped but are not rows in this manifest or CREDITS.md; attribution not audited.",
-      "Exact source URLs unknown for Terraria HD pack, Undertale/Deltarune rips, VFX packs and tiles -> null, not guessed.",
-      "Per-file pivot/palette/alpha not recorded anywhere; per-file w/h/frames only in img/act4/sheets.json."
+      "Human art review is still outstanding for all 175 generated originals. Status stays GENERATED_UNREVIEWED; owner approves art before release.",
+      "Exact source URLs unknown for Terraria HD pack, Undertale/Deltarune rips, VFX packs and tiles -> null, not guessed. These source files stay out of dist.",
+      "Per-file pivot/palette not recorded anywhere; per-file w/h/frames only in img/act4/sheets.json. Site-authored root SVGs are not rights-pending and still ship."
     ]
   },
   "prompts_ref": "plans/neu-v3/IMAGE_PROMPTS.md"

@@ -640,15 +640,15 @@
   var SH = NEU.sheets || {};
   function shSrc(k) { return SH[k] ? SH[k].src : ''; }
   var sansImg = btn.querySelector('img');
-  var FACE = { sans: 'img/Sans_sprite.webp', dog: 'img/annoying-dog.gif', tv: 'img/tv.svg',
-               witch: 'img/act4/witch-face.png',
+  var FACE = { sans: 'img/act4/original/root/Sans_sprite.webp', dog: 'img/act4/original/root/annoying-dog.gif', tv: 'img/tv.svg',
+               witch: 'img/act4/original/witch-face.png',
                /* real mod filenames — HoodlessHeadIcon/HoodedHeadIcon from
                   NPCs/SupremeCalamitas/, see js/data/sheets.js scalFace* */
-               scal: 'img/act4/calamity/HoodlessHeadIcon.png',
-               scalHood: 'img/act4/calamity/HoodedHeadIcon.png',
+               scal: 'img/act4/original/calamity/HoodlessHeadIcon.png',
+               scalHood: 'img/act4/original/calamity/HoodedHeadIcon.png',
                /* the mushroom's cap, sitting: one 28x35 cell of the dance sheet,
                   cropped to the head by the .is-mush recipe below */
-               mush: 'img/act4/undertale/mushroom-dance.png' };
+               mush: 'img/act4/original/undertale/mushroom-dance.png' };
 
   /* No face in FACE hides the portrait; it used to keep the previous
      speaker's, which is how narration and the witch wore Sans's. */
@@ -862,7 +862,7 @@
     if (!pop || !popImg) return;
     clearTimeout(popT);
     pop.classList.remove('is-pop');
-    popImg.src = 'img/totem.webp?' + Date.now();
+    popImg.src = 'img/act4/original/root/totem.webp?' + Date.now();
     void pop.offsetWidth;
     var a = Math.random() * Math.PI * 2;
     pop.style.setProperty('--tx', (Math.cos(a) * 30).toFixed(1) + 'px');
