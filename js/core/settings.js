@@ -180,7 +180,12 @@
   /* A range, not a mute switch plus a level. Zero IS the mute, and one
      control that goes to zero is one thing to find rather than two
      that can disagree with each other. */
-  function slider(id, label, hint, get, set_, after) {
+  function slider(id, label, hint, get, set_, after, cfg) {
+    cfg = cfg || {};
+    var lo = cfg.min === undefined ? 0 : cfg.min;
+    var hi = cfg.max === undefined ? 100 : cfg.max;
+    var st = cfg.step === undefined ? 5 : cfg.step;
+    var fmt = cfg.text || function (v) { return +v === 0 ? 'off' : v + '%'; };
     var r = document.createElement('div');
     r.className = 'sett__row';
 
@@ -211,12 +216,12 @@
     rg.className = 'sett__rng';
     rg.id = id;
     rg.type = 'range';
-    rg.min = '0'; rg.max = '100'; rg.step = '5';
+    rg.min = String(lo); rg.max = String(hi); rg.step = String(st);
     rg.value = String(get());
     rg.setAttribute('aria-labelledby', l.id);
     /* not called label(): a function declaration would shadow the
        label PARAMETER above and print its own source as the row name */
-    function vtext() { rg.setAttribute('aria-valuetext', +rg.value === 0 ? 'off' : rg.value + '%'); }
+    function vtext() { rg.setAttribute('aria-valuetext', fmt(+rg.value)); }
     function push() { set_(+rg.value); vtext(); }
     rg.addEventListener('input', push);
     rg.addEventListener('change', function () { push(); if (after) after(+rg.value); });
@@ -232,6 +237,26 @@
     r.appendChild(dots);
     r.appendChild(wrap);
     return r;
+  }
+
+  /* The one-line tier description belongs to menu.js, which owns the
+     tier picker. settings.js loads first, so read it only when the panel
+     is drawn or the slider moves — by then the menu has been built. */
+  function diffFx(v) {
+    var id = NEU.diff && NEU.diff.list ? NEU.diff.list()[v] : null;
+    if (id && NEU.menu && NEU.menu.effect) return NEU.menu.effect(id);
+    return NEU.diff && NEU.diff.name ? NEU.diff.name(v) :
+      'changes how hard the fights press you.';
+  }
+
+  function paintDiff(v) {
+    var rg = document.getElementById('settDiff');
+    var fx = document.getElementById('settDiffFx');
+    if (rg && v !== undefined) {
+      rg.value = String(v);
+      rg.setAttribute('aria-valuetext', NEU.diff && NEU.diff.name ? NEU.diff.name(v) : String(v));
+    }
+    if (fx) fx.textContent = diffFx(v === undefined ? (NEU.diff ? NEU.diff.index() : 2) : v);
   }
 
   /* Three choices, one of them picked: a radiogroup of buttons, arrow
@@ -487,6 +512,26 @@
 
     /* 1. Config pane */
     var pConfig = panes.config;
+
+    /* Seven tiers, the same list diff.js owns. NEU.diff.set writes the
+       opt_diff flag immediately; fights sample it on entry and retry.
+       First in the pane: at 720p the rest scrolls, this one does not. */
+    var diffRow = slider('settDiff', 'difficulty',
+        'how hard the fights press you. takes effect on the next fight.',
+        function () { return NEU.diff ? NEU.diff.index() : 2; },
+        function (v) {
+          if (NEU.diff && NEU.diff.list) NEU.diff.set(NEU.diff.list()[v]);
+          paintDiff(v);
+        }, null,
+        { min: 0, max: 6, step: 1,
+          text: function (v) { return NEU.diff && NEU.diff.name ? NEU.diff.name(v) : String(v); } });
+    var fx = document.createElement('small');
+    fx.className = 'sett__fx';
+    fx.id = 'settDiffFx';
+    fx.setAttribute('aria-live', 'polite');
+    diffRow.querySelector('.sett__lbl').appendChild(fx);
+    pConfig.appendChild(diffRow);
+
     pConfig.appendChild(seg('settMotion', 'motion',
         'calm keeps things still unless you move them. the game works either way.',
         [['auto', 'device'], ['full', 'full'], ['reduced', 'calm']],
@@ -676,6 +721,7 @@
       var g = document.getElementById(id);
       if (g && g._paint) g._paint();
     });
+    paintDiff();
   }
 
   /* The panel's focusables. Disabled ones are skipped: a trap that wraps
