@@ -120,6 +120,7 @@ function encode(s, withAlpha = true) {
     for (let x = 0; x < s.w; x++) {
       const a = (y * s.w + x) << 2, b = row + 1 + x * bpp;
       raw[b] = s.d[a]; raw[b + 1] = s.d[a + 1]; raw[b + 2] = s.d[a + 2];
+      if (withAlpha) raw[b + 3] = s.d[a + 3];
     }
   }
   return Buffer.concat([
@@ -341,9 +342,20 @@ const ANIM = [
   { file: 'root/cat.gif', w: 220, h: 216, frames: 44, fps: 8, kind: 'gif', draw: cat, opaque: true }
 ];
 
+/* Test seam: rebuild one frame without running the emitter. */
+export function surfaceFor(rel, frame) {
+  const p = PNG.find((x) => x[0] === rel);
+  if (p) { const s = surface(p[1], p[2]); p[3](s); return s; }
+  const a = ANIM.find((x) => x.file === rel);
+  if (a) { const s = surface(a.w, a.h); a.draw(s, frame || 0); return s; }
+  return null;
+}
+
 /* These two source PNGs have no tRNS and no alpha channel; mirror that. */
 const OPAQUE = ['act123/dark-floor.png', 'act123/sleep-rug.png'];
 
+const isMain = !!process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
 fs.mkdirSync(OUT, { recursive: true });
 for (const [rel, w, h, draw] of PNG) {
   const s = surface(w, h);
@@ -380,3 +392,4 @@ try {
   fs.rmSync(TMP, { recursive: true, force: true });
 }
 console.log('wrote ' + (PNG.length + ANIM.length) + ' original replacements to ' + OUT);
+}
