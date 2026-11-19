@@ -94,7 +94,10 @@
         var n = 0, tot = 0;
         for (var k = 0; k < STEPS.length; k++)
           if (groupFor(k) === g) { tot++; if (done[STEPS[k].id]) n++; }
-        hd.textContent = g + '  ' + n + '/' + tot;
+        if (NEU.glyph) {
+          NEU.glyph.put(hd, g === GROUPS[0] ? 'sword' : g === GROUPS[1] ? 'lamp' : g === GROUPS[2] ? 'deck' : 'map', g);
+          hd.appendChild(document.createTextNode('  ' + n + '/' + tot));
+        } else hd.textContent = g + '  ' + n + '/' + tot;
         list.appendChild(hd);
       }
       var s = STEPS[i], li = document.createElement('li');
@@ -105,8 +108,9 @@
       mark.textContent = on ? '×' : '·';   // × / ·
       var label = document.createElement('span');
       var txt = vis ? s.text : '???';
-      if (vis && s.count) txt += '  (' + (counts[s.id] || 0) + '/' + s.count + ')';
-      label.textContent = txt;
+      if (NEU.glyph) NEU.glyph.put(label, vis ? NEU.glyph.quest(s.id) : 'lock', txt);
+      else label.textContent = txt;
+      if (vis && s.count) label.appendChild(document.createTextNode('  (' + (counts[s.id] || 0) + '/' + s.count + ')'));
       li.appendChild(mark); li.appendChild(label);
       list.appendChild(li);
     }
@@ -170,6 +174,7 @@
     },
     open: function () {
       if (locked || !panel) return;
+      render();
       panel.classList.add('is-open');
       if (toggle) toggle.setAttribute('aria-expanded', 'true');
     },

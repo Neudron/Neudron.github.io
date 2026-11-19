@@ -2393,7 +2393,10 @@
     var pct = charge();
     if (docked)          tvLbl.textContent = 'playing';
     else if (!hasConsole) tvLbl.textContent = switchSeen ? 'empty dock' : 'dock';
-    else if (pct >= 100) tvLbl.textContent = 'dock it';
+    else if (pct >= 100) {
+      if (NEU.glyph) NEU.glyph.put(tvLbl, 'dock', 'dock it');
+      else tvLbl.textContent = 'dock it';
+    }
     else                 tvLbl.textContent = pct + '% — flat';
     if (tvEl) tvEl.classList.toggle('is-ready', !docked && hasConsole && pct >= 100);
     /* The chip carries the charge with it, so the thing in your hands
