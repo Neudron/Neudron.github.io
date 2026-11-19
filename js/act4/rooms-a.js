@@ -536,31 +536,39 @@
     }
   };
 
-  function mergeWoods() {
-    var rows = [], source = [
-      { room: A1, x: 0, y: 0, x0: 0, x1: 22 },
-      { room: A2, x: 22, y: 4, x0: 1, x1: 24 },
-      { room: A3, x: 46, y: 4, x0: 1, x1: 23 }
-    ];
-    var y, i, j, grid, start, end;
-    for (y = 0; y < 16; y++) rows[y] = Array(70 + 1).join('#');
-    for (i = 0; i < source.length; i++) {
-      grid = source[i].room.tiles.split('\n');
-      for (j = 0; j < grid.length; j++) {
-        y = source[i].y + j;
-        if (y >= rows.length) continue;
-        start = source[i].x + source[i].x0;
-        end = start + source[i].x1 - source[i].x0 + 1;
-        rows[y] = rows[y].substring(0, start) + grid[j].substring(source[i].x0, source[i].x1 + 1) + rows[y].substring(end);
+  /* E.merge (engine.js) builds a_woods' tiles, spawns, areas and aliases.
+     Each source room is cropped to x0..x1 at (x, y), rows past 16 are
+     clipped, and the A2/A3 seam's floor turns to path ('~'). Spawns are
+     in a_woods coordinates. Entities stay a live getter below: A1's own
+     list changes with save flags (the crack, the figure), so a copy taken
+     once at load would go stale. */
+  var WOODS_SEAM = [46, 47, 48, 46, 45, 47, 48, 46, 47, 45, 46, 48];   // rows 4..15, x 45..50
+  var WOODS_SRC = [
+    { id: 'a1_clearing', room: A1, x: 0, y: 0, x0: 0, x1: 22, spawn: 'a1_default',
+      spawns: { a1_default: { x: 10, y: 7, face: 'right' }, a1_north: { x: 10, y: 3, face: 'down' }, a1_east: { x: 22, y: 7, face: 'left' },
+                from_wex_woods_01: { x: 10, y: 2, face: 'down' } },
+      spawnMap: { default: 'a1_default', north: 'a1_north', east: 'a1_east' } },
+    { id: 'a2_path', room: A2, x: 22, y: 4, x0: 1, x1: 24, spawn: 'a2_west',
+      spawns: { a2_west: { x: 23, y: 7, face: 'right' }, a2_east: { x: 46, y: 11, face: 'left' } },
+      spawnMap: { west: 'a2_west', east: 'a2_east' } },
+    { id: 'a3_fork', room: A3, x: 46, y: 4, x0: 1, x1: 23, spawn: 'a3_west',
+      spawns: { a3_west: { x: 47, y: 11, face: 'right' }, castle: { x: 56, y: 6, face: 'down' }, altar: { x: 68, y: 11, face: 'left' } },
+      spawnMap: { west: 'a3_west', castle: 'castle', altar: 'altar' } }
+  ];
+  function woodsArea(s) {
+    var g = s.room.tiles.split('\n').slice(0, 16 - s.y), rows = [], spawns = {}, j, i, y, wx, ch, k, ox = s.x + s.x0;
+    for (j = 0; j < g.length; j++) {
+      y = s.y + j; ch = g[j].substring(s.x0, s.x1 + 1).split('');
+      for (i = 0; i < ch.length; i++) {
+        wx = ox + i;
+        if (y >= 4 && wx >= 45 && wx <= 50 && ch[i] === '.' && wx <= WOODS_SEAM[y - 4]) ch[i] = '~';
       }
+      rows.push(ch.join(''));
     }
-    var seam = [46, 47, 48, 46, 45, 47, 48, 46, 47, 45, 46, 48], chars;
-    for (y = 4; y <= 15; y++) {
-      chars = rows[y].split('');
-      for (i = 45; i <= 50; i++) if (chars[i] === '.' && i <= seam[y - 4]) chars[i] = '~';
-      rows[y] = chars.join('');
-    }
-    return rows.join('\n');
+    for (k in s.spawns) spawns[k] = { x: s.spawns[k].x - ox, y: s.spawns[k].y - s.y, face: s.spawns[k].face };
+    var def = { id: s.id, x: ox, y: s.y, tiles: rows.join('\n'), spawns: spawns, spawn: s.spawn, spawnMap: s.spawnMap };
+    if (s.room.onEnter) def.onEnter = s.room.onEnter;
+    return def;
   }
   function mergeWoodsEntities(room, id, dx, dy) {
     var entities = room.entities || [], out = [], i, e, copy;
@@ -582,35 +590,20 @@
   function mergeMist(room, dx, dy, x0, x1) {
     return room.mist.map(function (y) { return { y: dy + y, x0: dx + x0, x1: dx + x1 }; });
   }
-  E.register('a_woods', {
-    tileset: 'woods', tiles: mergeWoods(),
+  var WOODS = E.merge('a_woods', WOODS_SRC.map(woodsArea), { tileset: 'woods', extra: {
     beams: mergeBeams(A1, 0, 0).concat(mergeBeams(A2, 22, 4), mergeBeams(A3, 46, 4)),
-    mist: mergeMist(A1, 0, 0, 0, 22).concat(mergeMist(A2, 22, 4, 1, 24), mergeMist(A3, 46, 4, 1, 23)),
-    spawns: {
-      a1_default: { x: 10, y: 7, face: 'right' }, a1_north: { x: 10, y: 3, face: 'down' }, a1_east: { x: 22, y: 7, face: 'left' },
-      a2_west: { x: 23, y: 7, face: 'right' }, a2_east: { x: 46, y: 11, face: 'left' },
-      a3_west: { x: 47, y: 11, face: 'right' }, castle: { x: 56, y: 6, face: 'down' }, altar: { x: 68, y: 11, face: 'left' },
-      from_wex_woods_01: { x: 10, y: 2, face: 'down' }
-    },
-    areas: [
-      { id: 'a1_clearing', x0: 0, y0: 0, x1: 22, y1: 12, spawn: 'a1_default', onEnter: A1.onEnter },
-      { id: 'a2_path', x0: 23, y0: 4, x1: 46, y1: 14, spawn: 'a2_west' },
-      { id: 'a3_fork', x0: 47, y0: 4, x1: 69, y1: 15, spawn: 'a3_west', onEnter: A3.onEnter }
-    ],
-    get entities() {
-      var out = woodsLook(16)
-        .concat(mergeWoodsEntities(A1, 'a1_clearing', 0, 0), mergeWoodsEntities(A2, 'a2_path', 22, 4), mergeWoodsEntities(A3, 'a3_fork', 46, 4));
-      out.push(P('oak', 20, 6, { big: 1, rx: 18, solid: true }), P('oak', 25, 8, { big: 1, rx: 18, solid: true }), P('oak', 44, 10, { big: 1, rx: 18, solid: true }), P('oak', 47, 6, { big: 1, solid: true }), P('oak', 49, 12, { big: 1, rx: 18, solid: true }));
-      out.push({ t: 'exit', x: 10, y: 1, to: 'wex_woods_01', spawn: 'from_forest_trail', style: 'tunnel' });
-      if (NEU.save && (NEU.save.has('mush1') || NEU.save.flagged('gone:a2_path:mush1'))) {
-        return out.filter(function (e) { return e.mush !== 'mush1'; });
-      }
-      return out;
+    mist: mergeMist(A1, 0, 0, 0, 22).concat(mergeMist(A2, 22, 4, 1, 24), mergeMist(A3, 46, 4, 1, 23))
+  } });
+  Object.defineProperty(WOODS, 'entities', { enumerable: true, configurable: true, get: function () {
+    var out = woodsLook(16)
+      .concat(mergeWoodsEntities(A1, 'a1_clearing', 0, 0), mergeWoodsEntities(A2, 'a2_path', 22, 4), mergeWoodsEntities(A3, 'a3_fork', 46, 4));
+    out.push(P('oak', 20, 6, { big: 1, rx: 18, solid: true }), P('oak', 25, 8, { big: 1, rx: 18, solid: true }), P('oak', 44, 10, { big: 1, rx: 18, solid: true }), P('oak', 47, 6, { big: 1, solid: true }), P('oak', 49, 12, { big: 1, rx: 18, solid: true }));
+    out.push({ t: 'exit', x: 10, y: 1, to: 'wex_woods_01', spawn: 'from_forest_trail', style: 'tunnel' });
+    if (NEU.save && (NEU.save.has('mush1') || NEU.save.flagged('gone:a2_path:mush1'))) {
+      return out.filter(function (e) { return e.mush !== 'mush1'; });
     }
-  });
-  E.alias('a1_clearing', 'a_woods', { default: 'a1_default', north: 'a1_north', east: 'a1_east' }, 'a1_clearing');
-  E.alias('a2_path', 'a_woods', { west: 'a2_west', east: 'a2_east' }, 'a2_path');
-  E.alias('a3_fork', 'a_woods', { west: 'a3_west', castle: 'castle', altar: 'altar' }, 'a3_fork');
+    return out;
+  } });
 
   /* ── the castle's look ─────────────────────────────────────────────
      Same contract as the woods: one `castlefloor` (js/act4/look-castle.js

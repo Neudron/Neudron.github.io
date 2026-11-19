@@ -396,65 +396,48 @@
      id is an alias into d_city with its own area. A copied entity keeps
      its old room and cell in `origin`, so gone:… flags saved before the
      merge still match. */
+  /* E.merge (engine.js) builds the room and the aliases; each source is
+     cropped to x0..x1 here. Spawns are in d_city coordinates; every old
+     id keeps the spawns it declared and its 0..13 area rect. */
   var CITY_SRC = [
-    { id: 'd1_street', room: D1, dx: 0, dy: 1, x0: 0, x1: 24 },
-    { id: 'd2_alley', room: D2, dx: 24, dy: 2, x0: 1, x1: 18 },
-    { id: 'd3_square', room: D3, dx: 42, dy: 0, x0: 1, x1: 24 }
+    { id: 'd1_street', room: D1, dx: 0, dy: 1, x0: 0, x1: 24, spawn: 'fire',
+      spawns: { fire: { x: 1, y: 8, face: 'right' }, stall: { x: 10, y: 7, face: 'up' }, portal: { x: 6, y: 4, face: 'down' },
+                from_wex_city_01: { x: 22, y: 4, face: 'down' } },
+      spawnMap: { fire: 'fire', stall: 'stall', portal: 'portal', east: 'alley_west' } },
+    { id: 'd2_alley', room: D2, dx: 24, dy: 2, x0: 1, x1: 18, spawn: 'alley_west',
+      spawns: { alley_west: { x: 25, y: 8, face: 'right' }, garage: { x: 34, y: 5, face: 'up' }, alley_east: { x: 42, y: 7, face: 'left' } },
+      spawnMap: { west: 'alley_west', east: 'alley_east', garage: 'garage' } },
+    { id: 'd3_square', room: D3, dx: 42, dy: 0, x0: 1, x1: 24, spawn: 'square_west',
+      spawns: { square_west: { x: 43, y: 7, face: 'right' }, north: { x: 54, y: 10, face: 'down' } },
+      spawnMap: { west: 'square_west', north: 'north' } }
   ];
   var CITY_IDS = ['d1_street', 'd2_alley', 'd3_square'];
-  function mergeCityTiles() {
-    var rows = [], x, y, i, j, s, g;
-    for (y = 0; y < 14; y++) { rows.push([]); for (x = 0; x < 67; x++) rows[y].push('#'); }
-    for (i = 0; i < CITY_SRC.length; i++) {
-      s = CITY_SRC[i]; g = s.room.tiles.split('\n');
-      for (j = 0; j < g.length; j++)
-        for (x = s.x0; x <= s.x1; x++) rows[j + s.dy][x + s.dx] = g[j].charAt(x);
+  function cityArea(s) {
+    var g = s.room.tiles.split('\n'), rows = [], ents = [], spawns = {}, x, y, j, row, e, copy, key, ox = s.dx + s.x0;
+    for (j = 0; j < g.length; j++) {
+      y = j + s.dy; row = '';
+      /* the alley's west and east walls: shut, except at the seams (24,8)-(25,8) and (42,7)-(43,7) */
+      for (x = s.x0; x <= s.x1; x++)
+        row += (x + s.dx === 25 && y !== 8) || (x + s.dx === 42 && y !== 7) ? '#' : g[j].charAt(x);
+      rows.push(row);
     }
-    /* the alley's west and east walls: shut, except at the seams (24,8)-(25,8) and (42,7)-(43,7) */
-    for (y = 0; y < 14; y++) {
-      if (y !== 8) rows[y][25] = '#';
-      if (y !== 7) rows[y][42] = '#';
+    for (j = 0; j < s.room.entities.length; j++) {
+      e = s.room.entities[j];
+      if (e.t === 'cityfloor' || (e.t === 'exit' && CITY_IDS.indexOf(e.to) >= 0)) continue;
+      copy = {};
+      for (key in e) copy[key] = e[key];
+      copy.origin = { room: s.id, x: e.x, y: e.y };
+      copy.x = e.x - s.x0;   // merge adds the area offset (dx + x0)
+      ents.push(copy);
     }
-    return rows.map(function (r) { return r.join(''); }).join('\n');
-  }
-  function mergeCityEntities() {
-    var out = [], i, k, s, es, e, copy, key;
-    for (i = 0; i < CITY_SRC.length; i++) {
-      s = CITY_SRC[i]; es = s.room.entities;
-      for (k = 0; k < es.length; k++) {
-        e = es[k];
-        if (e.t === 'cityfloor' || (e.t === 'exit' && CITY_IDS.indexOf(e.to) >= 0)) continue;
-        copy = {};
-        for (key in e) copy[key] = e[key];
-        copy.origin = { room: s.id, x: e.x, y: e.y };
-        copy.x = e.x + s.dx; copy.y = e.y + s.dy;
-        out.push(copy);
-      }
-    }
-    return out;
+    for (key in s.spawns) spawns[key] = { x: s.spawns[key].x - ox, y: s.spawns[key].y - s.dy, face: s.spawns[key].face };
+    return { id: s.id, x: ox, y: s.dy, tiles: rows.join('\n'), spawns: spawns, spawn: s.spawn, spawnMap: s.spawnMap,
+             onEnter: s.room.onEnter, entities: ents, area: { y0: 0, y1: 13 } };
   }
 
-  E.register('d_city', {
-    tileset: 'city',
-    tiles: mergeCityTiles(),
-    spawns: {
-      fire: { x: 1, y: 8, face: 'right' }, stall: { x: 10, y: 7, face: 'up' }, portal: { x: 6, y: 4, face: 'down' },
-      alley_west: { x: 25, y: 8, face: 'right' }, garage: { x: 34, y: 5, face: 'up' }, alley_east: { x: 42, y: 7, face: 'left' },
-      square_west: { x: 43, y: 7, face: 'right' }, north: { x: 54, y: 10, face: 'down' },
-      from_wex_city_01: { x: 22, y: 4, face: 'down' }
-    },
-    areas: [
-      { id: 'd1_street', x0: 0, y0: 0, x1: 24, y1: 13, spawn: 'fire', onEnter: D1.onEnter },
-      { id: 'd2_alley', x0: 25, y0: 0, x1: 42, y1: 13, spawn: 'alley_west' },
-      { id: 'd3_square', x0: 43, y0: 0, x1: 66, y1: 13, spawn: 'square_west', onEnter: D3.onEnter }
-    ],
-    entities: [{ t: 'cityfloor', v: 'd_city', x: 0, y: 0 }].concat(mergeCityEntities())
-      .concat([{ t: 'exit', x: 22, y: 3, to: 'wex_city_01', spawn: 'from_city_street', style: 'door' }])
-  });
-  /* every spawn an old id declared is listed, as a_woods lists its own */
-  E.alias('d1_street', 'd_city', { fire: 'fire', stall: 'stall', portal: 'portal', east: 'alley_west' }, 'd1_street');
-  E.alias('d2_alley', 'd_city', { west: 'alley_west', east: 'alley_east', garage: 'garage' }, 'd2_alley');
-  E.alias('d3_square', 'd_city', { west: 'square_west', north: 'north' }, 'd3_square');
+  var CITY = E.merge('d_city', CITY_SRC.map(cityArea), { tileset: 'city' });
+  CITY.entities = [{ t: 'cityfloor', v: 'd_city', x: 0, y: 0 }].concat(CITY.entities)
+    .concat([{ t: 'exit', x: 22, y: 3, to: 'wex_city_01', spawn: 'from_city_street', style: 'door' }]);
 
   function drink(c) {
     if (!c.has('recall')) {
