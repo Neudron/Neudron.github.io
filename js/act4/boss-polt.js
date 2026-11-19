@@ -52,8 +52,20 @@
   var PHASE_GATES = [1, 0.65, 0.35];
   var VULN_COL = '#FFC46A';            /* same gold as her VULNERABLE banner */
   var REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  /* VIP-01: the device query is only an initial value. The shared motion
+     store is authority at runtime, so flipping the in-game switch (or the
+     OS setting) mid-fight takes effect on the very next frame. */
+  function liveReduced() {
+    if (NEU.juice && typeof NEU.juice.reduced === 'boolean') return NEU.juice.reduced;
+    if (NEU.motion && NEU.motion.reduced) return !!NEU.motion.reduced();
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
   /* PLAN 9.5: the boss reads at 2x so his legs and hooks are legible. */
   var BOSS_SCALE = 2;
+  /* VIP-03: every new VFX colour comes from the fight palette in polt-fx. */
+  var PAL = (NEU.poltFx && NEU.poltFx.PAL) || null;
+  /* VIP-05 safety properties: one hard live-shot ceiling and a lifetime. */
+  var MAX_BULLETS = 220, BULLET_LIFE = 6;
 
   var PLAYER_R = (dm.soul && dm.soul.R) || 3.2, IFRAMES = dm.IFRAMES || 1.1, MAXHP = 6;
   /* the shared fight feel: dash, adrenaline, rage, numbers, the HUD */
@@ -62,13 +74,22 @@
   var running = false, last = 0, t = 0, dying = 0;
   var AX = 0, AY = 0, AW = 0, AH = 0;
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
-  var bullets = [], hooks = [], legs = [], attackWarns = [], attackFrameAcc = 0, kit = null, bossTarget = { kind: 'boss' }, cloneTarget = { kind: 'clone' }, phase = 1, bossHP = 900, bossMax = 900;
+  var bullets = [], hooks = [], legs = [];
+  /* VIP-02: polt-fx owns the warning list; the local array is the same
+     object, so the existing `state.warns` surface keeps working. The
+     fallback keeps the fight whole in harnesses that load its files by
+     hand instead of through index.html. */
+  var attackWarns = (NEU.poltFx && NEU.poltFx.warns) || [];
+  var attackFrameAcc = 0, kit = null, bossTarget = { kind: 'boss' }, cloneTarget = { kind: 'clone' }, phase = 1, bossHP = 900, bossMax = 900;
   var bx = 0, by = 0, bz = 0, charging = 0, glow = 0, nextFire = 0, nextCharge = 0;
   var TELE = 24 / 60;                    /* hook telegraph: 24 frames before a hook can hit */
   /* game-clock state: every timer here is advanced by the update loop, so a
      pause or a death holds it and open()/close() wipe it */
   var warnAt = 0, chargePath = null, vuln = 0, sig = 0, sigDone = false, sigRing = 0, sigSpin = 0;
   var phaseFlash = 0, phaseFlashes = 0, flashedPhase = 0;
+  /* VIP-05: boss movement driven by named attacks through the adapter.
+     moveIntent is consumed in update; bossHidden hides only the body sprite. */
+  var moveIntent = null, bossHidden = false;
   var clone = null, mode = 'fight';
   var line = '', lineT = 0;
 
@@ -132,11 +153,11 @@
 
   function shot(x, y, vx, vy, r, c, kind) {
     if (dm.shot) {
-      var s = dm.shot(bullets, x, y, vx, vy, r, c, kind, 700);
+      var s = dm.shot(bullets, x, y, vx, vy, r, c, kind, MAX_BULLETS);
       if (s) s.z = 0;
       return;
     }
-    if (bullets.length > 700) return;
+    if (bullets.length >= MAX_BULLETS) return;
     bullets.push({ x: x, y: y, z: 0, vx: vx, vy: vy, r: r, c: c, k: kind || 0, age: 0 });
   }
 
@@ -151,7 +172,13 @@
   function attachAttacks() {
     if (!NEU.poltAtk) return;
     NEU.poltAtk.attach({
-      warn: function (shape) { attackWarns.push({ shape: shape, age: 0, life: 24 / 60 }); },
+      warn: function (shape) {
+        if (NEU.poltFx) {
+          NEU.poltFx.warn({ kind: shape.kind || 'line', x: shape.x, y: shape.y, a: shape.a,
+            r: shape.r, spread: shape.spread, len: shape.len, count: shape.count,
+            lines: shape.lines, phase: phase, compat: true, life: shape.telegraphFrames || 24 });
+        } else attackWarns.push({ shape: shape, age: 0, life: (shape.telegraphFrames || 24) / 60 });
+      },
       hit: function (shape, name, speed) {
         var i, n = shape.count, a, gapAt = Math.floor(n / 2), col = name === 'DesperationAttack' || phase === 3 ? COL.red : COL.ectoHi;
         for (i = 0; i < n; i++) {
@@ -166,7 +193,24 @@
           }
         }
         if (name === 'CloneSplit' && !clone) clone = { x: bx, y: by, t: 2.4 };
-      }
+      },
+      /* VIP-05 movement verbs. moveTo eases the body to a point; charge
+         reuses the existing telegraphed dash; hide/show gate the body sprite
+         (PhantomOrbit); splitClones spawns the 90 HP clone. All are inert
+         outside a running fight and are wiped by open()/close(). */
+      moveTo: function (x, y) {
+        if (!running) return;
+        moveIntent = { x: Math.min(Math.max(x, AX + 20), AX + AW - 20),
+                       y: Math.min(Math.max(y, AY + 20), AY + AH - 20) };
+      },
+      charge: function () {
+        if (!running || charging > 0 || warnAt || mode !== 'fight') return;
+        stopRise(); riseStop = NEU.sfx && NEU.sfx.rise ? NEU.sfx.rise(900) : null;
+        warnAt = t + 0.9; lockCharge();
+      },
+      hide: function () { if (running) bossHidden = true; },
+      show: function () { bossHidden = false; },
+      splitClones: function () { if (running && !clone) clone = { x: bx, y: by, t: 2.4 }; }
     });
   }
   function tickAttacks(dt) {
@@ -178,9 +222,13 @@
         sig = 0; sigDone = true; say('* it holds on. one more.');
       }
     }
-    for (var i = attackWarns.length - 1; i >= 0; i--) {
-      attackWarns[i].age += dt;
-      if (attackWarns[i].age >= attackWarns[i].life) attackWarns.splice(i, 1);
+    if (NEU.poltFx) {
+      NEU.poltFx.step(dt);
+    } else {
+      for (var i = attackWarns.length - 1; i >= 0; i--) {
+        attackWarns[i].age += dt;
+        if (attackWarns[i].age >= attackWarns[i].life) attackWarns.splice(i, 1);
+      }
     }
   }
 
@@ -266,6 +314,7 @@
 
   function stepFn(nowMs) {
     if (!running) { if (dying) deathStep(nowMs); return; }
+    REDUCE_MOTION = liveReduced();          /* VIP-01: read the live store every frame */
     /* legacy loop when the kernel is absent; the kernel tick owns the frame otherwise */
     if (!NEU.kernel) requestAnimationFrame(stepFn);
     if (NEU.perf && !NEU.perf.paced(nowMs)) return;
@@ -300,6 +349,11 @@
     }
     bx = Math.min(Math.max(bx, AX + 20), AX + AW - 20);
     by = Math.min(Math.max(by, AY + 20), AY + AH - 20);
+    if (moveIntent && charging <= 0) {
+      bx += (moveIntent.x - bx) * Math.min(1, dt * 2);
+      by += (moveIntent.y - by) * Math.min(1, dt * 2);
+      if (Math.abs(bx - moveIntent.x) + Math.abs(by - moveIntent.y) < 4) moveIntent = null;
+    }
     stepLegs();
 
     /* hooks. attached in P1 and P3, free and shooting in P2 */
@@ -362,19 +416,10 @@
     if (glow > 0) glow -= dt;
     if (vuln > 0) vuln -= dt;
     if (phaseFlash > 0) phaseFlash = Math.max(0, phaseFlash - dt);
-    /* the attack record owns the signature's hitboxes, so this timer
-       does not throw a second, untelegraphed ring */
-    if (sig > 0 && !NEU.poltAtk) {
-      sig -= dt; sigRing -= dt;
-      if (sigRing <= 0) {
-        sigRing = 1.2; sigSpin += 0.26;
-        for (var k = 0; k < 12; k++) {
-          var sa2 = sigSpin + k * Math.PI / 6;
-          shot(bx, by, Math.cos(sa2) * 170, Math.sin(sa2) * 170, 5, COL.red, 1);
-        }
-      }
-      if (sig <= 0) { sig = 0; sigDone = true; say('* it holds on. one more.'); }
-    } else if (sig > 0) {
+    /* The attack record owns the signature's hitboxes. This is only the
+       countdown to the kill gate - one authority, no second untelegraphed
+       ring (the old `!NEU.poltAtk` branch duplicated it). */
+    if (sig > 0) {
       sig -= dt;
       if (sig <= 0) { sig = 0; sigDone = true; say('* it holds on. one more.'); }
     }
@@ -417,6 +462,7 @@
     for (var i = 0; i < bullets.length; i++) {
       var b = bullets[i];
       b.age += dt;
+      if (b.age > BULLET_LIFE) continue;    /* no lingering shot outlives its read */
       /* Expert-mode behaviour: shots turn back toward you once, after
          travelling a way. It is the difference between a spread you
          sidestep and a spread you have to keep watching. */
@@ -454,7 +500,11 @@
     return hurtRaw(dx, dy);
   }
 
-  function bossHurtable() { return sig <= 0; }
+  function bossHurtable() { return running && sig <= 0; }
+  /* VIP-01: the plate reads the SAME gate tryHit uses. It can no longer
+     say INVULNERABLE while a strike would still land, or stay silent
+     through the punish window. */
+  function plateLabel() { return !bossHurtable() ? 'INVULNERABLE' : (vuln > 0 ? 'VULNERABLE' : null); }
   var STRIKE_CD = 0.18, lastHit = -1;   /* game seconds between strikes */
   function tryHit(target, amount) {
     if (!running || t - lastHit < STRIKE_CD) return;
@@ -536,6 +586,7 @@
      and one chrome sweep. Z or 2.5 s removes it. Reduced motion keeps a
      still highlight and skips the flash. Sits under the text box (96). */
   function showTvCard() {
+    REDUCE_MOTION = liveReduced();
     ensureTvCss();
     var old = document.getElementById('tvRestored');
     if (old && old.parentNode) old.parentNode.removeChild(old);
@@ -647,6 +698,7 @@
   /* one white frame per phase (0.4 s, under 3 Hz). Reduced motion
      keeps the palette change and skips the flash. */
   function pulsePhase() {
+    REDUCE_MOTION = liveReduced();
     if (flashedPhase === phase) return;
     flashedPhase = phase;
     if (REDUCE_MOTION) return;
@@ -878,6 +930,7 @@
   }
 
   function draw(nowMs) {
+    REDUCE_MOTION = liveReduced();          /* win() and close() also draw */
     ctx.fillStyle = COL.void_; ctx.fillRect(0, 0, innerWidth, innerHeight);
     var shook = NEU.juice ? NEU.juice.begin(ctx, innerWidth, innerHeight) : false;
     frame();
@@ -926,7 +979,7 @@
       }
       ctx.globalAlpha = 1;
     }
-    for (var awi = 0; awi < attackWarns.length; awi++) {
+    if (!NEU.poltFx) for (var awi = 0; awi < attackWarns.length; awi++) {
       var ash = attackWarns[awi].shape, ap = REDUCE_MOTION ? 1 : (NEU.poltAtk && NEU.poltAtk.bump
         ? NEU.poltAtk.bump(attackWarns[awi].age / attackWarns[awi].life, 0, 0.08, 0.27, 0.75)
         : 1 - attackWarns[awi].age / attackWarns[awi].life);
@@ -952,6 +1005,7 @@
     things.sort(function (a, b) { return a.z - b.z; });
 
     things.forEach(function (o) {
+      if (bossHidden && o.kind === 'body') return;   /* VIP-05 PhantomOrbit */
       var p = proj(o.x, o.y, o.z);
       var s = Math.max(0.5, p.k);
       /* PLAN 9.5: only the body and the clone double in size. Hooks stay
@@ -1000,6 +1054,11 @@
       ctx.fillRect((p.x - w / 4 + 4) | 0, (p.y - h / 4 + 4) | 0, (w / 2 - 8) | 0, (h / 2 - 8) | 0);
     });
 
+    /* VIP-02: shape-true warnings draw AFTER the VFX and BEFORE bullets,
+       so the tell is on top of the brightest frame and under every shot. */
+    if (NEU.poltFx) NEU.poltFx.drawWarns(ctx, { phase: phase, compat: true,
+      reduced: REDUCE_MOTION, compatCol: phase === 3 ? COL.red : COL.ectoHi });
+
     for (var b = 0; b < bullets.length; b++) {
       var bl = bullets[b], sz = (bl.r * 2) | 0;
       /* Potent shots in later phases; the plain ones in P1. Falls back
@@ -1028,9 +1087,8 @@
 
     /* the label sits outside the shake and outside the arena: on the
        boss-bar row, right-aligned under the bar, on a dark plate (AA) */
-    var isV = bossHurtable();
-    if (running && (!isV || vuln > 0)) {
-      var lt = isV ? 'VULNERABLE' : 'INVULNERABLE';
+    var lt = plateLabel();
+    if (running && lt) {
       var lbw = dm.barW ? dm.barW(innerWidth) : 480, lbx = ((innerWidth - lbw) / 2) | 0;
       /* 32px: the punish window is the one moment to read at a glance */
       ctx.font = '32px "Determination Mono","Pixelify Sans",monospace';
@@ -1038,7 +1096,7 @@
       var lw = ctx.measureText(lt).width || 160;
       ctx.globalAlpha = 0.85; ctx.fillStyle = '#000000';
       ctx.fillRect((lbx + lbw - lw - 8) | 0, 50, (lw + 16) | 0, 40);
-      ctx.globalAlpha = 1; ctx.fillStyle = isV ? VULN_COL : COL.dim;
+      ctx.globalAlpha = 1; ctx.fillStyle = lt === 'VULNERABLE' ? VULN_COL : COL.dim;
       ctx.fillText(lt, lbx + lbw, 57, innerWidth);
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     }
@@ -1105,7 +1163,9 @@
     if (msg) msg.hidden = true;
     layout();
     if (NEU.diff) NEU.diff.begin(); MAXHP = NEU.diff ? NEU.diff.fpick([12, 9, 6, 5, 4, 3, 1]) : 6; IFRAMES = (dm.IFRAMES || 1.1) * dp('iframes');
-    t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; attackWarns = []; attackFrameAcc = 0; keys = {}; dying = 0;
+    t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; attackWarns.length = 0; attackFrameAcc = 0; keys = {}; dying = 0;
+    moveIntent = null; bossHidden = false;
+    if (NEU.poltFx) NEU.poltFx.clear();   /* replay starts with no stale warning */
     bossMax = Math.round(900 * dp('bossHp')); bossHP = bossMax; phase = 1; clone = null; mode = 'fight';
     phaseFlash = 0; phaseFlashes = 0; flashedPhase = 0;
     px = AX + AW / 2; py = AY + AH - 70;
@@ -1140,8 +1200,11 @@
     running = false; dying = 0;
     if (NEU.kernel && NEU.kernel.current() === 'polt') NEU.kernel.pop();
     warnAt = 0; charging = 0; vuln = 0; sig = 0; chargePath = null;
+    moveIntent = null; bossHidden = false;
     stopRise();
     if (NEU.poltAtk) NEU.poltAtk.reset();
+    attackWarns.length = 0;
+    if (NEU.poltFx) NEU.poltFx.clear();
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', -1);
     if (NEU.activeMinigame === 'polt') NEU.activeMinigame = null;
     wrap.hidden = true;
@@ -1165,7 +1228,16 @@
                /* B4 review surface: boss scale, arena depth and the
                   reduced-motion gate are observable from tests. */
                get scale() { return BOSS_SCALE; },
-               get reduced() { return REDUCE_MOTION; },
+               /* live, not the load-time device query: the in-game switch
+                  is authority and can flip between two frames. */
+               get reduced() { return liveReduced(); },
+               get maxBullets() { return MAX_BULLETS; },
+               /* dodge-bot surface: the live shot list, not a copy. */
+               get bullets() { return bullets; },
+               /* the plate reads the same gate as tryHit. */
+               get plate() { return running ? plateLabel() : null; },
+               get palette() { return PAL; },
+               get fx() { return NEU.poltFx ? NEU.poltFx.stats() : null; },
                get depth() { return { farWall: true, chains: true, aura: true }; },
                get running() { return running; },
                get phase() { return phase; },
@@ -1179,6 +1251,9 @@
                hurtBoss: function (n) { return tryHit(bossTarget, n); },
                get clone() { return !!clone; },
                get hooks() { return hooks.length; },
+               /* VIP-05 movement proof surfaces */
+               get move() { return moveIntent; },
+               get hidden() { return bossHidden; },
                /* what a renderer draws: the locked charge path, the punish window,
                   the signature, and each hook's telegraph */
                get state() {

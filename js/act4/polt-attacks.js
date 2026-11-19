@@ -1,5 +1,8 @@
-/* polt-attacks.js — Infernum Polterghast cycle records.
-   Attack timings and shapes are scaled from the MIT behavior override. */
+/* polt-attacks.js — Polterghast named-attack authority (VISUAL_IMPROVEMENT_RESEARCH
+   VIP-05). One attack record per verb, fixed per-phase cycles, one telegraph
+   lead, and boss movement driven through the adapter. ES5, no per-frame
+   allocation. The legacy cadence in boss-polt.js stays as a whole fallback;
+   every shot still goes through that file's single shot() cap. */
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
@@ -7,6 +10,12 @@
   var ATK = {};
   var A = null, phase = 1, index = 0, current = null, signature = false;
   var TAU = Math.PI * 2;
+  /* VIP-05 budget. All one source of truth; boss-polt.js owns the bullet
+     array and enforces maxBullets/maxAge on every shot(). */
+  var CAP = { maxBullets: 220, looks: 6, gapPx: 56, contrast: 3, maxAge: 6,
+              tele: [24, 30], gap: 72, gapBig: 210 };
+  var TELE_MIN = CAP.tele[0], TELE_MAX = CAP.tele[1];
+
   function D(d, st) { return d * st.aw / 2000; }
   function V(v, st) { return v * 60 * st.aw / 2000; }
   function bump(t, a, b, peak, c) {
@@ -15,23 +24,51 @@
     if (t < peak) return 1;
     return (c - t) / (c - peak);
   }
-  var CYCLES = [null,
-    ['EctoplasmUppercutCharges', 'LegSwipes', 'WispCircleCharges', 'EctoplasmUppercutCharges', 'SpiritPetal'],
-    ['AsgoreRingSoulAttack', 'ArcingSouls', 'EctoplasmUppercutCharges', 'VortexCharge', 'SpiritPetal', 'LegSwipes', 'WispCircleCharges', 'ArcingSouls', 'EctoplasmUppercutCharges', 'VortexCharge', 'LegSwipes', 'SpiritPetal'],
-    ['CloneSplit', 'AsgoreRingSoulAttack', 'VortexCharge', 'ArcingSouls', 'SpiritPetal', 'EctoplasmUppercutCharges', 'LegSwipes', 'CloneSplit', 'VortexCharge', 'WispCircleCharges', 'ArcingSouls', 'EctoplasmUppercutCharges', 'LegSwipes', 'SpiritPetal']];
-  var TELEF = 24; /* SoulTelegraphLine.cs:27 — 24 frames, 0.4 s */
-  var SPECS = {
-    EctoplasmUppercutCharges: { duration: 204, events: [54, 102, 150], shape: 'line', count: 6, speed: 23 },
-    LegSwipes: { duration: 224, events: [54, 112, 170], shape: 'fan', count: 5, speed: 18 },
-    WispCircleCharges: { duration: 252, events: [54, 108, 162, 216], shape: 'ring', count: 8, speed: 15 },
-    AsgoreRingSoulAttack: { duration: 276, events: [54, 90, 126, 162, 198, 234], shape: 'ring', count: 24, gap: 4, speed: 14 },
-    ArcingSouls: { duration: 252, events: [54, 102, 150, 198], shape: 'fan', count: 6, speed: 19 },
-    VortexCharge: { duration: 240, events: [54, 108, 162], shape: 'line', count: 7, speed: 27 },
-    SpiritPetal: { duration: 300, events: [54, 84, 114, 144, 174, 204, 234, 264], shape: 'fan', count: 6, speed: 17 },
-    CloneSplit: { duration: 264, events: [90, 150, 210], shape: 'ring', count: 12, speed: 20 },
-    DesperationAttack: { duration: 300, events: [54, 84, 114, 144, 174, 204, 234, 264], shape: 'ring', count: 16, gap: 3, speed: 18 }
-  };
   function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+  function tele(n) { return clamp(n | 0, TELE_MIN, TELE_MAX); }
+  /* A ring's safe lane is an angular gap of `gap` darts at `gapR` px; the
+     arc width must clear the 56px dodge floor. */
+  function gapWidth(s) {
+    return s.gap ? TAU * (s.gapR || 200) * s.gap / s.count : 0;
+  }
+
+  /* Fixed cycles: every verb appears; no verb is adjacent to itself even at
+     the wrap. DesperationAttack is the signature, never a cycle lead. */
+  var CYCLES = [null,
+    ['EctoplasmUppercutCharges', 'LegSwipes', 'WispCircleCharges', 'SpiritPetal', 'ArcingSouls'],
+    ['AsgoreRingSoulAttack', 'HookCrossfire', 'ArcingSouls', 'VortexCharge',
+     'SpiritPetal', 'LegSwipes', 'WispCircleCharges', 'EctoplasmUppercutCharges'],
+    ['CloneSplit', 'PhantomOrbit', 'AsgoreRingSoulAttack', 'VortexCharge',
+     'HookCrossfire', 'ArcingSouls', 'SpiritPetal', 'EctoplasmUppercutCharges',
+     'LegSwipes', 'WispCircleCharges']];
+
+  /* duration: frames to the next lead. events: volley frames (hit frame).
+     tele: 24-30f lead issued at events[i]-tele. speed may be an array for a
+     per-volley ramp. look: 0-5 visual variant, bounded by CAP.looks. */
+  var SPECS = {
+    EctoplasmUppercutCharges: { duration: 204, events: [54, 102, 150], shape: 'line', count: 6, speed: [23, 27, 31], tele: 24, look: 0 },
+    LegSwipes: { duration: 224, events: [54, 112, 170], shape: 'fan', count: 5, spread: 1.22, speed: 18, tele: 24, look: 1 },
+    WispCircleCharges: { duration: 252, events: [54, 108, 162, 216], shape: 'ring', count: 8, speed: 15, tele: 24, look: 2 },
+    SpiritPetal: { duration: 240, events: [54, 84, 114, 144, 174, 204], shape: 'fan', count: 6, spread: 0.9, speed: [7, 9, 11, 13, 15, 18], tele: 26, look: 3 },
+    AsgoreRingSoulAttack: { duration: 480, events: [54, 121, 188, 255, 322, 389, 456], shape: 'ring', count: 24, gap: 4, gapR: 200, speed: [14, 16, 18, 20, 22, 24, 26], tele: 28, look: 4 },
+    ArcingSouls: { duration: 252, events: [54, 110, 166, 222], shape: 'fan', count: 5, spread: 1.1, speed: 19, tele: 24, look: 0 },
+    VortexCharge: { duration: 240, events: [54, 108, 162], shape: 'line', count: 7, speed: 27, tele: 24, look: 5 },
+    HookCrossfire: { duration: 260, events: [54, 84, 114, 144], shape: 'line', count: 4, speed: 20, tele: 24, look: 1 },
+    CloneSplit: { duration: 264, events: [54, 114, 174, 234], shape: 'ring', count: 12, speed: 20, tele: 26, look: 4 },
+    PhantomOrbit: { duration: 260, events: [54, 110, 166, 222], shape: 'ring', count: 3, gapR: 120, speed: 12, tele: 30, look: 2 },
+    DesperationAttack: { duration: 360, events: [42, 84, 126, 168, 210, 252, 294, 336], shape: 'ring', count: 16, gap: 3, gapR: 200, speed: 18, tele: 28, look: 5 }
+  };
+
+  /* Boss movement per verb: each op fires once at its frame via the adapter.
+     `player` targets resolve against the live player position at that frame. */
+  var MOVES = {
+    EctoplasmUppercutCharges: [{ f: 54, op: 'charge' }, { f: 102, op: 'charge' }, { f: 150, op: 'charge' }],
+    LegSwipes: [{ f: 54, op: 'moveTo', x: 'player', y: 'player' }],
+    VortexCharge: [{ f: 54, op: 'charge' }, { f: 162, op: 'charge' }],
+    CloneSplit: [{ f: 54, op: 'splitClones' }],
+    PhantomOrbit: [{ f: 54, op: 'hide' }, { f: 222, op: 'show' }]
+  };
+
   /* SoulTelegraphLine.cs:52-53 — the line is the shot's own direction. */
   function soulLines(shape, st) {
     var out = [], i, n = shape.count, a, x, y, gapAt = (n / 2) | 0, len = D(2000, st);
@@ -48,51 +85,67 @@
   function point(st) {
     return { x: st.x, y: st.y, tx: st.tx, ty: st.ty, ax: st.ax, ay: st.ay, aw: st.aw, ah: st.ah };
   }
+  function drive(name, f, p, st) {
+    var mv = MOVES[name], k, m;
+    if (!mv || !A) return;
+    for (k = 0; k < mv.length; k++) {
+      m = mv[k];
+      if (f !== m.f || p.moved[k]) continue;
+      p.moved[k] = 1;
+      if (m.op === 'moveTo' && A.moveTo) A.moveTo(m.x === 'player' ? st.tx : st.x, m.y === 'player' ? st.ty : st.y);
+      else if (m.op === 'charge' && A.charge) A.charge();
+      else if (m.op === 'hide' && A.hide) A.hide();
+      else if (m.op === 'show' && A.show) A.show();
+      else if (m.op === 'splitClones' && A.splitClones) A.splitClones();
+    }
+  }
   function attack(st, name) {
-    var spec = SPECS[name], p = st.p || (st.p = {}), i, f = st.f | 0, shape, origin, aim, n, phaseBoost;
+    var spec = SPECS[name], p = st.p || (st.p = {}), i, f = st.f | 0, shape, origin, aim,
+        n, phaseBoost, sp, lead = tele(spec.tele);
     if (!spec) return true;
-    if (!p.started) { p.started = 1; p.events = {}; p.shapes = {}; }
+    if (!p.started) { p.started = 1; p.events = {}; p.shapes = {}; p.moved = {}; }
     origin = point(st);
     aim = Math.atan2(origin.ty - origin.y, origin.tx - origin.x);
     phaseBoost = st.phase === 3 ? 1.18 : st.phase === 2 ? 1.08 : 1;
+    drive(name, f, p, st);
     for (i = 0; i < spec.events.length; i++) {
-      if (f !== spec.events[i] - TELEF && f !== spec.events[i]) continue;
+      if (f !== spec.events[i] - lead && f !== spec.events[i]) continue;
+      n = spec.count;
+      if (name === 'LegSwipes' && st.phase > 1) n = 7;
+      else if (name === 'WispCircleCharges' && st.phase === 3) n = 10;
+      else if (name === 'ArcingSouls' && st.phase === 3) n = 9;
       shape = p.shapes[i] || { kind: spec.shape, x: origin.x, y: origin.y, a: aim,
-        r: spec.shape === 'ring' ? D(200 + i * 35, st) : 0,
-        spread: spec.shape === 'fan' ? 0.8 : 0, len: spec.shape === 'line' ? D(2000, st) : 0,
-        count: spec.count + (name === 'WispCircleCharges' && st.phase === 3 ? 2 : 0),
-        gap: spec.gap || 0, phase: st.phase, telegraphFrames: TELEF };
+        r: spec.shape === 'ring' ? D(spec.gapR || 200 + i * 35, st) : 0,
+        spread: spec.shape === 'fan' ? spec.spread || 0.8 : 0,
+        len: spec.shape === 'line' ? D(2000, st) : 0,
+        count: n, gap: spec.gap || 0, phase: st.phase, telegraphFrames: lead };
+      shape.count = n;
       shape.lines = soulLines(shape, st);
-      if (f === spec.events[i] - TELEF && !p.events[i]) {
+      if (f === spec.events[i] - lead && !p.events[i]) {
         p.events[i] = 1;
         p.shapes[i] = shape;
         if (A && A.warn) A.warn(shape);
       } else if (f === spec.events[i] && p.events[i] === 1) {
         p.events[i] = 2;
-        n = shape.count;
-        if (A && A.hit) A.hit(shape, name, V(spec.speed * phaseBoost * dp('bulletSpeed'), st));
+        sp = spec.speed;
+        if (sp && typeof sp === 'object' && sp.length) sp = sp[Math.min(i, sp.length - 1)];
+        if (A && A.hit) A.hit(shape, name, V(sp * phaseBoost * dp('bulletSpeed'), st));
       }
     }
     return f >= spec.duration;
   }
 
-  /* Infernum PolterghastBehaviorOverride.cs:815-936 (EctoplasmUppercutCharges). */
+  /* Infernum PolterghastBehaviorOverride.cs anchors, one named record each. */
   ATK.EctoplasmUppercutCharges = function (st) { return attack(st, 'EctoplasmUppercutCharges'); };
-  /* Infernum PolterghastBehaviorOverride.cs:523-610 (LegSwipes). */
   ATK.LegSwipes = function (st) { return attack(st, 'LegSwipes'); };
-  /* Infernum PolterghastBehaviorOverride.cs:612-701 (WispCircleCharges). */
   ATK.WispCircleCharges = function (st) { return attack(st, 'WispCircleCharges'); };
-  /* Infernum PolterghastBehaviorOverride.cs:703-813 (AsgoreRingSoulAttack). */
-  ATK.AsgoreRingSoulAttack = function (st) { return attack(st, 'AsgoreRingSoulAttack'); };
-  /* Infernum PolterghastBehaviorOverride.cs:938-992 (ArcingSouls). */
-  ATK.ArcingSouls = function (st) { return attack(st, 'ArcingSouls'); };
-  /* Infernum PolterghastBehaviorOverride.cs:1069-1161 (VortexCharge). */
-  ATK.VortexCharge = function (st) { return attack(st, 'VortexCharge'); };
-  /* Infernum PolterghastBehaviorOverride.cs:994-1067 (SpiritPetal). */
   ATK.SpiritPetal = function (st) { return attack(st, 'SpiritPetal'); };
-  /* Infernum PolterghastBehaviorOverride.cs:1163-1283 (CloneSplit). */
+  ATK.AsgoreRingSoulAttack = function (st) { return attack(st, 'AsgoreRingSoulAttack'); };
+  ATK.ArcingSouls = function (st) { return attack(st, 'ArcingSouls'); };
+  ATK.VortexCharge = function (st) { return attack(st, 'VortexCharge'); };
+  ATK.HookCrossfire = function (st) { return attack(st, 'HookCrossfire'); };
   ATK.CloneSplit = function (st) { return attack(st, 'CloneSplit'); };
-  /* Infernum PolterghastBehaviorOverride.cs:1285-1427 (DesperationAttack). */
+  ATK.PhantomOrbit = function (st) { return attack(st, 'PhantomOrbit'); };
   ATK.DesperationAttack = function (st) { return attack(st, 'DesperationAttack'); };
 
   function start(which, sig) {
@@ -100,7 +153,7 @@
     current = { name: signature ? 'DesperationAttack' : CYCLES[phase][index], f: 0, p: {} };
   }
   function tickFrame(st) {
-    var fin;
+    var fin, cyc;
     if (!current && signature) return true;
     if (!current) start(phase, false);
     current.x = st.x; current.y = st.y; current.tx = st.tx; current.ty = st.ty;
@@ -109,8 +162,8 @@
     current.f++;
     if (fin) {
       if (signature) { current = null; return true; }
-      index = (index + 1) % CYCLES[phase].length;
-      current = { name: CYCLES[phase][index], f: 0, p: {} };
+      cyc = CYCLES[phase]; index = (index + 1) % cyc.length;
+      current = { name: cyc[index], f: 0, p: {} };
     }
     return false;
   }
@@ -122,15 +175,18 @@
     signature: function () { start(phase, true); },
     reset: function () { current = null; index = 0; signature = false; },
     cycles: function () { return CYCLES; },
-    /* B4 first step: the measured lead of every attack, in 60 Hz frames.
-       The warn is issued at events[i] - TELEF and the hit at events[i]. */
+    /* Lead of every attack, in 60 Hz frames. The warn issues at
+       events[i]-lead and the hit at events[i]. */
     leads: function () {
-      var out = [], k, i;
+      var out = [], k, s;
       for (k in SPECS) if (SPECS.hasOwnProperty(k)) {
-        out.push({ name: k, frames: TELEF, events: SPECS[k].events.slice() });
+        s = SPECS[k];
+        out.push({ name: k, frames: tele(s.tele), events: s.events.slice(),
+                   look: s.look, gapPx: Math.round(gapWidth(s)) });
       }
       return out;
     },
+    caps: function () { return CAP; },
     records: ATK,
     D: D,
     V: V,
