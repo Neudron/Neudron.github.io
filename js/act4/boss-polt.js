@@ -99,7 +99,11 @@
   var clone = null, mode = 'fight';
   var line = '', lineT = 0;
 
-  function say(s) { line = s; lineT = performance.now(); }
+  function say(s) {
+    line = s; lineT = performance.now();
+    var status = document.getElementById('poltTell');
+    if (status) status.textContent = s || '';
+  }
 
   var kitBox = { AX: 0, AY: 0, AW: 800, AH: 600 };
   function layout() {
@@ -603,7 +607,8 @@
     title.className = 'tvRestored__title';
     title.style.fontFamily = '"Pixelify Sans", ui-monospace, monospace';
     title.style.fontSize = '96px';
-    title.textContent = 'THE TV IS RESTORED';
+    if (NEU.glyph) NEU.glyph.put(title, 'deck', 'THE TV IS RESTORED');
+    else title.textContent = 'THE TV IS RESTORED';
     card.appendChild(title);
     document.body.appendChild(card);
     var removed = false;
@@ -1192,7 +1197,8 @@
       ctx.fillStyle = COL.bone;
       ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
       ctx.textBaseline = 'top';
-      ctx.fillText(line, AX, ty, Math.min(AW, innerWidth));
+      if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, (/hooks/i.test(line) ? 'open' : /another|one more/i.test(line) ? 'eyes' : 'warning'), AX, ty);
+      else ctx.fillText(line, AX, ty, Math.min(AW, innerWidth));
       ctx.textBaseline = 'alphabetic';
     }
   }
@@ -1273,6 +1279,8 @@
     if (NEU.kernel) NEU.kernel.push('polt');
   }
   function close() {
+    var status = document.getElementById('poltTell');
+    if (status) status.textContent = '';
     running = false; dying = 0;
     if (NEU.kernel && NEU.kernel.current() === 'polt') NEU.kernel.pop();
     warnAt = 0; charging = 0; vuln = 0; sig = 0; chargePath = null;

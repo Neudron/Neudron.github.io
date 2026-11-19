@@ -174,7 +174,11 @@
     } catch (e) {}
   }
 
-  function say(s) { line = s; lineT = performance.now(); }
+  function say(s) {
+    line = s; lineT = performance.now();
+    var status = document.getElementById('scalTell');
+    if (status) status.textContent = s || '';
+  }
 
   /* ── the look (W3c) ─────────────────────────────────────────────
      Infernum dresses this fight in a dark-red void with brimstone cinders
@@ -1612,7 +1616,8 @@
       frame();
       ctx.font = BANNER_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillStyle = '#FF1E12';
-      ctx.fillText('THE CALAMITY ENDS', (AX + AW / 2) | 0, (AY + AH / 2 - 10) | 0);
+      if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'check', (AX + AW / 2 | 0) - 7, (AY + AH / 2 | 0) - 10);
+      else ctx.fillText('THE CALAMITY ENDS', (AX + AW / 2) | 0, (AY + AH / 2 - 10) | 0);
     }
     if (winStage === 1) {
       if (!talkStarted) {
@@ -1955,7 +1960,8 @@
     if (enl) {
       ctx.font = FONT_UI; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       ctx.fillStyle = enl === 'ENRAGED' ? '#FF2A1A' : '#FFC46A';
-      ctx.fillText(enl, (AX + AW / 2) | 0, 56);
+      if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'fire', ((AX + AW / 2) | 0) - 7, 56);
+      else ctx.fillText(enl, (AX + AW / 2) | 0, 56);
       ctx.textAlign = 'left';
     }
     if (breakT >= 0) drawBreak();
@@ -1965,7 +1971,8 @@
       var bnw = (ctx.measureText(bannerTxt).width + 32) | 0, bnx = (AX + AW / 2) | 0;
       ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(bnx - (bnw >> 1), AY - 36, bnw, 24);
       ctx.fillStyle = bannerTxt === 'VULNERABLE' ? '#FFC46A' : '#B8E6FF';
-      ctx.fillText(bannerTxt, bnx, AY - 32);
+      if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, bannerTxt === 'VULNERABLE' ? 'target' : 'shield', bnx - 7, AY - 32);
+      else ctx.fillText(bannerTxt, bnx, AY - 32);
       ctx.textAlign = 'left';
     }
     drawBroBars(w);
@@ -1973,7 +1980,8 @@
     if (healToast > 0) {
       ctx.font = FONT_UI; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       ctx.fillStyle = '#B8FFD0';
-      ctx.fillText('HEAL READY', AX + AW / 2, AY - 56);
+      if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'heart', AX + AW / 2 - 7, AY - 56);
+      else ctx.fillText('HEAL READY', AX + AW / 2, AY - 56);
       ctx.textAlign = 'left';
     }
 
@@ -1986,7 +1994,8 @@
     if (talking) {
       ctx.fillStyle = COL.bone;
       ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
-      ctx.fillText(line, AX, dialY, AW);
+      if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, (/hearts/i.test(line) ? 'heart' : /eyes/i.test(line) ? 'eyes' : /rage|brothers/i.test(line) ? 'fire' : 'warning'), AX, dialY - 12);
+      else ctx.fillText(line, AX, dialY, AW);
     }
 
     /* F3 hitbox debug */
@@ -2483,6 +2492,8 @@
     if (NEU.kernel) NEU.kernel.push('scal');
   }
   function close() {
+    var status = document.getElementById('scalTell');
+    if (status) status.textContent = '';
     B.close('scal');
     active = false; running = false; dying = 0; stripOpen = false; breakT = -1;
     cineOff();
