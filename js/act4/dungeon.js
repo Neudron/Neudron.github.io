@@ -386,7 +386,7 @@
         else if (DECOR.indexOf(ch) >= 0) decor.push({ k: ch, x: wx, y: wy, f: z.wall });
         else if (FOE.indexOf(ch) >= 0) spawners.push({ k: ch, x: wx, y: wy, zone: id, rest: n % 3 === 2 });
         else if (ch === 'P') { save = { x: wx, y: wy }; ents.push({ t: 'dsave', x: wx, y: wy }); }
-        else if (ch === 'n') ents.push({ t: 'sign', x: wx, y: wy, lines: SIGN[id] });
+        else if (ch === 'n') ents.push({ t: 'sign', x: wx, y: wy, lines: SIGN[id], textlessCue: id === 'd5' ? ['graze', 'key:c'] : null });
         else if (ch === 'K') ents.push({ t: 'keeper', x: wx, y: wy });
         else if (ch === 'F') ents.push({ t: 'painting', x: wx, y: wy });
         else if (ch === 'M') ents.push({ t: 'magegate', x: wx, y: wy });
@@ -470,7 +470,7 @@
   }
   function px(cell) { return cell ? { x: (cell.x + 0.5) * T, y: (cell.y + 1) * T } : null; }
   function dN(id) { var m = /^d(\d+)$/.exec(id || ''); return m && +m[1] <= 10 ? +m[1] : -1; }
-  function talk(lines) { if (NEU.talk && !P.replaying()) NEU.talk(lines, 'narr'); }
+  function talk(lines, cue) { if (NEU.talk && !P.replaying()) NEU.talk(lines, 'narr', cue); }
   function flag(k, v) { if (NEU.save && NEU.save.flag && !P.replaying()) NEU.save.flag(k, v); }
   function flagged(k) { return !!(NEU.save && NEU.save.flagged && NEU.save.flagged(k)); }
 
@@ -542,7 +542,7 @@
     if (e.active) return;
     e.active = true; P.heal(6); flag('dgn_saved', 1);
   }, draw: function (c, x, y, e, now) { P.ent('checkpoint', c, x, y, e, now); } });
-  kd('sign', { touch: function (e, input, melee) { if (melee) { NEU.dungeon.sign = e.lines.join(' '); talk(e.lines); } } });
+  kd('sign', { touch: function (e, input, melee) { if (melee) { NEU.dungeon.sign = e.lines.join(' '); talk(e.lines, e.textlessCue); } } });
   /* TORCH MEMORY: walking past a brazier lights it permanently (WO-DGN). */
   kd('brazier', { touch: function (e) {
     if (flagged('dgn_lit_' + e.n)) return;

@@ -368,7 +368,7 @@
       NEU.talk(['toby gets up and goes. he does not look back, because he is a dog.',
                 'he sits down in a chair that was not there a minute ago and turns the console on.',
                 'there is a crack in the corner of the panel inside the cube.',
-                'there was probably always a crack.'], 'narr');
+                'there was probably always a crack.'], 'narr', ['dog', 'deck', null, 'glass']);
     }
     cue();
   }

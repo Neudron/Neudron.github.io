@@ -127,7 +127,7 @@
     if (el && el.parentNode) el.parentNode.removeChild(el);
     if (NEU.juice && NEU.juice.hit) NEU.juice.hit('medium');
     if (NEU.finale && NEU.finale.open) NEU.finale.open();
-    if (NEU.talk) NEU.talk(['a hood. no face. the thing behind you stops.'], 'narr');
+    if (NEU.talk) NEU.talk(['a hood. no face. the thing behind you stops.'], 'narr', 'eyes');
   }
   function caught() {
     var w;
