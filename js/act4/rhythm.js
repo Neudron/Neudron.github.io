@@ -114,7 +114,7 @@
   var judgedT = 0;
   var keys = {};
   var S = { brk: '', score: 0, combo: 0, health: 1, judgement: '', countdown: '', round: 0,
-            misses: 0, consecMiss: 0, acc: 1, judged: 0, weight: 0,
+            misses: 0, consecMiss: 0, acc: 1, judged: 0, weight: 0, sick: 0, good: 0,
             section: 0, mode: 'chart', arrowA: 1, sway: 0, swayUntil: 0,
             blockLane: -1, blockUntil: 0,
             soulx: 0, souly: 0, hazards: [], pattern: 0, spawnN: 0, paused: false, introT: 0,
@@ -134,8 +134,14 @@
     return actx;
   }
   function now() { return audio().currentTime; }
+  /* one flag, owned by save.js; the clock itself stays the single time source */
+  function offset() {
+    var v = NEU.save && NEU.save.flag ? NEU.save.flag('opt_rhythm_offset') : 0;
+    v = +v;
+    return isFinite(v) ? Math.max(-0.25, Math.min(0.25, v)) : 0;
+  }
   /* while paused the song clock stands still at the pause point */
-  function songPos() { return (S.paused ? pausedAt : now()) - t0; }
+  function songPos() { return (S.paused ? pausedAt : now()) - t0 - offset(); }
   function beatLen() { return 60 / BPM[round]; }
   function blOf(sp) { return 60 / BPM[Math.min(sectionOf(sp), BPM.length - 1)]; }
   function ms(d) { return Math.floor(d * 1000 + 1e-6); }
@@ -184,7 +190,10 @@
     var grid = s === 0 ? 1 : 0.5;
     var gapLim = Math.max(grid, Math.floor((MAX_GAP - 0.5) / bl / grid) * grid);
     var sameLim = Math.ceil(0.3 / bl / grid) * grid;
-    var out = [], seed = 977 + s * 131;
+    /* a saved run seed varies charts without breaking replay determinism */
+    var base = NEU.save && NEU.save.flag ? NEU.save.flag('rhythm_seed') : 0;
+    base = +base; if (!isFinite(base)) base = 0;
+    var out = [], seed = (977 + s * 131 + (base * 131 | 0)) & 0x7fffffff;
     var laneLast = [-99, -99, -99, -99];
     var lane = s & 3, lastM = -99, b;
     function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
@@ -289,7 +298,7 @@
   }
   /* the score, the streak and the judgement counts start from nothing */
   function resetScore() {
-    S.score = 0; S.combo = 0; S.misses = 0; S.judged = 0; S.weight = 0; S.acc = 1;
+    S.score = 0; S.combo = 0; S.misses = 0; S.judged = 0; S.weight = 0; S.acc = 1; S.sick = 0; S.good = 0;
     S.consecMiss = 0; S.glare = false; pops.length = 0;
   }
   /* the backing beat: round 0 changes tempo with its sections, later rounds keep their own */
@@ -385,6 +394,16 @@
     }
   }
 
+  /* FNF's completion rank: (sick + good - misses) / judged */
+  function rankOf() {
+    if (!S.judged) return '';
+    var c = (S.sick + S.good - S.misses) / S.judged;
+    if (c >= 1) return S.sick === S.judged ? 'PERFECT!' : 'PERFECT';
+    if (c >= 0.9) return 'EXCELLENT';
+    if (c >= 0.8) return 'GREAT';
+    if (c >= 0.6) return 'GOOD';
+    return 'SHIT';
+  }
   /* r: 0 sick, 1 good, 2 bad, 3 shit, 4 miss. ms: the timing error. */
   function judge(r, m, free) {
     /* PBOT1 score curve: flat 500 inside 5 ms, then a sigmoid that floors at 9 */
@@ -395,6 +414,7 @@
     S.judgement = NAMES[r];
     judgedT = now();
     S.judged++; S.weight += ACC[r]; S.acc = S.weight / S.judged;
+    if (r === 0) S.sick++; else if (r === 1) S.good++;
     /* only a note that went by counts toward the five-in-a-row; a stray tap or a bomb neither adds nor clears */
     if (r === 4) { S.misses++; if (!free) S.consecMiss++; } else S.consecMiss = 0;
     S.glare = S.consecMiss >= 3;           /* the merchant stops smiling */
@@ -1305,8 +1325,11 @@
     ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.fillRect(bx, by, bw, 4);
     var is = (!still() && beatFrac(sp) < 0.15) ? 5 : 4;
     if (S.drainFrom !== S.drainTo) is = 7;    /* the heads jump when you are hit */
-    icon(0, split - 6 * is + 4, by + 8, is);
-    icon(1, split + 6 * is - 4, by + 8, is);
+    var tilt = (!still() && beatFrac(sp) < 0.15) ? -0.10 : 0;
+    ctx.save(); ctx.translate(split - 6 * is + 4, by + 8); ctx.rotate(tilt);
+    icon(0, 0, 0, is); ctx.restore();
+    ctx.save(); ctx.translate(split + 6 * is - 4, by + 8); ctx.rotate(-tilt);
+    icon(1, 0, 0, is); ctx.restore();
     ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = '#EDE7DE';
     ctx.fillText(scoreLine(), g.w / 2 | 0, g.scoreY);
@@ -1393,7 +1416,7 @@
       ctx.fillRect(cx + gx, sy + gy, cell - 1, cell - 1);
     }
     ctx.fillStyle = '#FFFFFF';
-    if (Math.floor(t * 4) % 2 === 0) {
+    if (still() || Math.floor(t) % 2 === 0) {   /* t runs 3/s: 1.5 Hz, under the 3 Hz flash rule */
       gl = (rr * 0.55) | 0;
       ctx.fillRect(cx - gl - 1, sy - gl - 10, 3, 21); ctx.fillRect(cx - gl - 10, sy - gl - 1, 21, 3);
     }
@@ -1467,6 +1490,12 @@
     if (NEU.juice && NEU.juice.begin) shook = NEU.juice.begin(ctx, g.w, g.h);
     ctx.save();
     ctx.translate(sway, 0);
+    var zb = (!still() && beatFrac(sp) < 0.12) ? 1.015 : 1;   /* 1.5% downbeat bop, camera only */
+    if (zb !== 1) {
+      ctx.translate(g.w / 2, g.h / 2);
+      ctx.scale(zb, zb);
+      ctx.translate(-g.w / 2, -g.h / 2);
+    }
     if (hintEl) { var hy = Math.round(g.stage + 56) + 'px'; if (hintEl.style.top !== hy) hintEl.style.top = hy; }
     stage(g, sp);
     people(g, sp, t);
@@ -1482,6 +1511,17 @@
       return;
     }
     healthBar(g, sp);                   /* under the notes, so a note rising from the bottom stays readable */
+    if (NEU.juice && NEU.juice.drawParts) NEU.juice.drawParts(ctx, 1 / 60);
+
+    /* FNF's Strumline Background option, fixed low: notes must win over the crowd.
+       It fades with the receptors (break, SONG CLEAR) so no empty strip is left behind. */
+    ctx.globalAlpha = (won ? 0 : S.arrowA) * (still() ? 0.28 : 0.35);
+    ctx.fillStyle = '#0E0818';
+    for (var s0 = 0; s0 < 2; s0++) {
+      var sd0 = SD[s0];
+      ctx.fillRect(sd0.x - 4, sd0.y - 4, 4 * sd0.p + 8, N * sd0.s + 8);
+    }
+    ctx.globalAlpha = 1;
 
     /* receptors: his auto-confirm, yours press, then confirm on a hit or a held tail */
     var held = [[0, 0, 0, 0], [0, 0, 0, 0]];
@@ -1541,12 +1581,14 @@
       ctx.globalAlpha = still() ? 1 : Math.min(1, (performance.now() - winAt) / 300);
       if (NEU.glyph && NEU.glyph.compact()) { ctx.fillStyle = '#FFD34E'; NEU.glyph.draw(ctx, 'check', g.w / 2 - 7, g.popY - 16); }
       else text('SONG CLEAR', g.w / 2, g.popY, g.w < 600 ? 48 : 96, '#FFD34E');
+      text(rankOf(), g.w / 2, g.popY + (g.w < 600 ? 56 : 112), 32, '#FFD34E');
       ctx.globalAlpha = 1;
     }
     /* 3-2-1-GO in big numerals over your lane, fading through each beat */
     if (S.countdown) {
       ctx.globalAlpha = still() ? 1 : 1 - beatFrac(sp) * 0.7;
       text(S.countdown, g.cx, g.popY, 96, S.countdown === 'GO!' ? '#FFD34E' : '#FFFFFF');
+      if (round === CHARTS.length - 1) text('FINAL ROUND', g.w / 2, g.popY + (g.w < 600 ? 56 : 112), 32, '#E04A6B');
       ctx.globalAlpha = 1;
     }
 
@@ -1610,12 +1652,14 @@
       text(NEU.glyph && NEU.glyph.compact() ? NEU.glyph.key('x') : 'X or tap to leave', g.w / 2, g.h / 2 + 80, 16, '#EDE7DE');
     }
     ctx.restore();
-    if (NEU.juice && NEU.juice.drawParts) NEU.juice.drawParts(ctx, 1 / 60);
     if (NEU.juice && NEU.juice.end) NEU.juice.end(ctx, shook);
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
 
   /* ── input ──────────────────────────────────────────────────────*/
+  /* FNF supports keyboard, gamepad and dance pad; NEU uses ONE authority.
+     NEU.keys owns rebinding; laneOf is the only lane mapper. No second
+     keydown/gamepad listener here, or a rebind would silently stop working. */
   function laneOf(e) {
     var k = e.key;
     /* keys.js has already turned a moved key back into its default name */
@@ -1778,7 +1822,7 @@
   NEU.rhythm = { open: open, close: close, win: win, songPos: songPos,
                  get running() { return running; }, get notes() { return notes; },
                  state: S, pops: pops, geom: geom, noteY: noteY, dirOf: dirOf,
-                 charts: CHARTS, bpm: BPM, WINDOW: WINDOW_MS / 1000,
+                 charts: CHARTS, chart: songChart, rank: rankOf, offset: offset, bpm: BPM, WINDOW: WINDOW_MS / 1000,
                  sections: SECTIONS, length: SONG, soulHit: soulHit,
                  stats: chartStats, MAX_GAP: MAX_GAP, breaks: BREAK_AT, breakRaw: BREAK_RAW,
                  sec: SEC, barOf: barOf, scoreLine: scoreLine, ballLit: ballLit,
