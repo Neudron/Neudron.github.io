@@ -184,7 +184,9 @@
     info.appendChild(el('span', '', 'act: ' + actLabel(data)));
     info.appendChild(el('span', '', 'zone: ' + (data.room || 'not in a room')));
     var goal = NEU.quest && NEU.quest.nextText ? NEU.quest.nextText() : null;
-    info.appendChild(el('span', '', 'objective: ' + (goal || 'all caught up')));
+    var objective = el('span', 'menu__objective', 'objective: ' + (goal || 'all caught up'));
+    if (NEU.glyph) NEU.glyph.put(objective, goal ? 'list' : 'check', objective.textContent);
+    info.appendChild(objective);
     info.appendChild(el('span', '', 'time: ' +
       (NEU.save && NEU.save.playtime ? fmtTime(NEU.save.playtime()) : '0:00')));
     info.appendChild(el('span', '', 'objectives: ' + Object.keys(done).length));
