@@ -6,6 +6,22 @@
   var waterAt = { x: 0.5, y: 0.7 };   /* splash point, in screen fractions */
   function kind(name, def) { kinds[name] = def; return def; }
   function get(name) { return kinds[name] || null; }
+  /* One authority for transition category. A plain descriptor goes in, one
+     of the six categories comes out. Default is CINEMATIC (the classic
+     fade) so no edge silently becomes a seamless seam. */
+  var CATEGORIES = ['SEAMLESS', 'PHYSICAL DOOR', 'VERTICAL', 'SUPERNATURAL', 'CINEMATIC', 'MODE SHIFT'];
+  function classify(d) {
+    d = d || {};
+    var style = d.style || '', via = d.via || '', k = d.kind || '';
+    if (d.split || via === 'split' || /^(rift|crack|painting|recall)$/.test(style)) return 'SUPERNATURAL';
+    if (d.mode || via === 'mode' || /^mode:/.test(k)) return 'MODE SHIFT';
+    if (d.cine || /^cine:/.test(via) || /^cine:/.test(style)) return 'CINEMATIC';
+    if (/^(door|gate|curtain|alley)$/.test(style) || via === 'door' || k === 'door') return 'PHYSICAL DOOR';
+    if (/^(stairs|hatch)$/.test(style) || via === 'stairs' || via === 'fall' || k === 'stairs' || k === 'fall') return 'VERTICAL';
+    if (d.seamless) return 'SEAMLESS';
+    if (/^portal/.test(via) || /^(portal|fire|lightning)$/.test(style)) return 'SUPERNATURAL';
+    return 'CINEMATIC';
+  }
   function start(name, canvas, dir, reduced, incoming, opts) {
     var k = get(name), snapshot;
     if (active) return active;
@@ -106,6 +122,39 @@
     }
     ctx.restore();
   }
+  /* Deltarune-style hidden-game entry: two offscreen halves close in, a 1 px
+     highlight row rides each wipe edge, a 3-alpha ghost trail (0.25 / 0.5 /
+     1.0) drags behind, an 8 px stepped fake shake and a final 999x999 black
+     fade. Reduced motion takes the plain cut in drawState. */
+  function drawSplit(ctx, w, h, scale, a) {
+    var t = a.t, half = w / 2, reach = Math.round(half * t / scale) * scale;
+    var sh = Math.round(8 * scale * Math.sin(t * Math.PI * 6));
+    var ga = [0.25, 0.5, 1.0], lx = reach + sh, rx = w - reach + sh, i, gw;
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    if (a.canvas) ctx.drawImage(a.canvas, 0, 0, w, h);
+    if (a.incoming) {
+      ctx.save(); ctx.beginPath();
+      ctx.rect(sh, 0, Math.max(0, lx - sh), h);
+      ctx.rect(Math.min(w, rx), 0, Math.max(0, w - rx), h);
+      ctx.clip(); ctx.drawImage(a.incoming, 0, 0, w, h); ctx.restore();
+      for (i = 0; i < 3; i++) {
+        ctx.globalAlpha = ga[i];
+        gw = Math.min(2 * scale, w);
+        ctx.drawImage(a.incoming, Math.max(0, lx - (i + 1) * gw), 0, gw, h, Math.max(0, lx - (i + 1) * gw), 0, gw, h);
+        ctx.drawImage(a.incoming, Math.min(w - gw, rx + i * gw), 0, gw, h, Math.min(w - gw, rx + i * gw), 0, gw, h);
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect((lx - scale) | 0, 0, Math.max(1, scale | 0), h);
+      ctx.fillRect(rx | 0, 0, Math.max(1, scale | 0), h);
+    }
+    if (t > 0.85) {
+      ctx.globalAlpha = (t - 0.85) / 0.15; ctx.fillStyle = '#000000';
+      ctx.fillRect(-499 * scale, -499 * scale, 999 * scale, 999 * scale);
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
   function drawState(ctx, w, h, scale, a) {
     if (!a) return;
     if (a.name === 'portal:water') {
@@ -182,6 +231,7 @@
   kind('portal:d_city>h3_trip', { ms: 380 });
   kind('portal:recall', { ms: 2850 });
   kind('portal:water', { ms: 400, cover: function (a) { a.wx = waterAt.x; a.wy = waterAt.y; } });
+  kind('split', { ms: 460, cut: 150, draw: drawSplit });   /* hidden-game entry: Deltarune two-half wipe */
   kind('cine:rooms-g-trip', { ms: 320 });
   kind('cine:crack-sky', { ms: 320 });
   /* v4-B4: one themed kind per mode entry. cut = the reduced-motion hold in ms (a cut, not a wipe). Callers: engine.js,
@@ -192,7 +242,8 @@
   kind('mode:rhythm', { ms: 700, cut: 150, draw: drawStatic });
   kind('mode:quiz', { ms: 700, cut: 150, draw: drawStatic });
   kind('mode:cards', { ms: 600, cut: 150, draw: drawCards });
-  NEU.engineTrans = { kind: kind, get: get, enabled: enabled, start: start, step: step, draw: draw, motion: motion, enterMode: enterMode,
+  NEU.engineTrans = { kind: kind, get: get, enabled: enabled, classify: classify, CATEGORIES: CATEGORIES,
+    start: start, step: step, draw: draw, motion: motion, enterMode: enterMode,
     setOrigin: function (x, y) { waterAt.x = x; waterAt.y = y; },
     get active() { return active; }, get overlay() { return overlay; }, cut: function () { active = null; } };
 })();
