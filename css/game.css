@@ -224,6 +224,9 @@
 .tbox__txt::before { content: '*'; position: absolute; left: 0; top: 0; }
 
 /* Compact glyphs keep the copy in the accessibility tree. */
+#tboxCue { display: none; }
+html.neu-hints-off:not(.rm) #tboxCue:not(:empty) { display: block; flex: 1; align-self: center; }
+html.neu-hints-off:not(.rm) #tboxCue .glyph__shape { font-size: 32px; }
 .glyph__shape { display: none; width: 1em; height: 1em; fill: currentColor; vertical-align: middle; flex: none; }
 html.neu-hints-off:not(.rm) .glyph__shape { display: inline-block; }
 html.neu-hints-off:not(.rm) .glyph__copy {

@@ -235,7 +235,7 @@
   ];
 
   /* the one textbox on the site, never a canvas copy of it */
-  function say(s) { if (NEU.talk) NEU.talk([s], 'narr'); }
+  function say(s, cue) { if (NEU.talk) NEU.talk([s], 'narr', cue); }
 
   function layout() {
     var dpr = 1;   /* pixel art, smoothing off: a 2x backing store is 4x the fill for nothing */
@@ -266,12 +266,12 @@
   function fitSwitch() {
     var sr = swRect();
     if (!onSwitch(sr)) return;
-    if (fixed) { say('it works. go on.'); return; }
+    if (fixed) { say('it works. go on.', 'check'); return; }
     fixed = true;
     var scx = sr.left + sr.width / 2, scy = sr.top + sr.height / 2;
     ringAdd(scx, scy, '#C9A227', 10, 120, 500, 1);
     if (NEU.juice) { NEU.juice.burst(scx, scy, 30, '#C9A227', 200); NEU.juice.hit('large', { colour: '#FFE08A' }); }
-    say('the clicker seats with a click. of course it does.');
+    say('the clicker seats with a click. of course it does.', 'dock');
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     if (NEU.fitClicker) NEU.fitClicker();
     setTimeout(function () { if (running && mode === 'walk') close(); }, 1500);
