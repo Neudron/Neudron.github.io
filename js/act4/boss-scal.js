@@ -2226,13 +2226,14 @@
     var fy = by + 28 + STRIP.length * rowH + 4;
     ctx.fillStyle = '#3A1016'; ctx.fillRect(bx + 16, fy, bw - 32, 2);
     /* HP as hearts, TP as a number, then the gauge across the panel */
-    ctx.fillStyle = '#C0BCC8'; ctx.fillText('HP', bx + 24, fy + 14);
+    ctx.fillStyle = '#C0BCC8'; if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'heart', bx + 24, fy + 10);
+    else ctx.fillText('HP', bx + 24, fy + 14);
     for (i = 0; i < MAXHP; i++) {
       stamp(['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'],
             bx + 66 + i * 16, fy + 22, 2, i < hp ? COL.soul : '#2A1A20');
     }
     ctx.textAlign = 'right'; ctx.fillStyle = '#FF9E30';
-    ctx.fillText('TP ' + (tp >= 1 ? 'MAX' : Math.floor(tp * 100) + '%'), bx + bw - 24, fy + 14);
+    ctx.fillText((NEU.glyph && NEU.glyph.compact() ? '' : 'TP ') + (tp >= 1 && !(NEU.glyph && NEU.glyph.compact()) ? 'MAX' : Math.floor(tp * 100) + '%'), bx + bw - 24, fy + 14);
     /* the TP gauge: cells across the panel, orange; the share the
        selected action would spend blinks pale over the top of the fill */
     var gx = bx + 24, gy = fy + 40, gw = bw - 48, cells = 25, cw = gw / cells, fill = tp * cells;
@@ -2251,9 +2252,10 @@
       }
     }
     ctx.textAlign = 'left'; ctx.fillStyle = COL.dim;
-    ctx.fillText(kn('z') + ' use  ·  ' + kn('x') + ' back', bx + 24, fy + 64);
+    ctx.fillText(NEU.glyph && NEU.glyph.compact() ? NEU.glyph.key('z') + '  ·  ' + NEU.glyph.key('x') : kn('z') + ' use  ·  ' + kn('x') + ' back', bx + 24, fy + 64);
     ctx.textAlign = 'right'; ctx.fillStyle = '#5A5668';
-    ctx.fillText('graze bullets for TP', bx + bw - 24, fy + 64);
+    if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'graze', bx + bw - 40, fy + 61);
+    else ctx.fillText('graze bullets for TP', bx + bw - 24, fy + 64);
     ctx.textAlign = 'left';
     ctx.restore();
   }
