@@ -27,8 +27,13 @@
   var acc = 0, K = 0.35;   /* frame accumulator; arena px per Terraria px */
   var ATK = {};
 
+  /* one tier read for this module. The live page loads core/boss.js; a
+     standalone harness that loads only this file still lands on NEU.diff. */
+  function mul(k) {
+    return NEU.boss && NEU.boss.mul ? NEU.boss.mul(k) : (NEU.diff && NEU.diff.f ? NEU.diff.f(k) : 1);
+  }
   function D(d) { return d * K; }
-  function V(v) { return v * 60 * K; }
+  function V(v) { return v * 60 * K * mul('bulletSpeed'); }
   /* the pattern stream: Math.random until start() gives each fight its own seeded one */
   var RNG = Math.random;
   function rnd(a, b) { return a + RNG() * (b - a); }
@@ -142,7 +147,7 @@
     return ((a[0] + (b[0] - a[0]) * k) | 0) + ',' + ((a[1] + (b[1] - a[1]) * k) | 0) + ',' + ((a[2] + (b[2] - a[2]) * k) | 0);
   }
   /* telegraph length: every telegraph is 24-30 f (60 fps), whatever pace the attack asks for */
-  function teleT(T) { return clamp(T, 24, 30); }
+  function teleT(T) { return clamp(T, 24, 30) * mul('tele'); }
   /* a warning: a line (a = angle) or a ring (r = radius) that ramps up to its hit frame */
   function warn(o) { o.life = clamp(o.life || 24, 24, 30); o.at = G.fr; fx().warn.push(o); return o; }
   /* a safe gap (cyan, dashed, no fill): len across the wall, full depth of the
@@ -2254,9 +2259,11 @@
      that earns the long gap. Gaps: TUNE.gap f between attacks, TUNE.gapBig after big. */
   /* the gap lengths live in NEU.scal.TUNE (boss-scal.js), read at call time */
   function tune() {
-    return (NEU.scal && NEU.scal.TUNE) || {
+    var t = (NEU.scal && NEU.scal.TUNE) || {
       phaseF: 75, gap: 52, gapBig: 150, ceilVeil: 0.45
     };
+    return { phaseF: t.phaseF * mul('gap'), gap: t.gap * mul('gap'),
+             gapBig: t.gapBig * mul('gap'), ceilVeil: t.ceilVeil };
   }
   var TIMING = {
     HorizontalDarkSoulRelease: { tele: 30 }, CondemnationFanBurst: { tele: 30 }, ExplosiveCharges: { tele: 30 },
