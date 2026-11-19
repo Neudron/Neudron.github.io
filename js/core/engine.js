@@ -145,6 +145,87 @@
     return true;
   }
 
+  /* merge(roomId, areas, opts) — declare ONE contiguous physical room from
+     area defs. The a/d/s zones used to hand-roll this in their room files;
+     this is that same operation as data. It reuses register()/alias()/areas[]
+     below, so room, camera, flags and save keep a single authority — merge
+     adds no parallel registry. Every legacy area id stays an alias with its
+     old spawns and its own save namespace (entity.origin).               */
+  function merge(roomId, areas, opts) {
+    opts = opts || {};
+    var i, j, a, p, rows, maxX = 0, maxY = 0, cursor = 0, P = [], seen = {};
+    if (typeof roomId !== 'string' || !roomId || rooms[roomId] || aliases[roomId] ||
+        !Array.isArray(areas) || !areas.length) return null;
+    /* 1. normalise each area def into a local grid + world offset. */
+    for (i = 0; i < areas.length; i++) {
+      a = areas[i];
+      if (!a || typeof a.id !== 'string' || !a.id || seen[a.id] || typeof a.tiles !== 'string') return null;
+      seen[a.id] = true;
+      rows = a.tiles.split('\n').filter(function (r) { return r.length; });
+      p = { def: a, grid: rows, h: rows.length,
+            w: rows.reduce(function (m, r) { return Math.max(m, r.length); }, 0),
+            /* Explicit x/y win; a missing x auto-packs left-to-right and a
+               missing y sits at row 0. This covers both hand-laid footprints
+               (a/d/s) and a synthetic contiguous strip. */
+            x: a.x == null ? cursor : a.x | 0, y: a.y == null ? 0 : a.y | 0 };
+      cursor = Math.max(cursor, p.x + p.w);
+      P.push(p);
+    }
+    for (i = 0; i < P.length; i++) { maxX = Math.max(maxX, P[i].x + P[i].w); maxY = Math.max(maxY, P[i].y + P[i].h); }
+    /* 2. world-coordinate TILE paint: every cell lands at its absolute
+       x/y; filler is wall so a seam can never read as a hole. */
+    var grid = [], y, x, row;
+    for (y = 0; y < maxY; y++) { row = []; for (x = 0; x < maxX; x++) row.push('#'); grid.push(row); }
+    for (i = 0; i < P.length; i++) {
+      p = P[i];
+      for (y = 0; y < p.h; y++) { row = p.grid[y]; for (x = 0; x < row.length; x++) grid[p.y + y][p.x + x] = row[x]; }
+    }
+    /* 3. spawns (final merged keys), area records, entities (origin-tagged). */
+    var spawns = {}, areaRec = [], entList = [];
+    for (i = 0; i < P.length; i++) {
+      p = P[i]; a = p.def;
+      var map = a.spawnMap || {}, local = a.spawns || {}, name, s, key = a.spawn || map.default;
+      for (name in local) if (Object.prototype.hasOwnProperty.call(local, name)) {
+        s = local[name];
+        if (!s || typeof s.x !== 'number' || typeof s.y !== 'number') return null;
+        spawns[name] = { x: s.x + p.x, y: s.y + p.y, face: s.face || 'down' };
+      }
+      if (!key || !spawns[key]) {
+        /* No declared default: first open cell inside this area's footprint. */
+        var found = null;
+        for (y = 0; y < p.h && !found; y++) for (x = 0; x < p.w; x++)
+          if (grid[p.y + y][p.x + x] !== '#') { found = { x: p.x + x, y: p.y + y, face: 'down' }; break; }
+        if (!found) return null;
+        key = a.id + '_default'; spawns[key] = found;
+      }
+      var rec = { id: a.id, x0: p.x, y0: p.y, x1: p.x + p.w - 1, y1: p.y + p.h - 1, spawn: key };
+      if (typeof a.onEnter === 'function') rec.onEnter = a.onEnter;
+      for (j in a.area || {}) if (Object.prototype.hasOwnProperty.call(a.area, j)) rec[j] = a.area[j];
+      areaRec.push(rec);
+      var src = a.entities || [], e, k;
+      for (j = 0; j < src.length; j++) {
+        e = {}; for (k in src[j]) if (Object.prototype.hasOwnProperty.call(src[j], k)) e[k] = src[j][k];
+        if (!e.origin) e.origin = { room: a.id, x: e.x, y: e.y };
+        e.part = a.id; e.x += p.x; e.y += p.y;
+        entList.push(e);
+      }
+    }
+    var def = { tileset: opts.tileset || 'woods',
+      tiles: grid.map(function (r) { return r.join(''); }).join('\n'),
+      spawns: spawns, areas: areaRec, entities: entList };
+    for (j in opts.extra || {}) if (Object.prototype.hasOwnProperty.call(opts.extra, j)) def[j] = opts.extra[j];
+    for (j in opts.hooks || {}) if (Object.prototype.hasOwnProperty.call(opts.hooks, j)) def[j] = opts.hooks[j];
+    var roomDef = register(roomId, def);
+    /* 4. aliases last — alias() refuses an id that is already a room. */
+    for (i = 0; i < P.length; i++) {
+      a = P[i].def; var amap = {}, nm;
+      for (nm in a.spawnMap || {}) if (Object.prototype.hasOwnProperty.call(a.spawnMap, nm)) amap[nm] = a.spawnMap[nm];
+      amap.default = a.spawn || amap.default || areaRec[i].spawn;
+      alias(a.id, roomId, amap, a.id);
+    }
+    return roomDef;
+  }
+
   function areaTarget(id) {
     var found = null, collision = !!rooms[id], ids = Object.keys(rooms);
     for (var i = 0; i < ids.length; i++) {
@@ -367,6 +448,7 @@
     slideD = 0;
     slideDead = false;
     ents = spawnEnts(room);
+    buildPartIndex();
     if (room.onReset) room.onReset();
     say(['the room resets itself. it has done this before.'], 'narr');
   }
@@ -820,6 +902,34 @@
     });
   }
 
+  /* Entity partition. origin.room is the one authority for an entity's
+     legacy area (that is also what keys its saves); `part` is set by merge()
+     but hand-merged rooms carry origin.room too, so one index covers both.
+     Holds references, never copies, so death / pushed blocks / R-reset are
+     reflected without a second authority. Read-only: lookup and the fixed
+     60 Hz swept sim keep scanning `ents`; the index only answers culling /
+     per-area queries (proven in fixes930). */
+  var partIndex = {};
+  function buildPartIndex() {
+    partIndex = {};
+    for (var i = 0; i < ents.length; i++) {
+      var p = ents[i].part || (ents[i].origin && ents[i].origin.room) || (room && room.id) || '?';
+      (partIndex[p] || (partIndex[p] = [])).push(ents[i]);
+    }
+  }
+  function entsInPart(id) {
+    var list = partIndex[id] || [], out = [];
+    for (var i = 0; i < list.length; i++) if (!list[i].dead) out.push(list[i]);
+    return out;
+  }
+  function partInfo() {
+    var counts = {}, parts = [], total = 0;
+    for (var p in partIndex) if (Object.prototype.hasOwnProperty.call(partIndex, p)) {
+      var live = entsInPart(p); counts[p] = live.length; total += live.length; parts.push(p);
+    }
+    return { room: room ? room.id : null, parts: parts, counts: counts, total: total };
+  }
+
   /* Taking an entity's item for good. The gone flag keeps spawnEnts from
      putting it back on any later visit; the chime and burst match the
      pickup kind so a taken thing feels the same whichever kind it is. */
@@ -850,6 +960,7 @@
        back to their starting cells. */
     room.__solved = NEU.save ? NEU.save.flagged('solved:' + target.id) : false;
     ents = spawnEnts(room);
+    buildPartIndex();
     var s = (room.spawns && room.spawns[target.spawn]) || (room.spawns && room.spawns.default);
     if (!s) {
       /* An exit naming a spawn the target room does not declare is a
@@ -1781,6 +1892,7 @@
     },
     entHere: entHere, reset: resetPuzzle, check: checkPuzzle,
     ents: function () { return ents; },
+    entsInPart: entsInPart,
     key: function (prefix, e) { return entityKey(prefix, room, e); },
     solved: function (id) { return NEU.save ? NEU.save.flagged('solved:' + id) : false; },
     markSolved: function (id) { if (NEU.save) NEU.save.flag('solved:' + id, 1); },
@@ -1808,8 +1920,9 @@
   });
 
   NEU.engine = {
-    register: register, alias: alias, tileset: tileset, decor: decor, enter: enter, leave: leave, resume: resume, go: go,
+    register: register, alias: alias, merge: merge, tileset: tileset, decor: decor, enter: enter, leave: leave, resume: resume, go: go,
     confirmExit: confirmExit,
+    partInfo: partInfo,
     where: function () { return room ? { room: currentArea || room.id, spawn: room.__spawn } : null; },
     get running() { return running; },
     get room() { return room ? room.id : null; },
