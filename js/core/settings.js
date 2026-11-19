@@ -12,7 +12,7 @@
      larger text        — zooms the whole page 1.25x
      reduce hit-stop    — juice.js skips the frozen frame on impacts
      reduce particles   — juice.js stops spawning impact debris
-     relaxed quiz timer — the show gives twenty-four seconds, not twelve
+     relaxed quiz timer — the show gives twenty-four seconds, not twelve. New: particle budget (500/160/100), photosensitivity (≤3 flashes/s, no shake, no afterimages), visual overlay (0..1, default 0.5).
 
    Larger text is a zoom, not a font-size, and that is deliberate:
    the Undertale faces are drawn on a 16px grid, so resampling a
@@ -44,6 +44,9 @@
   var K_RELAX = 'opt_relaxedQuiz';  /* on = the quiz gives twice the time */
   var K_MUSIC = 'opt_music';        /* owned by music.js; read here    */
   var K_MUTE  = 'opt_mute';         /* on = silent; the level is kept  */
+  var K_PHOTOSENS = 'opt_photosensitive'; /* opt-in: clamp flashes, no shake */
+  var K_OVERLAY = 'opt_overlay';    /* 0..100 -> 0..1, default 50       */
+  var K_PARTCAP = 'opt_particleCap';/* active-particle ceiling, default 500 */
 
   var M = NEU.motion || {
     reduced: function () { return false; }, calmFlash: function () { return false; },
@@ -86,6 +89,11 @@
       NEU.juice.setNoFlash(false);
       NEU.juice.setNoHitstop(state(K_STOP));
       NEU.juice.setNoParticles(state(K_PART));
+      /* One budget, one flash rate, one intensity. The save file owns the
+         values; juice holds only the live copies it reads each effect. */
+      if (NEU.juice.setParticleCap) NEU.juice.setParticleCap(num(K_PARTCAP, 500));
+      if (NEU.juice.setOverlayIntensity) NEU.juice.setOverlayIntensity(num(K_OVERLAY, 50) / 100);
+      if (NEU.juice.setPhotosensitive) NEU.juice.setPhotosensitive(state(K_PHOTOSENS));
     }
     document.documentElement.classList.toggle('text-lg', !!state(K_TEXT));
     /* Music reads the flag itself. Sound effects (sans.js) read this
@@ -300,7 +308,10 @@
      God of War Ragnarök and The Last of Us Part II lead with. */
   function calmAll() {
     M.set('reduced', 'reduced');
-    if (NEU.save) { NEU.save.flag(K_SHAKEPCT, 0); NEU.save.flag(K_STOP, 1); NEU.save.flag(K_PART, 1); }
+    if (NEU.save) {
+      NEU.save.flag(K_SHAKEPCT, 0); NEU.save.flag(K_STOP, 1); NEU.save.flag(K_PART, 1);
+      NEU.save.flag(K_PHOTOSENS, 1); NEU.save.flag(K_PARTCAP, 160);
+    }
     apply(); refresh();
   }
   function defaults() {
@@ -308,6 +319,7 @@
     if (NEU.save) {
       NEU.save.flag(K_SHAKEPCT, 100); NEU.save.flag(K_SHAKE, 0); NEU.save.flag(K_STOP, 0);
       NEU.save.flag(K_PART, 0); NEU.save.flag(K_TEXT, 0); NEU.save.flag(K_RELAX, 0);
+      NEU.save.flag(K_PHOTOSENS, 0); NEU.save.flag(K_PARTCAP, 500); NEU.save.flag(K_OVERLAY, 50);
     }
     apply(); refresh();
   }
@@ -500,6 +512,11 @@
         'hits leave no debris behind', function (on) {
       set(K_PART, on);
     }));
+    pConfig.appendChild(seg('settPartBudget', 'particle budget',
+        'full 500, low 160, minimal 100. decoration goes before hit and telegraph feedback.',
+        [['500', 'full'], ['160', 'low'], ['100', 'minimal']],
+        function () { return String(num(K_PARTCAP, 500)); },
+        function (v) { if (NEU.save) NEU.save.flag(K_PARTCAP, +v); apply(); }));
 
     /* 2. Keybinds pane */
     var pKeys = panes.keybinds;
@@ -552,6 +569,10 @@
         'zooms the whole page 1.25x', function (on) {
       set(K_TEXT, on);
     }));
+    pDisplay.appendChild(slider('settOverlay', 'visual overlay',
+        'full-screen flashes. drag to zero for none; middle is normal.',
+        function () { return num(K_OVERLAY, 50); },
+        function (v) { if (NEU.save) NEU.save.flag(K_OVERLAY, v); apply(); }));
 
     /* 5. Accessibility pane */
     var pA11y = panes.accessibility;
@@ -561,6 +582,9 @@
     st.textContent = deviceLine();
     pA11y.appendChild(st);
 
+    pA11y.appendChild(row('settPhotosens', 'photosensitivity',
+        'flashes capped at three a second, no screen shake, no afterimages. warnings stay.',
+        function (on) { set(K_PHOTOSENS, on); }));
     pA11y.appendChild(row('settRelaxed', 'relaxed quiz timer',
         'twenty-four seconds a question, not twelve', function (on) {
       set(K_RELAX, on);
@@ -626,6 +650,7 @@
       ['settSound', !state(K_MUTE)],
       ['settHitstop',   state(K_STOP)],
       ['settParticles', state(K_PART)],
+      ['settPhotosens', state(K_PHOTOSENS)],
       ['settRelaxed', state(K_RELAX)],
       ['settTouch', NEU.touch ? NEU.touch.visible || NEU.touch.mode === 'on' : false]
     ];
@@ -640,9 +665,14 @@
       sk.value = String(shakePct());
       sk.setAttribute('aria-valuetext', shakePct() === 0 ? 'off' : shakePct() + '%');
     }
+    var ov = document.getElementById('settOverlay');
+    if (ov) {
+      ov.value = String(num(K_OVERLAY, 50));
+      ov.setAttribute('aria-valuetext', +ov.value === 0 ? 'off' : ov.value + '%');
+    }
     var dv = document.getElementById('settDevice');
     if (dv) dv.textContent = deviceLine();
-    ['settMotion', 'settFlashing'].forEach(function (id) {
+    ['settMotion', 'settFlashing', 'settPartBudget'].forEach(function (id) {
       var g = document.getElementById(id);
       if (g && g._paint) g._paint();
     });
@@ -947,6 +977,9 @@
     get text() { return state(K_TEXT); },
     get hitstop() { return state(K_STOP); },
     get particles() { return state(K_PART); },
+    get photosensitive() { return state(K_PHOTOSENS); },
+    get overlayIntensity() { return num(K_OVERLAY, 50) / 100; },
+    get particleCap() { return num(K_PARTCAP, 500); },
     get relaxedQuiz() { return state(K_RELAX); },
     get muted() { return state(K_MUTE); },
     get music() { return num(K_MUSIC, 55); }
