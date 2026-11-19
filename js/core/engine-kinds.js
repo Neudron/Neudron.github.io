@@ -321,7 +321,7 @@
          NOT get this guard: they carry their own state and must fire
          even while an unrelated box is open. */
       if (tboxOpen()) return;
-      sys.say(e.lines || ['a wooden sign. nothing else.'], 'narr');
+      sys.say(e.lines || ['a wooden sign. nothing else.'], 'narr', e.textlessCue);
       sfx('tick');
     },
     draw: function (g, e, d) { L().drawProp(g, 'signpost', null, d.sx, d.sy, d.S, d.now, 0); },
@@ -352,7 +352,7 @@
       /* Picked up where they left off: resume from the line they were
          at, capped with a closing beat. Finished talks replay whole. */
       var lines = (at > 0 && at < total) ? base.slice(at).concat(e.close || ['...']) : base;
-      sys.say(lines, who);
+      sys.say(lines, who, e.textlessCue);
       if (NEU.talkWatch) {
         var seen = at;
         NEU.talkWatch(function (i) {

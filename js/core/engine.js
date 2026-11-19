@@ -1657,7 +1657,7 @@
   });
 
   /* ── talking ──────────────────────────────────────────────────── */
-  function say(lines, who) { if (NEU.talk) NEU.talk(lines, who); }
+  function say(lines, who, cue) { if (NEU.talk) NEU.talk(lines, who, cue); }
   function flag(k, v) { return NEU.save ? NEU.save.flag(k, v) : null; }
 
   /* ── open / close ─────────────────────────────────────────────── */

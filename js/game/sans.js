@@ -635,6 +635,7 @@
      whole line goes to this sibling once, when it starts, and the
      region is emptied when the box closes. */
   var tboxSR = document.getElementById('tboxSR');
+  var talkCue = null, cueBox = document.getElementById('tboxCue');
   function srSay(s) { if (tboxSR) tboxSR.textContent = s; }
   /* narr has no face (css hides it) */
   var SH = NEU.sheets || {};
@@ -697,9 +698,10 @@
       }
     }, xHeld ? 8 : 42);
   }
-  function say(lines, who) {
+  function say(lines, who, cue) {
     clearTimeout(xHoldTimer); xHoldTimer = null; xHeld = false; xDown = false;
     queue = lines.slice();
+    talkCue = cue;
     queueV = lines.map(function (_, i) {
       return Array.isArray(who) ? (who[i] || 'narr') : (who || 'sans');
     });
@@ -720,6 +722,20 @@
     srSay(line);
     curV = queueV.shift() || 'sans';
     curIdx++;
+    if (cueBox) {
+      var cue = Array.isArray(talkCue) ? talkCue[curIdx - 1] : talkCue;
+      cueBox.textContent = '';
+      ttxt.classList.toggle('glyph__copy', !!(cue && NEU.glyph));
+      if (cue && NEU.glyph) {
+        if (cue.indexOf('key:') === 0) {
+          var cap = document.createElement('kbd');
+          cap.className = 'glyph__shape glyph__key';
+          cap.setAttribute('data-k', cue.slice(4));
+          cap.textContent = NEU.glyph.key(cue.slice(4));
+          cueBox.appendChild(cap);
+        } else cueBox.appendChild(NEU.glyph.icon(cue));
+      }
+    }
     if (watch) watch(curIdx, curTotal);
     /* The box wears the speaker too. His portrait sat in the corner of
        EVERY box on the page — including the dog's and the television's
@@ -746,7 +762,7 @@
      needs it, so it is lent out rather than reimplemented. Act IV
      talks through this — same typing, same voices, same portraits,
      same z-index, no second box to keep in sync. */
-  NEU.talk = function (lines, who) { say(lines, who); };
+  NEU.talk = function (lines, who, cue) { say(lines, who, cue); };
   /* Clear the box without saying anything new — rooms call this on
      entry so a door does not carry the last room's half-typed line. */
   NEU.talk.close = function () {
@@ -1171,7 +1187,7 @@
       return;
     }
     if (state === 'here') {
-      say(GREET);
+      say(GREET, 'sans', ['talk', 'arrow', 'talk']);
       /* Appears in his left hand, winds up, then gets thrown. See the
          launch block below for why it is a solved parabola and not a
          tween. */
@@ -1754,7 +1770,7 @@
       else flyHome();
       return;
     }
-    if (!overSans(x, y)) { setLedge(); say(["swing and a miss. classic."]); missBeat(); flyHome(); return; }
+    if (!overSans(x, y)) { setLedge(); say(["swing and a miss. classic."], 'sans', ['sword']); missBeat(); flyHome(); return; }
 
     state = 'swing';
     var willBreak = swings >= HITS - 1;        // the third landed swing breaks it
@@ -2175,7 +2191,7 @@
   function talkDog() {
     petSwipe();
     if (hasHammer || broken) { say(["he's out of hammers."], 'narr'); return; }
-    say([DOGTALK[Math.min(dogTalks, DOGTALK.length - 1)]], 'dog');
+    say([DOGTALK[Math.min(dogTalks, DOGTALK.length - 1)]], 'dog', dogTalks >= DOGTALK.length - 1 ? 'hammer' : 'dog');
     dogTalks++;
     if (dogTalks >= DOGTALK.length) {
       hasHammer = true;
@@ -2275,7 +2291,7 @@
       return true;
     }
     if (stuck && hasHammer) {
-      say(["...you hit it.", "you hit the jammed light with a hammer."], 'narr');
+      say(["...you hit it.", "you hit the jammed light with a hammer."], 'narr', 'hammer');
       smashLight();
       return true;
     }
@@ -2554,9 +2570,9 @@
       }
       say(["it's already playing."], 'tv'); return;
     }
-    if (!switchSeen) { say(["a television. nothing to put in it."], 'tv'); return; }
+    if (!switchSeen) { say(["a television. nothing to put in it."], 'tv', ['deck']); return; }
     if (!hasConsole) {
-      say(["an empty dock.", "the thing that goes in it is over there, on the blanket."], 'tv');
+      say(["an empty dock.", "the thing that goes in it is over there, on the blanket."], 'tv', ['dock']);
       return;
     }
     var pct = charge();

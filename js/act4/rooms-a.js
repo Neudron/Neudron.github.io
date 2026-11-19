@@ -638,7 +638,7 @@
      none is solid: the castle's one-cell corridors must stay walkable. */
   function inspect(v, x, y, lines) {
     /* `look` is the engine's figure key; `skin` is the castle's art. */
-    return { t: 'npc', skin: v, look: v === 'statue' ? 'stone' : v, x: x, y: y, lines: lines };
+    return { t: 'npc', textlessCue: 'eyes', skin: v, look: v === 'statue' ? 'stone' : v, x: x, y: y, lines: lines };
   }
   /* R5: something you notice by knocking. The first look spends the flag
      and says what is there; later looks are shorter and quieter. */
