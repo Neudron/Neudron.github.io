@@ -411,7 +411,11 @@
       line.className = 'sett__row';
       var l = document.createElement('span');
       l.className = 'sett__lbl';
-      l.textContent = info.title;
+      var actions = { w: 'arrow', a: 'arrow', s: 'arrow', d: 'arrow',
+        z: 'sword', x: 'dash', Shift: 'target', c: 'fire', r: 'reset', i: 'bag',
+        Tab: 'list', m: 'sound', e: 'open' };
+      if (NEU.glyph) NEU.glyph.put(l, actions[info.def], info.title);
+      else l.textContent = info.title;
       line.appendChild(l);
 
       var dots = document.createElement('span');
@@ -422,11 +426,14 @@
       b.type = 'button';
       b.className = info.def === 'e' ? 'sett__key-ext' : 'sett__key';
       var curKey = NEU.keys.label(info.def);
+      b.setAttribute('aria-label', info.title + ' — ' + curKey.toUpperCase());
       b.textContent = '◀ ' + (curKey ? curKey.toUpperCase() : info.def) + ' ▶';
 
       function startCapture() {
         var note = document.getElementById('settKeyNote');
-        b.textContent = 'press a key…';
+        b.setAttribute('aria-label', 'press a key…');
+        if (NEU.glyph) NEU.glyph.put(b, 'key', 'press a key…');
+        else b.textContent = 'press a key…';
         NEU.keys.capture(function (k) {
           if (k !== null) {
             var res = NEU.keys.set(info.def, k);
@@ -676,6 +683,7 @@
     keysNote.className = 'sett__note';
     keysNote.textContent = 'open this any time: the gear, or ctrl + shift + comma. ' +
                            'settings save on this device.';
+    if (NEU.glyph) NEU.glyph.put(keysNote, 'gear', keysNote.textContent);
     box.appendChild(keysNote);
 
     panel.appendChild(box);
