@@ -23,6 +23,14 @@ function walk(dir, out = []) {
 const files = walk(DIST);
 const byName = (re) => files.filter((f) => re.test(f));
 
+/* 1a. The unlicensed webfont kit must never reach the artifact. */
+const blockedFont = byName(/determination|undertale(papyrus|sans)|(?:^|\/)(?:sans|papyrus)-webfont|fonts\/webfonts\//i);
+const fontBinary = byName(/\.(?:woff2?|ttf|eot|otf)$/i);
+const distHtml = read('index.html');
+if (blockedFont.length || fontBinary.length) fail('blocked font in dist: ' + blockedFont.concat(fontBinary).join(', '));
+else if (/as="font"|fonts\/webfonts\//.test(distHtml)) fail('blocked font reference in dist/index.html');
+else ok('dist ships no font binary, blocked font or local font reference');
+
 /* 1. Every public URL and PWA/SEO surface survives. */
 const required = [
   'index.html', '404.html', 'CNAME', '.nojekyll', 'robots.txt', 'sitemap.xml',

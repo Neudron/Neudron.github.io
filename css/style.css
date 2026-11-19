@@ -34,23 +34,13 @@
    849 the key          */
 
 /* ═══════════════════════════════════════════════════════════════════
-   Type: the actual Undertale fonts.
+   Type: licensed pixel faces, all OFL 1.1 from Google Fonts.
 
-   The game's narration, overworld dialogue and interface are set in
-   8-Bit Operator JVE (Jayvee Enaguas). Determination Mono is the
-   faithful recreation of how that text actually renders in-game,
-   rebuilt by Haley Wakamatsu from the game's own spritesheet, and
-   Determination Sans is its proportional variant. Both are used here:
-   Mono for body and interface, Sans for display.
-
-   The font files are NOT in this repo. Download the webfonts kit and
-   drop the whole `webfonts` folder into site/fonts/ — see
-   fonts/README.txt. index.html links that kit's own stylesheet, so
-   the @font-face rules come from the kit and there is nothing here to
-   keep in sync with it.
-
-   Until the files are there the page falls back to Pixelify Sans off
-   Google Fonts, which is also a pixel face, so nothing looks broken.
+   Pixelify Sans carries the body, interface and display: a pixel face
+   with the old bitmap feel and a public redistribution grant. Comic
+   Neue sets talk; Cormorant Garamond and VT323 keep the boot screen.
+   No font file ships — the unlicensed webfont kit was removed, so
+   there are no local @font-face rules to keep in sync.
 
    THE SIZES ARE INTEGERS ON PURPOSE — and this is the font author's
    own advice, not a preference: "the fonts look best when your font
@@ -77,18 +67,13 @@
   --edge: #5C5C70;           /* interactive control borders — 3.07:1 on --void */
   --accent: var(--lilac);    /* the accent that is actually safe to read */
 
-  /* Determination Mono is the in-game text; Sans is its variant. The
-     *Fallback faces (fonts/webfonts/stylesheet.css) are local fonts
-     resized to the real faces' metrics: they hold the text while the
-     real face loads, so its swap does not move the page. */
-  --font:  "Determination Mono", "Pixelify Sans", "Determination Mono Fallback", ui-monospace, monospace;
-  --font-talk: 'Undertale Sans', 'Comic Sans MS', 'Comic Neue', cursive;
-  /* Papyrus for the objectives panel. It is the one place a second
-     in-game face belongs: a list of tasks is not the site's voice, it
-     is an overlay on top of it, and giving it its own typeface stops
-     it reading as page content. The kit ships it; nothing new loads. */
-  --font-quest: 'Undertale Papyrus', 'Determination Mono', 'Pixelify Sans', monospace;
-  --font-display: "Determination Sans", "Determination Mono", "Pixelify Sans", "Determination Sans Fallback", ui-monospace, monospace;
+  /* One pixel face on every surface; the CDN loads it once. */
+  --font:  "Pixelify Sans", ui-monospace, monospace;
+  --font-talk: 'Comic Neue', 'Comic Sans MS', cursive;
+  /* The objectives panel keeps a monospace stack so a list of tasks
+     still reads as an overlay, not page content. */
+  --font-quest: "Pixelify Sans", ui-monospace, monospace;
+  --font-display: "Pixelify Sans", ui-monospace, monospace;
 
   --bounce: cubic-bezier(.34, 1.36, .64, 1);
   --gutter: clamp(42px, 7vw, 120px);
@@ -2326,7 +2311,7 @@ html.text-lg .eng { zoom: 0.8; }
 }
 .tpad__b {
   pointer-events: auto; touch-action: none;
-  font: 16px/1 'Determination Mono', ui-monospace, monospace;
+  font: 16px/1 'Pixelify Sans', ui-monospace, monospace;
   color: var(--text);
   min-width: 72px; min-height: 72px;      /* >= 44px, comfortably */
   padding: 0 10px;

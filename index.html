@@ -24,15 +24,6 @@
 <!-- Canonical, og:url and the JSON-LD url below must stay identical —
      a mismatch across the three is what disqualifies rich results. -->
 <link rel="canonical" href="https://www.neu.ac/">
-<!-- The body font is on nearly every paint — start it before CSS parsing
-     discovers it inside fonts/webfonts/stylesheet.css. crossorigin is
-     required even same-origin: font requests are CORS-mode. -->
-<link rel="preload" href="fonts/webfonts/determinationmonoweb-webfont.woff2" as="font" type="font/woff2" crossorigin>
-<!-- The talk face is `optional`: a download that only starts when the
-     first line is typed misses its 100ms window, and the box falls back
-     (to a script face on phones) for the whole visit. 7.7 KB, so start
-     it here and it is in hand before anyone speaks. -->
-<link rel="preload" href="fonts/webfonts/sans-webfont.woff2" as="font" type="font/woff2" crossorigin>
 <script type="application/ld+json">
 { "@context": "https://schema.org",
   "@type": "WebSite",
@@ -46,14 +37,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<!-- The real Undertale faces — Carter Sande's kit, now SELF-HOSTED in
-     fonts/webfonts/ exactly as its author asks. The remote hotlink that
-     used to sit above this line is gone; nothing here depends on
-     anyone else's bandwidth any more. The kit's own stylesheet is used
-     unmodified, so the @font-face rules live with the files. -->
-<link rel="stylesheet" href="fonts/webfonts/stylesheet.css">
-<!-- Pixelify Sans: pixel fallback until the Undertale kit is installed.
-     Cormorant + VT323: the boot screen keeps its original typography. -->
+<!-- Every face is OFL 1.1 and loads from Google Fonts: Pixelify Sans is
+     the pixel grid, Cormorant + VT323 keep the boot typography, Comic
+     Neue sets talk. No font file is shipped, so nothing to preload. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&family=Cormorant+Garamond:ital,wght@1,300&family=VT323&family=Comic+Neue:wght@400;700&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&family=Cormorant+Garamond:ital,wght@1,300&family=VT323&family=Comic+Neue:wght@400;700&display=swap"></noscript>
 <link rel="stylesheet" href="css/style.css">
@@ -522,8 +508,8 @@
     </p>
     <p class="colophon lay lay--colophon">
       Undertale &amp; Deltarune are Toby Fox's. Boss behaviour references the
-      Calamity mod. Fonts by Carter Sande's kit and Pixelify Sans. A personal
-      fan page — nothing here is official or for sale.
+      Calamity mod. Type: Pixelify Sans, Comic Neue, Cormorant Garamond and
+      VT323, all SIL OFL. A personal fan page — nothing official or for sale.
     </p>
     <p class="colophon lay lay--colophon">
       no analytics, no cookies. your save stays in this browser.
