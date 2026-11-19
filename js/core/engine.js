@@ -86,6 +86,7 @@
   var busy = false;                    // a cutscene owns input
   var hideTransitionPlayer = false, transitionCanvas = null, transitionNewCanvas = null, transitionPlayer = null, transitionStarting = false, frameNow = 0;
   var physical = null, physicalExit = null;
+  var transitionCategory = null;       // last category from engineTrans.classify (one authority)
   var playerAct = null;                // { name, t, max } — a held player pose (the recall drink)
   var sitting = null;                  // { ent, x, y } — seated on a seat entity until a move key
   var cine = false;                    // a scripted walk owns the stick (api.drive)
@@ -732,6 +733,18 @@
     if (kind === 'fall') settle = 0.18;
     if (kind === 'stairs') startPhysicalSlide('slide', dir, 270);
   }
+  /* SEAMLESS: the a1/a2/a3 areas share one grid, so landing at the
+     neighbour's spawn leaves the camera where the player already is.
+     Keep held keys and travel velocity across the seam; never fade, never
+     write a save mid-portal (land() saves once, at the safe spawn). */
+  function seamlessGo(id, spawn) {
+    var held = {}, k, dx = vx, dy = vy;
+    for (k in keys) if (keys[k]) held[k] = true;
+    if (!land(id, spawn)) { busy = false; return; }
+    keys = held; vx = dx; vy = dy;
+    fade = 0; fadeDir = 0; fadeThen = null;
+    busy = false;
+  }
   function go(id, spawn, via, exit) {
     if (!resolve(id, spawn)) { say(['there is nothing through there. yet.'], 'narr'); return; }
     var T = NEU.engineTrans, kind = null, dir = face;
@@ -747,6 +760,11 @@
       if (exit && /^(left|right|up|down)$/.test(exit.dir || '')) dir = exit.dir;
       else if (pick && /^(left|right|up|down)$/.test(pick.dir || '')) dir = pick.dir;
     }
+    var seam = !!(room && room.tileset === 'woods' && /^a[123]_/.test(currentArea || room.id) && /^a[123]_/.test(id));
+    if (via === 'split' || /^(rift|crack|painting)$/.test(style || '')) kind = 'split';
+    transitionCategory = T && T.classify ? T.classify({ seamless: seam, style: style, via: via, kind: kind,
+      cine: /^cine:/.test((via || '') + (style || '')), mode: /^mode:/.test(kind || '') }) : 'CINEMATIC';
+    if (transitionCategory === 'SEAMLESS') { seamlessGo(id, spawn); return; }
     busy = true;
     if (/^(door|stairs|fall)$/.test(kind || '')) { beginPhysical(id, spawn, kind, dir, exit); return; }
     if (kind) {
@@ -1538,15 +1556,39 @@
     if (physicalExit) delete physicalExit.__transitionNear;
     if ((transitionPlayer || physical) && NEU.engineTrans) NEU.engineTrans.cut();
     physical = null; physicalExit = null; transitionPlayer = null; transitionStarting = false; cine = false;
+    transitionCategory = null;
     if (NEU.kernel) NEU.kernel.push('engine');
     if (NEU.settings && NEU.settings.warnFlash) NEU.settings.warnFlash();
     wrap.hidden = false;
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
     layout();
-    land(id, spawn);
-    fade = 1; fadeDir = -1; fadeThen = null;
-    fadeSpan = opts && opts.iris > 0 ? opts.iris : IRIS;
+    /* opts.split (or entry:'hidden') plays the Deltarune two-half wipe on
+       hidden-game entry. Reduced motion skips it for a plain cut. */
+    var wantSplit = !!(opts && (opts.split || opts.entry === 'hidden')) && !reduced &&
+      NEU.engineTrans && NEU.engineTrans.get('split');
+    if (!wantSplit) {
+      land(id, spawn);
+      fade = 1; fadeDir = -1; fadeThen = null;
+      fadeSpan = opts && opts.iris > 0 ? opts.iris : IRIS;
+    } else {
+      var fromX = Math.round(px * S) - Math.round((camX + kickX) * S);
+      var fromY = Math.round(py * S) - Math.round((camY + kickY) * S);
+      if (!transitionCanvas) transitionCanvas = document.createElement('canvas');
+      if (!transitionNewCanvas) transitionNewCanvas = document.createElement('canvas');
+      hideTransitionPlayer = true; draw(frameNow); hideTransitionPlayer = false;
+      snapshotInto(transitionCanvas);
+      land(id, spawn);
+      hideTransitionPlayer = true; draw(frameNow); hideTransitionPlayer = false;
+      snapshotInto(transitionNewCanvas);
+      transitionCategory = 'SUPERNATURAL';
+      if (NEU.engineTrans.start('split', transitionCanvas, 'right', false, transitionNewCanvas)) {
+        transitionPlayer = { x: fromX, y: fromY,
+          toX: Math.round(px * S) - Math.round((camX + kickX) * S),
+          toY: Math.round(py * S) - Math.round((camY + kickY) * S) };
+      }
+      fade = 0; fadeDir = 0; fadeThen = null; fadeSpan = IRIS;
+    }
     keys = {}; busy = false; acc = 0;
     /* rhythm and craft re-enter while the room still runs — a second
        loop here would tick everything at double speed. */
@@ -1641,6 +1683,7 @@
     if (physicalExit) delete physicalExit.__transitionNear;
     if ((transitionPlayer || physical) && NEU.engineTrans) NEU.engineTrans.cut();
     physical = null; physicalExit = null; transitionPlayer = null; transitionStarting = false; cine = false; fadeDir = 0; fadeThen = null; busy = false;
+    transitionCategory = null;
     camReset();
     if (NEU.kernel && NEU.kernel.current() === 'engine') NEU.kernel.pop();
     clearLater();
@@ -1796,7 +1839,7 @@
     /* read-only internals for tests and the dev console */
     get debug() {
       return { scale: S, cam: { x: camX, y: camY }, focus: { x: camFocusX, y: camFocusY }, camLead: { x: camLeadX, y: camLeadY }, vel: { x: vx, y: vy }, padH: padH,
-               baked: !!(room && (chunked || layers[room.id])), fade: fade, iris: fadeSpan, prompt: promptFor,
+               baked: !!(room && (chunked || layers[room.id])), fade: fade, iris: fadeSpan, transition: transitionCategory, prompt: promptFor,
                lights: (room && look()) ? lightsFor(0, camX, camY, view()).list.length : 0,
                cine: cine, seat: sitting ? { x: sitting.x, y: sitting.y } : null,
                view: view(), timers: timers.length };

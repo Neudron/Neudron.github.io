@@ -539,6 +539,25 @@
   }
   function placeCamera(dt) {
     var worldH = current.h * TILE, worldW = current.w * TILE, tx, ty, k, cfg;
+    if (current.cameraMode === 'arena') {
+      /* Bullet-hell arena: per-room mode on the one camera, never a second
+         global. 16x16 deadzone, 12-24 px look-ahead, frame-rate-independent
+         smoothing, clamp to the room. Shake stays render-only (J.begin in
+         draw) and is never fed back into the deadzone. */
+      var A = current.arena || {}, dzx = A.deadzone || 16, dzy = A.deadzoneY || dzx;
+      var cx0 = camera.x + view.w / 2, cy0 = camera.y + view.h / 2;
+      var lead = (player.face < 0 ? -12 : 12) + clamp(player.vx * 0.12, -12, 12);
+      var aimX = player.x + lead, aimY = player.y - HH;
+      var dx = aimX - cx0, dy = aimY - cy0;
+      tx = Math.abs(dx) <= dzx ? camera.x : aimX - (dx > 0 ? dzx : -dzx) - view.w / 2;
+      ty = Math.abs(dy) <= dzy ? camera.y : aimY - (dy > 0 ? dzy : -dzy) - view.h / 2;
+      tx = clamp(tx, 0, Math.max(0, worldW - view.w));
+      ty = clamp(ty, 0, Math.max(0, worldH - view.h));
+      if (dt < 0) { camera.x = Math.round(tx); camera.y = Math.round(ty); return; }
+      k = 1 - Math.pow(0.80, dt * 60);
+      camera.x += (tx - camera.x) * k; camera.y += (ty - camera.y) * k;
+      return;
+    }
     if (current.cameraMode === 'mountain') {
       cfg = current.camera || {};
       tx = clamp(player.x + clamp(player.vx * 0.12, -50, 50) + player.face * 16 - view.w / 2 + (cfg.offsetX || 0), 0, Math.max(0, worldW - view.w));
@@ -555,6 +574,17 @@
     camera.x = clamp(player.x - view.w / 2, 0, Math.max(0, worldW - view.w));
     if (worldH < view.h) camera.y = (worldH - view.h) / 2;
     else camera.y = clamp(player.y - view.h / 2, 0, Math.max(0, worldH - view.h));
+  }
+  /* The arena boundary is a visible contract: rendered from the room's own
+     rect, never from the camera or shake, so the playable edge reads at all
+     times. Rooms opt in with level.arena = { x, y, w, h, colour }. */
+  function drawArenaBounds(ctx, cx, cy) {
+    var r = current.arena, p = r.pad || 2;
+    ctx.save(); ctx.globalAlpha = r.alpha || 0.5; ctx.lineWidth = p;
+    ctx.strokeStyle = r.colour || '#8A5CFF';
+    ctx.strokeRect(Math.round(r.x - cx) + p, Math.round(r.y - cy) + p,
+      Math.max(1, Math.round(r.w) - 2 * p), Math.max(1, Math.round(r.h) - 2 * p));
+    ctx.restore();
   }
   function mod(a, n) { return ((a % n) + n) % n; }
   /* one cached 1x sprite; fn(R, g) paints it, R(x, y, w, h, colour) is an integer fillRect */
@@ -616,6 +646,7 @@
     /* begin() wraps save/rotate; only a live shake needs it, so a still frame paints with no transform */
     if (J && J.begin && !reduced && J.trauma > 0) shook = !!J.begin(ctx, view.w, view.h);
     if (api.backdrop) api.backdrop(ctx, cx, cy, L, now, area);
+    if (current.arena && current.cameraMode === 'arena') drawArenaBounds(ctx, cx, cy);
     if (L.chunked) drawChunks(cx, cy);
     else if (baked) ctx.drawImage(baked, -cx, -cy);
     if (api.live) api.live(ctx, cx, cy, L, now, area);
