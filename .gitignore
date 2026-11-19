@@ -100,3 +100,14 @@ fonts/README.txt
 node_modules/
 dist/
 .parity/
+
+# ── GitHub: source, assets and README only ────────────────────────
+# These stay on disk for local work and agents, but never go to GitHub.
+AGENTS.md
+CLAUDE.md
+design/
+docs/
+plans/
+scripts/v3/out/
+scripts/v3/RULES.txt
+img/act4/CREDITS.md
