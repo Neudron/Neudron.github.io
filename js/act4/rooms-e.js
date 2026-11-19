@@ -6,6 +6,17 @@
   var NEU = window.NEU = window.NEU || {};
   if (!NEU.engine || !NEU.engine.register) return;
   var E = NEU.engine;
+
+  /* W4: the lab district's entry socket. Generated output is verbatim;
+     this hook runs before gen-wex-lab.js is loaded (see index.html). */
+  var wexRegE = E.register;
+  E.register = function (id, def) {
+    if (id === 'wex_lab_01') {
+      def.spawns.from_home_study = { x: 7, y: 1, face: 'down' };
+      def.entities.push({ t: 'exit', x: 7, y: 0, to: 'e5_dad', spawn: 'from_wex_lab_01', style: 'frame' });
+    }
+    return wexRegE(id, def);
+  };
   var ticking = false, armed = false, actx = null;
 
   E.tileset('dad', {
@@ -221,7 +232,8 @@
       '#######.########',
       '################'
     ].join('\n'),
-    spawns: { door: { x: 7, y: 5, face: 'up' }, default: { x: 7, y: 5, face: 'up' } },
+    spawns: { door: { x: 7, y: 5, face: 'up' }, default: { x: 7, y: 5, face: 'up' },
+      from_wex_lab_01: { x: 7, y: 1, face: 'down' } },
     entities: [
       { t: 'cityfloor', v: 'e5_dad', x: 0, y: 0 },
       { t: 'cityprop', v: 'dadbounce', x: 7, y: 3 },
@@ -254,7 +266,8 @@
       { t: 'cityprop', v: 'homebowl', x: 13, y: 3, lines: ['a bowl beside the bed. somebody moved it closer.'] },
       { t: 'cityprop', v: 'homestack', x: 5, y: 4, lines: ['papers held down by a chipped mug.'] },
       { t: 'cityprop', v: 'cat', x: 10, y: 3, lines: ['a cat asleep at the foot of the bed. do not tell dad.'] },
-      { t: 'exit', x: 7, y: 6, to: 'e3_hall', spawn: 'dad', style: 'door' }
+      { t: 'exit', x: 7, y: 6, to: 'e3_hall', spawn: 'dad', style: 'door' },
+      { t: 'exit', x: 7, y: 0, to: 'wex_lab_01', spawn: 'from_home_study', style: 'portal' }
     ],
     onEnter: function () {
       ticking = true;

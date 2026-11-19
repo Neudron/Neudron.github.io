@@ -10,6 +10,17 @@
   if (!NEU.engine || !NEU.engine.register) return;
   var E = NEU.engine;
 
+  /* W4: the savanna district's entry socket. Generated output is verbatim;
+     this hook runs before gen-wex-savanna.js is loaded (see index.html). */
+  var wexRegS = E.register;
+  E.register = function (id, def) {
+    if (id === 'wex_savanna_01') {
+      def.spawns.from_sand_path = { x: 7, y: 1, face: 'down' };
+      def.entities.push({ t: 'exit', x: 7, y: 0, to: 's0_sand', spawn: 'from_wex_savanna_01', style: 'arch' });
+    }
+    return wexRegS(id, def);
+  };
+
   E.tileset('savanna', {
     solid: '#',
     colours: { '#': '#8A5A28', '.': '#E2B84A', ',': '#C47A32', '=': '#A86828',
@@ -512,13 +523,15 @@
     tileset: 'savanna',
     tiles: sandTiles(),
     landmarks: LANDMARKS,
-    spawns: { west: { x: 1, y: 5, face: 'right' }, east: { x: 360, y: 5, face: 'left' } },
+    spawns: { west: { x: 1, y: 5, face: 'right' }, east: { x: 360, y: 5, face: 'left' },
+      from_wex_savanna_01: { x: 150, y: 1, face: 'down' } },
     entities: [{ t: 'savannafloor', x: 0, y: 0 }, { t: 'savannafx', x: 1, y: 8, roomSpan: true }]
       .concat(trees)
       .concat(LANDMARKS.map(function (m) { return prop(m.v, m.x, m.y); }))
       .concat([
         { t: 'exit', x: 0, y: 5, to: 'd2_alley', spawn: 'garage', style: 'door' },
-        { t: 'exit', x: 361, y: 5, to: 's1_gate', spawn: 'west', style: 'arch' }
+        { t: 'exit', x: 361, y: 5, to: 's1_gate', spawn: 'west', style: 'arch' },
+        { t: 'exit', x: 150, y: 0, to: 'wex_savanna_01', spawn: 'from_sand_path', style: 'arch' }
       ]),
     onEnter: function (c) {
       if (c.flagged('s0_seen')) return;

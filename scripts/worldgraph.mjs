@@ -11,7 +11,8 @@ if (!fs.existsSync(path.join(ROOT, 'tests', 'reach.mjs'))) {
   process.exit(2);
 }
 const { loadRooms } = await import('../tests/reach.mjs');
-const ROOM_FILES = ['rooms-a.js', 'rooms-d.js', 'rooms-e.js', 'rooms-g.js', 'rooms-p.js', 'rooms-s.js'];
+const ROOM_FILES = ['rooms-a.js', 'rooms-d.js', 'rooms-e.js', 'rooms-g.js', 'rooms-p.js', 'rooms-s.js',
+  'gen-wex-woods.js', 'gen-wex-city.js', 'gen-wex-savanna.js', 'gen-wex-lab.js'];
 const PLAT_FILES = ['mountain.js', 'dungeon.js'];
 const MODE_EDGES = [
   { from: 'p1_tavern', to: 'm0', spawn: null, via: 'mode', mode: 'platform' },
@@ -74,9 +75,9 @@ function resolveRoomAlias(aliases, id, spawn) {
 
 function styleVia(style) {
   if (/^(door|gate|curtain|alley)$/.test(style || '')) return 'door';
-  if (style === 'stairs') return 'stairs';
+  if (/^(lift|stairs)$/.test(style || '')) return 'stairs';
   if (style === 'hatch') return 'fall';
-  if (/^(path|tunnel|arch)$/.test(style || '')) return 'slide';
+  if (/^(path|tunnel|arch|ridge)$/.test(style || '')) return 'slide';
   if (/^(portal|rift|frame)$/.test(style || '')) return 'portal';
   return null;
 }

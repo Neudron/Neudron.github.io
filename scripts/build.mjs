@@ -41,7 +41,9 @@ const GAME = [
   'js/act4/exo-ares.js', 'js/act4/exo-twins.js', 'js/act4/crack.js',
   'js/act4/cart.js', 'js/act4/elevator.js', 'js/act4/inventory.js',
   'js/act4/shopkit.js', 'js/act4/dummy.js',
-  'js/core/tphud.js', 'js/game/deck.js'
+  'js/core/tphud.js', 'js/game/deck.js',
+  'js/act4/gen-wex-woods.js', 'js/act4/gen-wex-city.js',
+  'js/act4/gen-wex-savanna.js', 'js/act4/gen-wex-lab.js'
 ];
 const FILES = [
   '404.html', 'CNAME', '.nojekyll', 'og.png', 'robots.txt', 'sitemap.xml',
