@@ -1273,19 +1273,19 @@ body.is-blackout::before {
 .quiz__main { display: contents; }
 .quiz__set {
   position: relative; width: 100%; aspect-ratio: 2 / 1;
-  background: #000 url(../img/act4/deltarune/tvtime/stage-bg.png) 0 0 / 100% 100% no-repeat;
+  background: #000 url(../img/act4/original/deltarune/tvtime/stage-bg.png) 0 0 / 100% 100% no-repeat;
   image-rendering: pixelated;
 }
 /* the one contestant podium: YOU, where the party stood */
 .quiz__pod {
   position: absolute; bottom: 8.125%; left: 23.75%; width: 10.625%; height: 27.5%;
-  background: url(../img/act4/deltarune/tvtime/podium.png) 0 0 / 100% 100% no-repeat;
+  background: url(../img/act4/original/deltarune/tvtime/podium.png) 0 0 / 100% 100% no-repeat;
   image-rendering: pixelated;
 }
 /* crowd band behind the dialog box: 3 frames, 4.5 fps */
 .quiz__set::after {
   content: ''; position: absolute; left: 0; width: 100%; top: 100%; height: 12.5%;
-  background: url(../img/act4/deltarune/tvtime/crowd.png) 0 0 / 300% auto repeat-x;
+  background: url(../img/act4/original/deltarune/tvtime/crowd.png) 0 0 / 300% auto repeat-x;
   image-rendering: pixelated; pointer-events: none;
   animation: quizCrowd .667s steps(1) infinite;
 }
@@ -1296,14 +1296,14 @@ body.is-blackout::before {
   width: 43.75%; height: 91.25%;
   image-rendering: pixelated; pointer-events: none;
 }
-i[data-s=tvTenPodium] { background-image: url(../img/act4/deltarune/tvtime/tenna-podium.png); }
-i[data-s=tvTenPoint] { background-image: url(../img/act4/deltarune/tvtime/tenna-point.png); }
-i[data-s=tvTenCheer] { background-image: url(../img/act4/deltarune/tvtime/tenna-cheer.png); }
-i[data-s=tvTenShrug] { background-image: url(../img/act4/deltarune/tvtime/tenna-shrug.png); }
-i[data-s=tvTenShock] { background-image: url(../img/act4/deltarune/tvtime/tenna-shock.png); }
-i[data-s=tvTenBow] { background-image: url(../img/act4/deltarune/tvtime/tenna-bow.png); }
-i[data-s=tvFaces] { background-image: url(../img/act4/deltarune/tvtime/faces.png); }
-i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-static.png); }
+i[data-s=tvTenPodium] { background-image: url(../img/act4/original/deltarune/tvtime/tenna-podium.png); }
+i[data-s=tvTenPoint] { background-image: url(../img/act4/original/deltarune/tvtime/tenna-point.png); }
+i[data-s=tvTenCheer] { background-image: url(../img/act4/original/deltarune/tvtime/tenna-cheer.png); }
+i[data-s=tvTenShrug] { background-image: url(../img/act4/original/deltarune/tvtime/tenna-shrug.png); }
+i[data-s=tvTenShock] { background-image: url(../img/act4/original/deltarune/tvtime/tenna-shock.png); }
+i[data-s=tvTenBow] { background-image: url(../img/act4/original/deltarune/tvtime/tenna-bow.png); }
+i[data-s=tvFaces] { background-image: url(../img/act4/original/deltarune/tvtime/faces.png); }
+i[data-s=tvStatic] { background-image: url(../img/act4/original/deltarune/tvtime/face-static.png); }
 .quiz.is-mini .quiz__tenna { visibility: hidden; }
 .quiz__top {
   position: relative; z-index: 2;
@@ -1347,7 +1347,7 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
   display: grid; gap: 8px; align-content: start;
   margin: 5% 0 12px;
   border: 16px solid #8888C8; background: #000;
-  border-image: url(../img/act4/deltarune/tvtime/box9.png) 16 fill / 16px stretch;
+  border-image: url(../img/act4/original/deltarune/tvtime/box9.png) 16 fill / 16px stretch;
   padding: 0 0 0 80px; min-height: 56px; box-sizing: content-box;
   image-rendering: pixelated;
 }
@@ -1383,7 +1383,7 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 .quiz__o.is-sel::before, .quiz__o:hover::before, .quiz__o.is-right::before {
   content: ''; position: absolute; left: 4px; top: 50%;
   width: 16px; height: 16px; margin-top: -8px;
-  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
+  background: url(../img/act4/original/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
   image-rendering: pixelated;
 }
 .quiz__o.is-right { color: #00FF00; animation: quizRight .5s ease-out; }
@@ -1673,7 +1673,7 @@ html.rm .quiz__beam { animation: none; }
 .craft__grid { display: grid; grid-template-columns: repeat(3, var(--cell)); gap: 8px; }
 .craft__cell {
   width: var(--cell); height: var(--cell); padding: 0; border: 0;
-  background: url('../img/act4/terraria/slot.png') center / var(--cell) var(--cell) no-repeat;
+  background: url('../img/act4/original/terraria/slot.png') center / var(--cell) var(--cell) no-repeat;
   image-rendering: pixelated;
   cursor: pointer; display: grid; place-items: center;
   transition: filter .14s;

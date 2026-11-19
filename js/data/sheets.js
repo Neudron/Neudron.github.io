@@ -48,7 +48,7 @@
   'use strict';
   var NEU = window.NEU = window.NEU || {};
 
-  var IMG = 'img/act4/';
+  var IMG = 'img/act4/original/';
   var TV = IMG + 'deltarune/tvtime/';
 
   NEU.sheets = {

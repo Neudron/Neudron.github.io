@@ -64,6 +64,20 @@ else ok('artifact excludes tests, notes, scripts, node_modules, source maps, Was
 if (!files.includes('assets/' + path.basename(game[0]))) fail('game chunk missing');
 else ok('game chunk exists but is not in the initial HTML');
 
+/* 3b. Rights-pending queues never reach the artifact, as files or as literal
+   URLs. Generated art under img/act4/original/ is the allowed replacement. */
+const QUEUES = 'calamity|terraria|deltarune|undertale|tiles|vfx';
+const queueFileRe = new RegExp('^img/act4/(?:' + QUEUES + ')/');
+const queueSrcRe = new RegExp('img/act4/(?!original/)(?:' + QUEUES + ')/');
+const queueFiles = files.filter((f) => queueFileRe.test(f));
+const queueRefs = files.filter((f) => /\.(?:js|css|html|json)$/.test(f) && queueSrcRe.test(read(f)));
+const originals = files.filter((f) => /^img\/act4\/original\//.test(f));
+if (queueFiles.length) fail('rights-pending files in artifact: ' + queueFiles.join(', '));
+if (queueRefs.length) fail('rights-pending paths in artifact text: ' + queueRefs.join(', '));
+if (!originals.length) fail('no generated Act IV originals in artifact');
+if (!queueFiles.length && !queueRefs.length && originals.length)
+  ok('rights queues excluded from artifact; ' + originals.length + ' originals shipped');
+
 /* 4. HTML keeps every anchor, id, external link, and canonical URL. */
 const ids = (s) => new Set([...s.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
 const srcIds = ids(source('index.html'));

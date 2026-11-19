@@ -48,6 +48,15 @@ const FILES = [
   'llms.txt', 'humans.txt', 'manifest.json', 'apple-touch-icon.png', 'icon-512.png'
 ];
 const DIRS = ['fonts', 'img', 'audio', '.well-known'];
+/* Rights queues stay in source for the historical direct paths in game files
+   this work order does not own; they never reach dist. Generated replacements
+   under img/act4/original/ are the only Act IV art the public artifact ships. */
+const RIGHTS_QUEUES = ['calamity', 'terraria', 'deltarune', 'undertale', 'tiles', 'vfx'];
+const QUEUE_FILE_RE = new RegExp('^img/act4/(?:' + RIGHTS_QUEUES.join('|') + ')/');
+const QUEUE_SRC_RE = new RegExp('img/act4/(?!original/)(?:' + RIGHTS_QUEUES.join('|') + ')/', 'g');
+const repoint = (s) => s.replace(QUEUE_SRC_RE, function (m) {
+  return 'img/act4/original/' + m.slice('img/act4/'.length);
+});
 
 async function concat(files) {
   const parts = [];
@@ -103,14 +112,14 @@ async function main() {
   await fs.mkdir(path.join(DIST, 'css'), { recursive: true });
 
   /* code split at the two seams the browser needs */
-  const gameSrc = await concat(GAME);
+  const gameSrc = repoint(await concat(GAME));
   const gameMin = (await transform(gameSrc, { minify: true, target: 'es2018', legalComments: 'none' })).code;
   const gameName = 'game.' + hash(gameMin) + '.js';
   await writeAsset('assets', gameName, gameMin);
 
   const prelude = await read('scripts/prelude.js');
-  const shellSrc = 'window.__NEU_GAME_URL__ = "assets/' + gameName + '";\n' +
-    prelude + '\n;\n' + await concat(SHELL);
+  const shellSrc = repoint('window.__NEU_GAME_URL__ = "assets/' + gameName + '";\n' +
+    prelude + '\n;\n' + await concat(SHELL));
   const shellMin = (await transform(shellSrc, { minify: true, target: 'es2018', legalComments: 'none' })).code;
   const shellName = 'shell.' + hash(shellMin) + '.js';
   await writeAsset('assets', shellName, shellMin);
@@ -153,6 +162,8 @@ async function main() {
       if (!f) continue;
       /* notes stay on GitHub, never in dist (AGENTS.md) */
       if (/\.md$/i.test(f)) continue;
+      /* rights queues never ship; originals under img/act4/original/ do */
+      if (QUEUE_FILE_RE.test(f)) continue;
       await fs.mkdir(path.dirname(path.join(DIST, f)), { recursive: true });
       await fs.cp(path.join(ROOT, f), path.join(DIST, f));
     }
