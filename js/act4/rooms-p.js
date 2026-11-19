@@ -279,7 +279,7 @@
         if (NEU.juice && NEU.juice.hit) NEU.juice.hit('small');
         lines.push('he hands you a misleading-looking package.');
       }
-      sys.say(lines, 'narr');
+      sys.say(lines, 'narr', ['player', 'mountain', 'key:z']);
     },
     draw: drawPainter
   });

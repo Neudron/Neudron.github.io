@@ -1302,9 +1302,9 @@
     if (b5face === 0) c.say(['the mirror turns away from the room.',
                              'it has opinions. they rotate.'], 'narr');
     else if (b5face === 1) c.say(['the mirror looks east.',
-                                  'whatever stands over the east plate stands on the west one too.'], 'narr');
+                                  'whatever stands over the east plate stands on the west one too.'], 'narr', ['eyes', 'plate']);
     else c.say(['the mirror looks west.',
-                'whatever stands over the west plate stands on the east one too.'], 'narr');
+                'whatever stands over the west plate stands on the east one too.'], 'narr', ['eyes', 'plate']);
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
     if (NEU.juice) NEU.juice.hit('small');
   }
@@ -1440,7 +1440,7 @@
     if (b6lit) { c.say(['the socket is lit. it has been lit since you were last here.'], 'narr'); return; }
     if (b6seated === n) { takeTorch(c); return; }
     if (!b6carry) {
-      c.say(['a socket in the wall, empty.', 'it is waiting for a light.'], 'narr');
+      c.say(['a socket in the wall, empty.', 'it is waiting for a light.'], 'narr', 'lamp');
       return;
     }
     b6carry = false; b6seated = n;
@@ -1458,7 +1458,7 @@
     } else {
       if (NEU.juice) NEU.juice.hit('tick');
       c.say(['the torch sits in the socket. nothing happens.',
-             'you can lift it straight back out.'], 'narr');
+             'you can lift it straight back out.'], 'narr', ['cross']);
     }
   }
   /* the old name stays the entry point for the one correct socket */

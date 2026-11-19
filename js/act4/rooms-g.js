@@ -680,11 +680,11 @@
     if (!NEU.save) return;
     if (NEU.save.has(id)) { c.say(['already cut.'], 'mush'); return; }
     if (!NEU.save.flagged('tripping')) {
-      c.say(['a mushroom. you have no reason to want it and nothing to cut it with.'], 'mush');
+      c.say(['a mushroom. you have no reason to want it and nothing to cut it with.'], 'mush', 'lock');
       return;
     }
     if (!NEU.save.has('axe')) {
-      c.say(['a mushroom. you want it very badly. you have nothing sharp.'], 'mush');
+      c.say(['a mushroom. you want it very badly. you have nothing sharp.'], 'mush', 'sword');
       return;
     }
     var ents = (typeof c.ents === 'function') ? c.ents() : (c.ents || []);
