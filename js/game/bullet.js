@@ -78,12 +78,12 @@
      every draw call below reads from it. Values are the shipped look. */
   var PAL = { bg: 'rgba(8,8,11,0.92)', box: '#FFFFFF', inner: '#000000',
               bone: '#FFFFFF', blaster: '#FFFFFF', elecCore: '#CFF3FF',
-              ui: '#EDE7DE', lilac: '#B892FF', blood: '#C2405F', dim: '#8A8598',
+              ui: '#EDE7DE', lilac: '#B892FF', blood: '#E24A6A', dim: '#8A8598',
               soul: '#E23B55', void_: '#08080B', elec: '#4FC3F7',
               panel: '#1B1B24', slot: '#22222E', full: '#7BE38A', meter: '#5CF08C' };
   /* Act III's variant: a warm amber console screen, so the room reads as
      a different visit and the strong blue blaster is the one cold thing
-     in it. Every bullet colour is >= 4.5:1 on `inner` (fixes68). */
+     in it. Every bullet colour is >= 4.5:1 on `inner` (fixes68 variant, fixes919 both). */
   var PAL_II = PAL, PAL_III = {
               bg: 'rgba(18,9,4,0.94)', box: '#FFB547', inner: '#0E0805',
               bone: '#FFE2B0', blaster: '#FFE2B0', elecCore: '#D6E8FF',
@@ -201,6 +201,13 @@
   var iScale = 1;   /* tier i-frame scale: the timer runs at 1/iScale, the grant stays the shared IFRAMES */
   var F = dm.fight(0, 0), keys = {};
   var bullets = [], emitters = [], phase = 0, phaseAt = 0;
+  var bulletDraw = [];
+  /* VIP-12 z-sort: large and slow drawn first, small and fast on top.
+     Squared speed keeps the order without a sqrt per bullet per frame. */
+  function bulletZ(a, b) {
+    var sa = a.vx * a.vx + a.vy * a.vy, sb = b.vx * b.vx + b.vy * b.vy;
+    return b.r - a.r || sa - sb;
+  }
   var AW = 0, AH = 0, AX = 0, AY = 0;     // box rect, canvas space
   var BAX = 0, BAW = 0;                    // the box's own rect, before the squeeze
   var transitionAt = -9, transitionUntil = -9;
@@ -328,6 +335,14 @@
     }
     /* The short phase pause gives the next pattern room to read. */
     if (n > 1 && NEU.juice) NEU.juice.hit('small');
+    /* A boundary is a clean slate: no bullet from the old pattern survives,
+       and the soul gets the shared ~2 s i-frame window to read the new one.
+       enterPhase(1) also runs on every begin(), so a death restarts fair. */
+    bullets = [];
+    /* A real phase boundary (not the opening) extends to the shared ~2 s
+       window. Delta form keeps IFRAMES/PHASE_IFRAMES the only authorities;
+       the opening keeps its tier-scaled IFRAMES so every difficulty reads. */
+    if (n > 1) inv += Math.max(0, (dm.PHASE_IFRAMES || 2) / iScale - inv);
   }
 
   /* ── Act III variant: the plan ────────────────────────────────────
@@ -338,7 +353,7 @@
      Escalation: a red warm-up, a blue middle (pair, bone run, a plain
      blaster), a faster blue last-but-one (triple, pair), and a short
      red final pattern to the twenty-second mark. */
-  var VGAP = 0.3, GRAZE_R = 7, GRAZE_GAIN = 4, GRAZE_GAP = 0.4;
+  var VGAP = 0.3, GRAZE_R = dm.GRAZE_R || 7, GRAZE_GAIN = 4, GRAZE_GAP = 0.4;
   var PULSE_R = 72, pulseAt = -9;
   var VBLOCK = {
     ring:    { dur: 2.4, at: [0.5, 1.8], kind: 'ring' },
@@ -465,11 +480,20 @@
     }
   }
 
+  /* VIP-12: a wall's safe gap is at least 56 px wide at the current arena
+     size, even when one grid cell is narrower. One authority, read by both
+     the warning outline and the wall itself. */
+  function wallGap(vertical, gap) {
+    var step = (vertical ? AW : AH) / WALL_CELLS;
+    var span = Math.max(1, Math.ceil(56 / step));
+    return { from: Math.min(gap, WALL_CELLS - span), span: span, step: step };
+  }
+
   function spawnWall(w) {
-    var step = w.vertical ? AW / WALL_CELLS : AH / WALL_CELLS;
+    var g = wallGap(w.vertical, w.gap), step = g.step;
     curE = w.e;
     for (var q = 0; q < WALL_CELLS; q++) {
-      if (q === w.gap) continue;
+      if (q >= g.from && q < g.from + g.span) continue;
       if (w.vertical) {
         add(AX + q * step, w.fromStart ? AY - 14 : AY + AH + 14,
             0, w.fromStart ? w.speed : -w.speed, 4, PAL.dim);
@@ -833,8 +857,9 @@
         else ctx.fillRect(w.fromStart ? AX : AX + AW - 4, (AY + q * AH / WALL_CELLS) | 0, 4, ch);
       }
       ctx.globalAlpha = 1; ctx.strokeStyle = PAL.bone; ctx.lineWidth = 2;
-      if (w.vertical) ctx.strokeRect((AX + w.gap * AW / WALL_CELLS) | 0, w.fromStart ? AY - 1 : AY + AH - 3, cw, 6);
-      else ctx.strokeRect(w.fromStart ? AX - 1 : AX + AW - 3, (AY + w.gap * AH / WALL_CELLS) | 0, 6, ch);
+      var gp = wallGap(w.vertical, w.gap), gs = Math.ceil(gp.step * gp.span);
+      if (w.vertical) ctx.strokeRect((AX + gp.from * gp.step) | 0, w.fromStart ? AY - 1 : AY + AH - 3, gs, 6);
+      else ctx.strokeRect(w.fromStart ? AX - 1 : AX + AW - 3, (AY + gp.from * gp.step) | 0, 6, gs);
       ctx.restore();
     }
     wallTelegraphs = keep;
@@ -868,6 +893,11 @@
     /* blasters first: their telegraph and beam must never hide a bullet */
     for (var q = 0; q < blasters.length; q++) drawBlaster(blasters[q]);
 
+    /* VIP-12 z-order: decorative particles sit UNDER every hostile bullet.
+       They move up here; the soul is drawn after the bullet pass. */
+    if (NEU.juice) NEU.juice.drawParts(ctx, 1 / 60);
+    drawGrazeSparks();
+
     var floor = AY + AH;
     ctx.save();                          // bones and bullets stay inside the box
     ctx.beginPath(); ctx.rect(AX, AY, AW, AH); ctx.clip();
@@ -893,13 +923,12 @@
     ctx.globalAlpha = 1;
     drawTelegraphs();
 
-    /* bullets — squares on integer coords over a soft glow */
-    for (var i = 0; i < bullets.length; i++) {
-      var b = bullets[i], s = (b.r * 2) | 0;
-      dm.glow(ctx, b.x, b.y, b.r * 3, b.c, 0.35);
-      ctx.fillStyle = b.c;
-      ctx.fillRect((b.x - b.r) | 0, (b.y - b.r) | 0, s, s);
-    }
+    /* bullets: large/slow first, small/fast on top; the shared look gives
+       each a dark plate and a pale core, so the hazard reads without hue. */
+    bulletDraw.length = 0;
+    for (var i = 0; i < bullets.length; i++) bulletDraw.push(bullets[i]);
+    bulletDraw.sort(bulletZ);
+    for (var bi = 0; bi < bulletDraw.length; bi++) dm.drawBullet(ctx, bulletDraw[bi]);
     ctx.restore();
     /* spawn markers, on the rim only */
     marks = marks.filter(function (m) { return t - m.t0 < 0.35; });
@@ -914,7 +943,6 @@
       ctx.restore();
     }
     dm.drawFX(ctx, F, inv * iScale);
-    drawGrazeSparks();
     if (t - pulseAt < 0.3) {
       var pk = (t - pulseAt) / 0.3;
       ctx.globalAlpha = 1 - pk; ctx.lineWidth = 3; ctx.strokeStyle = PAL.meter;
@@ -952,8 +980,7 @@
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    if (NEU.juice) { NEU.juice.drawParts(ctx, 1 / 60);
-                     NEU.juice.end(ctx, shook);
+    if (NEU.juice) { NEU.juice.end(ctx, shook);
                      NEU.juice.overlay(ctx, w, h); }
 
     /* The clock is the boss: its bar is the time left. Endless has no
@@ -1043,6 +1070,10 @@
     running = false;                 // stops the main loop's next frame
     announce('ouch. the soul broke.');
     dying = performance.now();
+    /* VIP-12: wipe every hostile bullet the instant the soul breaks. The
+       next begin() re-enters phase 1, which grants the ~2 s i-frame window. */
+    bullets = []; blasters = []; bones = []; aims = []; wallTelegraphs = [];
+    marks = []; telegraphs = [];
     dm.resetDeath();
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     requestAnimationFrame(deathStep);
@@ -1222,7 +1253,7 @@
                  get variant() { return variant; }, get plan() { return plan; }, get meter() { return meter; }, get hp() { return hp; },
                  get phases() { return PHASES; }, get bullets() { return bullets; },
                  get aims() { return aims; },
-                 get box() { return { AX: AX, AW: AW, BAW: BAW }; }, get telegraphs() { return telegraphs; }, get marks() { return marks; },
+                 get box() { return { AX: AX, AY: AY, AW: AW, AH: AH, BAW: BAW }; }, get telegraphs() { return telegraphs; }, get marks() { return marks; },
                  get attacks() { return { bullets: bullets.length, bones: bones.length, aims: aims.length, blasters: blasters.length, blasterAge: blasters.length ? blasters[0].t : -1, walls: wallTelegraphs.length, wallAt: wallTelegraphs.length ? wallTelegraphs[0].at : -1 }; }, get t() { return t; },
                  buildPlan: buildPlan, teleAlpha: teleAlpha, chargeTime: BL_CHARGE, cellCfg: CELL, coreGain: coreGain, sparkCols: sparkCols, get cell() { return cell; }, get pal() { return PAL; },
                  set t(v) { t = +v || 0; } };   /* dev/screenshots: jump the clock */

@@ -22,6 +22,14 @@
   var COL_SOUL = '#E23B55';
   var COL_BONE = '#EDE7DE';
   var COL_VOID = '#08080B';
+  /* One authority for the true hitbox and the graze band. Every fight reads
+     these instead of keeping its own copy (VIP-12: no second hitbox owner). */
+  var SOUL_R = 3.2;
+  var GRAZE_R = 7;
+  /* Boss bar: the invulnerable state is plated gold, never a grey fill. */
+  var BAR_GOLD = '#E8B83C';
+  var BAR_GOLD_LIT = '#FFE08A';
+  var BAR_GOLD_DARK = '#7A5A12';
 
   function stamp(ctx, rows, cx, cy, s, on, off) {
     var h = rows.length, w = rows[0].length;
@@ -131,7 +139,7 @@
   }
 
   function hits(list, px, py, r) {
-    var pr = r || 3.2;
+    var pr = r || SOUL_R;
     for (var i = 0; i < list.length; i++) {
       var b = list[i];
       var dx = b.x - px;
@@ -410,6 +418,18 @@
     ctx.globalCompositeOperation = op; ctx.globalAlpha = ga;
   }
 
+  /* One bullet look, shared by every fight: a dark plate separates the
+     hazard from the arena, the hue body carries the pattern, and a pale
+     core keeps it bright once hue fails (VIP-12 greyscale readability). */
+  function drawBullet(ctx, b) {
+    var x = (b.x - b.r) | 0, y = (b.y - b.r) | 0, s = (b.r * 2) | 0;
+    glow(ctx, b.x, b.y, b.r * 3, b.c, 0.35);
+    ctx.fillStyle = COL_VOID; ctx.fillRect(x - 1, y - 1, s + 2, s + 2);
+    ctx.fillStyle = b.c;      ctx.fillRect(x, y, s, s);
+    var cs = s > 5 ? 2 : 1;
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect((b.x - cs / 2) | 0, (b.y - cs / 2) | 0, cs, cs);
+  }
+
   /* The soul with its feel, drawn inside the shake: afterimages, the
      resource glows, the colour swap, the dash pip, the damage numbers. */
   function drawFX(ctx, F, inv) {
@@ -434,8 +454,17 @@
        stray blue-white line stuck to the heart; it now lives in the HUD
        panel (hud, DASH). Nothing but the heart is drawn on the soul. */
     drawSoul(ctx, F.x, F.y, F.dashI > 0 ? 0 : inv, col);
-    /* focus (Shift) shows the true hitbox: three pixels of bone at the centre */
-    if (F.focus) { ctx.fillStyle = COL_BONE; ctx.fillRect((F.x - 1) | 0, (F.y - 1) | 0, 3, 3); }
+    /* focus (Shift) shows the honest hitbox: a pale 3px core on a dark
+       plate, so it reads even when a bright bullet passes under it. The
+       thin ring is the graze boundary — one step wider than the core —
+       never a second hitbox. Both are >=3:1 on the arena (VIP-12). */
+    if (F.focus) {
+      ctx.fillStyle = COL_VOID; ctx.fillRect((F.x - 2) | 0, (F.y - 2) | 0, 5, 5);
+      ctx.fillStyle = COL_BONE; ctx.fillRect((F.x - 1) | 0, (F.y - 1) | 0, 3, 3);
+      ctx.strokeStyle = COL_BONE; ctx.lineWidth = 1; ctx.globalAlpha = 0.55;
+      ctx.beginPath(); ctx.arc(F.x, F.y, SOUL_R + GRAZE_R, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     ctx.font = FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     for (var j = 0; j < F.pops.length; j++) {
       var p = F.pops[j], px = Math.round(p.x), py = Math.round(p.y);
@@ -526,15 +555,20 @@
        screen-reader line below are shared. */
     if (!o.panelOnly) {
     var bw = barW(o.w), bx = ((o.w - bw) / 2) | 0, by = 36;
+    var inv = !!o.invuln;
     ctx.fillStyle = '#05050A'; ctx.fillRect(bx - 4, by - 4, bw + 8, 20);
-    ctx.fillStyle = '#5A5468'; ctx.fillRect(bx - 2, by - 2, bw + 4, 16);
+    ctx.fillStyle = inv ? BAR_GOLD_DARK : '#5A5468'; ctx.fillRect(bx - 2, by - 2, bw + 4, 16);
     ctx.fillStyle = '#1A0A0E'; ctx.fillRect(bx, by, bw, 12);
     ctx.fillStyle = '#FFFFFF'; ctx.fillRect(bx, by, Math.round(bw * F.chip), 12);
-    ctx.fillStyle = o.invuln ? '#6A6480' : '#C8202E'; ctx.fillRect(bx, by, Math.round(bw * r), 12);
-    ctx.fillStyle = o.invuln ? '#8A8598' : '#FF5A4A'; ctx.fillRect(bx, by, Math.round(bw * r), 3);
-    ctx.fillStyle = '#EDE7DE';
-    for (var i = 0; o.ticks && i < o.ticks.length; i++)
-      ctx.fillRect(bx + Math.round(bw * o.ticks[i]), by - 2, 2, 16);
+    ctx.fillStyle = inv ? BAR_GOLD : '#C8202E'; ctx.fillRect(bx, by, Math.round(bw * r), 12);
+    ctx.fillStyle = inv ? BAR_GOLD_LIT : '#FF5A4A'; ctx.fillRect(bx, by, Math.round(bw * r), 3);
+    /* Segment dividers cut through the fill so phase progress reads without
+       hue; a plated cap marks each one. Percent stays on the right. */
+    for (var i = 0; o.ticks && i < o.ticks.length; i++) {
+      var tx = bx + Math.round(bw * o.ticks[i]);
+      ctx.fillStyle = '#05050A'; ctx.fillRect(tx, by - 2, 2, 16);
+      ctx.fillStyle = inv ? BAR_GOLD_LIT : '#EDE7DE'; ctx.fillRect(tx, by - 2, 2, 3);
+    }
     /* Glitch: the last phase look shivers her name at 2 Hz (two pinned
        positions per second, none under reduced motion). */
     var still = !!(NEU.settings && NEU.settings.reduced);
@@ -641,21 +675,25 @@
     tick: tick, hurt: hurt, mul: mul, slow: slow, pop: pop, bossHit: bossHit,
     adrenaline: adrenaline, rage: rage, soulMode: soulMode,
     stageLook: stageLook,
-    glow: glow, drawFX: drawFX, drawFlash: drawFlash, hud: hud, barW: barW,
+    glow: glow, drawBullet: drawBullet, drawFX: drawFX, drawFlash: drawFlash,
+    hud: hud, barW: barW,
     DASH_CD: DASH_CD, ADREN_ON: ADREN_ON,
     TAP: 0,      /* double-tap window, s; 0 = off: X is the only dash */
     soul: {
       draw: drawSoul,
-      R: 3.2,
+      R: SOUL_R,
       stamp: stamp,
       COL: COL_SOUL
     },
+    GRAZE_R: GRAZE_R,
+    BAR_GOLD: BAR_GOLD, BAR_GOLD_LIT: BAR_GOLD_LIT, BAR_GOLD_DARK: BAR_GOLD_DARK,
     shot: shot,
     step: step,
     hits: hits,
     death: death,
     resetDeath: resetDeath,
     IFRAMES: 1.1,
+    PHASE_IFRAMES: 2,
     SPEED: 250,
     FOCUS: 108    /* Shift held: the soul's slow, precise speed */
   };
