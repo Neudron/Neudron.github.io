@@ -72,40 +72,40 @@ else ok('artifact excludes tests, notes, scripts, node_modules, source maps, Was
 if (!files.includes('assets/' + path.basename(game[0]))) fail('game chunk missing');
 else ok('game chunk exists but is not in the initial HTML');
 
-/* 3b. No rights-pending image reaches the artifact, as a file or as a literal
-   URL in any text file (including root and act123). Generated originals under
-   img/act4/original/ are the only allowed replacement and must be present. */
+/* 3b. Owner decision: the original game art ships from its rights-review
+   queues. AI-generated img/act4/original/ art was removed: fail if any such
+   file or path string enters the artifact, and require the game-art paths. */
 const QUEUES = 'calamity|terraria|deltarune|undertale|tiles|vfx';
-const rightsFileRe = new RegExp(
+const gameArtFileRe = new RegExp(
   '^img/act4/(?:' + QUEUES + ')/' +
   '|^img/act4/witch-face\\.png$' +
   '|^img/act123/' +
   '|^img/(?:Sans_sprite\\.webp|totem\\.webp|annoying-dog\\.gif|cat\\.gif)$'
 );
-const rightsSrcRe = new RegExp(
-  'img/act4/(?!original/)(?:' + QUEUES + ')/' +
-  '|img/act4/witch-face\\.png' +
-  '|img/act123/' +
-  '|img/(?:Sans_sprite\\.webp|totem\\.webp|annoying-dog\\.gif|cat\\.gif)'
-);
-const rightsFiles = files.filter((f) => rightsFileRe.test(f));
-const rightsRefs = files.filter((f) => /\.(?:js|css|html|json|svg|txt)$/.test(f) && rightsSrcRe.test(read(f)));
-const originals = files.filter((f) => /^img\/act4\/original\//.test(f));
-const requiredOriginals = [
-  'img/act4/original/act123/sans-idle.png',
-  'img/act4/original/witch-face.png',
-  'img/act4/original/root/Sans_sprite.webp',
-  'img/act4/original/root/totem.webp',
-  'img/act4/original/root/annoying-dog.gif',
-  'img/act4/original/root/cat.gif'
+const generatedRe = /img\/act4\/original\//;
+const gameArtFiles = files.filter((f) => gameArtFileRe.test(f));
+const generatedFiles = files.filter((f) => generatedRe.test(f));
+const generatedRefs = files.filter((f) => /\.(?:js|css|html|json|svg|txt)$/.test(f) && generatedRe.test(read(f)));
+const requiredGameArt = [
+  'img/act123/sans-idle.png',
+  'img/act4/witch-face.png',
+  'img/Sans_sprite.webp',
+  'img/totem.webp',
+  'img/annoying-dog.gif',
+  'img/cat.gif',
+  'img/act4/calamity/SupremeCalamitas.png',
+  'img/act4/deltarune/tvtime/soul.png',
+  'img/act4/terraria/axe.png',
+  'img/act4/tiles/woods.png',
+  'img/act4/vfx/GigCast.png'
 ];
-const missingOriginals = requiredOriginals.filter((f) => !files.includes(f));
-if (rightsFiles.length) fail('rights-pending files in artifact: ' + rightsFiles.join(', '));
-if (rightsRefs.length) fail('rights-pending paths in artifact text: ' + rightsRefs.join(', '));
-if (missingOriginals.length) fail('generated replacements missing from artifact: ' + missingOriginals.join(', '));
-if (originals.length < 175) fail('generated originals in artifact: expected >=175, got ' + originals.length);
-if (!rightsFiles.length && !rightsRefs.length && !missingOriginals.length && originals.length >= 175)
-  ok('zero rights-pending art in artifact; ' + originals.length + ' generated originals shipped');
+const missingGameArt = requiredGameArt.filter((f) => !files.includes(f));
+if (generatedFiles.length) fail('AI-generated original art in artifact: ' + generatedFiles.join(', '));
+if (generatedRefs.length) fail('AI-generated original path in artifact text: ' + generatedRefs.join(', '));
+if (missingGameArt.length) fail('game art missing from artifact: ' + missingGameArt.join(', '));
+if (gameArtFiles.length < 175) fail('game art in artifact: expected >=175, got ' + gameArtFiles.length);
+if (!generatedFiles.length && !generatedRefs.length && !missingGameArt.length && gameArtFiles.length >= 175)
+  ok('game art ships from rights queues; ' + gameArtFiles.length + ' files, zero AI-generated originals');
 
 /* 4. HTML keeps every anchor, id, external link, and canonical URL. */
 const ids = (s) => new Set([...s.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));

@@ -1,15 +1,15 @@
 {
   "schema": "neu-v3-asset-inventory/1",
   "baseline": "bbb4331e9ded30a9160bee3d087d6f08cc3479eb",
-  "status": "RIGHTS_PENDING",
-  "rights_note": "Non-commercial fan project. No rightsholder licence or redistribution right is claimed for franchise art; these folders are rights-review queues, not evidence of permission. Availability online is not a licence; screenshots and search hits are research links, not permission. Prior rights correction is preserved: no set below is CLEARED.",
+  "status": "OWNER-ACCEPTED-FAN-USE",
+  "rights_note": "Non-commercial fan project. No rightsholder licence or redistribution right is claimed for franchise art. OWNER-ACCEPTED-FAN-USE: the owner explicitly accepted the risk of shipping the original game art without a licence. This is an owner risk decision, not clearance; no set below has a licence or approval. Availability online is not a licence; screenshots and search hits are research links, not permission.",
   "dist_rights_policy": {
-    "excluded_prefixes": ["img/act4/calamity/", "img/act4/terraria/", "img/act4/deltarune/", "img/act4/undertale/", "img/act4/tiles/", "img/act4/vfx/", "img/act123/"],
-    "excluded_files": ["img/act4/witch-face.png", "img/Sans_sprite.webp", "img/totem.webp", "img/annoying-dog.gif", "img/cat.gif"],
-    "shipped_prefix": "img/act4/original/",
-    "note": "All rights-pending art stays in source only: six Act IV queues, img/act123/, the witch crop and four root franchise images. scripts/build.mjs excludes every path above from dist and repoints unowned HTML/CSS URLs; scripts/verify-dist.mjs fails on any rights-pending file or path string in dist. Generated originals under img/act4/original/ are the only replacements and ship."
+    "shipped_prefixes": ["img/act4/calamity/", "img/act4/terraria/", "img/act4/deltarune/", "img/act4/undertale/", "img/act4/tiles/", "img/act4/vfx/", "img/act123/"],
+    "shipped_files": ["img/act4/witch-face.png", "img/Sans_sprite.webp", "img/totem.webp", "img/annoying-dog.gif", "img/cat.gif"],
+    "excluded_prefix": "img/act4/original/",
+    "note": "Owner decision: keep the original assets from the games; AI-generated originals were removed. scripts/build.mjs copies the game-art queues into dist; scripts/verify-dist.mjs requires those paths and fails if AI-generated img/act4/original/ art enters dist. No rightsholder licence is claimed."
   },
-  "tag_vocabulary": ["APPROVED", "RIGHTS_PENDING", "GENERATED_UNREVIEWED", "REJECTED"],
+  "tag_vocabulary": ["APPROVED", "RIGHTS_PENDING", "GENERATED_UNREVIEWED", "OWNER-ACCEPTED-FAN-USE", "REJECTED"],
   "fields": [
     "asset_id",
     "scene_id",
@@ -33,24 +33,6 @@
   ],
   "groups": [
     {
-      "id": "generated-originals",
-      "prefix": "img/act4/original/",
-      "files": 175,
-      "author": "Original pixel-art replacements generated in-repo for this site (scripts/v3/gen-art/{calamity,duo,terraria,vfx,wire}.mjs)",
-      "source_url": null,
-      "license": null,
-      "use_terms": "Original work generated for this site; no third-party rightsholder licence is claimed. Owner-directed replacement for all rights-pending image art. Not human-art-reviewed.",
-      "modification": "Deterministic regeneration at the source basenames and pixel dimensions: 159 Act IV queue mirrors plus 11 img/act123/ PNGs, witch-face.png and four root franchise images (WebP/GIF frames encoded bitexactly from generated PNG rasters).",
-      "attribution": "Generated under img/act4/original/; no external asset licence.",
-      "redistribution": "Ships in dist/ as the Act IV art.",
-      "dimensions": "per-file, identical to the corresponding rights-pending source (PNG/WebP/GIF headers read programmatically)",
-      "frame_count": "Act IV sheets and animated WebP/GIF replacements match the source frame count; still sprites are single frame",
-      "pivot": null,
-      "status": "GENERATED_UNREVIEWED",
-      "dist": "shipped",
-      "note": "Owner decision: generate originals first, block the queues from dist second. Status stays unreviewed until a human signs off; no APPROVED or licence claim is invented."
-    },
-    {
       "id": "existing-calamity",
       "prefix": "img/act4/calamity/",
       "files": 59,
@@ -60,11 +42,11 @@
       "use_terms": "Proprietary / 'Other', all rights reserved to Azafure, LLC. Source may be used as reference only; lifted code must credit 'Azafure, LLC'. The Calamity Mod 'cannot be redistributed in any form or in any location' (Steam Workshop is the only official host). Music owned by respective composers. No asset licence granted.",
       "modification": "Byte-for-byte copies under the mod's own filenames; tRNS added 2026-11-09 to five NPC sheets whose palette index 0 is background.",
       "attribution": "img/act4/CREDITS.md creator index; per-sheet source paths in js/data/sheets.js",
-      "redistribution": "NOT permitted. No rightsholder licence.",
+      "redistribution": "No rightsholder licence. Ships in dist under OWNER-ACCEPTED-FAN-USE (owner risk decision).",
       "dimensions": null,
       "frame_count": null,
       "pivot": null,
-      "status": "RIGHTS_PENDING",
+      "status": "OWNER-ACCEPTED-FAN-USE",
       "note": "Per-file w/h/frames live in img/act4/sheets.json. Pivot, palette and alpha per file not recorded -> null."
     },
     {
@@ -78,11 +60,11 @@
       "use_terms": "Terraria assets (c) Re-Logic. No reuse or redistribution licence located. A free texture-pack download is a source, not a licence.",
       "modification": "Tiles/walls re-encoded from the pack's own RGBA, pixel-identical 2026-11-09; tRNS added to NPC/projectile sheets so palette index 0 is transparent; item icons untrimmed rips with alpha already present.",
       "attribution": "img/act4/CREDITS.md creator index",
-      "redistribution": "Not redistributed as a pack; no rightsholder licence.",
+      "redistribution": "No rightsholder licence; not redistributed as a pack. Ships in dist under OWNER-ACCEPTED-FAN-USE (owner risk decision).",
       "dimensions": null,
       "frame_count": null,
       "pivot": null,
-      "status": "RIGHTS_PENDING",
+      "status": "OWNER-ACCEPTED-FAN-USE",
       "note": "Dimensions, frames, pivot not recorded at folder level -> null."
     },
     {
@@ -96,11 +78,11 @@
       "use_terms": "Deltarune assets (c) Toby Fox. No licence granted. Hosted extracted dumps are rights-review only.",
       "modification": "Cropped from the chapters' own atlases; tvtime/ sheets are raw extracted frames; sr-*.png rips are gitignored and not shipped.",
       "attribution": "img/act4/CREDITS.md creator index",
-      "redistribution": "NOT permitted outside this non-commercial project; no rightsholder licence.",
+      "redistribution": "No rightsholder licence. Ships in dist under OWNER-ACCEPTED-FAN-USE (owner risk decision).",
       "dimensions": null,
       "frame_count": null,
       "pivot": null,
-      "status": "RIGHTS_PENDING",
+      "status": "OWNER-ACCEPTED-FAN-USE",
       "note": "deltarune/equip-icons.png provenance still unknown within this set -> null fields, no approval."
     },
     {
@@ -114,11 +96,11 @@
       "use_terms": "Undertale assets (c) Toby Fox. No licence granted.",
       "modification": "Trimmed/re-mapped onto the site's palette; armchair.png regenerated 2026-11-09 (shipped file had been a corrupted placeholder).",
       "attribution": "img/act4/CREDITS.md creator index",
-      "redistribution": "NOT permitted; no rightsholder licence.",
+      "redistribution": "No rightsholder licence. Ships in dist under OWNER-ACCEPTED-FAN-USE (owner risk decision).",
       "dimensions": null,
       "frame_count": null,
       "pivot": null,
-      "status": "RIGHTS_PENDING",
+      "status": "OWNER-ACCEPTED-FAN-USE",
       "note": "Dimensions, frames, pivot not recorded at folder level -> null."
     },
     {
@@ -132,11 +114,11 @@
       "use_terms": "Gigapack free tier: bundle in a game with attribution ('Super Pixel Effects Gigapack - Will Tice / unTied Games'); do not reupload. BDragon free tier: non-commercial use with attribution. These are third-party free-tier terms, not rightsholder clearance, and are recorded without an exact source URL or owner sign-off.",
       "modification": "Re-sliced from the packs' horizontal rows into the site's vertical-strip convention; FxHoly is row 2 of sheet 00 re-sliced and cropped.",
       "attribution": "img/act4/CREDITS.md (Will Tice / unTied Games; BDragon)",
-      "redistribution": "Bundling with attribution per free tier; no standalone reupload.",
+      "redistribution": "No standalone reupload. Ships in dist under OWNER-ACCEPTED-FAN-USE (owner risk decision); free-tier terms are not rightsholder clearance.",
       "dimensions": null,
       "frame_count": null,
       "pivot": null,
-      "status": "RIGHTS_PENDING",
+      "status": "OWNER-ACCEPTED-FAN-USE",
       "note": "Free-tier terms exist but no exact public source URL or owner sign-off on file -> not APPROVED."
     },
     {
@@ -150,11 +132,11 @@
       "use_terms": "Toby Fox atlas crops (c) Toby Fox. No licence granted.",
       "modification": "Atlases picked from the Deltarune atlases and re-mapped onto the site's own palette; witch-face.png is a crop of the TownNPC witch portrait.",
       "attribution": "img/act4/CREDITS.md creator index",
-      "redistribution": "NOT permitted; no rightsholder licence.",
+      "redistribution": "No rightsholder licence. Ships in dist under OWNER-ACCEPTED-FAN-USE (owner risk decision).",
       "dimensions": null,
       "frame_count": null,
       "pivot": null,
-      "status": "RIGHTS_PENDING",
+      "status": "OWNER-ACCEPTED-FAN-USE",
       "note": "Dimensions, frames, pivot not recorded at folder level -> null."
     },
     {
@@ -177,33 +159,34 @@
   ],
   "audit": {
     "date": "2026-11-19",
-    "work_order": "W9-ASSETS / WB-ARTWIRE",
-    "method": "Truthful audit of tracked, shipped dependencies. Availability online is not a licence; screenshots and search hits are research links, not permission. No licence or approval invented. Unknown dimensions, pivots and frame counts recorded as null, not guessed.",
+    "work_order": "YA-SWITCH / owner asset-strategy decision",
+    "method": "Truthful audit of tracked, shipped dependencies. Availability online is not a licence; screenshots and search hits are research links, not permission. OWNER-ACCEPTED-FAN-USE records the owner's explicit non-commercial risk acceptance, not a rightsholder licence. No licence or approval invented. Unknown dimensions, pivots and frame counts recorded as null, not guessed.",
     "tag_counts": {
       "APPROVED": 0,
-      "RIGHTS_PENDING": 7,
-      "GENERATED_UNREVIEWED": 1,
+      "RIGHTS_PENDING": 1,
+      "GENERATED_UNREVIEWED": 0,
+      "OWNER-ACCEPTED-FAN-USE": 6,
       "REJECTED": 0,
-      "unit": "manifest group (8 groups: 175 generated originals + 165 tracked rights/audio files)"
+      "unit": "manifest group (7 groups: 169 original game-art files + 6 audio files)"
     },
-    "generated_assets": "175 originals under img/act4/original/: 159 PNG mirrors of the six Act IV queues plus 11 img/act123/ PNGs, witch-face.png and four root WebP/GIF images, generated by scripts/v3/gen-art/{calamity,duo,terraria,vfx,wire}.mjs at the source basenames, dimensions, frame counts and transparency. Byte-identical on repeated generation. All are GENERATED_UNREVIEWED, never CLEARED.",
-    "dist_shipping": "ZERO rights-pending art in dist. scripts/build.mjs excludes all six Act IV queues, img/act123/, witch-face.png and the four root franchise files, and repoints unowned HTML/CSS URLs to generated originals; scripts/verify-dist.mjs fails on any rights-pending file or path string in dist and requires the generated replacements. The source queues remain on GitHub as rights-review material only.",
-    "must_replace_before_release": [
-      "img/act4/calamity/ (59) — replaced and excluded",
-      "img/act4/terraria/ (42) — replaced and excluded",
-      "img/act4/deltarune/ (19) — replaced and excluded",
-      "img/act4/undertale/ (7) — replaced and excluded",
-      "img/act123/ (11) — replaced and excluded",
-      "img/act4/tiles/ (6) — replaced and excluded",
-      "img/act4/vfx/ (26) — replaced and excluded",
-      "img/act4/witch-face.png (TownNPC witch crop) — replaced and excluded",
-      "img/Sans_sprite.webp, img/totem.webp, img/annoying-dog.gif, img/cat.gif — replaced and excluded"
+    "asset_decision": "Owner: keep the original assets from the games, remove AI-generated originals, fill remaining gaps with itch.io later. 175 game-art files ship from img/act4/{calamity,terraria,deltarune,undertale,tiles,vfx}/, img/act123/, img/act4/witch-face.png and four root franchise images. AI-generated img/act4/original/ and scripts/v3/gen-art/ were removed. No rightsholder licence is claimed.",
+    "dist_shipping": "scripts/build.mjs copies the game-art queues into dist; scripts/verify-dist.mjs requires 175 game-art files and fails on any img/act4/original/ file or path string. Franchise art ships under OWNER-ACCEPTED-FAN-USE, not on a claimed licence.",
+    "owner_risk_accepted": [
+      "img/act4/calamity/ (59) — original game art, no rightsholder licence",
+      "img/act4/terraria/ (42) — original game art, no rightsholder licence",
+      "img/act4/deltarune/ (19) — original game art, no rightsholder licence",
+      "img/act4/undertale/ (7) — original game art, no rightsholder licence",
+      "img/act123/ (11) — original game art, no rightsholder licence",
+      "img/act4/tiles/ (6) — original game art, no rightsholder licence",
+      "img/act4/vfx/ (26) — third-party free-tier art, no rightsholder licence",
+      "img/act4/witch-face.png (TownNPC witch crop) — original game art, no rightsholder licence",
+      "img/Sans_sprite.webp, img/totem.webp, img/annoying-dog.gif, img/cat.gif — original game art, no rightsholder licence"
     ],
     "coverage_gaps": [
-      "Human art review is still outstanding for all 175 generated originals. Status stays GENERATED_UNREVIEWED; owner approves art before release.",
-      "Exact source URLs unknown for Terraria HD pack, Undertale/Deltarune rips, VFX packs and tiles -> null, not guessed. These source files stay out of dist.",
-      "Per-file pivot/palette not recorded anywhere; per-file w/h/frames only in img/act4/sheets.json. Site-authored root SVGs are not rights-pending and still ship."
+      "No rightsholder licence exists for the shipped franchise art; owner accepted that risk for a non-commercial fan project. Not an approval.",
+      "Exact source URLs unknown for Terraria HD pack, Undertale/Deltarune rips, VFX packs and tiles -> null, not guessed.",
+      "Per-file pivot/palette not recorded anywhere; per-file w/h/frames only in img/act4/sheets.json. Site-authored root SVGs are not franchise art and still ship.",
+      "itch.io gap filling is a later step; no itch.io asset was downloaded or inspected for this change."
     ]
-  },
-  "prompts_ref": "plans/neu-v3/IMAGE_PROMPTS.md"
+  }
 }

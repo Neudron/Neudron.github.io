@@ -287,7 +287,7 @@
     if (!soulImg && typeof Image === 'function') {
       soulImg = new Image();
       soulImg.onload = function () { if (box && !box.hidden) render(); };
-      soulImg.src = 'img/act4/original/deltarune/tvtime/soul.png';
+      soulImg.src = 'img/act4/deltarune/tvtime/soul.png';
     }
     if (soulImg && soulImg.complete && soulImg.naturalWidth) { ctx.drawImage(soulImg, 0, 0, 16, 16, x, y, 16, 16); return; }
     ctx.fillStyle = '#FF0000';

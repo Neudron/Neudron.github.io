@@ -55,14 +55,14 @@
        `colours` stays as the fallback and MUST NOT be deleted. It is what
        let every room ship before the art existed, and it is what renders if
        a sheet 404s (and under a harness with no canvas, it is the room). */
-    src: 'img/act4/original/tiles/prize.png',
+    src: 'img/act4/tiles/prize.png',
     rects: { '#': [0, 0], '|': [16, 0], '.': [32, 0], ',': [48, 0], '=': [64, 0], '_': [80, 0], '+': [96, 0] },
     solid: '#|+o',
     colours: { '#': '#14121C', '|': '#221E2E', '.': '#1A1724',
                ',': '#241F33', '=': '#2E2740', '_': '#3A2140', '+': '#4A3255', 'o': '#1A1724' }
   });
   E.tileset('storm', {
-    src: 'img/act4/original/tiles/storm.png',
+    src: 'img/act4/tiles/storm.png',
     rects: { '#': [0, 0], '|': [16, 0], '.': [32, 0], ',': [48, 0], '=': [64, 0], '_': [80, 0], '+': [96, 0] },
     solid: '#|+ov',
     colours: { '#': '#0A0C18', '|': '#141A30', '.': '#101426',

@@ -128,7 +128,7 @@
     if (wantImg && !img && typeof Image === 'function') {
       img = new Image();
       img.onload = function () { if (active) draw(); };
-      img.src = 'img/act4/original/deltarune/tvtime/soul.png';
+      img.src = 'img/act4/deltarune/tvtime/soul.png';
     }
     if (img && img.complete && img.naturalWidth) c.drawImage(img, 0, 0, 16, 16, 30, 96, 20, 20);
     else {
