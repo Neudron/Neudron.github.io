@@ -55,6 +55,17 @@
   if (!NEU.engine || !NEU.engine.register) return;
 
   var E = NEU.engine;
+
+  /* W4: the woods district's entry socket. Generated output is verbatim;
+     this hook runs before gen-wex-woods.js is loaded (see index.html). */
+  var wexRegA = E.register;
+  E.register = function (id, def) {
+    if (id === 'wex_woods_01') {
+      def.spawns.from_forest_trail = { x: 7, y: 1, face: 'down' };
+      def.entities.push({ t: 'exit', x: 7, y: 0, to: 'a_woods', spawn: 'from_wex_woods_01', style: 'tunnel' });
+    }
+    return wexRegA(id, def);
+  };
   /* set dressing: never pressed, never solid (engine-kinds `decor`).
      A stand-in engine without decor (the reach proof) gets none. */
   var D = E.decor || function () { return []; };
@@ -578,7 +589,8 @@
     spawns: {
       a1_default: { x: 10, y: 7, face: 'right' }, a1_north: { x: 10, y: 3, face: 'down' }, a1_east: { x: 22, y: 7, face: 'left' },
       a2_west: { x: 23, y: 7, face: 'right' }, a2_east: { x: 46, y: 11, face: 'left' },
-      a3_west: { x: 47, y: 11, face: 'right' }, castle: { x: 56, y: 6, face: 'down' }, altar: { x: 68, y: 11, face: 'left' }
+      a3_west: { x: 47, y: 11, face: 'right' }, castle: { x: 56, y: 6, face: 'down' }, altar: { x: 68, y: 11, face: 'left' },
+      from_wex_woods_01: { x: 10, y: 2, face: 'down' }
     },
     areas: [
       { id: 'a1_clearing', x0: 0, y0: 0, x1: 22, y1: 12, spawn: 'a1_default', onEnter: A1.onEnter },
@@ -589,6 +601,7 @@
       var out = woodsLook(16)
         .concat(mergeWoodsEntities(A1, 'a1_clearing', 0, 0), mergeWoodsEntities(A2, 'a2_path', 22, 4), mergeWoodsEntities(A3, 'a3_fork', 46, 4));
       out.push(P('oak', 20, 6, { big: 1, rx: 18, solid: true }), P('oak', 25, 8, { big: 1, rx: 18, solid: true }), P('oak', 44, 10, { big: 1, rx: 18, solid: true }), P('oak', 47, 6, { big: 1, solid: true }), P('oak', 49, 12, { big: 1, rx: 18, solid: true }));
+      out.push({ t: 'exit', x: 10, y: 1, to: 'wex_woods_01', spawn: 'from_forest_trail', style: 'tunnel' });
       if (NEU.save && (NEU.save.has('mush1') || NEU.save.flagged('gone:a2_path:mush1'))) {
         return out.filter(function (e) { return e.mush !== 'mush1'; });
       }

@@ -43,6 +43,17 @@
   if (!NEU.engine || !NEU.engine.register) return;
   var E = NEU.engine;
 
+  /* W4: the city district's entry socket. Generated output is verbatim;
+     this hook runs before gen-wex-city.js is loaded (see index.html). */
+  var wexRegD = E.register;
+  E.register = function (id, def) {
+    if (id === 'wex_city_01') {
+      def.spawns.from_city_street = { x: 7, y: 1, face: 'down' };
+      def.entities.push({ t: 'exit', x: 7, y: 0, to: 'd_city', spawn: 'from_wex_city_01', style: 'door' });
+    }
+    return wexRegD(id, def);
+  };
+
   E.tileset('city', {
     /* Texture from the real Deltarune atlases, PALETTE from this site.
        look-city.js paints over all of it; this is what renders if that
@@ -429,7 +440,8 @@
     spawns: {
       fire: { x: 1, y: 8, face: 'right' }, stall: { x: 10, y: 7, face: 'up' }, portal: { x: 6, y: 4, face: 'down' },
       alley_west: { x: 25, y: 8, face: 'right' }, garage: { x: 34, y: 5, face: 'up' }, alley_east: { x: 42, y: 7, face: 'left' },
-      square_west: { x: 43, y: 7, face: 'right' }, north: { x: 54, y: 10, face: 'down' }
+      square_west: { x: 43, y: 7, face: 'right' }, north: { x: 54, y: 10, face: 'down' },
+      from_wex_city_01: { x: 22, y: 4, face: 'down' }
     },
     areas: [
       { id: 'd1_street', x0: 0, y0: 0, x1: 24, y1: 13, spawn: 'fire', onEnter: D1.onEnter },
@@ -437,6 +449,7 @@
       { id: 'd3_square', x0: 43, y0: 0, x1: 66, y1: 13, spawn: 'square_west', onEnter: D3.onEnter }
     ],
     entities: [{ t: 'cityfloor', v: 'd_city', x: 0, y: 0 }].concat(mergeCityEntities())
+      .concat([{ t: 'exit', x: 22, y: 3, to: 'wex_city_01', spawn: 'from_city_street', style: 'door' }])
   });
   /* every spawn an old id declared is listed, as a_woods lists its own */
   E.alias('d1_street', 'd_city', { fire: 'fire', stall: 'stall', portal: 'portal', east: 'alley_west' }, 'd1_street');
