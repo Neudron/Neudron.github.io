@@ -728,8 +728,8 @@
       msg.style.visibility = '';
       msg.hidden = false;
       msg.innerHTML = 'he stops, mid-bar. "no."' +
-        '<br><small>' + keycap('Z') + 'enter to go again' + keycap('X') + 'dash' +
-        keycap('← ↓ ↑ →') + 'soul' + keycap('ESC') + 'leave</small>';
+        '<br><small>' + keycap('Z') + '<span class="glyph__copy">enter to go again</span>' + keycap('X') + '<span class="glyph__copy">dash</span>' +
+        keycap('← ↓ ↑ →') + '<span class="glyph__copy">soul</span>' + keycap('ESC') + '<span class="glyph__copy">leave</span></small>';
     }
     draw(songPos());
   }

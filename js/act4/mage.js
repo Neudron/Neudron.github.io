@@ -59,6 +59,10 @@
     if (n > full.length) n = full.length;
     if (n < 0) n = 0;
     sayEl.textContent = full.substring(0, Math.floor(n));
+    if (NEU.glyph && /^(?:\* )?(?:what will you (?:buy|sell)\?|you again\. the cards remember you\.)$/.test(full) &&
+        Math.floor(n) >= full.length) {
+      NEU.glyph.put(sayEl, /cards/.test(full) ? 'card' : 'coin', full);
+    }
   }
 
   function say(msg) {

@@ -103,7 +103,10 @@
   }
 
   function say(msg) {
-    if (sayEl) sayEl.textContent = msg || '';
+    if (sayEl) {
+      sayEl.textContent = msg || '';
+      if (NEU.glyph && /^what will you (?:buy|sell)\?$/.test(msg || '')) NEU.glyph.put(sayEl, 'coin', msg);
+    }
   }
 
   function personaLine() {
