@@ -528,6 +528,39 @@
   /* frame time of the last heartbeat (sfx.heart). begin() puts it back to
      -Infinity, so a new run's first beat is not held up by the last one. */
   var beatAt = -Infinity;
+  /* Bot tier only: greedy 0.32 s lookahead dodge. Deterministic: no RNG, ties
+     keep the soul still. It dodges the electric blaster too, so it never charges:
+     bounded runs only, the endless console run stays hand-played. */
+  var AUTO = [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+  function autoKeys() {
+    var blue = F.mode === 'blue', sp = F.speed || dm.SPEED, best = 0, bc = 1e9, d, s, i;
+    for (d = 0; d < (blue ? 3 : 9); d++) {
+      var ix = AUTO[d][0], iy = blue ? 0 : AUTO[d][1];
+      var c = Math.abs(F.x + ix * sp * 0.32 - AX - AW / 2) * 0.002 + Math.abs(F.y + iy * sp * 0.32 - AY - AH / 2) * 0.002;
+      for (s = 1; s <= 5; s++) {
+        var u = s * 0.08;
+        var px = Math.min(Math.max(F.x + ix * sp * u, AX + 7), AX + AW - 7);
+        var py = Math.min(Math.max(F.y + iy * sp * u, AY + 7), AY + AH - 7);
+        for (i = 0; i < bullets.length; i++) {
+          var bb = bullets[i], m = bb.r + PLAYER_R + 16;
+          var ex = bb.x + bb.vx * u - px, ey = bb.y + bb.vy * u - py;
+          if (ex * ex + ey * ey < m * m) c += 4 + 10 * (1 - Math.sqrt(ex * ex + ey * ey) / m);
+        }
+        for (i = 0; i < blasters.length; i++) {
+          var bl = blasters[i], at = bl.t + u;
+          if (at < BL_CHARGE - 0.1 || at > BL_CHARGE + BL_FIRE) continue;
+          if (Math.abs((bl.horiz ? py : px) - bl.lane) < BL_HALF + PLAYER_R + 6) c += 10;
+        }
+      }
+      if (c < bc - 1e-9) { bc = c; best = d; }
+    }
+    var k = { left: AUTO[best][0] < 0, right: AUTO[best][0] > 0, up: blue ? F.vy < 0 && !F.ground : AUTO[best][1] < 0, down: !blue && AUTO[best][1] > 0 };
+    if (blue && F.ground) for (i = 0; i < bones.length; i++) {
+      var bo = bones[i], dx = bo.x - F.x;
+      if (dx * bo.vx < 0 && Math.abs(dx) < Math.abs(bo.vx) * 0.32 + 14) k.up = true;
+    }
+    return k;
+  }
   function step(now) {
     if (!running) return;
     if (!NEU.kernel) requestAnimationFrame(step);
@@ -538,7 +571,7 @@
     if (phaseFor() !== phase) enterPhase(phaseFor());
     squeezeBox();
 
-    dm.move(F, keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH });
+    dm.move(F, !endless && NEU.boss && NEU.boss.tier === 'bot' ? autoKeys() : keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH });
     dm.tick(F, dt, null);
     var bdt = dt * dm.slow(F);           // adrenaline's first beat slows the room
 
