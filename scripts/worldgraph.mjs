@@ -253,6 +253,59 @@ export function reachability(graph, starts) {
 }
 function asList(value) { return value == null ? [] : Array.isArray(value) ? value : [value]; }
 
+/* Pure markdown for plans/neu-v3/WORLD_GRAPH.md. root is where entry points were read from. */
+export function worldGraphMd(graph, problems, reach, root = ROOT) {
+  const list = a => (a.length ? a.map(x => `- ${x}`) : ['- None']).join('\n');
+  const sheet = graph.roomIds.map(id => {
+    const r = graph.rooms[id], t = String(r.tiles).split('\n').filter(Boolean), es = r.entities || [], ex = es.filter(e => e.t === 'exit');
+    return { id, tileset: r.tileset, w: Math.max(0, ...t.map(l => l.length)), h: t.length, spawns: Object.keys(r.spawns || {}).length,
+      exits: ex.length, locks: ex.filter(e => e.locked).length, areas: (r.areas || []).length, ia: es.filter(e => e.lines || e.run).length };
+  });
+  return `# World graph
+
+Rooms: ${graph.roomIds.length}; edges: ${graph.edges.length}. Entries: ${entries(graph, root).join(', ')}.
+
+## Edges
+
+| From | To | Spawn | Via | Lock |
+|---|---|---|---|---|
+${graph.edges.map(e => `| ${e.from} | ${e.to} | ${e.spawn || ''} | ${e.via || 'MISSING'} | ${e.lock || ''} |`).join('\n')}
+
+## Dynamic exits
+
+| From | To | Spawn | When |
+|---|---|---|---|
+${graph.edges.filter(e => e.cond).map(e => `| ${e.from} | ${e.to} | ${e.spawn || ''} | ${e.cond} |`).join('\n')}
+
+## Unreached from entries
+
+${list(reach.unreached)}
+
+## Validation findings
+
+${list(problems)}
+
+## Design limits
+
+- seamless scope: woods areas a1-a3 of a_woods only (R19: wider seams wait for owner GO)
+- critical path: UNKNOWN (grants/goal are story content, not in room data)
+
+## Room sheet
+
+| id | tileset | w | h | spawns | exits | locks | areas | ia |
+|---|---|---|---|---|---|---|---|---|
+${sheet.map(r => `| ${r.id} | ${r.tileset} | ${r.w} | ${r.h} | ${r.spawns} | ${r.exits} | ${r.locks} | ${r.areas} | ${r.ia} |`).join('\n')}
+
+## Savanna rooms with ia < 6
+
+${list(sheet.filter(r => /^s(\d+)?_/.test(r.id) && r.ia < 6).map(r => `${r.id} (ia ${r.ia})`))}
+
+## Not derivable from room data
+
+Camera, sound, save and focal point/sightline stay with art direction (D-AB-12, D-LD-10 PARTIAL). ia = entities with lines or run.
+`;
+}
+
 export function render(root = ROOT) {
   const graph = buildGraph(root), problems = validate(graph, root);
   const pathProof = criticalPath(graph, {});
@@ -265,6 +318,9 @@ export function render(root = ROOT) {
   }, null, 2) + '\n');
   fs.writeFileSync(path.join(out, 'WORLD_GRAPH.md'), `# World graph\n\nRooms: ${graph.roomIds.length}; edges: ${graph.edges.length}.\n\n| From | To | Spawn | Via | Lock |\n|---|---|---|---|---|\n${graph.edges.map(e => `| ${e.from} | ${e.to} | ${e.spawn || ''} | ${e.via || 'MISSING'} | ${e.lock || ''} |`).join('\n')}\n\n## Validation findings\n\n${problems.length ? problems.map(p => `- ${p}`).join('\n') : '- None'}\n\nCritical-path flag grants are not encoded in room registration data; automatic story-path proof is unavailable from these sources.\n`);
   fs.appendFileSync(path.join(out, 'WORLD_GRAPH.md'), `\nCritical-path checker status: ${pathProof.status} (${pathProof.reason}).\n`);
+  const md = path.join(root, 'plans/neu-v3');
+  fs.mkdirSync(md, { recursive: true });
+  fs.writeFileSync(path.join(md, 'WORLD_GRAPH.md'), worldGraphMd(graph, problems, reachability(graph, entries(graph, root)), root));
   return { graph, problems };
 }
 
