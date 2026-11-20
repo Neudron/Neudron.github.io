@@ -1481,6 +1481,21 @@
     ];
   }
 
+  /* compact pause: bars for PAUSED, then play / restart / exit glyph (2x, 28-32px) beside each key chip */
+  function pauseGlyphs(g) {
+    var cx = g.w / 2, cy = g.h / 2, i, y, rows = [['Esc', 0, '#FFFFFF'], [NEU.glyph.key('r'), 'reset', '#FF8A8A'], [NEU.glyph.key('x'), 'door', '#EDE7DE']];
+    ctx.fillStyle = '#000000'; ctx.fillRect(cx - 100, cy - 100, 200, 200);
+    ctx.strokeStyle = '#EDE7DE'; ctx.lineWidth = 2; ctx.strokeRect(cx - 99, cy - 99, 198, 198);
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(cx - 22, cy - 84, 16, 44); ctx.fillRect(cx + 6, cy - 84, 16, 44);
+    for (i = 0; i < 3; i++) {
+      y = cy - 16 + i * 40;
+      ctx.fillStyle = rows[i][2];
+      if (rows[i][1]) { ctx.save(); ctx.translate(cx - 70, y); ctx.scale(2, 2); NEU.glyph.draw(ctx, rows[i][1], 0, 0); ctx.restore(); }
+      else { ctx.beginPath(); ctx.moveTo(cx - 68, y); ctx.lineTo(cx - 68, y + 32); ctx.lineTo(cx - 42, y + 16); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle = '#3A3A44'; ctx.fillRect(cx + 8, y + 2, 64, 28);
+      text(rows[i][0], cx + 40, y + 16, 16, '#EDE7DE');
+    }
+  }
   function draw(sp) {
     var g = geom(), t = now(), s = g.s, half = (N * s) >> 1;
     var SD = [{ x: g.hisX, y: g.hisY, s: g.hs, p: g.pitchH }, { x: g.mineX, y: g.strumY, s: s, p: g.pitch }];
@@ -1645,11 +1660,13 @@
     }
     if (S.paused) {                     /* ESC pauses: the held frame under a veil */
       ctx.globalAlpha = 0.6; ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, g.w, g.h); ctx.globalAlpha = 1;
-      if (NEU.glyph && NEU.glyph.compact()) { ctx.fillStyle = '#FFFFFF'; NEU.glyph.draw(ctx, 'note', g.w / 2 - 7, g.h / 2 - 26); }
-      else text('PAUSED', g.w / 2, g.h / 2 - 16, 48, '#FFFFFF');
-      text(NEU.glyph && NEU.glyph.compact() ? 'Esc' : 'ESC to resume', g.w / 2, g.h / 2 + 32, 16, '#EDE7DE');
-      text(NEU.glyph && NEU.glyph.compact() ? NEU.glyph.key('r') : 'R to restart', g.w / 2, g.h / 2 + 56, 16, '#EDE7DE');
-      text(NEU.glyph && NEU.glyph.compact() ? NEU.glyph.key('x') : 'X or tap to leave', g.w / 2, g.h / 2 + 80, 16, '#EDE7DE');
+      if (NEU.glyph && NEU.glyph.compact()) pauseGlyphs(g);
+      else {
+        text('PAUSED', g.w / 2, g.h / 2 - 16, 48, '#FFFFFF');
+        text('ESC to resume', g.w / 2, g.h / 2 + 32, 16, '#EDE7DE');
+        text('R to restart', g.w / 2, g.h / 2 + 56, 16, '#EDE7DE');
+        text('X or tap to leave', g.w / 2, g.h / 2 + 80, 16, '#EDE7DE');
+      }
     }
     ctx.restore();
     if (NEU.juice && NEU.juice.end) NEU.juice.end(ctx, shook);
