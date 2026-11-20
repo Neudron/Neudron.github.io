@@ -206,7 +206,7 @@
      the bar and the clock disagreeing about that question. */
   function limit() {
     var s = NEU.settings;
-    return s && s.relaxedQuiz ? 24 : 12;
+    return (s && s.relaxedQuiz) || (NEU.diff && NEU.diff.fpick([1, 1, 0, 0, 0, 0, 0])) ? 24 : 12;
   }
   var span = 12;
   var i = 0, score = 0, t = 0, tick = null, locked = false, open_ = false;
@@ -473,6 +473,7 @@
   function open() {
     if (open_) return;
     open_ = true;
+    if (NEU.diff) NEU.diff.begin();   /* latch the tier for this show's question clocks */
     /* Where to put the player back when they leave. Only captured once
        per visit, so a replay cannot overwrite it with a button inside. */
     if (!lastFocus) lastFocus = document.activeElement;
