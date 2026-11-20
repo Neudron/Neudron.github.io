@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { fanRefs, isReferencedFan } from './lib/fan-refs.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
@@ -106,6 +107,14 @@ if (missingGameArt.length) fail('game art missing from artifact: ' + missingGame
 if (gameArtFiles.length < 175) fail('game art in artifact: expected >=175, got ' + gameArtFiles.length);
 if (!generatedFiles.length && !generatedRefs.length && !missingGameArt.length && gameArtFiles.length >= 175)
   ok('game art ships from rights queues; ' + gameArtFiles.length + ' files, zero AI-generated originals');
+
+/* 3c. Fan art stays in the repo in full, but Pages ships only the sheets
+   NEU.sheets references (js/css/html path literals, %03d seq frames expanded). */
+const fanRefList = fanRefs(ROOT);
+const distFan = files.filter((f) => f.startsWith('img/act4/fan/'));
+const strayFan = distFan.filter((f) => !isReferencedFan(f, fanRefList));
+if (strayFan.length) fail('unreferenced fan art in dist: ' + strayFan.slice(0, 5).join(', '));
+else ok('dist fan files are only referenced sheets (' + distFan.length + ' files)');
 
 /* 4. HTML keeps every anchor, id, external link, and canonical URL. */
 const ids = (s) => new Set([...s.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));

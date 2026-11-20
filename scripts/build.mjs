@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fanRefs, isReferencedFan } from './lib/fan-refs.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
@@ -159,7 +160,10 @@ async function main() {
   for (const f of FILES) if (await exists(path.join(ROOT, f))) await fs.cp(path.join(ROOT, f), path.join(DIST, f));
   await fs.writeFile(path.join(DIST, '.nojekyll'), '');
   /* Publish tracked web assets only: ignored notes (for example
-     .well-known/README.md) must never reach Pages. */
+     .well-known/README.md) must never reach Pages. The owner keeps every
+     downloaded fan file in the repo, but Pages ships only the sheets
+     NEU.sheets actually references; unreferenced fan art stays in source. */
+  const refs = fanRefs(ROOT);
   for (const d of DIRS) {
     if (!(await exists(path.join(ROOT, d)))) continue;
     const list = execFileSync('git', ['ls-files', '-z', '--', d], { cwd: ROOT, encoding: 'utf8' });
@@ -169,6 +173,7 @@ async function main() {
       if (/\.md$/i.test(f)) continue;
       /* game-art queues ship; removed AI-generated art must not */
       if (/^img\/act4\/original\//.test(f)) throw new Error('AI-generated art in source tree: ' + f);
+      if (/^img\/act4\/fan\//.test(f) && !isReferencedFan(f, refs)) continue;
       await fs.mkdir(path.dirname(path.join(DIST, f)), { recursive: true });
       await fs.cp(path.join(ROOT, f), path.join(DIST, f));
     }

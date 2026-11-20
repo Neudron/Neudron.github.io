@@ -24,6 +24,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fanRefs, isReferencedFan } from '../scripts/lib/fan-refs.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist');
@@ -97,15 +98,19 @@ ok('fan art is PNG only, no audio smuggled into img/',
   fanFiles.every((f) => /\.png$/i.test(f)),
   fanFiles.filter((f) => !/\.png$/i.test(f)).slice(0, 5));
 
-console.log('\n3. dist ships the fan art and nothing from the jar');
+console.log('\n3. dist ships referenced fan art only, and nothing from the jar');
 ok('dist exists (run npm run build first)', fs.existsSync(DIST));
 if (fs.existsSync(DIST)) {
   const files = walk(DIST);
+  const refs = fanRefs(ROOT);
+  const wantedFan = fanFiles.filter((f) => isReferencedFan(f, refs));
   const shippedFan = files.filter((f) => f.startsWith('img/act4/fan/'));
-  ok('dist ships the fan art (' + shippedFan.length + ' files)',
-    shippedFan.length === fanFiles.length && fanFiles.length > 0, shippedFan.length);
-  const missing = fanFiles.filter((f) => !files.includes(f));
-  ok('dist ships every fan file byte-for-byte', missing.length === 0, missing.slice(0, 5));
+  ok('dist ships every referenced fan file (' + wantedFan.length + ' of ' + fanFiles.length + ' staged)',
+    wantedFan.length > 0 && wantedFan.every((f) => files.includes(f)),
+    wantedFan.filter((f) => !files.includes(f)).slice(0, 5));
+  ok('dist ships no unreferenced fan file',
+    shippedFan.length === wantedFan.length && shippedFan.every((f) => wantedFan.includes(f)),
+    shippedFan.filter((f) => !wantedFan.includes(f)).slice(0, 5));
   const jars = files.filter((f) => /\.jar$/i.test(f));
   ok('dist contains no .jar', jars.length === 0, jars);
 
