@@ -555,11 +555,12 @@
     }
     return rows.join('\n');
   }
+  var HOME = {};
   function corridor(id, w, next, prev, styles, solids, odd, xspawns) {
     var spawns = { south: { x: 1, y: 4, face: 'right' }, north: { x: w - 2, y: 4, face: 'left' } };
     if (id === 'e3_hall') spawns.dad = { x: 12, y: 2, face: 'down' };
     if (xspawns) for (var k in xspawns) spawns[k] = xspawns[k];
-    E.register(id, {
+    HOME[id] = E.register(id, {
       tileset: 'home',
       tiles: hallGrid(w, solids),
       spawns: spawns,
@@ -809,7 +810,38 @@
     }
   }
 
-  // world C1 spike: dev-only flag, default off. Task 2 defines NEU.worldSpikeBuild.
+  /* world C1 spike (dev-only): the city areas, a 12-tile seam corridor and
+     the e3_hall floor in one room. Built on first flag set; no omitted-room
+     parts (e4..e6) and no roof fade. */
+  var spikeDef = null;
+  function spikeBuild() {
+    if (spikeDef) return spikeDef;
+    var areas = CITY_SRC.map(cityArea), last, rows, y, seam = [], hall, hr, i, ents = [], e, k, c;
+    for (i = 0; i < areas.length; i++) areas[i].id = 'ws_' + areas[i].id;
+    last = areas[areas.length - 1];
+    rows = last.tiles.split('\n');
+    for (y = 9; y <= 11; y++) rows[y] = rows[y].slice(0, -1) + '.';
+    last.tiles = rows.join('\n');
+    for (y = 0; y < 14; y++) seam.push(y >= 9 && y <= 11 ? '............' : '############');
+    hr = HOME.e3_hall;
+    for (i = 0; i < hr.entities.length; i++) {
+      e = hr.entities[i];
+      if (e.t === 'cityfloor' || e.t === 'exit') continue;
+      c = {}; for (k in e) c[k] = e[k];
+      c.x = e.x - 1; ents.push(c);
+    }
+    hall = { id: 'ws_e3_hall', x: 79, y: 6, tiles: hr.grid.map(function (r) { return r.slice(1, -1); }).join('\n'),
+             spawns: { hall: { x: 0, y: 4, face: 'right' } }, spawn: 'hall', entities: ents };
+    areas.push({ id: 'ws_seam', x: 67, y: 0, tiles: seam.join('\n'),
+                 spawns: { seam: { x: 6, y: 10, face: 'right' }, porch: { x: 11, y: 10, face: 'right' } }, spawn: 'seam', entities: [] });
+    areas.push(hall);
+    spikeDef = E.merge('w_spike', areas, { tileset: 'city' });
+    if (spikeDef) spikeDef.entities = [{ t: 'cityfloor', v: 'w_spike', x: 0, y: 0 }].concat(spikeDef.entities);
+    return spikeDef;
+  }
+  NEU.worldSpikeBuild = spikeBuild;
+
+  // flag: dev-only, default off.
   // shortcut: reload clears, no teardown on false
   var spikeOn = false;
   if (NEU.engine) Object.defineProperty(NEU.engine, 'worldSpike', {
