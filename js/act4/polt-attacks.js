@@ -1,19 +1,20 @@
 /* polt-attacks.js — Polterghast named-attack authority (VISUAL_IMPROVEMENT_RESEARCH
    VIP-05). One attack record per verb, fixed per-phase cycles, one telegraph
    lead, and boss movement driven through the adapter. ES5, no per-frame
-   allocation. The legacy cadence in boss-polt.js stays as a whole fallback;
-   every shot still goes through that file's single shot() cap. */
+   allocation. This file is the only cadence: boss-polt.js has no bullet
+   source of its own, and every shot still goes through its shot() cap. */
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
   function dp(k) { return NEU.boss && NEU.boss.mul ? NEU.boss.mul(k) : 1; }
   var ATK = {};
-  var A = null, phase = 1, index = 0, current = null, signature = false;
+  var A = null, phase = 1, index = 0, current = null, signature = false, pending = 0;
   var TAU = Math.PI * 2;
   /* VIP-05 budget. All one source of truth; boss-polt.js owns the bullet
      array and enforces maxBullets/maxAge on every shot(). */
+  var TIMING = { tele: [24, 30], gap: 72, gapBig: 210 }, GAP = TIMING.gap, GAP_BIG = TIMING.gapBig;
   var CAP = { maxBullets: 220, looks: 6, gapPx: 56, contrast: 3, maxAge: 6,
-              tele: [24, 30], gap: 72, gapBig: 210 };
+              tele: TIMING.tele, gap: GAP, gapBig: GAP_BIG };
   var TELE_MIN = CAP.tele[0], TELE_MAX = CAP.tele[1];
 
   function D(d, st) { return d * st.aw / 2000; }
@@ -46,17 +47,17 @@
      tele: 24-30f lead issued at events[i]-tele. speed may be an array for a
      per-volley ramp. look: 0-5 visual variant, bounded by CAP.looks. */
   var SPECS = {
-    EctoplasmUppercutCharges: { duration: 204, events: [54, 102, 150], shape: 'line', count: 6, speed: [23, 27, 31], tele: 24, look: 0 },
-    LegSwipes: { duration: 224, events: [54, 112, 170], shape: 'fan', count: 5, spread: 1.22, speed: 18, tele: 24, look: 1 },
-    WispCircleCharges: { duration: 252, events: [54, 108, 162, 216], shape: 'ring', count: 8, speed: 15, tele: 24, look: 2 },
-    SpiritPetal: { duration: 240, events: [54, 84, 114, 144, 174, 204], shape: 'fan', count: 6, spread: 0.9, speed: [7, 9, 11, 13, 15, 18], tele: 26, look: 3 },
-    AsgoreRingSoulAttack: { duration: 480, events: [54, 121, 188, 255, 322, 389, 456], shape: 'ring', count: 24, gap: 4, gapR: 200, speed: [14, 16, 18, 20, 22, 24, 26], tele: 28, look: 4 },
-    ArcingSouls: { duration: 252, events: [54, 110, 166, 222], shape: 'fan', count: 5, spread: 1.1, speed: 19, tele: 24, look: 0 },
-    VortexCharge: { duration: 240, events: [54, 108, 162], shape: 'line', count: 7, speed: 27, tele: 24, look: 5 },
-    HookCrossfire: { duration: 260, events: [54, 84, 114, 144], shape: 'line', count: 4, speed: 20, tele: 24, look: 1 },
-    CloneSplit: { duration: 264, events: [54, 114, 174, 234], shape: 'ring', count: 12, speed: 20, tele: 26, look: 4 },
-    PhantomOrbit: { duration: 260, events: [54, 110, 166, 222], shape: 'ring', count: 3, gapR: 120, speed: 12, tele: 30, look: 2 },
-    DesperationAttack: { duration: 360, events: [42, 84, 126, 168, 210, 252, 294, 336], shape: 'ring', count: 16, gap: 3, gapR: 200, speed: 18, tele: 28, look: 5 }
+    EctoplasmUppercutCharges: { kick: 'small', origin: 'body', counter: 'dash through the line, then slip behind', duration: 204, events: [54, 102, 150], shape: 'line', count: 6, speed: [23, 27, 31], tele: 24, look: 0 },
+    LegSwipes: { kick: 'small', origin: 'player', counter: 'fan aims at you, step out of the middle', duration: 224, events: [54, 112, 170], shape: 'fan', count: 5, spread: 1.22, speed: 18, tele: 24, look: 1 },
+    WispCircleCharges: { kick: 'small', origin: 'body', counter: 'ring spreads from the centre, stay between darts', duration: 252, events: [54, 108, 162, 216], shape: 'ring', count: 8, speed: 15, tele: 24, look: 2 },
+    SpiritPetal: { kick: 'small', origin: 'body', counter: 'each petal speeds up, move before the next', duration: 240, events: [54, 84, 114, 144, 174, 204], shape: 'fan', count: 6, spread: 0.9, speed: [7, 9, 11, 13, 15, 18], tele: 26, look: 3 },
+    AsgoreRingSoulAttack: { kick: 'medium', origin: 'body', counter: 'step into the gap, the lane tracks you', duration: 480, events: [54, 121, 188, 255, 322, 389, 456], shape: 'ring', count: 24, gap: 4, gapR: 200, speed: [14, 16, 18, 20, 22, 24, 26], tele: 28, look: 4 },
+    ArcingSouls: { kick: 'small', origin: 'body', counter: 'fans sweep wide, drift to the edge of the fan', duration: 252, events: [54, 110, 166, 222], shape: 'fan', count: 5, spread: 1.1, speed: 19, tele: 24, look: 0 },
+    VortexCharge: { kick: 'medium', origin: 'body', counter: 'two dashes, leave the lane after the first', duration: 240, events: [54, 108, 162], shape: 'line', count: 7, speed: 27, tele: 24, look: 5 },
+    HookCrossfire: { kick: 'small', origin: 'body', counter: 'hook shots cross the arena, hold the centre', duration: 260, events: [54, 84, 114, 144], shape: 'line', count: 4, speed: 20, tele: 24, look: 1 },
+    CloneSplit: { kick: 'medium', origin: 'clone', counter: 'a clone fires too, keep both rings in view', duration: 264, events: [54, 114, 174, 234], shape: 'ring', count: 12, speed: 20, tele: 26, look: 4 },
+    PhantomOrbit: { kick: 'small', origin: 'orbit', counter: 'he hides, three darts orbit, wait it out', duration: 260, events: [54, 110, 166, 222], shape: 'ring', count: 3, gapR: 120, speed: 12, tele: 30, look: 2 },
+    DesperationAttack: { kick: 'medium', origin: 'body', counter: 'gap faces you every ring, keep slipping through', duration: 360, events: [42, 84, 126, 168, 210, 252, 294, 336], shape: 'ring', count: 16, gap: 3, gapR: 200, speed: 18, tele: 28, look: 5 }
   };
 
   /* Boss movement per verb: each op fires once at its frame via the adapter.
@@ -64,6 +65,12 @@
   var MOVES = {
     EctoplasmUppercutCharges: [{ f: 54, op: 'charge' }, { f: 102, op: 'charge' }, { f: 150, op: 'charge' }],
     LegSwipes: [{ f: 54, op: 'moveTo', x: 'player', y: 'player' }],
+    WispCircleCharges: [{ f: 54, op: 'moveTo', x: 'center', y: 'center' }],
+    SpiritPetal: [{ f: 54, op: 'moveTo', x: 'player', y: 'top' }],
+    AsgoreRingSoulAttack: [{ f: 54, op: 'moveTo', x: 'center', y: 'center' }],
+    ArcingSouls: [{ f: 54, op: 'moveTo', x: 'center', y: 'top' }],
+    HookCrossfire: [{ f: 54, op: 'moveTo', x: 'center', y: 'top' }],
+    DesperationAttack: [{ f: 0, op: 'moveTo', x: 'center', y: 'center' }],
     VortexCharge: [{ f: 54, op: 'charge' }, { f: 162, op: 'charge' }],
     CloneSplit: [{ f: 54, op: 'splitClones' }],
     PhantomOrbit: [{ f: 54, op: 'hide' }, { f: 222, op: 'show' }]
@@ -85,6 +92,13 @@
   function point(st) {
     return { x: st.x, y: st.y, tx: st.tx, ty: st.ty, ax: st.ax, ay: st.ay, aw: st.aw, ah: st.ah };
   }
+  /* movement target: 'player' | 'center' | 'top' resolve live; else hold. */
+  function pos(v, st, axis) {
+    if (v === 'player') return axis ? st.ty : st.tx;
+    if (v === 'center') return axis ? st.ay + st.ah / 2 : st.ax + st.aw / 2;
+    if (v === 'top') return st.ay + 60;
+    return axis ? st.y : st.x;
+  }
   function drive(name, f, p, st) {
     var mv = MOVES[name], k, m;
     if (!mv || !A) return;
@@ -92,7 +106,7 @@
       m = mv[k];
       if (f !== m.f || p.moved[k]) continue;
       p.moved[k] = 1;
-      if (m.op === 'moveTo' && A.moveTo) A.moveTo(m.x === 'player' ? st.tx : st.x, m.y === 'player' ? st.ty : st.y);
+      if (m.op === 'moveTo' && A.moveTo) A.moveTo(pos(m.x, st, 0), pos(m.y, st, 1));
       else if (m.op === 'charge' && A.charge) A.charge();
       else if (m.op === 'hide' && A.hide) A.hide();
       else if (m.op === 'show' && A.show) A.show();
@@ -101,8 +115,9 @@
   }
   function attack(st, name) {
     var spec = SPECS[name], p = st.p || (st.p = {}), i, f = st.f | 0, shape, origin, aim,
-        n, phaseBoost, sp, lead = tele(spec.tele);
+        n, phaseBoost, sp, lead;
     if (!spec) return true;
+    lead = tele(spec.tele);
     if (!p.started) { p.started = 1; p.events = {}; p.shapes = {}; p.moved = {}; }
     origin = point(st);
     aim = Math.atan2(origin.ty - origin.y, origin.tx - origin.x);
@@ -114,7 +129,9 @@
       if (name === 'LegSwipes' && st.phase > 1) n = 7;
       else if (name === 'WispCircleCharges' && st.phase === 3) n = 10;
       else if (name === 'ArcingSouls' && st.phase === 3) n = 9;
-      shape = p.shapes[i] || { kind: spec.shape, x: origin.x, y: origin.y, a: aim,
+      /* a safe lane faces the bearing the warn was issued at */
+      shape = p.shapes[i] || { kind: spec.shape, x: origin.x, y: origin.y,
+        a: spec.gap ? aim - (((n / 2) | 0) + (spec.gap - 1) / 2) * TAU / n : aim,
         r: spec.shape === 'ring' ? D(spec.gapR || 200 + i * 35, st) : 0,
         spread: spec.shape === 'fan' ? spec.spread || 0.8 : 0,
         len: spec.shape === 'line' ? D(2000, st) : 0,
@@ -184,8 +201,37 @@
   }
 
   function start(which, sig) {
-    phase = clamp(which | 0, 1, 3); index = 0; signature = !!sig;
+    phase = clamp(which | 0, 1, 3); index = 0; signature = !!sig; pending = 0;
     current = { name: signature ? 'DesperationAttack' : CYCLES[phase][index], f: 0, p: {} };
+  }
+  function setPhase(n) {
+    phase = clamp(n | 0, 1, 3); index = 0; signature = false;
+    current = { name: CYCLES[phase][0], f: 0, p: {} };
+  }
+  /* One record per verb: the data a reader (or a test) needs without
+     running it. states are frame boundaries into the attack. */
+  function defs() {
+    var out = [], k, s, lead, e0, last;
+    for (k in SPECS) if (SPECS.hasOwnProperty(k)) {
+      s = SPECS[k]; lead = tele(s.tele); e0 = s.events[0]; last = s.events[s.events.length - 1];
+      out.push({ name: k, owner: 'polt', origin: s.origin, hitbox: 4, duration: s.duration,
+        events: s.events.slice(), lead: lead, kick: s.kick, counter: s.counter,
+        shape: s.shape, count: s.count, gap: s.gap || 0, speed: s.speed,
+        moves: (MOVES[k] || []).slice(),
+        states: { idle: 0, notice: e0 - lead - 12, anticipation: e0 - lead, active: e0,
+                  recovery: last + 12, end: s.duration },
+        reduced: 'static warn, no afterimage', test: 'fixes9931' });
+    }
+    return out;
+  }
+  function stateAt(name, f) {
+    var s = SPECS[name], lead, e0, last;
+    if (!s || f < 0 || f >= s.duration) return 'idle';
+    lead = tele(s.tele); e0 = s.events[0]; last = s.events[s.events.length - 1];
+    if (f >= last + 12) return 'recovery';
+    if (f >= e0) return 'active';
+    if (f >= e0 - lead) return 'anticipation';
+    return f >= e0 - lead - 12 ? 'notice' : 'idle';
   }
   function tickFrame(st) {
     var fin, cyc;
@@ -197,6 +243,7 @@
     current.f++;
     if (fin) {
       if (signature) { current = null; return true; }
+      if (pending) { setPhase(pending); pending = 0; return false; }
       cyc = CYCLES[phase]; index = (index + 1) % cyc.length;
       current = { name: cyc[index], f: 0, p: {} };
     }
@@ -206,9 +253,16 @@
     attach: function (adapter) { A = adapter; },
     start: start,
     step: tickFrame,
-    phase: function (n) { phase = clamp(n | 0, 1, 3); index = 0; signature = false; current = { name: CYCLES[phase][0], f: 0, p: {} }; },
+    /* deferred: the running volley finishes, then the new cycle leads.
+       `now` cuts immediately. */
+    phase: function (n, now) {
+      if (now || !current) setPhase(n); else pending = clamp(n | 0, 1, 3);
+    },
+    timing: function () { return TIMING; },
+    defs: defs,
+    stateAt: stateAt,
     signature: function () { start(phase, true); },
-    reset: function () { current = null; index = 0; signature = false; trans = null; },
+    reset: function () { current = null; index = 0; signature = false; trans = null; pending = 0; },
     cycles: function () { return CYCLES; },
     /* Lead of every attack, in 60 Hz frames. The warn issues at
        events[i]-lead and the hit at events[i]. */

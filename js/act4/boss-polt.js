@@ -89,7 +89,7 @@
      hand instead of through index.html. */
   var attackWarns = (NEU.poltFx && NEU.poltFx.warns) || [];
   var attackFrameAcc = 0, kit = null, bossTarget = { kind: 'boss' }, cloneTarget = { kind: 'clone' }, phase = 1, bossHP = 900, bossMax = 900;
-  var bx = 0, by = 0, bz = 0, charging = 0, glow = 0, nextFire = 0, nextCharge = 0;
+  var bx = 0, by = 0, bz = 0, charging = 0, glow = 0, nextCharge = 0;
   var TELE = 24 / 60;                    /* hook telegraph: 24 frames before a hook can hit */
   /* game-clock state: every timer here is advanced by the update loop, so a
      pause or a death holds it and open()/close() wipe it */
@@ -164,14 +164,6 @@
     }
     if (bullets.length >= MAX_BULLETS) return;
     bullets.push({ x: x, y: y, z: 0, vx: vx, vy: vy, r: r, c: c, k: kind || 0, age: 0 });
-  }
-
-  function spread(n, sp, col, r) {
-    var a0 = Math.atan2(py - by, px - bx);
-    for (var i = 0; i < n; i++) {
-      var a = a0 + (i - (n - 1) / 2) * 0.20;
-      shot(bx, by, Math.cos(a) * sp, Math.sin(a) * sp, r, col, phase >= 2 ? 1 : 0);
-    }
   }
 
   function attachAttacks() {
@@ -400,14 +392,6 @@
       }
     }
 
-    /* his own cadence — silent while the phase blackout plays, so the
-       only new shots are the transition's two telegraphed dart rings */
-    nextFire -= dt;
-    if (!seq && nextFire <= 0 && charging <= 0) {
-      if (phase === 1) { spread(6, 150, COL.ecto, 4); nextFire = 1.5; }
-      else if (phase === 2) { spread(7, 190, COL.ectoHi, 4); nextFire = 1.15; }
-      else { spread(clone ? 8 : 10, 210, COL.red, 5); nextFire = phase === 3 ? 7 : 2; }
-    }
     nextCharge -= dt;
     if (!seq && nextCharge <= 0 && charging <= 0) {
       glow = 0.9;
@@ -1288,7 +1272,7 @@
       sfx: function (n) { if (NEU.sfx && NEU.sfx[n]) NEU.sfx[n](); }
     } }) : null;
     bx = AX + AW / 2; by = AY + 80; bz = 0;
-    charging = 0; glow = 0; nextFire = 1.4; nextCharge = 5;
+    charging = 0; glow = 0; nextCharge = 5;
     warnAt = 0; chargePath = null; vuln = 0; sig = 0; sigDone = false;
     resetHooks();
     resetLegs();
