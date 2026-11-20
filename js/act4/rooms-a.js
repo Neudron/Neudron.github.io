@@ -599,6 +599,18 @@
       .concat(mergeWoodsEntities(A1, 'a1_clearing', 0, 0), mergeWoodsEntities(A2, 'a2_path', 22, 4), mergeWoodsEntities(A3, 'a3_fork', 46, 4));
     out.push(P('oak', 20, 6, { big: 1, rx: 18, solid: true }), P('oak', 25, 8, { big: 1, rx: 18, solid: true }), P('oak', 44, 10, { big: 1, rx: 18, solid: true }), P('oak', 47, 6, { big: 1, solid: true }), P('oak', 49, 12, { big: 1, rx: 18, solid: true }));
     out.push({ t: 'exit', x: 10, y: 1, to: 'wex_woods_01', spawn: 'from_forest_trail', style: 'tunnel' });
+    /* R1/R5 (WO-RWK-WOODS): two more things to look at and one to knock on, one per old area, on the existing bark-tree skin. */
+    out.push({ t: 'npc', x: 27, y: 8, colour: '#4A4560', skin: 'barktree', look: 'tree',
+      lines: ['the rings on this one are counted wrong.', 'it keeps a tally of something else.'] });
+    out.push({ t: 'npc', x: 52, y: 8, colour: '#4A4560', skin: 'barktree', look: 'tree',
+      lines: ['someone leaned here a long time ago.', 'the shape of them is still the only dry spot.'] });
+    out.push({ t: 'npc', x: 5, y: 9, colour: '#4A4560', skin: 'barktree', look: 'tree', secret: 'woods_hollow',
+      run: function (c) {
+        if (c.flagged('woods_hollow')) { c.say(['the hollow is empty now.'], 'narr'); return; }
+        c.flag('woods_hollow', 1);
+        if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
+        c.say(['you knock. it knocks back, once, a little late.'], 'narr');
+      } });
     if (NEU.save && (NEU.save.has('mush1') || NEU.save.flagged('gone:a2_path:mush1'))) {
       return out.filter(function (e) { return e.mush !== 'mush1'; });
     }
