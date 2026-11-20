@@ -67,6 +67,10 @@
   border-top: 1px dotted rgba(244, 244, 244, 0.3); }
 .menu__slot-h { font: 400 16px/1.5 var(--font, monospace); color: var(--dim); overflow-wrap: anywhere; }
 .menu__slot-b { display: flex; gap: 8px; }
+.menu__prog { margin: 0 0 8px; }
+.menu__prog h4 { margin: 0 0 4px; font: 400 16px/1.5 var(--font, monospace); color: var(--text); }
+.menu__prog ul { margin: 0; padding-left: 20px; }
+.menu__prog li { font: 400 16px/1.5 var(--font, monospace); color: var(--dim); }
 .menu__act.menu__mini { flex: 1 1 0; width: auto; min-height: 40px;
   justify-content: center; padding: 6px 10px; }
 .menu__io { width: 100%; box-sizing: border-box; min-height: 128px; padding: 8px;
