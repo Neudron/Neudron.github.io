@@ -83,9 +83,35 @@
      NEVER drew: the room canvas stayed black behind the overlay, or the
      overlay's embers/vignette never painted over the room. The decision
      is made once per timestamp and shared by all callers of that frame. */
+  /* AUTO DEGRADE. Fed once per distinct rAF timestamp from paced(). 45
+     consecutive frames over 28 ms raise the level (1: half the particle
+     ceiling, 2: also drop decoration families and trails); 300 consecutive
+     frames under 22 ms lower it. A gap over 250 ms (hidden tab) or a lone
+     hitch resets nothing but the run, so it cannot flip the level. Off under
+     jsdom, where the pump clock is arbitrary, unless a suite turns it on.
+     shortcut: counters, not an EMA; revisit if flapping is seen. */
+  var adaptOn = !/jsdom/i.test((window.navigator && navigator.userAgent) || '');
+  var adaptPrev = 0, slow = 0, good = 0, level = 0;
+  function adapt(now) {
+    var dt = adaptPrev ? now - adaptPrev : 0;
+    adaptPrev = now;
+    if (!adaptOn || !dt) return;
+    if (dt > 250) { slow = good = 0; return; }
+    if (dt > 28) { slow++; good = 0; }
+    else if (dt <= 22) { good++; slow = 0; }
+    else return;
+    var nl = level;
+    if (slow >= 45) nl = Math.min(2, level + 1);
+    else if (good >= 300) nl = Math.max(0, level - 1);
+    else return;
+    slow = good = 0;
+    level = nl;
+    if (NEU.juice && NEU.juice.setDegrade) NEU.juice.setDegrade(level);
+  }
   function paced(now) {
     if (now === pacedNow) return pacedOk;
     pacedNow = now;
+    adapt(now);
     if (now - pacedLast < PACE - SLACK) return (pacedOk = false);
     pacedLast = now;
     return (pacedOk = true);
@@ -216,13 +242,15 @@
   /* Backgrounding is not a stutter. Drop the stale timestamp so the
      first frame back is not measured against it. */
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) last = 0;
+    if (!document.hidden) { last = 0; adaptPrev = 0; slow = good = 0; }
   });
 
   NEU.perf = {
     start: start, stop: stop, toggle: function () { return running ? (stop(), false) : (start(), true); },
     stats: stats, line: line, work: work, workStats: workStats, WORK_TARGET: WORK_TARGET, scene: scene, paced: paced, PACE: PACE,
-    _pacedReset: function () { pacedLast = 0; pacedNow = -1; pacedOk = true; },
+    _pacedReset: function () { pacedLast = 0; pacedNow = -1; pacedOk = true; adaptPrev = 0; slow = good = 0; },
+    _adaptOn: function (on) { adaptOn = !!on; },
+    get adaptLevel() { return level; },
     get running() { return running; },
     TARGET: TARGET, WARN: WARN, FAIL: FAIL, WINDOW: WINDOW,
     /* tests: feed frames without a real rAF loop */
