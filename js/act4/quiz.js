@@ -289,17 +289,17 @@
 
   /* ── Tenna, from the game's own sheets ──────────────────────────
      Each pose is a horizontal strip in NEU.sheets: [sheet, frames,
-     fps, hold]. He is drawn 1:1 into a 140 x 146 canvas with his feet
+     hold, loopTail]; the fps comes from the sheet. He is drawn 1:1 into a 140 x 146 canvas with his feet
      on the bottom row; CSS scales the canvas by whole stage units.
      The face on his own screen is part of every pose sprite, so the
      expression (look.face) is shown as a head portrait in the box. */
   var POSES = {
     idle:  ['tvTenPodium', [0], 0, 0],
     point: ['tvTenPoint',  [0], 0, 0],
-    cheer: ['tvTenCheer',  [0, 1, 2, 3], 8, 3],
+    cheer: ['tvTenCheer',  [0, 1, 2, 3], 3, 0],
     shrug: ['tvTenShrug',  [0], 0, 0],
     shock: ['tvTenShock',  [0], 0, 0],
-    bow:   ['tvTenBow',    [0, 1, 2], 7, 2]
+    bow:   ['tvTenBow',    [0, 1, 2], 2, 0]
   };
   var FACES = { grin: 0, smug: 1, wink: 2, happy: 3, stars: 4, shock: 5, sad: 6, off: 7 };
   var tcv = $('quizTenna'), fcv2 = $('quizFace');
@@ -337,8 +337,8 @@
 
   function paintPose(clock) {
     var P = POSES[look.pose] || POSES.idle, sh = NEU.sheets[P[0]];
-    var k = P[3];
-    if (!reduced && P[2]) k = Math.min(P[1].length - 1, Math.floor((clock - poseAt) * P[2]));
+    var k = P[2];
+    if (!reduced && sh.fps) k = Math.min(P[1].length - 1, Math.floor((clock - poseAt) * sh.fps));
     var bob = reduced ? 0 : Math.floor(clock * 2.5) % 2;
     /* the point pose stands 1 px further right, as in the game */
     put(tSpr, P[0], P[1][k], 70 + (look.pose === 'point' ? 1 : 0) - sh.ax, 146 - sh.ay - bob, 140, 146);
