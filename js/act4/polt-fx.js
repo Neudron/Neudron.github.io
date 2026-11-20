@@ -283,7 +283,7 @@
     bump: bump, clamp: clamp,
     warn: warn, step: step, clear: clear, drawWarns: drawWarns,
     shake: shake, SHAKE_MAX: SHAKE_MAX, ghosts: ghosts, ghost: ghost, eachGhost: eachGhost,
-    card: titleCard, drawCard: drawCard,
+    card: titleCard, drawCard: drawCard, cardOn: function () { return !!card.text; },
     glow: {
       stamp: glowStamp,
       begin: beginGlow,

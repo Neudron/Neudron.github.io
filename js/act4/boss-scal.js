@@ -1993,7 +1993,7 @@
     if (kh && kh.__v !== talking) { kh.__v = talking; kh.style.visibility = talking ? 'hidden' : ''; }
     if (talking) {
       ctx.fillStyle = COL.bone;
-      ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
+      ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
       if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, (/hearts/i.test(line) ? 'heart' : /eyes/i.test(line) ? 'eyes' : /rage|brothers/i.test(line) ? 'fire' : 'warning'), AX, dialY - 12);
       else ctx.fillText(line, AX, dialY, AW);
     }
