@@ -276,6 +276,7 @@
     dust:       { cap: 40,  prio: 0 },
     afterimage: { cap: 24,  prio: 0 },
     impact:     { cap: 260, prio: 1 },
+    boom:       { cap: 56,  prio: 1 },
     hit:        { cap: 500, prio: 2 },
     telegraph:  { cap: 500, prio: 2 },
     bullet:     { cap: 500, prio: 2 }
@@ -320,7 +321,74 @@
     }
   }
 
+  /* ── boom: original ring + square debris + 2-frame smoke ──────────
+     Drawn in code only. Visual only: it adds NO shake, hit-stop or
+     flash, so the caller pairs it with hit(tier) and every flash and
+     shake gate stays in one place (hit, canFlash, noFlash/calmFlash).
+     Debris is the shared pool (family 'boom'), capped by the tier's
+     `parts` (8..14 from medium up). The ring and smoke ride a small
+     fixed list that drawParts steps. Reduced motion: no debris, no
+     smoke, one still ring frame held 0.2 s. */
+  var BOOM_N = 8, booms = [];
+  for (var bi = 0; bi < BOOM_N; bi++) booms.push({ life: 0 });
+  var RING_T = 0.3, SMOKE_T = 0.34, RING_STILL = 0.2;
+  function boom(x, y, tier, opts) {
+    opts = opts || {};
+    var t = TIER[tier] || TIER.medium;
+    var col = opts.col || '#FFD34E', R = opts.r || (14 + t.parts * 1.6);
+    var still = reduced, b = null, k, n;
+    for (k = 0; k < BOOM_N; k++) if (booms[k].life <= 0) { b = booms[k]; break; }
+    if (!b) b = booms[0];                 // oldest-ish slot; 8 live booms is already a storm
+    b.x = x; b.y = y; b.R = R; b.c = col; b.still = still;
+    b.max = b.life = still ? RING_STILL : SMOKE_T;
+    b.puffs = [];
+    if (!still && !customNoParticles && !photosensitive) {
+      n = Math.min(5, Math.ceil(t.parts / 4));
+      for (k = 0; k < n; k++) {
+        var a = Math.random() * Math.PI * 2, d = R * (0.15 + Math.random() * 0.4);
+        b.puffs.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: 3 + ((Math.random() * 3) | 0) });
+      }
+    }
+    n = Math.min(14, t.parts);
+    if (n > 0) burst(x, y, n, col, 150 + t.parts * 4, 'boom');
+    return b;
+  }
+  function drawBooms(ctx, dt) {
+    var any = false, k, j;
+    for (k = 0; k < BOOM_N; k++) if (booms[k].life > 0) { any = true; break; }
+    if (!any) return;
+    ctx.save();
+    for (k = 0; k < BOOM_N; k++) {
+      var b = booms[k];
+      if (b.life <= 0) continue;
+      b.life -= dt;
+      if (b.life <= 0) continue;
+      var age = b.max - b.life;
+      var u = Math.min(1, age / RING_T);
+      /* ring: expands and thins; still ring is one frame at 0.6 R */
+      var rr = b.still ? b.R * 0.6 : 3 + (b.R - 3) * outCubic(u);
+      var ra = b.still ? 0.85 : Math.max(0, 1 - u);
+      if (ra > 0) {
+        ctx.globalAlpha = ra;
+        ctx.strokeStyle = b.c;
+        ctx.lineWidth = b.still ? 2 : Math.max(1, 3 * (1 - u));
+        ctx.beginPath(); ctx.arc(b.x, b.y, rr, 0, Math.PI * 2); ctx.stroke();
+      }
+      /* smoke: exactly two frames, small light then big dark */
+      for (j = 0; j < b.puffs.length; j++) {
+        var p = b.puffs[j], second = age >= SMOKE_T / 2;
+        var r = second ? p.r + 3 : p.r, px = (b.x + p.x) | 0, py = (b.y + p.y - (second ? 4 : 0)) | 0;
+        ctx.globalAlpha = second ? 0.45 : 0.7;
+        ctx.fillStyle = second ? '#5E5668' : '#A79FB2';
+        ctx.fillRect(px - r, py - r + 2, 2 * r, 2 * r - 4);
+        ctx.fillRect(px - r + 2, py - r, 2 * r - 4, 2 * r);
+      }
+    }
+    ctx.restore();
+  }
+
   function drawParts(ctx, dt) {
+    drawBooms(ctx, dt);
     for (var k = 0; k < POOL; k++) {
       var p = parts[k];
       if (p.life <= 0) continue;
@@ -453,7 +521,7 @@
   NEU.juice = {
     hit: hit, frozen: frozen, pause: pause, popEl: popEl, shatter: shatter,
     begin: begin, end: end, overlay: overlay,
-    burst: burst, drawParts: drawParts,
+    burst: burst, boom: boom, drawParts: drawParts,
     pop: pop, backOut: backOut, outCubic: outCubic, outElastic: outElastic,
     shakeEl: shakeEl,
     setNoShake: function (on) { customNoShake = !!on; },
@@ -476,6 +544,7 @@
     get particleCap() { return particleCap; },
     get poolSize() { return POOL; },
     activeParticles: active,
+    get activeBooms() { var n = 0; for (var k = 0; k < BOOM_N; k++) if (booms[k].life > 0) n++; return n; },
     get flashCount() { return flashCount; },
     get flashTimes() { return flashTimes.slice(); },
     get noShake() { return customNoShake || photosensitive; },
@@ -494,6 +563,7 @@
       trauma = 0; bias = { x: 0, y: 0 }; freezeUntil = 0; flashUntil = 0;
       flashTimes = []; flashCount = 0;
       for (var k = 0; k < POOL; k++) parts[k].life = 0;
+      for (k = 0; k < BOOM_N; k++) booms[k].life = 0;
     }
   };
 })();
