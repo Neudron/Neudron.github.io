@@ -639,9 +639,8 @@
 <script src="js/act4/gen-wex-city.js"></script>
 <script src="js/act4/gen-wex-savanna.js"></script>
 <script src="js/act4/gen-wex-lab.js"></script>
-<!-- after every scene, before settings: like touch.js it polls the
-     scenes to decide what to play, and settings.js reads its volume
-     when the panel is built. -->
+<!-- after every scene, before settings: it polls the scenes to decide
+     what to play, and settings.js reads its volume when the panel is built. -->
 <script src="js/core/music.js"></script>
 <!-- samples nothing until the dev console asks; dev.js exposes it -->
 <script src="js/core/perf.js"></script>
@@ -649,8 +648,6 @@
 <!-- the in-game Play/Config/Save menu: after settings and save, so it can
      reuse their panels and the difficulty table without a second store. -->
 <script src="js/core/menu.js"></script>
-<!-- after every scene: it polls them to decide which buttons to show -->
-<script src="js/core/touch.js"></script>
 <script src="js/core/dev.js"></script>
 <script type="module" src="js/page/scene.js"></script>
 </body>
