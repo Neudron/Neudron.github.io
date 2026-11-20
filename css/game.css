@@ -884,6 +884,10 @@ html.neu-hints-off:not(.rm) .inv__list li.is-equipped span::after { content: '  
 .tphud__num { min-width: 48px; }
 .tphud.is-gain .tphud__num { color: #8fe39b; }
 .tphud.is-spend .tphud__num { color: #ff8a7a; }
+.tphud__delta { min-width: 56px; }
+.tphud.is-gain .tphud__delta { color: #8fe39b; }
+.tphud.is-spend .tphud__delta { color: #ff8a7a; }
+.tphud__tier { color: #8A8598; }
 .tphud__acts { display: flex; gap: 8px; }
 .tphud__chip { position: relative; width: 48px; height: 56px; background: #0d0d12; border: 2px solid #444; }
 .tphud__chip.is-off { opacity: .45; }

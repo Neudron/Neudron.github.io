@@ -5,6 +5,7 @@
   var IDS = ['bot', 'easy', 'medium', 'hard', 'vhard', 'ultrakill', 'finalbreath'];
   var cur = null;   /* the tier latched by begin() */
   var NAMES = ['Bot', 'Easy', 'Medium', 'Hard', 'Very Hard', 'Ultrakill', "Neu's Final Breath"];
+  var GLYPHS = ['◇', '○', '●', '▲', '▲▲', '✶', '✝'];
   var P = {
     bulletSpeed: [0.60, 0.80, 1, 1.12, 1.25, 1.40, 1.55],
     gap:         [1.50, 1.25, 1, 0.85, 0.72, 0.62, 0.50],
@@ -23,6 +24,7 @@
   NEU.diff = {
     list: function () { return IDS.slice(); },
     name: function (i) { return NAMES[i === undefined ? index() : i] || NAMES[2]; },
+    glyph: function (i) { return GLYPHS[i === undefined ? index() : i] || GLYPHS[2]; },
     id: function () { return IDS[index()]; },
     index: index,
     set: function (id) {
