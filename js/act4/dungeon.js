@@ -622,6 +622,7 @@
     if (e.top && !flagged('dgn_lift_' + e.n)) { talk(['* the chain is slack. it hangs from somewhere deep.']); return; }
     to = lifts[e.n + (e.top ? '' : 'top')];
     if (!to) return;
+    if (!flagged('dgn_lift_' + e.n)) talk(['* a chain lift wakes.']);
     flag('dgn_lift_' + e.n, 1);
     if (NEU.dungeon) NEU.dungeon._liftLock = true;
     P.hero().x = (to.x + 0.5) * T; P.hero().y = (to.y + 1) * T; P.hero().vx = 0; P.hero().vy = 0; P.hero().wipe = 0.25; P.snap();
