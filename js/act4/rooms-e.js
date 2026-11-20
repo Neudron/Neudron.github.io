@@ -332,15 +332,16 @@
       { t: 'cityprop', v: 'homestack', x: 5, y: 4, lines: ['school things, never sorted, never thrown out.'] },
       { t: 'cityprop', v: 'cat', x: 10, y: 3, lines: ['a cat watching the rain through the blinds.'] },
       { t: 'exit', x: 7, y: 6, to: 'a1_clearing', spawn: 'default', style: 'door', locked: 'bed_free',
-        label: 'door', lines: ['* sans: go look at that crack first.'] }
+        label: 'door', alt: { to: 'e3_hall', spawn: 'dad', when: 'quest:a4_home' },
+        lines: ['* sans: go look at that crack first.'] }
     ],
     onEnter: function (c) {
       var must = c.flagged('must_leave'), i, door = null, ents = c.ents();
       for (i = 0; i < ents.length; i++) if (ents[i].t === 'exit') door = ents[i];
       if (door) {
         var home = NEU.quest && NEU.quest.has && NEU.quest.has('a4_home');
-        door.to = home ? 'e3_hall' : 'a1_clearing';
-        door.spawn = home ? 'dad' : 'default';
+        door.to = home ? door.alt.to : 'a1_clearing';
+        door.spawn = home ? door.alt.spawn : 'default';
       }
       c.flag('bed_free', must ? 0 : 1);
       if (must) {
