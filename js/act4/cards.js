@@ -7,14 +7,16 @@
   var ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
   var active = false;
   var state = null;
+  var losePending = null;
   var CW = 72;
   var CH = 104;
 
   var SPEC = [['ATTACK', 6], ['HEAL', 4], ['DEFEND', 3], ['PARRY', 3]];
   /* PLAN 9.4: no shuffle. Both orders are written data, guarded by the
-     solver in fixes522 (a reacting line wins, all-in ATTACK loses). */
-  var PLAYER_DECK = ['ATTACK', 'HEAL', 'ATTACK', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'ATTACK',
-    'PARRY', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'HEAL', 'ATTACK', 'DEFEND'];
+     solver in fixes522 (a reacting line wins, all-in ATTACK loses) and
+     fixes587 (never-ATTACK also loses). */
+  var PLAYER_DECK = ['ATTACK', 'PARRY', 'ATTACK', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'ATTACK',
+    'HEAL', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'HEAL', 'ATTACK', 'DEFEND'];
   var MAGE_DECK = ['ATTACK', 'ATTACK', 'HEAL', 'PARRY', 'HEAL', 'HEAL', 'DEFEND', 'ATTACK',
     'HEAL', 'ATTACK', 'ATTACK', 'DEFEND', 'PARRY', 'DEFEND', 'PARRY', 'ATTACK'];
   var ANIM = { lift: 150, flip: 200, travel: 250, effect: 300, discard: 150, hp: 60, retreat: 400 };
@@ -47,12 +49,13 @@
 
   function blank() {
     return {
-      you: { hp: 15, hand: [], block: 0, parry: false, streak: 0 },
-      mage: { hp: 15, hand: [], block: 0, parry: false },
+      you: { hp: 15, hand: [], block: 0, blockShown: 0, parry: false, streak: 0 },
+      mage: { hp: 15, hand: [], block: 0, blockShown: 0, parry: false },
       deck: [], mageDeck: [], discard: [],
       sel: 0, over: false, result: null, awarded: false,
       clock: 0, flies: [], slide: null, grain: [], grainAt: -1000,
       disp: { you: 15, mage: 15 }, fx: [], intent: null,
+      legacy: false,
       exiting: false, exitT: 0, returned: false, endT: 0
     };
   }
@@ -78,10 +81,24 @@
     }
   }
 
+  function attackDamage(who) {
+    return who === 'you' ? Math.min(3 + state.you.streak, 5) : 3;
+  }
+
+  /* Fixed priority over public state: each rule fires only when its card is
+     in hand, then the next rule gets its turn. */
   function mageIndex() {
-    var h = state.mage.hand, i;
+    var h = state.mage.hand, i, through, dmg;
+    dmg = attackDamage('mage');
+    through = state.you.block >= dmg ? 0 : dmg - state.you.block;
+    if (!state.you.parry && state.you.hp - through <= 0) {
+      i = h.indexOf('ATTACK'); if (i >= 0) return i;
+    }
     if (state.mage.hp <= 6) { i = h.indexOf('HEAL'); if (i >= 0) return i; }
     if (state.you.streak >= 2) { i = h.indexOf('PARRY'); if (i >= 0) return i; }
+    if (state.you.streak === 1 && state.mage.hp <= 9) {
+      i = h.indexOf('DEFEND'); if (i >= 0) return i;
+    }
     i = h.indexOf('ATTACK');
     if (i >= 0) return i;
     return h.length ? 0 : -1;
@@ -117,23 +134,26 @@
   }
 
   function act(who, idx) {
-    var p, id, enemy;
+    var p, id, enemy, dmg, tier, reflected;
     if (!state || state.over) return false;
     p = state[who];
     if (idx < 0 || idx >= p.hand.length) return false;
     id = p.hand.splice(idx, 1)[0];
     enemy = state[who === 'you' ? 'mage' : 'you'];
+    reflected = false;
     if (id !== 'ATTACK' && enemy.parry) enemy.parry = false;
     if (id === 'ATTACK') {
-      if (enemy.parry) { enemy.parry = false; hurt(p, 3); }
-      else hurt(enemy, 3);
-      if (who === 'you') state.you.streak++;
+      dmg = attackDamage(who);
+      if (enemy.parry) { enemy.parry = false; reflected = true; hurt(p, dmg); }
+      else hurt(enemy, dmg);
+      if (who === 'you') state.you.streak = Math.min(state.you.streak + 1, 3);
     } else if (id === 'HEAL') {
       p.hp = p.hp + 3;
       if (p.hp > 15) p.hp = 15;
       if (who === 'you') state.you.streak = 0;
     } else if (id === 'DEFEND') {
       p.block = 3;
+      p.blockShown = 3;
       if (who === 'you') state.you.streak = 0;
     } else if (id === 'PARRY') {
       p.parry = true;
@@ -141,7 +161,14 @@
     }
     state.discard.push(id);
     if (who === 'you' && !reduced()) state.slide = { id: id, t: 0, dur: 280 };
-    if (NEU.juice && NEU.juice.hit) NEU.juice.hit(id === 'ATTACK' ? 'medium' : 'small');
+    /* small for quiet cards, medium for a normal ATTACK, large only for a
+       killing blow or a parry that actually turns a blow back. */
+    tier = 'small';
+    if (id === 'ATTACK') {
+      tier = 'medium';
+      if (reflected || p.hp <= 0 || enemy.hp <= 0) tier = 'large';
+    }
+    if (NEU.juice && NEU.juice.hit) NEU.juice.hit(tier);
     if (state.mage.hp <= 0) { state.mage.hp = 0; state.over = true; state.result = 'win'; }
     else if (state.you.hp <= 0) { state.you.hp = 0; state.over = true; state.result = 'lose'; }
     if (!state.over) drawUp(who);
@@ -163,6 +190,15 @@
     if (NEU.dungeon && NEU.dungeon.toSurface) NEU.dungeon.toSurface();
   }
 
+  /* The board is held, then the surface teleport fires. A new duel or a
+     direct close cannot swallow the pending death: it pays exactly once. */
+  function finishLose(s) {
+    if (!losePending || losePending.s !== s) return;
+    losePending = null;
+    if (state === s && active) close();
+    dungeonDeath();
+  }
+
   /* Both decks and both hands empty, both still up: the duel has nowhere
      to go. Higher HP wins. A tie is a loss. */
   function settle() {
@@ -175,18 +211,27 @@
   }
 
   function play(idx) {
-    var intent, youCard, mageCard, mi;
-    if (!state) return state;
+    var intent, youCard, mageCard, mi, wasOver, s, done;
+    if (!state || losePending) return state;
+    wasOver = state.over;
+    /* Keep the played block visible for this frame; it expires at the
+       start of its owner's next turn (below). */
+    state.you.blockShown = 0;
+    state.mage.blockShown = 0;
     if (!state.over) {
       intent = state.intent;
       youCard = state.you.hand[idx];
       mageCard = intent ? intent.id : null;
       act('you', idx);
       if (!state.over) {
+        /* his last block guarded your turn; it expires as his turn starts */
+        state.mage.block = 0;
         mi = intent && intent.index < state.mage.hand.length &&
              state.mage.hand[intent.index] === intent.id ? intent.index : mageIndex();
         if (mi >= 0) { mageCard = state.mage.hand[mi]; act('mage', mi); }
         else mageCard = null;
+        /* your block guarded his turn; it expires as your next turn starts */
+        state.you.block = 0;
       } else mageCard = null;
       settle();
       queueFx(youCard, 'you');
@@ -194,8 +239,17 @@
       if (!state.over) beginTurn();
     }
     if (state.result === 'win') grant();
-    if (state.result === 'lose') { close(); dungeonDeath(); }
-    else draw();
+    if (state.result === 'lose') {
+      if (wasOver || state.legacy || reduced()) { close(); dungeonDeath(); }
+      else if (!losePending) {
+        draw();
+        s = state;
+        losePending = { s: s };
+        done = function () { finishLose(s); };
+        if (NEU.kernel && NEU.kernel.after) NEU.kernel.after(1200, done);
+        else setTimeout(done, 1200);
+      }
+    } else draw();
     return state;
   }
 
@@ -211,6 +265,7 @@
 
   function open(opts) {
     var rng;
+    if (losePending) { losePending = null; dungeonDeath(); }
     opts = opts || {};
     rng = opts.rng;
     if (!rng && opts.seed != null && NEU.rand && NEU.rand.seeded) rng = NEU.rand.seeded(opts.seed);
@@ -219,6 +274,7 @@
     /* Shipped game: fixed orders. An explicit rng/seed is kept only as a
        compatibility adapter for the older scripted suites. */
     if (opts.rng || opts.seed != null) {
+      state.legacy = true;
       state.deck = shuffle(buildDeck(), rng);
       state.mageDeck = shuffle(buildDeck(), rng);
     } else {
@@ -251,6 +307,7 @@
   }
 
   function close() {
+    if (losePending) { losePending = null; dungeonDeath(); }
     if (!active) return;
     if (state && state.result === 'win' && !state.returned) {
       state.returned = true;
@@ -744,6 +801,7 @@
   function onKey(e) {
     var k, n, r;
     if (!active || !state || covered()) return;
+    if (losePending) return;
     if (NEU.kernel && NEU.kernel.current() !== 'cards') return;
     /* Tab is not a duel action. Swallow it so quest.js cannot open the
        objectives panel over a live hand of cards. */
@@ -783,6 +841,7 @@
     ANIM: ANIM,
     decks: function () { return { you: PLAYER_DECK.slice(), mage: MAGE_DECK.slice() }; },
     intent: function () { return state ? state.intent : null; },
+    mageIndex: function () { return mageIndex(); },
     shelf: function () {
       if (!state) return [];
       return [state.deck[state.deck.length - 1], state.deck[state.deck.length - 2]]
