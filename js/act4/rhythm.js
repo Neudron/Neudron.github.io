@@ -294,7 +294,7 @@
     S.section = 0; S.mode = 'chart'; S.arrowA = 1; S.boxA = 0; S.wind = 0; S.windN = 0;
     S.sway = 0; S.swayUntil = 0;
     S.blockLane = -1; S.blockUntil = 0; S.soulx = 0; S.souly = 0; S.hazards = [];
-    soulF = null; hazBreak = -1; lastBrk = 0;
+    soulF = null; hazBreak = -1; lastBrk = 0; S.fbox = null;
   }
   /* the score, the streak and the judgement counts start from nothing */
   function resetScore() {
@@ -670,6 +670,22 @@
       var box = { AX: 64, AY: 64, AW: Math.max(32, g.w - 128), AH: Math.max(32, g.h - 128) };
       if (NEU.danmaku && NEU.danmaku.move) NEU.danmaku.move(soulF, mk, dt, box);
       else if (soulF.dashI > 0) soulF.dashI -= dt;
+      /* The turnbattle-derived box is now the soul's edge: danmaku owns
+         movement and i-frames, this only clamps the resulting position to
+         the morph polygon. Input is still keys -> mk above, and still()
+         remains the only motion gate. Gentle shapes keep the dodge fair. */
+      if (NEU.fightbox && NEU.fightbox.make) {
+        if (!S.fbox) {
+          S.fbox = NEU.fightbox.make();
+          S.fbox.setRect(box.AW, box.AH).centre(box.AX + box.AW / 2, box.AY + box.AH / 2);
+        }
+        var bi = S.brkI >= 0 ? S.brkI % 4 : 0, fshape = [0, 1, 2, 5][bi];
+        S.fbox.setShape(fshape, fshape, 0);
+        S.fbox.soul.x = soulF.x; S.fbox.soul.y = soulF.y;
+        S.fbox.rebuild();
+        S.fbox.clampSoul();
+        soulF.x = S.fbox.soul.x; soulF.y = S.fbox.soul.y;
+      }
       var hi, hdt = dt * (NEU.boss ? NEU.boss.mul('bulletSpeed') : 1);   /* tier scales hazard motion as time */
       for (hi = 0; hi < S.hazards.length; hi++) {
         var h = S.hazards[hi];
@@ -811,6 +827,11 @@
     }
   }
   function arrow(f, l, x, y, s) {
+    /* Week 4 bright arrows are owner-accepted fan use, NOT CLEARED. When the
+       strip is ready it replaces the procedural glyph; the 4x4 canvas sheet
+       stays as the fallback so a blocked/missing image is harmless. */
+    if (NEU.sheetDraw && NEU.sheetDraw(ctx, 'fanWeek4', x + N * s / 2, y + N * s / 2,
+        { frame: l, scale: s * N / 160, alpha: f === 0 ? 0.55 : 1 })) return;
     if (!sheet) buildSheet();
     ctx.drawImage(sheet, f * N, l * N, N, N, x, y, N * s, N * s);
   }
@@ -1051,8 +1072,15 @@
      and the crowd behind the singers. */
   function stage(g, sp) {
     var sc = stageBg(g), i, pulse = still() ? 0 : (beatFrac(sp) < 0.25 ? 2 : 0);
-    if (!sc.bg) { ctx.fillStyle = '#1F1439'; ctx.fillRect(0, 0, g.w, g.stage); ctx.fillStyle = '#2A1C42'; ctx.fillRect(0, g.stage, g.w, g.h - g.stage); return; }
-    ctx.drawImage(sc.bg, 0, 0);
+    /* The Deltarune battle-background sequence sits behind the stage. The
+       animated loop is skipped under still(): no >3 Hz pulsing there, and
+       the baked stage is the static fallback in that mode. */
+    var fanBg = !still() && NEU.sheetDraw && NEU.sheetDraw(ctx, 'fanBg', g.w / 2, g.h / 2,
+      { frame: ((sp * 8) | 0) % 100, scale: Math.max(g.w / 320, g.h / 240) });
+    if (!fanBg) {
+      if (!sc.bg) { ctx.fillStyle = '#1F1439'; ctx.fillRect(0, 0, g.w, g.stage); ctx.fillStyle = '#2A1C42'; ctx.fillRect(0, g.stage, g.w, g.h - g.stage); return; }
+      ctx.drawImage(sc.bg, 0, 0);
+    }
     var swing = still() ? 0 : [-4, 0, 4, 0][((sp / beatLen()) | 0) & 3] || 0;
     if (sc.beams) ctx.drawImage(sc.beams, -8 + swing, 0);
     /* the crowd is the back row: drawn first, so the speakers and singers stand in front of it */
@@ -1629,6 +1657,11 @@
         ctx.fillStyle = PAT_COL[S.brkI >= 0 ? S.brkI : 0];
         for (var si = 0; si < 4; si++) ctx.fillRect(segs[si].x, segs[si].y, segs[si].w, segs[si].h);
         ctx.globalAlpha = 1;
+        /* The Deltarune battle-box frame sequence plays over the four bars
+           while the box is up. Under still() the static bars alone carry
+           the shape: no pulsing, no frame churn. */
+        if (!still() && NEU.sheetDraw) NEU.sheetDraw(ctx, 'fanBox', g.w / 2, (64 + g.h - 68) / 2,
+          { frame: ((sp * 10) | 0) % 46, scale: Math.min((g.w - 128) / 320, (g.h - 132) / 240) });
       }
       /* the soul materialises: a shrinking ring while it fades/rises in,
          and it fades back out on the return */
