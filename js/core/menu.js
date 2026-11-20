@@ -175,29 +175,42 @@
     if (NEU.act4 && NEU.act4.open) NEU.act4.open();
   }
 
-  /* Read-only window onto the two owners. Nothing is computed here that
-     quest.js or save.js does not already know: act from the a1_seen flag,
-     zone from the file's room, objective from the quest's own next step,
-     flags/items/objectives counted from the file. No second authority. */
+  /* Read-only window onto the two owners: quest.view() already hides the
+     unreachable steps, and save.js owns every number shown here. No
+     room ids or flag counts — those only ever spoiled the chain. */
   function progress() {
     clear();
     heading('where you are.');
     var data = (NEU.save && NEU.save.data) || {};
-    var flags = data.flags || {};
-    var items = data.items || [];
-    var quest = data.quest || {};
-    var done = quest.done || {};
+    var view = NEU.quest && NEU.quest.view ? NEU.quest.view() : [];
+    for (var g = 0; g < view.length; g++) {
+      var grp = view[g];
+      var group = el('div', 'menu__prog');
+      group.appendChild(el('h4', '', grp.group + ' ' + grp.n + '/' + grp.total));
+      var ul = el('ul', '');
+      for (var r = 0; r < grp.rows.length; r++) {
+        var row = grp.rows[r];
+        var line = (row.done ? '\u00d7 ' : '\u00b7 ') + row.text +
+          (row.of ? ' (' + row.count + '/' + row.of + ')' : '');
+        ul.appendChild(el('li', '', line));
+      }
+      group.appendChild(ul);
+      box._body.appendChild(group);
+    }
     var info = el('div', 'menu__file');
-    info.appendChild(el('span', '', 'act: ' + actLabel(data)));
-    info.appendChild(el('span', '', 'zone: ' + (data.room || 'not in a room')));
-    var goal = NEU.quest && NEU.quest.nextText ? NEU.quest.nextText() : null;
-    var objective = el('span', 'menu__objective', 'objective: ' + (goal || 'all caught up'));
-    if (NEU.glyph) NEU.glyph.put(objective, goal ? 'list' : 'check', objective.textContent);
-    info.appendChild(objective);
+    info.appendChild(el('span', '', 'coins: ' +
+      (NEU.save && NEU.save.coins ? NEU.save.coins() : (data.coins || 0))));
     info.appendChild(el('span', '', 'time: ' +
       (NEU.save && NEU.save.playtime ? fmtTime(NEU.save.playtime()) : '0:00')));
-    info.appendChild(el('span', '', 'objectives: ' + Object.keys(done).length));
-    info.appendChild(el('span', '', 'flags: ' + countOn(flags) + ' \u00b7 items: ' + items.length));
+    var items = data.items || [];
+    for (var i = 0; i < items.length; i++) {
+      var def = NEU.items && NEU.items.get ? NEU.items.get(items[i]) : null;
+      if (def && def.name) info.appendChild(el('span', '', 'item: ' + def.name));
+    }
+    var best = data.best || {};
+    for (var b in best)
+      if (Object.prototype.hasOwnProperty.call(best, b) && best[b] > 0)
+        info.appendChild(el('span', '', b + ': ' + best[b]));
     box._body.appendChild(info);
     box._body.appendChild(button('Back', 'menu__back', function () { setScreen('root'); }));
     note('');
@@ -241,13 +254,26 @@
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
 
+  function fmtDate(ms) {
+    var d = new Date(Number(ms) || 0);
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) +
+      '-' + ('0' + d.getDate()).slice(-2);
+  }
+
   function slotRow(n) {
     var cards = NEU.save && NEU.save.slots ? NEU.save.slots() : [];
-    var card = cards[n - 1] || { empty: true, ok: false };
+    var card = cards[n - 1] || { empty: true, ok: true };
     var row = el('div', 'menu__slot');
-    var label = card.empty ? 'empty' :
-      card.ok && card.meta ? card.meta.group + ' \u00b7 ' + card.meta.diff : 'unreadable';
-    row.appendChild(el('span', 'menu__slot-h', 'slot ' + n + ' \u00b7 ' + label));
+    var label;
+    if (card.empty) label = 'slot ' + n + ' \u00b7 empty';
+    else if (!card.ok) label = 'slot ' + n + ' \u00b7 cannot load';
+    else {
+      var m = card.meta || {};
+      label = 'slot ' + n + ' \u00b7 ' + (m.group || '?') + ' \u00b7 ' + (m.done || 0) +
+        ' steps \u00b7 ' + (m.diff || '') + ' \u00b7 ' + fmtTime(m.t_play) +
+        ' \u00b7 ' + fmtDate(m.saved);
+    }
+    row.appendChild(el('span', 'menu__slot-h', label));
     var acts = el('div', 'menu__slot-b');
     acts.appendChild(button('Save', 'menu__mini', function () {
       function write() {
@@ -259,7 +285,7 @@
       else ask('overwrite slot ' + n + '?', 'the file in this slot will be replaced.',
         'overwrite', write, function () { setScreen('save'); });
     }));
-    acts.appendChild(button('Load', 'menu__mini', function () {
+    if (card.ok || card.empty) acts.appendChild(button('Load', 'menu__mini', function () {
       var loaded = NEU.save && NEU.save.loadSlot ? NEU.save.loadSlot(n) : false;
       if (loaded) setScreen('save');
       note(loaded ? 'loaded slot ' + n + '.' : 'nothing saved in this slot yet.');

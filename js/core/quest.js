@@ -117,6 +117,35 @@
     if (tally) tally.textContent = completed() + '/' + total();
   }
 
+  /* A read-only, spoiler-safe window for the progress screen. Steps the
+     player cannot reach yet read '???' and never carry their id, so the
+     screen cannot leak the Act IV chain. Groups with no reachable step
+     are omitted entirely rather than shown as an empty shell. */
+  function view() {
+    var groups = [], byName = {}, out = [], i, k, g, s, vis, grp;
+    for (i = 0; i < STEPS.length; i++) {
+      g = groupFor(i);
+      if (!byName[g]) {
+        byName[g] = { group: g, n: 0, total: 0, any: false, rows: [] };
+        groups.push(byName[g]);
+      }
+      grp = byName[g];
+      s = STEPS[i];
+      vis = reachable(i);
+      grp.total++;
+      if (done[s.id]) grp.n++;
+      if (vis) grp.any = true;
+      grp.rows.push({ text: vis ? s.text : '???', done: !!done[s.id],
+        count: s.count ? (counts[s.id] || 0) : null, of: s.count || null });
+    }
+    for (k = 0; k < groups.length; k++) {
+      grp = groups[k];
+      if (!grp.any) continue;
+      out.push({ group: grp.group, n: grp.n, total: grp.total, rows: grp.rows });
+    }
+    return out;
+  }
+
   function flash() {
     if (!panel) return;
     panel.classList.remove('is-hit');
@@ -149,6 +178,8 @@
     },
     has: function (id) { return !!done[id]; },
     unlock: function (id) { unveiled[id] = true; render(); },
+
+    view: view,
 
     /* The first open step after the last completed one: the "what next"
        that the wake cue names. Falls back to the first open step at all. */
