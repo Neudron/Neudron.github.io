@@ -569,6 +569,20 @@
       bullet.grazed = true; addTp(grazePts); F.grazes = F.grazes || []; F.grazes.push({ x: bullet.x, y: bullet.y, t: 0, label: GRAZE_TEXT });
       return true;
     }
+    /* line hazards have no bullet array: keep one pseudo-bullet at the closest
+       point on the segment so a near pass pays once, then re-arms on exit. */
+    function grazeLine(s) {
+      if (!s) return false;
+      var a = s.a || 0, ca = Math.cos(a), sa = Math.sin(a), len = s.len || 0;
+      var px = F.x - s.x, py = F.y - s.y, t = px * ca + py * sa;
+      if (t < 0) t = 0; else if (t > len) t = len;
+      var gx = s.x + ca * t, gy = s.y + sa * t, dx = gx - F.x, dy = gy - F.y;
+      var far = 8 + playerR + grazePad + 24;
+      if (!s._g) s._g = { x: 0, y: 0, r: 8, grazed: false };
+      s._g.x = gx; s._g.y = gy;
+      if (dx * dx + dy * dy > far * far) s._g.grazed = false;
+      return graze(s._g);
+    }
     function hit(n) {
       if (shield) { shield = false; sfx('snap'); return true; }
       if (adapter.hurtPlayer) adapter.hurtPlayer(n);
@@ -585,7 +599,7 @@
 
     var api = {
       keydown: keydown, keyup: keyup, tick: tick, draw: draw,
-      addTp: addTp, graze: graze, hit: hit, cooldowns: cooldowns, drainTp: drainTp,
+      addTp: addTp, graze: graze, grazeLine: grazeLine, hit: hit, cooldowns: cooldowns, drainTp: drainTp,
       stepGauge: stepGauge, paintGauge: paintGauge,
       get gauge() { return { current: tpCur, apparent: tpApp, target: tp, chase: TP_CHASE, units: TP_UNITS }; },
       get tp() { return tp; },

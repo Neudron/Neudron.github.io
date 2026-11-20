@@ -303,6 +303,7 @@
     var h = NEU.thanatosAtk ? NEU.thanatosAtk.hazard() : null;
     if (!h || playerHp <= 0) return;
     if (Math.abs(F.y - h.y) < 14 && F.x >= h.x && F.x <= h.x + (h.len || 0)) hurtPlayer(1);
+    else if (kit) kit.grazeLine(h);   /* 14px hit band, graze out to 20px */
   }
   function frameOnce() {
     place();
@@ -317,7 +318,7 @@
       overdriveOpen = true;
     stepCombo();
     if (NEU.danmaku && NEU.danmaku.move) NEU.danmaku.move(F, held, 1 / 60, box);
-    if (kit) kit.tick(1 / 60);
+    if (kit) { kit.hp = playerHp; kit.tick(1 / 60); }
     fightFrame++;
     collide();
     if (mode !== 'fight') return;
@@ -330,6 +331,7 @@
     if (mode !== 'fight') return;
     if (!dt || dt < 0) return;
     if (dt > 2) dt = dt / 1000;
+    if (kit) dt *= kit.slow;                        /* the C strip slows the fight to 0.2x */
     acc += dt;
     while (acc >= 1 / 60 && n < 5) {
       acc -= 1 / 60;
@@ -535,7 +537,7 @@
       if (NEU.danmaku && NEU.danmaku.key) NEU.danmaku.key(F, { key: 'x' });
       return;
     }
-    if (kit && (k === 'z' || k === 'c' || k === 'C')) { kit.keydown(k); return; }
+    if (kit && (k === 'z' || k === 'c' || k === 'C')) { kit.hp = playerHp; kit.keydown(k); playerHp = Math.max(playerHp, kit.hp); publish(); return; }
     dir = k === 'ArrowLeft' || k === 'a' ? 'left' : k === 'ArrowRight' || k === 'd' ? 'right' :
       k === 'ArrowUp' || k === 'w' ? 'up' : k === 'ArrowDown' || k === 's' ? 'down' : k === 'Shift' ? 'focus' : '';
     if (dir) held[dir] = true;

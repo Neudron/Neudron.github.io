@@ -274,6 +274,7 @@
     playerHp -= n || 1;
     if (NEU.juice) NEU.juice.hit('medium');
     if (playerHp <= 0) resetFight();
+    else publish();                              /* mirror Exo: host HP is read live */
   }
   function onLine(s) {
     var dx, dy, px, py, t, ox, oy;
@@ -291,9 +292,12 @@
   function fightStep() {
     stepAtk();
     if (NEU.danmaku && NEU.danmaku.move) NEU.danmaku.move(F, held, 1 / 60, box);
-    if (kit) kit.tick(1 / 60);
+    if (kit) { kit.hp = playerHp; kit.tick(1 / 60); }
     if (iframe > 0) iframe--;
-    if (vulnerableNow() && onLine(haz)) hurtPlayer(1);
+    if (vulnerableNow()) {
+      if (onLine(haz)) hurtPlayer(1);
+      else if (kit && haz) kit.grazeLine(haz);   /* 12px hit radius, graze out to 20px */
+    }
   }
   function nukeStep() {
     var need = kit ? kit.tp : 0;
@@ -547,6 +551,7 @@
     if (mode !== 'fight' && mode !== 'nuke' && mode !== 'fall') return;
     if (!dt || dt < 0) return;
     if (dt > 2) dt = dt / 1000;
+    if (kit) dt *= kit.slow;                        /* the C strip slows the fight to 0.2x */
     acc += dt;
     while (acc >= 1 / 60 && n < 5) {
       acc -= 1 / 60;
@@ -570,14 +575,16 @@
     if (!k) return;
     if (k === 'Escape') { if (NEU.engine && NEU.engine.confirmExit) NEU.engine.confirmExit('Draedon', close); else close(); return; }
     if (mode !== 'fight' && mode !== 'nuke') return;
-    if (kit && kit.stripOpen) { kit.keydown(k); publish(); return; }
+    if (kit && kit.stripOpen) { kit.hp = playerHp; kit.keydown(k); playerHp = Math.max(playerHp, kit.hp); publish(); return; }
     if (k === 'x' || k === 'X') {
       if (NEU.danmaku && NEU.danmaku.key) NEU.danmaku.key(F, { key: 'x' });
       return;
     }
     if (kit && (k === 'z' || k === 'c' || k === 'C')) {
       tp0 = kit.tp;
+      kit.hp = playerHp;
       kit.keydown(k);
+      playerHp = Math.max(playerHp, kit.hp);
       /* spending TP in the nuke is the soul shield going up */
       if (mode === 'nuke' && kit.tp < tp0) shieldOn = true;
       publish();
