@@ -314,7 +314,7 @@
     return e;
   }
   var tSpr = mk(tcv), fSpr = mk(fcv2), fSt = mk(fcv2);
-  var look = { pose: 'idle', face: 'grin' }, poseAt = 0;
+  var look = { pose: 'idle', face: 'grin' }, poseAt = 0, talkUntil = 0;
   /* 3-step settle on each pose change (CSS keyframes on the child sprite, off under reduced motion) */
   function swap() { if (reduced || !tcv) return; tcv.classList.remove('is-swap'); void tcv.offsetWidth; tcv.classList.add('is-swap'); }
   function pose(p, f) { if (p !== look.pose) { poseAt = clock; swap(); } look.pose = p; if (f) look.face = f; paint(); }
@@ -350,7 +350,8 @@
     var P = POSES[look.pose] || POSES.idle, sh = NEU.sheets[P[0]];
     var k = P[2];
     if (!reduced && sh.fps) k = poseIdx(P, sh.fps, clock - poseAt);
-    var bob = reduced ? 0 : Math.floor(clock * 2.5) % 2;
+    /* one 2.5 Hz beat: 1 px bob, 2 px while a host line is on */
+    var beat = Math.floor(clock * 2.5) % 2, bob = reduced ? 0 : (clock < talkUntil ? beat * 2 : beat);
     /* the point pose stands 1 px further right, as in the game */
     put(tSpr, P[0], P[1][k], 70 + (look.pose === 'point' ? 1 : 0) - sh.ax, 146 - sh.ay - bob, 140, 146);
   }
@@ -542,7 +543,7 @@
     lastFocus = null;
   }
 
-  function host(s) { if (elSay) elSay.textContent = s; }
+  function host(s) { talkUntil = clock + Math.min(1.5, 0.3 + (s || '').length * 0.03); if (elSay) elSay.textContent = s; }
 
   function board() {
     var el = $('quizBoard');
