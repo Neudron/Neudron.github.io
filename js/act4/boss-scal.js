@@ -68,6 +68,7 @@
 
   var running = false, last = 0, t = 0, lastDt = 1 / 60;
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
+  var assisting = false, assistSet = { left: false, right: false, up: false, down: false };
   var rage = 0, tp = 0, shieldT = 0;
   var rageMode = 0, rageModeT = 0;
   var stripOpen = false, stripSel = 0, healCd = 0, healToast = 0, healsOn = true;
@@ -933,6 +934,14 @@
   /* Blue soul is gravity: dm.move runs it when F.mode is 'blue', with
      the optional platforms a pattern sets on NEU.scalSoul. */
   function movePlayer(dt) {
+    /* Bot tier: same steering as Polt, no auto strike (three-target funnel). */
+    if (B.tier === 'bot' && !keys.left && !keys.right && !keys.up && !keys.down) {
+      var as = dm.assist(F, bullets, { AX: AX, AY: AY, AW: AW, AH: AH });
+      keys.left = as.left; keys.right = as.right; keys.up = as.up; keys.down = as.down;
+      assistSet.left = as.left; assistSet.right = as.right; assistSet.up = as.up; assistSet.down = as.down;
+      assisting = as.left || as.right || as.up || as.down;
+      if (as.dash) dm.key(F, { key: 'x' });
+    }
     F.x = px; F.y = py;
     dm.move(F, keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH }, NEU.scalSoul.platforms);
     px = F.x; py = F.y;
@@ -2363,7 +2372,14 @@
     /* The C strip owns the keys while it is open. */
     if (stripOpen) { e.preventDefault(); stripKey(e); return; }
     var d = arrowName(e);
-    if (d) { keys[d] = true; e.preventDefault(); return; }
+    if (d) {
+      if (assisting) {
+        if (assistSet.left) keys.left = false; if (assistSet.right) keys.right = false;
+        if (assistSet.up) keys.up = false; if (assistSet.down) keys.down = false;
+        assisting = false;
+      }
+      keys[d] = true; e.preventDefault(); return;
+    }
     if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); if (!e.repeat) startCharge(); return; }
     if (e.key === 'x' || e.key === 'X') { e.preventDefault(); if (!e.repeat) dashKey(); return; }
     if (e.key === 'c' || e.key === 'C') {
@@ -2385,7 +2401,7 @@
   });
   /* A Shift (or arrow) let go outside the tab never sends its keyup, so the
      soul stayed slow, or kept walking, until the next press. */
-  addEventListener('blur', function () { keys = {}; });
+  addEventListener('blur', function () { keys = {}; assisting = false; });
 
   /* ── the attack machine's hands (scal-attacks.js) ─────────────────
      Everything she does reaches the fight through this object. The getters
@@ -2470,6 +2486,7 @@
     }
     layout();
     t = 0; hp = MAXHP; inv = 0; dropBullets(); keys = {}; booms = []; flashAt = -9;
+    assisting = false; assistSet.left = assistSet.right = assistSet.up = assistSet.down = false;
     IFRAMES = B.iframes(dm.IFRAMES || 1.1);
     HEAL_CD = B.healCd(30); healsOn = B.heals();
     shownInv = null; bannerTxt = ''; endPh(); setPh(0);
