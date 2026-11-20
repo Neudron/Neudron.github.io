@@ -60,49 +60,13 @@
     stamp(ctx, HEART, x, y, 2, col || COL_SOUL);
   }
 
-  /* The touch pad is a fixed strip along the bottom of the window on a
-     phone (touch.js builds it, style.css sizes it). It sits over whatever
-     is under it, so an arena centred in the whole window lost its bottom
-     edge to the pad. This measures the pad the way engine.js measurePad()
-     does, so the arena and the play area agree on where it is. A hidden
-     pad (every desktop, and a touch device with no pad showing) measures
-     zero, and the arena stays exactly where it was. */
-  function padHeight() {
-    var el = document.querySelector && document.querySelector('.tpad');
-    if (!el || el.hidden) return 0;
-    try {
-      var cs = getComputedStyle(el);
-      if (cs.display === 'none' || cs.visibility === 'hidden') return 0;
-    } catch (e) {}
-    var r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
-    if (!r || !r.height) return 0;
-    var vh = window.innerHeight || 600;
-    return Math.max(0, Math.min(r.height, vh - r.top, vh * 0.45));
-  }
-
   function arena(w, h, maxW, maxH, padY) {
     var winW = w || window.innerWidth || 800;
     var winH = h || window.innerHeight || 600;
-    /* Fit above the pad, so the centre is the centre of the space the
-       player can actually see. Only when that still leaves a fightable
-       arena: a phone held sideways is too short for the pad AND the
-       190px of HUD, and squeezing it gave a 52px arena (W7's caveat), so
-       there the arena keeps its old size and the pad sits over its
-       bottom corners, as it did before. */
-    var full = Math.min(maxH || 520, winH - 190);
-    var ph = padHeight();
-    var above = Math.min(maxH || 520, winH - ph - 190);
-    var hasPad = ph > 0 && above >= full * 0.6;
-    if (hasPad) winH -= ph;
     var AW = Math.min(maxW || 760, winW - 48);
     var AH = Math.min(maxH || 520, winH - 190);
     var AX = ((winW - AW) / 2) | 0;
     var AY = ((winH - AH) / 2 + (padY !== undefined ? padY : 22)) | 0;
-    /* SCal prints her dialogue line 96px under the arena (boss-scal dialY,
-       16px type), so on a padded phone the arena shifts up to keep the
-       line clear of the pad's TP button instead of sliding under it. */
-    if (hasPad)
-      AY = Math.max(36, Math.min(AY, winH - AH - 96));
     return { AX: AX, AY: AY, AW: AW, AH: AH };
   }
 
