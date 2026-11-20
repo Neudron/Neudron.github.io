@@ -1,4 +1,14 @@
-/* mountain.js — eight original screens on the plat kernel (W5.4). */
+/* mountain.js — eight original screens on the plat kernel (W5.4).
+   PLAY-1 M1 movement envelope, measured on this kernel (tests/fixes9957.mjs): tiles, TILE=16, 60 Hz.
+   metric   measured  SAFE    HARD
+   jumpH      3.5625   2.494   3.384
+   runD       8.1146   5.680   7.709
+   dashD      4.5000   3.150   4.275
+   jdashD     9.6056   6.724   9.125
+   wallH      3.5625   2.494   3.384
+   climbH    15.0000  10.500  14.250
+   springH    2.2396   1.568   2.128
+   SAFE = 0.7 x measured maximum. HARD = 0.95 x measured maximum. Required-path gaps use SAFE or less; HARD only on an optional refill ledge. */
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
