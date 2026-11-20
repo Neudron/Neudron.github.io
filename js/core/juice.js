@@ -90,9 +90,10 @@ var degrade = 0;   /* 0..2, set by perf.js when frame time collapses; never touc
      still runs, which is what makes the freeze read as a held frame
      rather than a dropped one. */
   var freezeUntil = 0;
-  /* A Leave prompt holds the same freeze, for as long as it is up. */
-  var paused = false;
-  function pause(on) { paused = !!on; }
+  /* Modal holders (Leave prompt, flash note) each add one freeze; a
+     shared boolean would unfreeze while another holder is still up. */
+  var paused = 0;
+  function pause(on) { paused = on ? paused + 1 : Math.max(0, paused - 1); }
 
   /* ── flash ──────────────────────────────────────────────────────*/
   var flashUntil = 0, flashCol = '#FFFFFF', flashFrom = 0;
@@ -171,7 +172,7 @@ var degrade = 0;   /* 0..2, set by perf.js when frame time collapses; never touc
     return t;
   }
 
-  function frozen() { return paused || performance.now() < freezeUntil; }
+  function frozen() { return paused > 0 || performance.now() < freezeUntil; }
 
   /* ── the camera ─────────────────────────────────────────────────
      Call `begin(ctx)` before drawing a scene and `end(ctx)` after.
