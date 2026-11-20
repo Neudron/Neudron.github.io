@@ -1290,6 +1290,10 @@ i[data-s=tvTenBow] { background-image: url(../img/act4/deltarune/tvtime/tenna-bo
 i[data-s=tvFaces] { background-image: url(../img/act4/deltarune/tvtime/faces.png); }
 i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-static.png); }
 .quiz.is-mini .quiz__tenna { visibility: hidden; }
+/* pose-swap settle: 3 steps, on the child sprite so it never fights put() */
+@keyframes quizTenSwap { from { transform: translateY(-4%); } to { transform: none; } }
+.quiz__tenna.is-swap > i { animation: quizTenSwap .2s steps(3); }
+html.rm .quiz__tenna.is-swap > i { animation: none; }
 .quiz__top {
   position: relative; z-index: 2;
   display: flex; justify-content: space-between; gap: 16px;
