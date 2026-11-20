@@ -24,6 +24,7 @@
      foes (dgn-foes.js): u cursed skull  U giant cursed skull  a/t/h blue/rusty/hell armored bones  N necromancer
      G ragged caster  X diabolist  y sniper  T tactical  C commando  E paladin  Y renegade warlock  Q phantom spirit
      hazards: O spike ball  W blazing wheel */
+  /* D1 beat table: the pacing curve the ZONES below are built to (intensity 0..1): d0 arrival 0.0 · d1 teach skull 0.2 · d2 teach fighter + cracked floor 0.3 · d3 lift, rest 0.1 · d4 teach caster 0.4 · d5 mage gate, rest 0.1 · d6 fighter + spike ball 0.6 · d7 ranged with cover 0.7 · d8 wheel + caster 0.8 · d9 lift, gauntlet 0.9 · d10 bone door, rest 0.1. */
   var ZONES = {
     d0: ['                                        ',
       '                                        ',
