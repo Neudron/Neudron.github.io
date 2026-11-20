@@ -572,6 +572,8 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
    overlay slider stay reachable instead of wrapping to one word per line. */
 @media (max-width: 520px) {
   .sett__two-pane { flex-direction: column; gap: 12px; }
+  /* 200% zoom at 320 CSS px: a row wraps its slider or switch instead of pushing it past the edge */
+  .sett__row { flex-wrap: wrap; }
   .sett__cats { flex: none; flex-direction: row; flex-wrap: wrap; gap: 4px;
     border-right: 0; border-bottom: 2px solid rgba(244, 244, 244, 0.3); padding: 0 0 8px; }
   .sett__cat { min-height: 40px; padding: 6px 10px; }
