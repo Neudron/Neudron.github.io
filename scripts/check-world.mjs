@@ -52,7 +52,7 @@ if (!/['"]js\/core\/world-graph\.js['"]/.test(buildSrc))
 /* 3. real graph: hard problems fail, known advisory findings are listed. */
 const graph = buildGraph(ROOT);
 const problems = validate(graph, ROOT);
-const HARD = /^(missing-target|missing-spawn|alias-|unresolved-alias|solid-or-missing-spawn|missing-source|missing-or-invalid-via)/;
+const HARD = /^(missing-target|missing-spawn|alias-|unresolved-alias|solid-or-missing-spawn|missing-source|missing-or-invalid-via|area-overlap)/;
 const hard = problems.filter(p => HARD.test(p));
 const advisory = problems.filter(p => !HARD.test(p));
 check('no hard graph problems (' + graph.roomIds.length + ' rooms, ' + graph.edges.length + ' edges)',
@@ -76,6 +76,38 @@ if (src) {
     const found = WG.validate(rooms);
     check('validate(real rooms) returns an array', Array.isArray(found));
     check('validate(real rooms) does not mutate input', JSON.stringify(rooms) === snap);
+
+    /* The seven named world-graph cases (WG.validate above built the index). */
+    const open = { flagged() { return true; } }, shut = { flagged() { return false; } };
+    const r1 = WG.resolveExit('d_city', { to: 'nowhere' }, open);
+    check('case 1 missing target falls back', r1.ok === false && r1.fallback === true && r1.reason === 'missing-target', r1);
+    const r2 = WG.resolveExit('d_city', { to: 'e3_hall', spawn: 'nope' }, open);
+    check('case 2 missing spawn falls back', r2.reason === 'missing-spawn' && r2.fallback === true, r2);
+    const gate = { to: 'e5_dad', spawn: 'door', locked: 'dad_door' };
+    const g1 = WG.resolveExit('e3_hall', gate, shut), g2 = WG.resolveExit('e3_hall', gate, open);
+    check('case 3 locked gate holds then opens', g1.reason === 'locked-gate' && g2.ok === true, [g1.reason, g2.reason]);
+    const d1 = WG.resolveExit('e6_room', { to: 'e3_hall', spawn: 'dad' }, open);
+    const d2 = WG.resolveExit('e6_room', { to: 'd_city', spawn: 'fire' }, open);
+    check('case 4 story redirect is declared, other targets dynamic', d1.dynamic === false && d2.dynamic === true, [d1.dynamic, d2.dynamic]);
+    const o1 = WG.resolveExit('e3_hall', gate, {});
+    check('case 5 old save without flagged() does not throw and stays closed', o1.reason === 'locked-gate' && o1.fallback === true, o1);
+    let frozen = null;
+    try { frozen = WG.resolveExit('e3_hall', Object.freeze({ to: 'e5_dad', spawn: 'door', locked: 'dad_door' }), Object.freeze({ flagged() { return true; } })); } catch (e) { frozen = e.message; }
+    check('case 6 inputs are not mutated', !!frozen && frozen.ok === true, frozen);
+    const o7 = WG.resolveExit('e3_hall', gate, shut);
+    check('case 7 no console bypass', !/NEU\.dev|console\.|\.go\(/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')) && WG.enabled === false && o7.fallback === true,
+      { enabled: WG.enabled, fallback: o7.fallback });
+    const gaps = [];
+    for (const rid of ['a_woods', 'd_city']) {
+      const as = graph.rooms[rid].areas.slice().sort((a, b) => a.x0 - b.x0);
+      for (let i = 1; i < as.length; i++) if (as[i].x0 !== as[i - 1].x1 + 1) gaps.push(rid + ':' + as[i].id);
+      for (const a of as) {
+        const al = graph.roomAliases[a.id];
+        if (!al || al.id !== rid) gaps.push('noalias:' + a.id);
+        else for (const sp of Object.keys(al.spawns || {})) if (!(al.spawns[sp] in graph.rooms[rid].spawns)) gaps.push('spawn:' + a.id + ':' + sp);
+      }
+    }
+    check('merged areas are contiguous and alias spawns resolve', gaps.length === 0, gaps);
   }
 }
 
