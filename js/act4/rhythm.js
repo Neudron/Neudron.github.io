@@ -1809,19 +1809,9 @@
           ctx.globalAlpha = 1;
         }
       }
-      /* The soul arena: its polygon is the collision edge, drawn as a 3 px border. The landed
-         Deltarune frame sequence (fanBox) sits over it only while the shape is the rect and no morph
-         runs, and crossfades to the border while one does, so sprite and collision never disagree. */
+      /* The soul arena: its polygon is the collision edge, drawn as a 3 px code border. */
       var fb = S.fbox;
-      if (fb && S.boxA > 0.001) {
-        var spA = 0, bx = arena(g);
-        if (!still() && NEU.sheetDraw && fb.a === 0 && fb.tw > 0) {
-          spA = (1 - fb.m) * Math.max(0, Math.min(1, (Math.min(fb.w / bx.AW, fb.h / bx.AH) - 0.9) * 10));
-        }
-        boxChrome(fb, PAT_COL[S.brkI >= 0 ? S.brkI : 0], Math.min(1, S.boxA * 3) * (0.35 + 0.65 * (1 - spA)));
-        if (spA > 0.001) NEU.sheetDraw(ctx, 'fanBox', g.w / 2, (64 + g.h - 68) / 2,
-          { frame: ((sp * 10) | 0) % 46, scale: Math.min((g.w - 128) / 320, (g.h - 132) / 240), alpha: spA });
-      }
+      if (fb && S.boxA > 0.001) boxChrome(fb, PAT_COL[S.brkI >= 0 ? S.brkI : 0], Math.min(1, S.boxA * 3));
       /* the soul materialises: a shrinking ring while it fades/rises in,
          and it fades back out on the return */
       var sa = S.soulA === undefined ? 1 : S.soulA;
