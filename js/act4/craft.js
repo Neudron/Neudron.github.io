@@ -62,7 +62,7 @@
     } catch (e) { return false; }
   }
 
-  /* The soul is the cursor, and it is FREE: arrows / touch stick move it
+  /* The soul is the cursor, and it is FREE: arrows move it
      over the whole panel (Shift slows it), Z / Enter / Space presses the
      button under it. Held keys, not keydown counts, same as quiz.js. */
   var soul = null, sx = 0, sy = 0, held_ = {};
@@ -488,9 +488,8 @@
   });
 
   NEU.craft = { open: open, close: close, fromRoom: fromRoom,
-                /* Every other scene exposes this; core/touch.js asks all
-                   nine which one is live. Without it the crafting grid
-                   was the one screen with no thumb controls. */
+                /* Every other scene exposes this; music.js asks all of
+                   them which one is live. */
                 get running() { return !wrap.hidden; },
                 get grid() { return grid.slice(); },
                 get held() { return held; },

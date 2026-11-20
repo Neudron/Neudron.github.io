@@ -23,9 +23,7 @@
       units slides you around it — one-tile doorways stop snagging.
    8. YOU INTERACT WITH WHAT YOU FACE. When two things are in reach, the
       one in front of you wins. REACH itself is unchanged.
-   9. THE CAMERA EASES, LEADS AND KNOWS ABOUT THUMBS. Exponential follow
-      with a little look-ahead; on a phone the touch pad's height is
-      taken out of the view so the player is never under it.
+   9. THE CAMERA EASES AND LEADS. Exponential follow with a little look-ahead.
   10. THE VIEW FITS THE SCREEN. About 20×12 tiles at the largest integer
       scale that fits, instead of a fixed 3× that showed 8 tiles on a
       phone and a postage stamp on a desktop.
@@ -555,8 +553,7 @@
        - the exit cell is floor: the feet box has to be well inside it;
        - the exit cell is a wall / door-frame / undergrowth tile: the feet
          box is pressed against it while the input points into it;
-       - either way the input is whatever `keys` holds, which is also what
-         the touch stick feeds (touch.js dispatches arrow keydowns).
+       - either way the input is whatever `keys` holds.
      Landing never bounces you back: every entity is a fresh copy on land,
      and an exit is ARMED only after the player has been out of contact
      with it once (e.__arm). Z / E on an exit still fires it, and an exit
@@ -1749,9 +1746,8 @@
       if (NEU.juice) NEU.juice.pause(false);
       if (before && before.focus && document.contains(before)) { try { before.focus(); } catch (x) {} }
     }
-    /* Window, capture phase, and stopImmediatePropagation: the touch pad
-       dispatches its synthetic Enter/Escape on window, which a document
-       listener never hears, and the minigames listen on window too. */
+    /* Listen on window, capture phase, and stopImmediatePropagation:
+       the minigames listen on window too. */
     function onKey(e) {
       e.stopImmediatePropagation();
       var k = e.key;
