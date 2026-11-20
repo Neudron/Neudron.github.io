@@ -120,7 +120,18 @@
             soulx: 0, souly: 0, hazards: [], pattern: 0, spawnN: 0, paused: false, introT: 0,
             drainFrom: 1, drainTo: 1, drainT: 0,
             mercHit: 9, glare: false, soulA: 1, brkI: -1,
-            wind: 0, windN: 0, boxA: 0 };
+            wind: 0, windN: 0, boxA: 0, lbA: 0, la: [1, 1, 1, 1], lf: [0, 0, 0, 0] };
+  /* One NEU.anim drives how every phase looks. The song still decides WHEN a
+     state starts (breakPhase, BREAK_AT, introOn, win, lose); the animator only
+     shapes the look, and its clock is stepped by songPos deltas so it never
+     drifts from the chart. arrowA/boxA/soulA stay as its derived outputs. */
+  var FXCFG = { states: { intro: { dur: INTRO }, chart: {}, 'in': { dur: EASE_IN }, dodge: { dur: DODGE },
+                          out: { dur: EASE_OUT }, clear: { dur: 0.9 }, fail: { dur: 0.5 } },
+                trans: { 'intro>chart': { dur: 0.35, ease: 'outCubic' } } };
+  var LANE_STAG = 0.05, FALL = 36;    /* s between lanes; px a receptor drops */
+  var lastFx = null, tAcc = 0, clearBoomed = false, failing = false, failSp = 0, failPrev = 0;
+  function makeFx() { var a = NEU.anim.make(FXCFG); a.set('chart'); return a; }
+  S.fx = makeFx();
   var pops = [], splashes = [];
   var raf = 0, soulF = null, hazBreak = -1, lastBrk = 0, loopSrc = null;
   var introOn = false, boomed = false, crowdCache = null;
@@ -292,6 +303,8 @@
   }
   function resetFeel() {
     S.section = 0; S.mode = 'chart'; S.arrowA = 1; S.boxA = 0; S.wind = 0; S.windN = 0;
+    S.fx = makeFx(); lastFx = null; tAcc = 0; clearBoomed = false; failing = false; S.lbA = 0;
+    S.la = [1, 1, 1, 1]; S.lf = [0, 0, 0, 0];
     S.sway = 0; S.swayUntil = 0;
     S.blockLane = -1; S.blockUntil = 0; S.soulx = 0; S.souly = 0; S.hazards = [];
     soulF = null; hazBreak = -1; lastBrk = 0; S.fbox = null;
@@ -339,6 +352,7 @@
     else notes = build(false).concat(build(true));
     lastSp = 0; phase = 0; S.round = round; S.judgement = '';
     resetFeel();
+    if (introOn) S.fx.set('intro');
     say(TAUNT[round][0]);
     backing();
   }
@@ -390,8 +404,9 @@
     if (soulF) soulF.dashI = NEU.boss ? NEU.boss.iframes(0.45) : 0.45;
     if (NEU.juice) {
       NEU.juice.hit('medium');
-      NEU.juice.burst(soulF.x, soulF.y - 10, 9, '#E04A6B', 1.3);
+      NEU.juice.boom(soulF.x, soulF.y - 10, 'medium', { col: '#E04A6B' });
     }
+    if (S.fbox) S.fbox.dmg(soulF.x, soulF.y - 14, '-' + Math.round((S.drainFrom - S.drainTo) * 100));
   }
 
   /* FNF's completion rank: (sick + good - misses) / judged */
@@ -520,6 +535,7 @@
       if (sp < -4 * beatLen()) {       /* the intro: mics, explosion, disco sphere */
         S.mode = 'intro'; S.brk = '';
         S.introT = sp + 4 * beatLen() + INTRO;
+        fxSync('intro', sp, S.introT);
         draw(sp);
         return;
       }
@@ -536,7 +552,8 @@
       return;
     }
     S.mode = 'chart'; S.brk = '';
-    S.arrowA = 1;
+    fxSync('chart', sp, 0);
+    S.arrowA = 1; S.la = [1, 1, 1, 1]; S.lf = [0, 0, 0, 0]; S.boxA = 0; S.fbox = null;
 
     var ph = ms(sp - 4 * beatLen()) >= 0 ? 1 : 0;
     if (ph !== phase) { phase = ph; say(TAUNT[round][ph] || 'go.'); }
@@ -565,6 +582,38 @@
       nextRound(); return;
     }
     draw(sp);
+  }
+  /* Song says which window it is in and how long it has run; the animator
+     catches up to that on entry, then follows songPos deltas (a hit-stop or a
+     hidden frame only makes the next step bigger, capped). Returns true on entry. */
+  function fxSync(name, sp, since) {
+    var d = lastFx === null ? 0 : sp - lastFx, enter = S.fx.state !== name;
+    lastFx = sp;
+    if (!(d > 0)) d = 0;
+    if (d > 0.25) d = 0.25;
+    if (enter) { S.fx.set(name); d = since > 0 ? since : 0; }
+    S.fx.step(d);
+    return enter;
+  }
+  /* the fightbox counts 60 Hz ticks; run the whole ones that dt owes it */
+  function fbTicks(dt) {
+    var f = S.fbox, n = 0;
+    if (!f) return;
+    tAcc += dt;
+    while (tAcc >= 1 / 60 && n++ < 8) { tAcc -= 1 / 60; f.step(null); }
+    if (tAcc >= 1 / 60) tAcc = 0;
+    f.rebuild();
+  }
+  /* any confirm or cancel key (keys.js has already routed rebinds) or Escape
+     ends the intro: the clock moves up to the countdown, so no timing changes
+     after it and the bars ease out through the animator, not a cut */
+  function skipIntro() {
+    var sp = songPos(), lead = -4 * beatLen();
+    if (!introOn || S.paused || sp >= lead) return false;
+    t0 -= lead - sp;
+    introOn = false;
+    backing();
+    return true;
   }
   function easeU(u) {
     if (u < 0) u = 0;
@@ -641,50 +690,86 @@
       S.spawnN++;
     }
   }
+  /* the soul arena: the old 64 px margin box. danmaku moves inside this rect and the
+     fightbox polygon is the true edge on top of it */
+  function arena(g) { return { AX: 64, AY: 64, AW: Math.max(32, g.w - 128), AH: Math.max(32, g.h - 128) }; }
+  function newBox(box) {
+    var f = NEU.fightbox.make();
+    f.setRect(box.AW, box.AH).centre(box.AX + box.AW / 2, box.AY + box.AH / 2);
+    f.rate = Math.max(NEU.fightbox.K.BOX_ANIM_SPEED, Math.ceil(box.AW / 24));   /* the full travel in ~0.4 s */
+    return f;
+  }
+  /* receptor i of an 'in' or 'out' window: staggered by lane, falling as it fades.
+     e = seconds into the window, dur = its length; rev starts from the last lane. */
+  function laneFx(e, dur, rev) {
+    var l, p, span = Math.max(0.1, dur - 3 * LANE_STAG);
+    for (l = 0; l < 4; l++) {
+      p = Math.max(0, Math.min(1, (e - (rev ? 3 - l : l) * LANE_STAG) / span));
+      p = easeU(p);
+      S.la[l] = rev ? p : 1 - p;
+      S.lf[l] = FALL * (rev ? 1 - p : p);
+    }
+  }
   function runBreak(sp, bp) {
-    var g = geom(), u = easeU(bp.u);
+    var g = geom(), u, e, dur, enter, l, f;
     var cx = g.w / 2, cy = g.h / 2;
     var dt = sp - lastBrk;
     if (!(dt > 0) || dt > 0.05) dt = 0.05;
     lastBrk = sp;
     S.mode = 'break'; S.brk = bp.name; S.brkI = bp.i;
+    var b0 = BREAK_AT[bp.i];
+    if (bp.name === 'out') FXCFG.states.out.dur = RETURN_AT[bp.i] - b0 - DODGE;   /* the bar-snapped window */
+    enter = fxSync(bp.name, sp, sp - (bp.name === 'in' ? b0 - EASE_IN : bp.name === 'dodge' ? b0 : b0 + DODGE));
+    dur = FXCFG.states[bp.name].dur;
+    u = easeU(S.fx.u); e = S.fx.u * dur;
     if (!soulF && NEU.danmaku) soulF = NEU.danmaku.fight(g.cx, g.strumY, { speed: 170, focus: 85 });
     if (!soulF) soulF = { x: g.cx, y: g.strumY, dashI: 0 };
-    if (bp.name === 'dodge') spawnHazards(bp.i, sp - BREAK_AT[bp.i], g);
+    var box = arena(g), have = NEU.fightbox && NEU.fightbox.make, fresh = false;
+    if (have && !S.fbox) { S.fbox = newBox(box); fresh = true; }
+    f = S.fbox;
+    if (bp.name === 'dodge') spawnHazards(bp.i, sp - b0, g);
     if (bp.name === 'in') {
-      S.arrowA = 1 - u; S.boxA = u;
+      /* the box grows out of the strum line while the receptors fall away and the soul arcs in */
+      if (f && (fresh || enter)) f.spawn(box.AW, box.AH);
+      S.arrowA = 1 - u; S.soulA = u;
+      laneFx(e, dur, false);
       soulF.x = g.cx + (cx - g.cx) * u;
       soulF.y = g.strumY + (cy - g.strumY) * u - (still() ? 0 : Math.sin(u * Math.PI) * 34);
-      S.soulA = u;
+      if (f) { f.cx = g.cx + (cx - g.cx) * u; f.cy = g.strumY + (cy - g.strumY) * u; fbTicks(dt); }
     } else if (bp.name === 'out') {
-      S.arrowA = u; S.boxA = 1 - u; S.hazards = [];
-      soulF.x = cx + (g.cx - cx) * u;
-      soulF.y = cy + (g.strumY - cy) * u;
-      S.soulA = 1 - u;
+      /* the reverse: the heart flies back to the strum line on the jar's return tween, the box
+         retreats into it, then the receptors come back from the last lane */
+      S.hazards = [];
+      if (f && enter) { f.soul.x = soulF.x; f.soul.y = soulF.y; f.recall(g.cx, g.strumY); f.retreat(); }
+      S.arrowA = u; S.soulA = 1 - Math.max(0, Math.min(1, e / 0.32));
+      laneFx(e, dur, true);
+      if (f) {
+        var cp = easeU(Math.min(1, e / 0.4));
+        f.cx = cx + (g.cx - cx) * cp; f.cy = cy + (g.strumY - cy) * cp;
+        fbTicks(dt);
+        soulF.x = f.soul.x; soulF.y = f.soul.y;
+      }
     } else {
-      S.arrowA = 0; S.boxA = 1; S.soulA = 1;
+      S.arrowA = 0; S.soulA = 1;
+      S.la = [0, 0, 0, 0]; S.lf = [FALL, FALL, FALL, FALL];
       var mk = {
         left: !!keys[LANES[0]], down: !!keys[LANES[1]],
         up: !!keys[LANES[2]], right: !!keys[LANES[3]], focus: !!keys.focus
       };
-      var box = { AX: 64, AY: 64, AW: Math.max(32, g.w - 128), AH: Math.max(32, g.h - 128) };
       if (NEU.danmaku && NEU.danmaku.move) NEU.danmaku.move(soulF, mk, dt, box);
       else if (soulF.dashI > 0) soulF.dashI -= dt;
-      /* The turnbattle-derived box is now the soul's edge: danmaku owns
-         movement and i-frames, this only clamps the resulting position to
-         the morph polygon. Input is still keys -> mk above, and still()
-         remains the only motion gate. Gentle shapes keep the dodge fair. */
-      if (NEU.fightbox && NEU.fightbox.make) {
-        if (!S.fbox) {
-          S.fbox = NEU.fightbox.make();
-          S.fbox.setRect(box.AW, box.AH).centre(box.AX + box.AW / 2, box.AY + box.AH / 2);
-        }
-        var bi = S.brkI >= 0 ? S.brkI % 4 : 0, fshape = [0, 1, 2, 5][bi];
-        S.fbox.setShape(fshape, fshape, 0);
-        S.fbox.soul.x = soulF.x; S.fbox.soul.y = soulF.y;
-        S.fbox.rebuild();
-        S.fbox.clampSoul();
-        soulF.x = S.fbox.soul.x; soulF.y = S.fbox.soul.y;
+      /* The turnbattle-derived box is the soul's edge: danmaku owns movement
+         and i-frames, this only clamps the resulting position to the polygon.
+         The box morphs from the rect on the break's downbeat. Input is still
+         keys -> mk above, and still() remains the only motion gate. */
+      if (f) {
+        f.cx = box.AX + box.AW / 2; f.cy = box.AY + box.AH / 2;
+        if (enter) f.morph([0, 1, 2, 5][S.brkI >= 0 ? S.brkI % 4 : 0], 24);
+        fbTicks(dt);
+        f.soul.x = soulF.x; f.soul.y = soulF.y;
+        f.rebuild();
+        f.clampSoul();
+        soulF.x = f.soul.x; soulF.y = f.soul.y;
       }
       var hi, hdt = dt * (NEU.boss ? NEU.boss.mul('bulletSpeed') : 1);   /* tier scales hazard motion as time */
       for (hi = 0; hi < S.hazards.length; hi++) {
@@ -706,6 +791,7 @@
         }
         if (h.broke) h.age += hdt;
         var dx = soulF.x - h.x, dy = soulF.y - h.y;
+        if (f && !h.broke) f.graze(h);   /* a dash through a hazard: the graze ring, once per hazard */
         if (!h.broke && dx * dx + dy * dy < HIT_R * HIT_R && !(soulF.dashI > 0)) {
           soulHit();
         }
@@ -716,6 +802,7 @@
         return h.x > -60 && h.x < g.w + 60 && h.y > -60 && h.y < g.h + 60;
       });
     }
+    S.boxA = f ? Math.min(1, f.w / box.AW, f.h / box.AH) : 0;
     S.soulx = soulF.x; S.souly = soulF.y;
   }
 
@@ -729,7 +816,12 @@
     running = false;
     won = true;
     winAt = performance.now();
-    if (NEU.juice) { NEU.juice.hit('big'); NEU.juice.burst(geom().hisX, geom().stage - 40, 18, '#FFD34E', 1.6); }
+    S.fx.set('clear');
+    /* the arena frame collapses to a point, then bursts there (boom is visual only; hit adds the shake) */
+    tAcc = 0; clearBoomed = false; S.fbox = null;
+    if (NEU.fightbox && NEU.fightbox.make) { S.fbox = newBox(arena(geom())); S.fbox.retreat(); }
+    if (NEU.juice) NEU.juice.hit('large');
+    clearFx(0);
     outroSp = songPos(); outroPrev = performance.now();
     outro();
     if (msg) { placeMsg(false); msg.hidden = true; }   /* the talk box says it; the stall carries the esc hint */
@@ -742,12 +834,20 @@
      songPos is frozen once the notes end, so the outro walks a virtual
      clock on from the win point and the beat keeps bouncing */
   var outroAt = 0, outroSp = 0, outroPrev = 0;
+  function clearFx(dt) {
+    var f = S.fbox;
+    S.fx.step(dt); fbTicks(dt);
+    if (f && !clearBoomed && f.w < 1 && f.h < 1) {
+      clearBoomed = true;
+      if (NEU.juice) NEU.juice.boom(f.cx, f.cy, 'large', { col: '#FFD34E' });
+    }
+  }
   function outro(ts) {
     if (!won || wrap.hidden) return;
     var t = ts || performance.now();
     var dt = (t - outroPrev) / 1000;
     outroPrev = t;
-    if (dt > 0 && dt < 0.1) outroSp += dt;
+    if (dt > 0 && dt < 0.1) { outroSp += dt; clearFx(dt); }
     if (t - outroAt > 8) { outroAt = t; draw(outroSp); }
     requestAnimationFrame(outro);
   }
@@ -759,6 +859,10 @@
     running = false;
     stopBacking();                       /* the track is cut with the round */
     resetScore();                        /* a death wipes the score */
+    /* forced cut: no easing out of whatever phase it was, the arena and the soul are gone, then the shake */
+    S.fx.set('fail', true); S.hazards = []; S.boxA = 0; S.soulA = 0; S.fbox = null;
+    if (NEU.juice) NEU.juice.hit('medium');
+    failSp = songPos(); failing = true; failPrev = performance.now();
     if (msg) {
       placeMsg(true);
       msg.style.visibility = '';
@@ -767,7 +871,17 @@
         '<br><small>' + keycap('Z') + '<span class="glyph__copy">enter to go again</span>' + keycap('X') + '<span class="glyph__copy">dash</span>' +
         keycap('← ↓ ↑ →') + '<span class="glyph__copy">soul</span>' + keycap('ESC') + '<span class="glyph__copy">leave</span></small>';
     }
-    draw(songPos());
+    failLoop();
+  }
+  /* the shake and the veil need frames after the round has stopped: a short loop, like the outro */
+  function failLoop(ts) {
+    if (!failing || running || wrap.hidden) { failing = false; return; }
+    var t = ts || performance.now(), dt = (t - failPrev) / 1000;
+    failPrev = t;
+    S.fx.step(dt > 0 && dt < 0.1 ? dt : 0);
+    if (S.fx.u >= 1) failing = false;
+    draw(failSp);
+    if (failing) requestAnimationFrame(failLoop);
   }
 
   /* ── draw ───────────────────────────────────────────────────────*/
@@ -1491,6 +1605,33 @@
     }
   }
 
+  function outCubicK(x) { return NEU.juice && NEU.juice.outCubic ? NEU.juice.outCubic(x) : x; }
+  /* the fightbox polygon as a jar-style 3 px border, drawn in code */
+  function boxChrome(f, col, a) {
+    var p = f.poly, i, n = p.length / 2;
+    if (a <= 0.01 || !(f.w > 0.5 && f.h > 0.5)) return;
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(p[0], p[1]);
+    for (i = 1; i < n; i++) ctx.lineTo(p[2 * i], p[2 * i + 1]);
+    ctx.closePath();
+    ctx.lineJoin = 'miter';
+    ctx.globalAlpha = a * 0.3; ctx.fillStyle = '#000000'; ctx.fill();
+    ctx.globalAlpha = a; ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+    ctx.globalAlpha = a * 0.8; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+  }
+  /* the intro's silent letterbox: two black bars and an original title card on the top one.
+     a = 0..1 is how far they are in (S.lbA), driven by the animator and by introT */
+  function letterbox(g, a) {
+    var h = Math.round(Math.max(56, g.h * 0.12) * a);
+    if (h < 1) return;
+    ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, g.w, h); ctx.fillRect(0, g.h - h, g.w, h);
+    ctx.fillStyle = '#FFD34E'; ctx.globalAlpha = 0.6; ctx.fillRect(0, h - 2, g.w, 2); ctx.fillRect(0, g.h - h, g.w, 2);
+    ctx.globalAlpha = a;
+    text('THE MERCHANT', g.w / 2, Math.round(h / 2), g.w < 600 ? 20 : 32, '#FFD34E');
+    ctx.globalAlpha = 1;
+  }
+
   /* The arrows fold up (a vertical squash) while four border segments slide
      in from off-screen to the soul arena. One progress value, u, drives both:
      the same 0.6s ease the fight already used for the crossfade. */
@@ -1548,6 +1689,8 @@
     }
     if (S.mode === 'intro') {
       introFx(g, S.introT);
+      S.lbA = still() ? (S.introT < 0.6 ? 1 : 0) : outCubicK(Math.min(1, S.introT / 0.35));
+      letterbox(g, S.lbA);
       ctx.restore();
       if (NEU.juice && NEU.juice.end) NEU.juice.end(ctx, shook);
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
@@ -1571,16 +1714,16 @@
     notes.forEach(function (n) {
       if (n.end > n.t && n.hit && sp < n.end && (n.mine ? !n.done : true)) held[n.mine ? 1 : 0][n.lane] = 1;
     });
-    ctx.globalAlpha = won ? 0 : S.arrowA;      /* the fight is over: no receptors, no notes */
     for (var side = 0; side < 2; side++) {
       var sd = SD[side];
       for (var l = 0; l < 4; l++) {
         var f = (t - confirmAt[side][l] < 0.15 || held[side][l]) ? 2 : (side && keys[LANES[l]]) ? 1 : 0;
         if (side && l === S.blockLane && sp < S.blockUntil) f = 1;
+        ctx.globalAlpha = won ? 0 : S.la[l];   /* the fight is over: no receptors, no notes */
         ctx.save();
-        ctx.translate(0, sd.y);
+        ctx.translate(0, sd.y + S.lf[l]);      /* each lane falls and fades on its own delay (laneFx) */
         var pulse = still() ? 1 : 1 - 0.1 * Math.max(0, 1 - (t - confirmAt[side][l]) / 0.15);   /* a hit dips to 0.9 and springs back */
-        ctx.scale(1, Math.max(0.02, arrowFold(1 - S.arrowA)) * pulse);
+        ctx.scale(1, Math.max(0.02, arrowFold(1 - S.la[l])) * pulse);
         ctx.translate(0, -sd.y);
         arrow(f, l, sd.x + l * sd.p, sd.y, sd.s);
         ctx.restore();
@@ -1620,6 +1763,7 @@
       }
     }
 
+    if (won && S.fbox && S.fx.state === 'clear' && S.fbox.w > 1) boxChrome(S.fbox, '#FFD34E', 0.9);   /* the arena collapses */
     if (won) {
       ctx.globalAlpha = still() ? 1 : Math.min(1, (performance.now() - winAt) / 300);
       if (NEU.glyph && NEU.glyph.compact()) { ctx.fillStyle = '#FFD34E'; NEU.glyph.draw(ctx, 'check', g.w / 2 - 7, g.popY - 16); }
@@ -1665,18 +1809,18 @@
           ctx.globalAlpha = 1;
         }
       }
-      if (S.boxA > 0.001) {
-        var ba = still() ? 0.35 : 0.3 + 0.15 * Math.sin(sp * 5);
-        var segs = boxSegments(S.boxA, g);
-        ctx.globalAlpha = ba;
-        ctx.fillStyle = PAT_COL[S.brkI >= 0 ? S.brkI : 0];
-        for (var si = 0; si < 4; si++) ctx.fillRect(segs[si].x, segs[si].y, segs[si].w, segs[si].h);
-        ctx.globalAlpha = 1;
-        /* The Deltarune battle-box frame sequence plays over the four bars
-           while the box is up. Under still() the static bars alone carry
-           the shape: no pulsing, no frame churn. */
-        if (!still() && NEU.sheetDraw) NEU.sheetDraw(ctx, 'fanBox', g.w / 2, (64 + g.h - 68) / 2,
-          { frame: ((sp * 10) | 0) % 46, scale: Math.min((g.w - 128) / 320, (g.h - 132) / 240) });
+      /* The soul arena: its polygon is the collision edge, drawn as a 3 px border. The landed
+         Deltarune frame sequence (fanBox) sits over it only while the shape is the rect and no morph
+         runs, and crossfades to the border while one does, so sprite and collision never disagree. */
+      var fb = S.fbox;
+      if (fb && S.boxA > 0.001) {
+        var spA = 0, bx = arena(g);
+        if (!still() && NEU.sheetDraw && fb.a === 0 && fb.tw > 0) {
+          spA = (1 - fb.m) * Math.max(0, Math.min(1, (Math.min(fb.w / bx.AW, fb.h / bx.AH) - 0.9) * 10));
+        }
+        boxChrome(fb, PAT_COL[S.brkI >= 0 ? S.brkI : 0], Math.min(1, S.boxA * 3) * (0.35 + 0.65 * (1 - spA)));
+        if (spA > 0.001) NEU.sheetDraw(ctx, 'fanBox', g.w / 2, (64 + g.h - 68) / 2,
+          { frame: ((sp * 10) | 0) % 46, scale: Math.min((g.w - 128) / 320, (g.h - 132) / 240), alpha: spA });
       }
       /* the soul materialises: a shrinking ring while it fades/rises in,
          and it fades back out on the return */
@@ -1690,7 +1834,13 @@
       if (NEU.danmaku && NEU.danmaku.soul) NEU.danmaku.soul.draw(ctx, soulF.x, soulF.y, 0);
       else { ctx.fillStyle = '#FF00FF'; ctx.fillRect(soulF.x - 4, soulF.y - 4, 8, 8); }
       ctx.globalAlpha = 1;
+      if (fb) fb.draw(ctx);                 /* graze ring and damage numbers (T2 mechanics) */
     }
+    if (S.fx.state === 'fail' && !still()) {   /* the cut: one red veil that fades out once, no flicker */
+      ctx.globalAlpha = 0.28 * (1 - S.fx.u); ctx.fillStyle = '#7A0A1E'; ctx.fillRect(0, 0, g.w, g.h); ctx.globalAlpha = 1;
+    }
+    var lb = S.fx.prev === 'intro' ? S.lbA * (1 - S.fx.k) : 0;   /* the bars ease out into the countdown */
+    if (lb > 0.002) letterbox(g, lb);
     if (S.paused) {                     /* ESC pauses: the held frame under a veil */
       ctx.globalAlpha = 0.6; ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, g.w, g.h); ctx.globalAlpha = 1;
       if (NEU.glyph && NEU.glyph.compact()) pauseGlyphs(g);
@@ -1733,6 +1883,9 @@
     }
     if (S.paused && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); retry(); return; }
     if (S.paused && (e.key === 'x' || e.key === 'X')) { e.preventDefault(); leavePrompt(); return; }
+    if (introOn && !e.repeat && (e.key === 'Enter' || e.key === 'z' || e.key === 'Z' || e.key === 'x' || e.key === 'X') && skipIntro()) {
+      e.preventDefault(); return;
+    }
     if (e.key === 'Escape') {
       e.preventDefault();
       if (running) { togglePause(); return; }   /* ESC pauses and resumes; Quit leaves */
@@ -1843,7 +1996,7 @@
     NEU.stageCurtain.through(function () { closing = false; leave(); }, 240);
   }
   function leave() {
-    running = false;
+    running = false; failing = false;
     if (NEU.boss) NEU.boss.close('rhythm');
     if (raf && window.cancelAnimationFrame) cancelAnimationFrame(raf);
     raf = 0;

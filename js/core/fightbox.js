@@ -284,10 +284,11 @@
     f.clampSoul = function () { var p = clampPoint(f.soul.x, f.soul.y, K.SOUL_HALF, f.poly); f.soul.x = p.x; f.soul.y = p.y; return f; };
     f.hit = function () { f.soul.iframe = K.IFRAME; return f; };
     f.step = function (input) {
-      var sp = input && input.focus ? K.SNEAK : K.SPEED, i, w, bk, p;
+      var sp = input && input.focus ? K.SNEAK : K.SPEED, i, w, bk, p, bs;
       f.tick++;
-      f.w = toward(f.w, f.tw, K.BOX_ANIM_SPEED);
-      f.h = toward(f.h, f.th, K.BOX_ANIM_SPEED);
+      bs = f.rate || K.BOX_ANIM_SPEED;      /* f.rate: an arena wider than the jar's box scales the speed, not the easing */
+      f.w = toward(f.w, f.tw, bs);
+      f.h = toward(f.h, f.th, bs);
       if (f.rt >= 0 && ++f.rt >= K.RETREAT_FX) f.rt = -1;
       if (f.sp >= 0 && ++f.sp >= K.SPAWN_FX) f.sp = -1;
       if (f.mdur > 0) {
