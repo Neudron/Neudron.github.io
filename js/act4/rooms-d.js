@@ -809,6 +809,19 @@
     }
   }
 
+  // world C1 spike: dev-only flag, default off. Task 2 defines NEU.worldSpikeBuild.
+  // shortcut: reload clears, no teardown on false
+  var spikeOn = false;
+  if (NEU.engine) Object.defineProperty(NEU.engine, 'worldSpike', {
+    enumerable: true, configurable: true,
+    get: function () { return spikeOn; },
+    set: function (v) {
+      v = !!v;
+      if (v && typeof NEU.worldSpikeBuild === 'function') NEU.worldSpikeBuild();
+      spikeOn = v;
+    }
+  });
+
   NEU.act4RoomsD = ['d_city',
                     'e1_hall','e2_hall','e3_hall','e4_corridor',
                     'e7_nook','e8_larder','e9_cellar'];
