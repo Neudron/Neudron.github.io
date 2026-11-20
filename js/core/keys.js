@@ -90,6 +90,7 @@
       bound('i', act4 ? 'items' : '???'),
       bound('Tab', 'quest log'),
       bound('m', 'mute'),
+      bound('e', 'interact'),
       fixed('move', 'arrows'),
       fixed('confirm', 'enter / space'),
       fixed('back · close', 'esc'),
