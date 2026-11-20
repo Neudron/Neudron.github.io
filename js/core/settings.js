@@ -26,7 +26,7 @@
    says so in plain words with the steps for that device, and every
    switch here stays usable (Xbox Accessibility Guidelines 117/118).
 
-   Opens on Ctrl + Shift + , and from the gear button top-right.
+   Opens on Ctrl + Shift + , and from the gear button top-left.
    The dialogue box (z-index 96) stays the top layer; this panel
    sits below it at 94.                                              */
 
@@ -391,50 +391,41 @@
     }
   }
 
-  var DEFS_INFO = [
-    { def: 'w', title: 'W — move up — rooms, fights, dark walk' },
-    { def: 'a', title: 'A — move left — rooms, fights, dark walk' },
-    { def: 's', title: 'S — move down — rooms, fights, dark walk' },
-    { def: 'd', title: 'D — move right — rooms, fights, dark walk' },
-    { def: 'z', title: 'Z — confirm / melee / hold: ranged — rooms, fights, pot, shop' },
-    { def: 'x', title: 'X — cancel / skip text / dash — rooms, fights' },
-    { def: 'Shift', title: 'Shift — focus / slow move — fights' },
-    { def: 'c', title: 'C — fight menu / equip — fights, inventory' },
-    { def: 'r', title: 'R — reset room — puzzle rooms' },
-    { def: 'i', title: 'I — items / inventory — Act IV' },
-    { def: 'Tab', title: 'Tab — quest log — overworld' },
-    { def: 'm', title: 'M — mute / unmute — global' },
-    { def: 'e', title: 'E — interact — dark walk' }
-  ];
-
-  /* Keybinds page: lists every DEFS action with human label and minigames.
+  /* Keybinds page: one row per NEU.keys.rows() entry, so the labels, the
+     ??? for verbs not met yet and the fixed keys come from keys.js alone.
      Enter or click starts capture; Esc cancels; conflicts swap. */
+  var KEY_GLYPH = { w: 'arrow', a: 'arrow', s: 'arrow', d: 'arrow', z: 'sword', x: 'dash',
+    Shift: 'target', c: 'fire', r: 'reset', i: 'bag', Tab: 'list', m: 'sound', e: 'open' };
   function drawKeys() {
     var host = document.getElementById('settKeys');
     if (!host || !NEU.keys) return;
     host.textContent = '';
-    DEFS_INFO.forEach(function (info) {
+    NEU.keys.rows().forEach(function (r) {
       var line = document.createElement('div');
       line.className = 'sett__row';
       var l = document.createElement('span');
       l.className = 'sett__lbl';
-      var actions = { w: 'arrow', a: 'arrow', s: 'arrow', d: 'arrow',
-        z: 'sword', x: 'dash', Shift: 'target', c: 'fire', r: 'reset', i: 'bag',
-        Tab: 'list', m: 'sound', e: 'open' };
-      if (NEU.glyph) NEU.glyph.put(l, actions[info.def], info.title);
-      else l.textContent = info.title;
+      if (NEU.glyph) NEU.glyph.put(l, r.def && r.label !== '???' ? KEY_GLYPH[r.def] : 'key', r.label);
+      else l.textContent = r.label;
       line.appendChild(l);
 
       var dots = document.createElement('span');
       dots.className = 'sett__dots';
       line.appendChild(dots);
 
+      if (r.fixed) {
+        var kt = document.createElement('span');
+        kt.className = 'sett__keytext';
+        kt.textContent = r.key;
+        line.appendChild(kt);
+        host.appendChild(line);
+        return;
+      }
       var b = document.createElement('button');
       b.type = 'button';
-      b.className = info.def === 'e' ? 'sett__key-ext' : 'sett__key';
-      var curKey = NEU.keys.label(info.def);
-      b.setAttribute('aria-label', info.title + ' — ' + curKey.toUpperCase());
-      b.textContent = '◀ ' + (curKey ? curKey.toUpperCase() : info.def) + ' ▶';
+      b.className = r.def === 'e' ? 'sett__key-ext' : 'sett__key';
+      b.setAttribute('aria-label', r.label + ' — ' + r.key.toUpperCase());
+      b.textContent = '◀ ' + (r.key ? r.key.toUpperCase() : r.def) + ' ▶';
 
       function startCapture() {
         var note = document.getElementById('settKeyNote');
@@ -443,7 +434,7 @@
         else b.textContent = 'press a key…';
         NEU.keys.capture(function (k) {
           if (k !== null) {
-            var res = NEU.keys.set(info.def, k);
+            var res = NEU.keys.set(r.def, k);
             var other = res.swapped;
             if (note) {
               note.textContent = !res.ok ? res.why :
@@ -715,6 +706,27 @@
     foot.appendChild(calm);
     foot.appendChild(dflt);
     pA11y.appendChild(foot);
+
+    /* One reset per tab: only that tab's own switches go back to default. */
+    function tabReset(pane, fn) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'sett__act sett__tabreset'; b.textContent = 'reset this tab';
+      b.addEventListener('click', function () { fn(); apply(); refresh(); });
+      panes[pane].appendChild(b);
+    }
+    function flags(o) { if (NEU.save) for (var k in o) if (o.hasOwnProperty(k)) NEU.save.flag(k, o[k]); }
+    tabReset('config', function () { if (NEU.diff) NEU.diff.set('medium'); });
+    tabReset('sound', function () {
+      mute(false);
+      if (NEU.music) NEU.music.setVolume(55); else flags({ opt_music: 55 });
+    });
+    tabReset('display', function () {
+      var o = {}; o[K_SHAKEPCT] = 100; o[K_SHAKE] = 0; o[K_STOP] = 0; o[K_PART] = 0;
+      o[K_TEXTSIZE] = 100; o[K_TEXT] = 0; flags(o); M.set('auto', 'auto');
+    });
+    tabReset('accessibility', function () {
+      var o = {}; o[K_RELAX] = 0; o[K_PHOTOSENS] = 0; o[K_PARTCAP] = 500; o[K_OVERLAY] = 50; o[K_HINTS] = 0; flags(o);
+    });
 
     twoPane.appendChild(catsNav);
     twoPane.appendChild(panesContainer);
