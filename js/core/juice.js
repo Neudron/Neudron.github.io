@@ -64,6 +64,7 @@
      it never touches a telegraph or a hit tell. 0.5 = the normal overlay
      brightness, 0 turns every full-screen overlay off. */
   var particleCap = 500, overlayIntensity = 0.5, photosensitive = false;
+var degrade = 0;   /* 0..2, set by perf.js when frame time collapses; never touches the particleCap setting */
 
   /* ── trauma ─────────────────────────────────────────────────────*/
   var trauma = 0, DECAY = 1.5;
@@ -297,8 +298,8 @@
       if (parts[k].f === family) same++;
     }
     /* The photosensitivity opt-in removes decoration, not tells. */
-    if ((photosensitive && f.prio === 0) || f.cap <= same) return;
-    room = particleCap - room;
+    if (((photosensitive || degrade >= 2) && f.prio === 0) || f.cap <= same) return;
+    room = (degrade >= 1 ? particleCap >> 1 : particleCap) - room;
     if (room <= 0 && f.prio === 0) return;
     if (room <= 0) for (k = 0; k < POOL && room < n; k++) {
       /* Never retire gameplay feedback to make room for more feedback of
@@ -534,6 +535,8 @@
       n = +n;
       particleCap = isFinite(n) ? Math.max(0, Math.min(POOL, Math.round(n))) : POOL;
     },
+    setDegrade: function (n) { n = Math.floor(+n); degrade = isFinite(n) ? Math.max(0, Math.min(2, n)) : 0; },
+    get degrade() { return degrade; },
     setOverlayIntensity: function (v) {
       v = +v;
       overlayIntensity = isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
