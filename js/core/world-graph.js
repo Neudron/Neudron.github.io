@@ -48,6 +48,11 @@
           x: e.x, y: e.y };
         node.exits.push(ex);
         if (isStr(e.to) && node.staticTargets.indexOf(e.to) < 0) node.staticTargets.push(e.to);
+        if (isObj(e.alt) && isStr(e.alt.to)) {
+          if (node.staticTargets.indexOf(e.alt.to) < 0) node.staticTargets.push(e.alt.to);
+          node.exits.push({ from: id, to: e.alt.to, spawn: isStr(e.alt.spawn) ? e.alt.spawn : null,
+            style: 'door', via: 'door', locked: e.locked || null, oneWay: true, cine: false });
+        }
       }
       out[id] = node;
     }

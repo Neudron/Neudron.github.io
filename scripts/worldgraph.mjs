@@ -21,14 +21,14 @@ const MODE_EDGES = [
   { from: 'dgn', to: 'd_city', spawn: null, via: 'mode', mode: 'dungeon' }
 ];
 // One-way routes are intentional: d3_square is the park-gate entry to the city end (rooms-d.js:290-294); e1_hall routes there (rooms-d.js:407).
-// The bed exit changes from woods to hall after home is reached (rooms-e.js:298-301).
+// The bed exit changes from woods to hall after home is reached (rooms-e.js:298-301); that redirect is the declared `alt` on the exit (rooms-e.js:334).
 // The way down to the storm is the stairs in g_8, the rank T room, reached only through the g0_hall T door; the trapdoor explicitly drops shut behind you (rooms-g.js:251-255).
 // The Exo arena is entered by the scripted fight sequence (rooms-s.js:776); its hatch exits to the foyer (rooms-s.js:871).
 // Platform ascent and the tavern exits intentionally move forward or return to the woods.
 const ONE_WAY = new Set([
   'p1_tavern>m0', 'm7>p1_tavern',
   'p1_tavern>a_woods',
-  'e1_hall>d3_square', 'e6_room>a_woods',
+  'e1_hall>d3_square', 'e6_room>a_woods', 'e6_room>e3_hall',
   'g_0>a_woods', 'x2_arena>x0_foyer',
   ...Array.from({ length: 7 }, (_, i) => `m${i}>m${i + 1}`),
   ...Array.from({ length: 3 }, (_, i) => `h${i}>h${i + 1}`),
@@ -50,6 +50,11 @@ export function buildGraph(root = ROOT) {
     const resolved = resolveRoomAlias(roomAliases, e.to, e.spawn || null);
     edges.push({ from, to: resolved.id, originalTo: e.to, spawn: resolved.spawn, originalSpawn: e.spawn || null,
       aliasError: resolved.error, via: styleVia(e.style), lock: e.locked || null, kind: 'room' });
+    if (e.alt && e.alt.to) {
+      const alt = resolveRoomAlias(roomAliases, e.alt.to, e.alt.spawn || null);
+      edges.push({ from, to: alt.id, originalTo: e.alt.to, spawn: alt.spawn, originalSpawn: e.alt.spawn || null,
+        aliasError: alt.error, via: styleVia(e.style), lock: e.locked || null, cond: e.alt.when || null, kind: 'room' });
+    }
   }
   for (let i = 0; i < 7; i++) edges.push({ from: `m${i}`, to: `m${i + 1}`, spawn: null, via: 'mode', kind: 'platform' });
   for (const [prefix] of [['h'], ['v']]) for (let i = 0; i < 3; i++) edges.push({ from: `${prefix}${i}`, to: `${prefix}${i + 1}`, spawn: null, via: 'mode', kind: 'platform' });
@@ -125,6 +130,13 @@ export function validate(graph, root = ROOT) {
     });
     if ((rooms[e.to] || levels[e.to]) && !edges.some(back => back.from === e.to && back.to === e.from) && !allowedOneWay)
       problems.push(`one-way-edge:${key}`);
+  }
+  for (const id of Object.keys(rooms)) {
+    const as = rooms[id].areas || [];
+    for (let i = 0; i < as.length; i++) for (let j = i + 1; j < as.length; j++) {
+      const a = as[i], b = as[j];
+      if (a.x0 <= b.x1 && b.x0 <= a.x1 && a.y0 <= b.y1 && b.y0 <= a.y1) problems.push(`area-overlap:${id}:${a.id}:${b.id}`);
+    }
   }
   for (const [oldId, newId] of Object.entries(graph.aliases)) {
     const resolved = roomAliases[oldId] ? resolveRoomAlias(roomAliases, oldId, null) : { id: newId };
@@ -217,6 +229,27 @@ export function criticalPath(graph, { start, goal, complete = false }) {
     }
   }
   return { status: reached.has(goal) ? 'REACHABLE' : 'UNREACHABLE', reached: [...reached], flags: [...flags] };
+}
+/* Real entry points: act4.js START/HOME plus every literal enter/warp/go('id') under js/. */
+export function entries(graph, root = ROOT) {
+  const out = new Set(), add = id => {
+    const c = resolveRoomAlias(graph.roomAliases || {}, id, null).id;
+    if (graph.roomIds.includes(c)) out.add(c);
+  };
+  const act4 = fs.readFileSync(path.join(root, 'js/act4/act4.js'), 'utf8');
+  for (const m of act4.matchAll(/var (?:START|HOME) = '([^']+)'/g)) add(m[1]);
+  for (const f of fs.readdirSync(path.join(root, 'js'), { recursive: true }).filter(f => String(f).endsWith('.js')))
+    for (const m of fs.readFileSync(path.join(root, 'js', f), 'utf8').matchAll(/\b(?:enter|warp|go)\('([a-z0-9_]+)'/g)) add(m[1]);
+  return [...out];
+}
+/* BFS over every edge, locks ignored; unreached covers rooms only. */
+export function reachability(graph, starts) {
+  const seen = new Set(starts), q = [...starts];
+  while (q.length) {
+    const id = q.pop();
+    for (const e of graph.edges) if (e.from === id && !seen.has(e.to)) { seen.add(e.to); q.push(e.to); }
+  }
+  return { reached: [...seen], unreached: graph.roomIds.filter(id => !seen.has(id)) };
 }
 function asList(value) { return value == null ? [] : Array.isArray(value) ? value : [value]; }
 
