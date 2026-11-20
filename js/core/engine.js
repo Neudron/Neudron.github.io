@@ -1105,6 +1105,7 @@
       return;
     }
     chunked = false;
+    if (chunkOrder.length) resetChunks(null);
     if (layers[room.id]) return;
     try { layers[room.id] = L.bakeRoom(room, ts, room.tileset); } catch (e) { layers[room.id] = null; }
   }
