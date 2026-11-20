@@ -210,7 +210,7 @@
   }
   function resetFight() {
     var n, id;
-    MAX = B.hp(1000);
+    MAX = 1000;   /* R11: Exo takes soul HP + damage tiers, no boss-HP tier */
     overdriveOpen = false;
     compSummoned = false;
     finSummoned = false;

@@ -2252,9 +2252,11 @@
     /* HP as hearts, TP as a number, then the gauge across the panel */
     ctx.fillStyle = '#C0BCC8'; if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'heart', bx + 24, fy + 10);
     else ctx.fillText('HP', bx + 24, fy + 14);
+    /* Bot tier has 16 hearts; on a narrow strip pack them to stay inside the panel. */
+    var heartStep = (bw - 90 < MAXHP * 16) ? Math.floor((bw - 90) / MAXHP) : 16;
     for (i = 0; i < MAXHP; i++) {
       stamp(['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'],
-            bx + 66 + i * 16, fy + 22, 2, i < hp ? COL.soul : '#2A1A20');
+            bx + 66 + i * heartStep, fy + 22, 2, i < hp ? COL.soul : '#2A1A20');
     }
     ctx.textAlign = 'right'; ctx.fillStyle = '#FF9E30';
     ctx.fillText((NEU.glyph && NEU.glyph.compact() ? '' : 'TP ') + (tp >= 1 && !(NEU.glyph && NEU.glyph.compact()) ? 'MAX' : Math.floor(tp * 100) + '%'), bx + bw - 24, fy + 14);
@@ -2445,6 +2447,7 @@
   function open() {
     /* one tier latch for the whole fight; health and phase stay here */
     B.open('scal');
+    MAXHP = NEU.diff ? NEU.diff.fpick([16, 12, 8, 7, 6, 4, 1]) : 8;
     /* a retry starts from a clean attack machine: the last attempt's beam,
        warnings and flares must not draw through the intro. startLead()
        builds the fresh one once the intro is over. */
@@ -2580,6 +2583,7 @@
                get running() { return running; },
                get active() { return active; },
                get hp() { return bossHP; },
+               get php() { return hp; },
                get booms() { return booms.length; },
                get embers() { return embers; },
                get flashA() { return flashAlpha(); },
