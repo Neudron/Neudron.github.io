@@ -331,6 +331,48 @@
     return true;
   }
 
+  /* Bot tier: deterministic 27-frame dodge planner. Nine headings, one
+     decision per six frames with 1-point hysteresis. It steers the soul;
+     it never grants invulnerability or touches the bullet list. */
+  var AUTO = [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1],
+              [-1, -1], [1, -1], [-1, 1], [1, 1]];
+  function assist(F, bullets, box) {
+    if (!F.auto) F.auto = { n: 0, t: 0, dir: 0, planned: false,
+                            res: { left: false, right: false, up: false, down: false, dash: false } };
+    var A = F.auto, res = A.res, d, f, i;
+    A.t++;
+    if (!A.planned || A.t >= 7) {
+      if (A.planned) A.n++;
+      A.t = 1; A.planned = true;
+      var cost = [], early = [], sp = NEU.danmaku.SPEED / 60;
+      var cx = box.AX + box.AW / 2, cy = box.AY + box.AH / 2;
+      for (d = 0; d < 9; d++) {
+        var ix = AUTO[d][0], iy = AUTO[d][1], c = 0, hitEarly = 0, sx = F.x, sy = F.y;
+        for (f = 1; f <= 27; f++) {
+          sx = Math.min(Math.max(F.x + ix * sp * f, box.AX + 7), box.AX + box.AW - 7);
+          sy = Math.min(Math.max(F.y + iy * sp * f, box.AY + 7), box.AY + box.AH - 7);
+          var touch = 0;
+          for (i = 0; bullets && i < bullets.length; i++) {
+            var b = bullets[i], rr = (b.r === undefined ? 4 : b.r) + 5.2;
+            var bx = b.x + (b.vx || 0) * f / 60, by = b.y + (b.vy || 0) * f / 60;
+            var ex = sx - bx, ey = sy - by;
+            if (ex * ex + ey * ey < rr * rr) { touch = 1; break; }
+          }
+          if (touch) { c++; if (f <= 6) hitEarly = 1; }
+        }
+        cost[d] = c + 0.001 * Math.hypot(sx - cx, sy - cy);
+        early[d] = hitEarly;
+      }
+      var best = A.dir, bc = cost[best];
+      for (d = 0; d < 9; d++) if (d !== best && cost[d] < bc - 1) { bc = cost[d]; best = d; }
+      A.dir = best;
+      res.left = AUTO[best][0] < 0; res.right = AUTO[best][0] > 0;
+      res.up = AUTO[best][1] < 0; res.down = AUTO[best][1] > 0;
+      res.dash = !!(early[best] && (F.dashCd || 0) <= 0);
+    }
+    return res;
+  }
+
   function keyName(e) {
     var k = e.key;
     if (k === 'ArrowLeft'  || k === 'a' || k === 'A') return 'left';
@@ -678,6 +720,7 @@
 
   NEU.danmaku = {
     arena: arena,
+    assist: assist,
     fight: fight, move: move, dash: dash, tap: tap, key: key, keyName: keyName,
     tick: tick, hurt: hurt, mul: mul, slow: slow, pop: pop, bossHit: bossHit,
     adrenaline: adrenaline, rage: rage, soulMode: soulMode,
