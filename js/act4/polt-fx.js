@@ -29,6 +29,9 @@
      over an explosion. A safe gap uses ECTO[3], not a new hue. */
   var WARN = { warn: '#FF5D73', commit: '#FFD98A', ink: '#000000', life: 24 };
   var KINDS = ['line', 'rect', 'fan', 'ring', 'safe'];
+  /* Explicit danger-layer order. Bullets are drawn by the fight itself,
+     between warn and card; this array documents that placement. */
+  var LAYERS = ['ghost', 'warn', 'bullets', 'card'];
   var LIFE_MIN = 24, LIFE_MAX = 30;
 
   function clamp(n, lo, hi) { return n < lo ? lo : n > hi ? hi : n; }
@@ -90,6 +93,7 @@
   var GHOSTS = 4, GHOST_LIFE = 0.2, GHOST_A = 0.4, ghosts = [], gCool = 0, gi;
   for (gi = 0; gi < GHOSTS; gi++) ghosts.push({ x: 0, y: 0, a: 0 });
   function ghost(x, y) {
+    if (NEU.juice && NEU.juice.degrade >= 2) return;   /* degrade: no decorative ghosts */
     if (gCool > 0.001) return;   /* float slack: 4 frames of dt land at ~0 */
     for (var i = 0; i < GHOSTS; i++) if (ghosts[i].a <= 0) {
       ghosts[i].x = x; ghosts[i].y = y; ghosts[i].a = GHOST_A; gCool = 4 / 60;
@@ -274,8 +278,17 @@
     };
   }
 
+  /* One layered draw entry. The fight never calls drawWarns/drawCard/
+     eachGhost directly; it routes every VFX layer through here. */
+  function drawFx(ctx, layer, o) {
+    o = o || {};
+    if (layer === 'warn') drawWarns(ctx, o);
+    else if (layer === 'card') drawCard(ctx, o.cx, o.cy, o);
+    else if (layer === 'ghost' && !o.reduced && o.ghost) eachGhost(o.ghost);
+  }
+
   NEU.poltFx = {
-    PAL: PAL, WARN: WARN, KINDS: KINDS,
+    PAL: PAL, WARN: WARN, KINDS: KINDS, LAYERS: LAYERS, drawFx: drawFx,
     warns: warns,
     pal: pal,
     ramp: function (t, p) { var q = pal(p); return q ? q.ramp[clamp(t, 0, 5) | 0] : null; },

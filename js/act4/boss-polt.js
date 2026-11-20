@@ -1096,10 +1096,10 @@
         outline(tinted('polter', fr, COL.red, 1), bxp, byp, bs);
         ctx.globalAlpha = 1;
       }
-      if (isBody && !REDUCE_MOTION && NEU.poltFx) NEU.poltFx.eachGhost(function (g) {
+      if (isBody && NEU.poltFx) NEU.poltFx.drawFx(ctx, 'ghost', { reduced: REDUCE_MOTION, ghost: function (g) {
         var gp = proj(g.x, g.y, o.z);
         ctx.globalAlpha = g.a; drawSheet('polter', Math.round(gp.x), Math.round(gp.y), bs, null, 0, fr); ctx.globalAlpha = 1;
-      });
+      } });
       var drew = drawSheet('polter', bxp, byp, bs * 1.0, glows, 0, fr);
       /* the clone is the same body, flooded red by a baked copy */
       if (o.kind === 'clone' && drew) putTint(tinted('polter', fr, COL.red, 0.5), bxp, byp, bs);
@@ -1112,7 +1112,7 @@
 
     /* VIP-02: shape-true warnings draw AFTER the VFX and BEFORE bullets,
        so the tell is on top of the brightest frame and under every shot. */
-    if (NEU.poltFx) NEU.poltFx.drawWarns(ctx, { phase: phase, compat: true,
+    if (NEU.poltFx) NEU.poltFx.drawFx(ctx, 'warn', { phase: phase, compat: true,
       reduced: REDUCE_MOTION, compatCol: phase === 3 ? COL.red : COL.ectoHi });
 
     for (var b = 0; b < bullets.length; b++) {
@@ -1186,7 +1186,7 @@
       var cw = ctx.measureText(BOSS_NAMES[phase] || '').width + 32;
       ctx.globalAlpha = 0.85; ctx.fillStyle = '#000000';
       ctx.fillRect(((innerWidth - cw) / 2) | 0, 52, cw | 0, 40); ctx.globalAlpha = 1;
-      NEU.poltFx.drawCard(ctx, innerWidth / 2, 72, { reduced: REDUCE_MOTION, pal: phase === 3 ? 'RED' : 'ECTO' });
+      NEU.poltFx.drawFx(ctx, 'card', { cx: innerWidth / 2, cy: 72, reduced: REDUCE_MOTION, pal: phase === 3 ? 'RED' : 'ECTO' });
     }
 
     if (line && !cardUp && nowMs - lineT < 5000) {
