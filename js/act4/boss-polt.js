@@ -221,7 +221,15 @@
     });
   }
   function tickAttacks(dt) {
-    if (!NEU.poltAtk) return;
+    if (!NEU.poltAtk) {
+      /* The attack record owns the signature on the page. Without it the
+         local clock still ends the hold, so a kill is never stranded at 1 HP. */
+      if (sig > 0) {
+        sig -= dt;
+        if (sig <= 0) { sig = 0; sigDone = true; say('* it holds on. one more.'); }
+      }
+      return;
+    }
     attackFrameAcc += dt;
     while (attackFrameAcc >= 1 / 60) {
       attackFrameAcc -= 1 / 60;
