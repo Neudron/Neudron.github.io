@@ -321,12 +321,8 @@
     for (k = 0; k < cycles; k++) a.push([18, 'right jump'], [rest, 'right']);
     return a;
   }
-  P.levels.mtest_medium.recording = climbRecording(4, 40);
-  P.levels.mtest_medium.testing.rehearsed = { frames: 337, deaths: 0 };
-  NEU.mountain.recordings.mtest_medium = P.levels.mtest_medium.recording;
-  P.levels.mtest_hard.recording = climbRecording(8, 40);
-  P.levels.mtest_hard.testing.rehearsed = { frames: 430, deaths: 0 };
-  NEU.mountain.recordings.mtest_hard = P.levels.mtest_hard.recording;
+  record('mtest_medium', climbRecording(4, 40), 337);
+  record('mtest_hard', climbRecording(8, 40), 430);
 
   NEU.mountain.prototypes = ['mtest_easy', 'mtest_medium', 'mtest_hard', 'mtest_springs', 'mtest_start', 'mtest_flags'];
   NEU.mountain.openPrototype = function (difficulty) {

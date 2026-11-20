@@ -64,7 +64,7 @@ check('three original, tall, explicitly provisional prototype levels are authore
     assert.ok(def.h > 18 && def.w >= 24, 'tall geometry');
     assert.equal(def.cameraMode, 'mountain');
     assert.equal(def.chunked, true);
-    assert.equal(def.testing.status, difficulty === 'easy' ? 'simulated-route-passed' : 'not-playtested');
+    assert.equal(def.testing.status, 'simulated-route-passed');
     assert.ok(def.entities.some(e => e.t === 'exit'));
     assert.ok(def.grid.every(line => line.length === def.w), 'rectangular authored tile grid');
   }
