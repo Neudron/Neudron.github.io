@@ -1198,19 +1198,34 @@
       ctx.globalAlpha = 1;
     }
 
-    if (NEU.poltFx && mode === 'fight') NEU.poltFx.drawCard(ctx, AX + AW / 2, AY + 40, { reduced: REDUCE_MOTION, pal: phase === 3 ? 'RED' : 'ECTO' });
+    /* the card owns the band under the boss bar (clear of the sprite and the
+       horns above the arena) on a dark plate; the intro line waits for it */
+    var cardUp = NEU.poltFx && mode === 'fight' && NEU.poltFx.cardOn();
+    if (cardUp) {
+      ctx.font = '32px "Determination Mono","Pixelify Sans",monospace';
+      var cw = ctx.measureText(BOSS_NAMES[phase] || '').width + 32;
+      ctx.globalAlpha = 0.85; ctx.fillStyle = '#000000';
+      ctx.fillRect(((innerWidth - cw) / 2) | 0, 52, cw | 0, 40); ctx.globalAlpha = 1;
+      NEU.poltFx.drawCard(ctx, innerWidth / 2, 72, { reduced: REDUCE_MOTION, pal: phase === 3 ? 'RED' : 'ECTO' });
+    }
 
-    if (line && nowMs - lineT < 5000) {
+    if (line && !cardUp && nowMs - lineT < 5000) {
       /* 8px of gap below the 16px line, clear of the arena frame */
       var ty = (AY - 24) | 0;
       var hudTop = Math.min(AY + AH + 24, innerHeight - 52) | 0;
       if (ty + 16 > hudTop) ty = (hudTop - 16) | 0;
       if (ty < 32) ty = 32;
-      ctx.fillStyle = COL.bone;
-      ctx.font = '16px "Undertale Sans","Comic Sans MS",cursive';
+      ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
       ctx.textBaseline = 'top';
       if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, (/hooks/i.test(line) ? 'open' : /another|one more/i.test(line) ? 'eyes' : 'warning'), AX, ty);
-      else ctx.fillText(line, AX, ty, Math.min(AW, innerWidth));
+      else {
+        /* dark plate: the horns above the arena must not eat the line */
+        var lnw = Math.min(AW, innerWidth, ctx.measureText(line).width || 400);
+        ctx.globalAlpha = 0.85; ctx.fillStyle = '#000000';
+        ctx.fillRect(AX - 4, ty - 4, (lnw + 8) | 0, 24); ctx.globalAlpha = 1;
+        ctx.fillStyle = COL.bone;
+        ctx.fillText(line, AX, ty, Math.min(AW, innerWidth));
+      }
       ctx.textBaseline = 'alphabetic';
     }
   }

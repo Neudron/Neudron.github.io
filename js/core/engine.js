@@ -1724,7 +1724,7 @@
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:95;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = '<div style="background:#1A1016;padding:32px 48px;border:2px solid #E23B55;border-radius:4px;text-align:center;">' +
       '<p style="font:24px \'Determination Mono\',monospace;color:#EDE7DE;margin:0 0 16px;">Leave ' + minigameName + '?</p>' +
-      '<p style="font:16px \'Undertale Sans\',cursive;color:#8A8598;margin:0 0 24px;">Z = select, X = back</p>' +
+      '<p style="font:16px \'Determination Mono\',monospace;color:#8A8598;margin:0 0 24px;">Z = select, X = back</p>' +
       '<div style="display:flex;gap:16px;justify-content:center;margin:0 0 20px;">' +
         confirmOpt('yes') + confirmOpt('no') +
       '</div>' +
