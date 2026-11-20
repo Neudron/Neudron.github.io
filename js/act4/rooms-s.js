@@ -1038,6 +1038,7 @@
     list.push({ t: 'trigger', x: x, y: y, once: 1,
       run: function () { if (NEU.chase && NEU.chase.arrive) NEU.chase.arrive(); } });
   }
+  /* Hand-merged on purpose, not E.merge: fixed 84x88 'd' canvas, post-paint carves and banks, sites; E.merge fills '#' and sizes from bbox. Needs an engine API change. */
   function mergeVillage() {
     var rows = vGrid(), ids = Object.keys(V_ORIGIN), i, k, id, o, def, es, e, copy,
         key, s, map, st, spawns = {}, areas = [], ents = [], sites = [], rowsOf;
