@@ -830,8 +830,8 @@
     /* Week 4 bright arrows are owner-accepted fan use, NOT CLEARED. When the
        strip is ready it replaces the procedural glyph; the 4x4 canvas sheet
        stays as the fallback so a blocked/missing image is harmless. */
-    if (NEU.sheetDraw && NEU.sheetDraw(ctx, 'fanWeek4', x + N * s / 2, y + N * s / 2,
-        { frame: l, scale: s * N / 160, alpha: f === 0 ? 0.55 : 1 })) return;
+    if ((f === 0 || f === 3) && NEU.sheetDraw && NEU.sheetDraw(ctx, 'fanWeek4', x + N * s / 2, y + N * s / 2,
+        { frame: l, scale: s * N / 160, alpha: (f === 0 ? 0.55 : 1) * ctx.globalAlpha })) return;
     if (!sheet) buildSheet();
     ctx.drawImage(sheet, f * N, l * N, N, N, x, y, N * s, N * s);
   }

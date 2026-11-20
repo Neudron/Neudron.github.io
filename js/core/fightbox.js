@@ -40,7 +40,7 @@
   /* Ray from the centre at (cs,sn) to the nearest polygon edge. Convex,
      origin-centred shapes only; 0.5 is the circle/no-hit fallback. */
   function rayHit(csV, cs, sn) {
-    var best = 0.5, n = csV.length, i, ax, ay, ex, ey, den, u, s;
+    var best = csV.length ? Infinity : 0.5, n = csV.length, i, ax, ay, ex, ey, den, u, s;
     for (i = 0; i < n; i++) {
       ax = csV[i][0]; ay = csV[i][1];
       ex = csV[(i + 1) % n][0] - ax; ey = csV[(i + 1) % n][1] - ay;
