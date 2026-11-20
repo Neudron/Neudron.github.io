@@ -1054,7 +1054,7 @@
 
   /* ── the prompt ──────────────────────────────────────────────────────
      A small key cap above whatever you can use — the letter on a
-     keyboard, three dots on a phone. It eases in and bobs. */
+     keyboard. It eases in and bobs. */
   var GLYPH_Z = ['111', '001', '010', '100', '111'];
   function drawPrompt(ctx, cx, cy, s, t) {
     var u = Math.max(2, Math.round(s * 0.75));

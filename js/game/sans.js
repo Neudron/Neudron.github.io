@@ -91,7 +91,7 @@
 
   /* Where a carried thing rides when there is no finger on it.
      Bottom-centre: clear of sans (bottom right), the #chips stack
-     (bottom left), and touch.js's stick and buttons. Re-derived every
+     (bottom left). Re-derived every
      frame by its callers rather than set once, so a scroll, a rotation
      or the URL bar collapsing can never strand it off screen. */
   function handX() { return innerWidth / 2; }

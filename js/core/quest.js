@@ -285,7 +285,7 @@
     if (NEU.bullet && NEU.bullet.running) return;
     if (NEU.dark && NEU.dark.running) return;
     /* A higher overlay owns Tab. This listener is on window, so when the
-       event is dispatched at window (touch pad, scripts) it runs in
+       event is dispatched at window (scripts) it runs in
        registration order BEFORE the settings trap's capture listener and
        would open the objectives behind it. */
     if (NEU.settings && NEU.settings.open_) return;

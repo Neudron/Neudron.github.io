@@ -164,7 +164,7 @@
              worst: worst, worstEver: worstEver, verdict: verdict };
   }
 
-  /* Which scene the number belongs to. Same polling idea as touch.js
+  /* Which scene the number belongs to. Same polling idea as music.js
      and music.js — a frame time with no attribution tells you that
      something is slow and nothing about what. */
   function scene() {
