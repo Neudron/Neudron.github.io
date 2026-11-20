@@ -26,6 +26,13 @@
     DEFEND: ['01110', '11111', '11111', '11111', '01110'],
     PARRY: ['00100', '01100', '11111', '00110', '00100']
   };
+  /* The one written copy of each rule, reused by the hand and the intent. */
+  var RULES = {
+    ATTACK: 'deal 3. +1 for each attack in a row.',
+    HEAL: 'restore 3.',
+    DEFEND: 'block 3 until your next turn.',
+    PARRY: 'turn his next attack back on him. wasted if he does not attack.'
+  };
 
   function reduced() {
     if (NEU.motion && NEU.motion.reduced) return !!NEU.motion.reduced();
@@ -643,6 +650,19 @@
     ctx.fillText(s, x, y);
   }
 
+  /* Keep a long rule on screen by sliding it left, never shrinking the 16px
+     game font (the pixel grid is the constraint, not the string length). */
+  function ruleLine(line, x, y, col) {
+    var w;
+    if (!line) return;
+    ctx.font = '16px "Determination Mono"';
+    if (ctx.measureText) {
+      w = ctx.measureText(line).width;
+      if (w) x = Math.min(x, 640 - w - 8);
+    }
+    text(line, x < 8 ? 8 : x, y, 16, col);
+  }
+
   /* A small face-up card used by the draw forecast and the mage's intent. */
   function miniCard(id, x, y, w, h, gold) {
     var f = FILL[id] || FILL.DEFEND;
@@ -745,6 +765,7 @@
     if (state.intent && !state.over) {
       miniCard(state.intent.id, 124, 120, 48, 68, true);
       text('HE WILL PLAY', 118, 112, 16, '#FFE080');
+      ruleLine(RULES[state.intent.id], 124, 272, '#FFE080');
     }
     for (i = 0; i < state.you.hand.length; i++) {
       f = flyFor(i);
@@ -758,6 +779,9 @@
         drawFace(f.id, x, y, false);
       } else drawFace(state.you.hand[i], slotPos(i).x, slotPos(i).y, i === state.sel && !state.over);
     }
+    if (!state.over && state.you.hand[state.sel]) {
+      ruleLine(RULES[state.you.hand[state.sel]], 196 + state.sel * 86, 476, '#F0D8A8');
+    }
     if (state.slide && state.slide.t < state.slide.dur) {
       t = state.slide.t / state.slide.dur;
       drawFace(state.slide.id, qbez(300, 320, 284, t), qbez(360, 200, 236, t), false);
@@ -767,6 +791,29 @@
     text(String(Math.round(state.disp.you)), 544, 50, 32, '#F4EFE4');
     text('MAGE', 48, 70, 16, '#C8B898');
     text('YOU', 544, 70, 16, '#C8B898');
+    /* status icons and the pre-absorb block value sit under each HP plate */
+    if (state.mage.blockShown > 0) {
+      icon(ctx, ICON.DEFEND, { '1': '#C8A040' }, 48, 84);
+      text('BLK' + state.mage.blockShown, 68, 94, 16, '#C8A040');
+    }
+    if (state.mage.parry) {
+      icon(ctx, ICON.PARRY, { '1': '#4A82C0' }, 48, 84);
+      text('PARRY', 68, 94, 16, '#4A82C0');
+    }
+    if (state.you.blockShown > 0) {
+      icon(ctx, ICON.DEFEND, { '1': '#C8A040' }, 544, 84);
+      text('BLK' + state.you.blockShown, 564, 94, 16, '#C8A040');
+    }
+    if (state.you.parry) {
+      icon(ctx, ICON.PARRY, { '1': '#4A82C0' }, 544, 84);
+      text('PARRY', 564, 94, 16, '#4A82C0');
+    }
+    /* up to three streak pips under the player plate */
+    for (i = 0; i < 3; i++) {
+      ctx.fillStyle = INK; ctx.fillRect(543 + i * 12, 110, 10, 10);
+      ctx.fillStyle = i < state.you.streak ? '#C8A040' : '#2A1C12';
+      ctx.fillRect(545 + i * 12, 112, 6, 6);
+    }
     if (!reduced()) {
       if (state.clock - state.grainAt >= 400) {
         state.grainAt = state.clock;
@@ -839,6 +886,8 @@
     play: play,
     tick: tick,
     ANIM: ANIM,
+    RULES: RULES,
+    rule: function (id) { return RULES[id]; },
     decks: function () { return { you: PLAYER_DECK.slice(), mage: MAGE_DECK.slice() }; },
     intent: function () { return state ? state.intent : null; },
     mageIndex: function () { return mageIndex(); },
