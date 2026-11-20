@@ -22,7 +22,7 @@ const SHELL = [
   'js/core/settings.js', 'js/core/menu.js', 'js/core/touch.js', 'js/core/dev.js'
 ];
 const GAME = [
-  'js/data/items.js', 'js/core/danmaku.js', 'js/core/fightbox.js', 'js/core/kit.js',
+  'js/data/items.js', 'js/core/danmaku.js', 'js/core/anim.js', 'js/core/fightbox.js', 'js/core/kit.js',
   'js/data/sheets.js', 'js/core/engine-look.js', 'js/core/engine-doors.js',
   'js/core/world-graph.js', 'js/core/engine-kinds.js', 'js/core/engine-trans.js', 'js/core/engine.js', 'js/core/plat.js',
   'js/act4/look-dungeon.js', 'js/act4/dungeon.js', 'js/act4/dgn-foes.js', 'js/act4/look-mountain.js',
