@@ -315,7 +315,9 @@
   }
   var tSpr = mk(tcv), fSpr = mk(fcv2), fSt = mk(fcv2);
   var look = { pose: 'idle', face: 'grin' }, poseAt = 0;
-  function pose(p, f) { if (p !== look.pose) poseAt = clock; look.pose = p; if (f) look.face = f; paint(); }
+  /* 3-step settle on each pose change (CSS keyframes on the child sprite, off under reduced motion) */
+  function swap() { if (reduced || !tcv) return; tcv.classList.remove('is-swap'); void tcv.offsetWidth; tcv.classList.add('is-swap'); }
+  function pose(p, f) { if (p !== look.pose) { poseAt = clock; swap(); } look.pose = p; if (f) look.face = f; paint(); }
 
   /* sheet cell fr at (dx, dy) in a W x H box; only touches the DOM on change */
   function put(e, key, fr, dx, dy, W, H) {
