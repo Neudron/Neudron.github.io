@@ -104,18 +104,19 @@
   }
 
   function stats() {
-    if (!n) return { n: 0, fps: 0, mean: 0, p50: 0, p99: 0, worst: 0, verdict: 'no data' };
+    if (!n) return { n: 0, fps: 0, mean: 0, p50: 0, p95: 0, p99: 0, worst: 0, verdict: 'no data' };
     var a = times.slice(0, n).sort(function (x, y) { return x - y; });
     var sum = 0, i;
     for (i = 0; i < n; i++) sum += a[i];
     var mean = sum / n;
     var p50 = a[(n * 0.50) | 0];
+    var p95 = a[Math.min(n - 1, (n * 0.95) | 0)];
     var p99 = a[Math.min(n - 1, (n * 0.99) | 0)];
     var worst = a[n - 1];
     /* Judged on the 1% low, not the mean and not p95. See the header. */
     /* +1 ms: a vsync-locked 60 Hz frame lands at 16.67 ms plus rAF jitter and is on budget */
     var verdict = p99 <= TARGET + 1 ? 'ok' : p99 <= WARN ? 'warn' : p99 <= FAIL ? 'over' : 'fail';
-    return { n: n, fps: mean ? 1000 / mean : 0, mean: mean, p50: p50, p99: p99,
+    return { n: n, fps: mean ? 1000 / mean : 0, mean: mean, p50: p50, p95: p95, p99: p99,
              worst: worst, worstEver: worstEver, verdict: verdict };
   }
 
@@ -186,7 +187,7 @@
     var s = stats();
     if (!s.n) return 'no frames sampled yet';
     return Math.round(s.fps) + ' fps · p50 ' + s.p50.toFixed(1) +
-           'ms · p99 ' + s.p99.toFixed(1) + 'ms · worst ' + s.worst.toFixed(1) +
+           'ms · p95 ' + s.p95.toFixed(1) + 'ms · p99 ' + s.p99.toFixed(1) + 'ms · worst ' + s.worst.toFixed(1) +
            'ms · ' + s.n + ' frames · ' + scene() + ' · ' + s.verdict +
            ' (budget ' + TARGET.toFixed(1) + '/' + WARN.toFixed(1) + '/' + FAIL.toFixed(1) + ')';
   }
