@@ -1,8 +1,36 @@
-/* fightbox.js — the morphing soul arena, ported from the verified mechanics
+/*! fightbox.js — the morphing soul arena, ported from the verified mechanics
    of Soulbound Turn Battle 2.0.29 (Pixelcite, MIT). ES5, one IIFE on NEU.
-   See TURNBATTLE-JAR-ANALYSIS.md §2.2-2.3 for the bytecode evidence and
-   THIRD-PARTY-NOTICES.md for the licence. No input listener lives here:
-   NEU.keys stays the only input authority and callers own the motion gate. */
+   No input listener lives here: NEU.keys stays the only input authority and
+   callers own the motion gate.
+
+   This is an independent port for the neu site. Pixelcite did not author,
+   review, sponsor or endorse it. Only this file's re-implemented mechanics
+   are covered by the notice below; no art or audio from the original jar was
+   copied, and this notice does not cover any other asset on the site.
+
+   Original licence (LICENSE_turnbattle), reproduced verbatim:
+
+   MIT License
+
+   Copyright (c) 2024
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE. */
 
 (function () {
   'use strict';

@@ -73,6 +73,11 @@ else ok('artifact excludes tests, notes, scripts, node_modules, source maps, Was
 if (!files.includes('assets/' + path.basename(game[0]))) fail('game chunk missing');
 else ok('game chunk exists but is not in the initial HTML');
 
+/* 3a. fightbox.js ports MIT code; the licence text must ship with the bundle. */
+const gameJs = read(game[0]);
+if (!gameJs.includes('Permission is hereby granted') || !gameJs.includes('Pixelcite')) fail('game bundle lacks the Pixelcite MIT notice');
+else ok('game bundle carries the Pixelcite MIT licence notice');
+
 /* 3b. Owner decision: the original game art ships from its rights-review
    queues. AI-generated img/act4/original/ art was removed: fail if any such
    file or path string enters the artifact, and require the game-art paths. */

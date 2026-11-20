@@ -117,7 +117,8 @@ async function main() {
   /* code split at the two seams the browser needs */
   const gameSrc = await concat(GAME);
   assertNoGeneratedOriginal('game bundle', gameSrc);
-  const gameMin = (await transform(gameSrc, { minify: true, target: 'es2018', legalComments: 'none' })).code;
+  /* keep the /*! licence notice (fightbox.js ports MIT code); shell and scene stay 'none' */
+  const gameMin = (await transform(gameSrc, { minify: true, target: 'es2018', legalComments: 'inline' })).code;
   const gameName = 'game.' + hash(gameMin) + '.js';
   await writeAsset('assets', gameName, gameMin);
 
