@@ -917,9 +917,9 @@
 
   /* ── the prompt ──────────────────────────────────────────────────────
      A small key cap above whatever you can use — the letter on a
-     keyboard, three dots on a phone. It eases in and bobs. */
+     keyboard. It eases in and bobs. */
   var GLYPH_Z = ['111', '001', '010', '100', '111'];
-  function drawPrompt(ctx, cx, cy, s, t, touch) {
+  function drawPrompt(ctx, cx, cy, s, t) {
     var u = Math.max(2, Math.round(s * 0.75));
     var bob = reduced ? 0 : Math.round(Math.sin(t * 5) * u * 0.6);
     var w = 9 * u, h = 9 * u, x = Math.round(cx - w / 2), y = Math.round(cy - h) + bob;
@@ -927,9 +927,7 @@
     ctx.fillStyle = '#EDE7DE'; ctx.fillRect(x, y, w, h - u);
     ctx.fillStyle = '#B8B0C8'; ctx.fillRect(x, y + h - 2 * u, w, u);
     ctx.fillStyle = OUT;
-    if (touch) {
-      ctx.fillRect(x + 2 * u, y + 4 * u, u, u); ctx.fillRect(x + 4 * u, y + 4 * u, u, u); ctx.fillRect(x + 6 * u, y + 4 * u, u, u);
-    } else if (NEU.keys && NEU.keys.get('z') !== 'z') {
+    if (NEU.keys && NEU.keys.get('z') !== 'z') {
       /* a moved key draws its own letter; the bitmap stays for the default */
       ctx.font = '16px "Determination Mono",monospace';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';

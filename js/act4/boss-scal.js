@@ -333,7 +333,7 @@
       var x = x0 + i * (half + 16), y = 76, c = BRO_COL[order[i]];
       ctx.textAlign = 'left';
       ctx.fillStyle = br ? c.ink : '#6A6480';
-      ctx.fillText(w < 560 ? BRO_NAME[order[i]].split(' ')[1] : BRO_NAME[order[i]], x, y - 20);
+      ctx.fillText(BRO_NAME[order[i]], x, y - 20);
       ctx.fillStyle = '#05050A'; ctx.fillRect(x - 2, y - 2, half + 4, 12);
       ctx.fillStyle = '#1A0A0E'; ctx.fillRect(x, y, half, 8);
       if (br) {
@@ -1772,8 +1772,7 @@
        the difference between this fight and the one on the television.
        Ticks sit at every phase gate in damageTarget. */
     dm.hud(ctx, F, { w: w, h: h, AY: AY, AH: AH,
-                     /* her Infernum title; a phone's 230 px bar holds only her name */
-                     name: (w < 560 ? 'Calamitas' : 'Supreme Witch, Calamitas') + (invuln && w >= 560 ? ' — shielded' : ''),
+                     name: 'Supreme Witch, Calamitas' + (invuln ? ' — shielded' : ''),
                      hp: bossHP, max: bossMax, invuln: invuln,
                      glitch: ph >= 3, ticks: HUD_TICKS,
                      php: hp, pmax: MAXHP, phase: phase,

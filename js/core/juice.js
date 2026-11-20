@@ -108,22 +108,6 @@
     bias = { x: dx / len, y: dy / len };
   }
 
-  /* ── haptics ────────────────────────────────────────────────────
-     Only the two big tiers buzz. A phone that buzzes on every pickup
-     stops meaning anything, and a buzz on every tick would be constant.
-     The buzz rides the shake gate, so the setting that stops the screen
-     moving also stops the phone. Durations are short on purpose (18ms
-     and 30ms, felt as a tap, not a rumble). Browsers may refuse
-     vibrate() without a user gesture or by policy, so a refusal is
-     swallowed and the shake still lands. */
-  function buzz(tier) {
-    var ms = tier === 'huge' ? 30 : tier === 'large' ? 18 : 0;
-    if (!ms) return;
-    try {
-      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(ms);
-    } catch (e) { /* refused: the shake still lands */ }
-  }
-
   function hit(tier, opts) {
     var t = TIER[tier] || TIER.small;
     opts = opts || {};
@@ -137,7 +121,6 @@
          makes the second hit feel weaker than the first, which is
          exactly backwards. */
       trauma = Math.min(1, trauma + (opts.shake != null ? opts.shake : t.shake) * shakeScale);
-      buzz(tier);
     }
     if (!noFlash && t.flash) {
       flashUntil = performance.now() + t.flash * 1000;

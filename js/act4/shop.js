@@ -533,8 +533,6 @@
 
   NEU.shop = {
     open: open, close: close, buy: buy, sell: sell, handover: handover, tick: tick, pose: pose,
-    get active() { return active; },
-    /* same contract as the other scenes — core/touch.js polls it */
-    get running() { return active; }
+    get active() { return active; }
   };
 })();

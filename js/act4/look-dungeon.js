@@ -315,7 +315,7 @@
       if (e.t !== 'painting' || e.dead) continue;
       ex = (e.x + 0.5) * T; ey = (e.y + 1) * T;
       if (Math.abs(h.x - ex) <= 22 && Math.abs((h.y - 11) - (ey - 8)) <= 48)
-        NEU.engineLook.drawPrompt(c, e.x * T - cx + 8, e.y * T - cy - 3, 1, now, !!(NEU.touch && NEU.touch.visible));
+        NEU.engineLook.drawPrompt(c, e.x * T - cx + 8, e.y * T - cy - 3, 1, now);
     }
   }
   var prevFg2 = P.foreground;

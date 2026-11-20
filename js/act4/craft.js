@@ -62,7 +62,7 @@
     } catch (e) { return false; }
   }
 
-  /* The soul is the cursor, and it is FREE: arrows / touch stick move it
+  /* The soul is the cursor, and it is FREE: arrows move it
      over the whole panel (Shift slows it), Z / Enter / Space presses the
      button under it. Held keys, not keydown counts, same as quiz.js. */
   var soul = null, sx = 0, sy = 0, held_ = {};
@@ -394,7 +394,7 @@
     goEl.style.cssText = 'font:400 16px/1 var(--font-display, monospace);min-width:144px;padding:16px 24px;color:#170D1F;background:#7BE38A;border:3px solid #E9FFE9;cursor:pointer;box-shadow:inset -4px -4px 0 #2F7A3C,inset 4px 4px 0 #C9FFD2';
     goEl.addEventListener('click', commit);
     /* result slot and button travel as one block, so the row stays three
-       things wide (recipe, grid, result) and stacks cleanly on a phone */
+       things wide (recipe, grid, result) */
     var act = document.createElement('div');
     act.className = 'craft__act';
     outEl.parentNode.insertBefore(act, outEl);
@@ -403,8 +403,8 @@
   }
 
   /* Layout the shipped sheets get wrong: the cauldron box keeps its old
-     400x520 size with its art hidden, which pushed the grid off a phone
-     and left a dead gap under it. Injected here so the lane that owns the
+     400x520 size with its art hidden, which left a dead gap under the
+     grid. Injected here so the lane that owns the
      craft screen owns its geometry. */
   function layout() {
     if (document.getElementById('craftLayout') || !document.head) return;
@@ -472,13 +472,8 @@
   });
 
   NEU.craft = { open: open, close: close, fromRoom: fromRoom,
-                /* Every other scene exposes this; core/touch.js asks all
-                   nine which one is live. Without it the crafting grid
-                   was the one screen with no thumb controls. */
                 get running() { return !wrap.hidden; },
-                get grid() { return grid.slice(); },
-                get held() { return held; },
-                tick: tick, press: press, soul: function () { return { x: sx, y: sy }; },
+                tick: tick,
                 recipe: RECIPE,
                 matches: matches,
                 put: function (n) { click(n); },

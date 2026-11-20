@@ -18,7 +18,7 @@ const SHELL = [
   'js/core/motion.js', 'js/data/data.js', 'js/page/main.js', 'js/page/stars.js',
   'js/core/quest.js', 'js/core/save.js', 'js/core/keys.js', 'js/core/juice.js', 'js/core/rand.js', 'js/core/kernel.js', 'js/core/tune.js',
   'js/game/sword.js', 'js/game/sans.js', 'js/core/music.js', 'js/core/perf.js',
-  'js/core/settings.js', 'js/core/touch.js', 'js/core/dev.js'
+  'js/core/settings.js', 'js/core/dev.js'
 ];
 const GAME = [
   'js/data/items.js', 'js/core/danmaku.js', 'js/core/kit.js',
@@ -44,7 +44,7 @@ const GAME = [
 ];
 const FILES = [
   '404.html', 'CNAME', '.nojekyll', 'og.png', 'robots.txt', 'sitemap.xml',
-  'llms.txt', 'humans.txt', 'manifest.json', 'apple-touch-icon.png', 'icon-512.png'
+  'llms.txt', 'humans.txt', 'manifest.json', 'icon-512.png'
 ];
 const DIRS = ['fonts', 'img', 'audio', '.well-known'];
 

@@ -23,9 +23,8 @@
       units slides you around it — one-tile doorways stop snagging.
    8. YOU INTERACT WITH WHAT YOU FACE. When two things are in reach, the
       one in front of you wins. REACH itself is unchanged.
-   9. THE CAMERA EASES, LEADS AND KNOWS ABOUT THUMBS. Exponential follow
-      with a little look-ahead; on a phone the touch pad's height is
-      taken out of the view so the player is never under it.
+   9. THE CAMERA EASES AND LEADS. Exponential follow
+      with a little look-ahead.
   10. THE VIEW FITS THE SCREEN. About 20×12 tiles at the largest integer
       scale that fits, instead of a fixed 3× that showed 8 tiles on a
       phone and a postage stamp on a desktop.
@@ -69,7 +68,7 @@
   var px = 0, py = 0, vx = 0, vy = 0, keys = {}, face = 'down', walked = 0, moving = false;
   var movedFor = 0, settle = 0;
   var camX = 0, camY = 0, kickX = 0, kickY = 0;
-  var S = 3, padH = 0, padPoll = 0;
+  var S = 3;
   var fade = 0, fadeDir = 0, fadeThen = null;
   /* Seconds the iris takes. A door is quick (0.22); arriving from a
      scene that has just played its own ending can ask for a slower one
@@ -380,8 +379,7 @@
        - the exit cell is floor: the feet box has to be well inside it;
        - the exit cell is a wall / door-frame / undergrowth tile: the feet
          box is pressed against it while the input points into it;
-       - either way the input is whatever `keys` holds, which is also what
-         the touch stick feeds (touch.js dispatches arrow keydowns).
+       - either way the input is whatever `keys` holds, which is the keyboard.
      Landing never bounces you back: every entity is a fresh copy on land,
      and an exit is ARMED only after the player has been out of contact
      with it once (e.__arm). Z / E on an exit still fires it, and an exit
@@ -642,20 +640,8 @@
     var s = Math.floor(Math.min(innerWidth / (20 * TILE), innerHeight / (12 * TILE)));
     return Math.max(2, Math.min(6, s || 2));
   }
-  /* How much of the bottom of the screen the touch pad covers. */
-  function measurePad() {
-    var el = document.querySelector && document.querySelector('.tpad');
-    if (!el || el.hidden) return 0;
-    try {
-      var cs = getComputedStyle(el);
-      if (cs.display === 'none' || cs.visibility === 'hidden') return 0;
-    } catch (e) {}
-    var r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
-    if (!r || !r.height) return 0;
-    return Math.max(0, Math.min(r.height, innerHeight - r.top, innerHeight * 0.45));
-  }
   function view() {
-    return { w: innerWidth / S, h: innerHeight / S, uh: Math.max(1, innerHeight - padH) / S };
+    return { w: innerWidth / S, h: innerHeight / S, uh: innerHeight / S };
   }
   function camClamp() {
     var v = view();
@@ -691,7 +677,6 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
     S = chooseScale();
-    padH = measurePad();
     if (room) camClamp();
   }
   /* A window drag fires resize dozens of times a frame; lay out once per frame. */
@@ -709,7 +694,6 @@
       if (fade >= 1 && fadeDir > 0) { fade = 1; fadeDir = 0; fadeSpan = IRIS; var f = fadeThen; fadeThen = null; if (f) f(); }
       else if (fade <= 0 && fadeDir < 0) { fade = 0; fadeDir = 0; fadeSpan = IRIS; var g = fadeThen; fadeThen = null; if (g) g(); }
     }
-    if ((padPoll -= dt) <= 0) { padPoll = 0.5; var ph = measurePad(); if (ph !== padH) padH = ph; }
     if (!room) return;
 
     if (!busy) { if (!NEU.activeMinigame) move(dt); walkExits(); } else { vx = 0; vy = 0; moving = false; }
@@ -975,7 +959,7 @@
       var pn = entAt(n);
       var a = reduced ? 1 : Math.min(1, promptT / 0.12);
       ctx.globalAlpha = a;
-      L.drawPrompt(ctx, sx(pn.x), sy(pn.y - 18), S, clock, padH > 0);
+      L.drawPrompt(ctx, sx(pn.x), sy(pn.y - 18), S, clock);
       ctx.globalAlpha = 1;
     }
 
@@ -1157,9 +1141,8 @@
       if (NEU.juice) NEU.juice.pause(false);
       if (before && before.focus && document.contains(before)) { try { before.focus(); } catch (x) {} }
     }
-    /* Window, capture phase, and stopImmediatePropagation: the touch pad
-       dispatches its synthetic Enter/Escape on window, which a document
-       listener never hears, and the minigames listen on window too. */
+    /* Window, capture phase, and stopImmediatePropagation: the minigames
+       listen on window too, so this one must run first. */
     function onKey(e) {
       e.stopImmediatePropagation();
       var k = e.key;
@@ -1275,7 +1258,7 @@
     REACH: REACH, PLAYER_H: PLAYER_H, PLAYER_W: PLAYER_W, SPEED: SPEED,
     /* read-only internals for tests and the dev console */
     get debug() {
-      return { scale: S, cam: { x: camX, y: camY }, vel: { x: vx, y: vy }, padH: padH,
+      return { scale: S, cam: { x: camX, y: camY }, vel: { x: vx, y: vy },
                baked: !!(room && layers[room.id]), fade: fade, iris: fadeSpan, prompt: promptFor,
                lights: (room && look()) ? lightsFor(0, camX, camY, view()).list.length : 0,
                cine: cine,

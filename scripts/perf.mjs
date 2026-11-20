@@ -13,7 +13,6 @@
  *   npm run build                                  # the probe measures dist/, not source
  *   node scripts/perf.mjs                          # every scene, desktop, 4x throttle
  *   node scripts/perf.mjs --scene bullet           # one scene
- *   node scripts/perf.mjs --profile mobile         # 390x844 @2x touch
  *   node scripts/perf.mjs --rate 4 --ms 10000      # throttle / window per scene
  *   node scripts/perf.mjs --write                  # .parity/perf-baseline.json
  *
@@ -42,7 +41,6 @@ const flag = (name) => {
 };
 const RATE = Number(flag('--rate') || 4);
 const WINDOW_MS = Number(flag('--ms') || 10000);
-const MOBILE = flag('--profile') === 'mobile';
 const OUT = path.join(ROOT, '.parity', 'perf-baseline.json');
 const WRITE = argv.includes('--write');
 const ONLY = flag('--scene');
@@ -119,9 +117,7 @@ let failCount = 0;
 
 try {
   for (const sc of picked) {
-    const vp = MOBILE
-      ? { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
-      : { width: 1280, height: 720, deviceScaleFactor: 1 };
+    const vp = { width: 1280, height: 720, deviceScaleFactor: 1 };
     const page = await browser.newPage({ viewport: vp });
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: RATE });
@@ -222,7 +218,7 @@ try {
 if (WRITE && !failCount) {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify({ v: 2, rate: RATE, ms: WINDOW_MS,
-    profile: MOBILE ? 'mobile-390x844@2x' : 'desktop-1280x720', scenes: results }, null, 2) + '\n');
+    profile: 'desktop-1280x720', scenes: results }, null, 2) + '\n');
   console.log('perf: baseline written → .parity/perf-baseline.json');
 }
 if (failCount) {

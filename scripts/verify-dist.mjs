@@ -26,7 +26,7 @@ const byName = (re) => files.filter((f) => re.test(f));
 /* 1. Every public URL and PWA/SEO surface survives. */
 const required = [
   'index.html', '404.html', 'CNAME', '.nojekyll', 'robots.txt', 'sitemap.xml',
-  'manifest.json', 'apple-touch-icon.png', 'icon-512.png', 'og.png',
+  'manifest.json', 'icon-512.png', 'og.png',
   'humans.txt', 'llms.txt', '.well-known/discord'
 ];
 for (const f of required) if (!exists(f)) fail('missing public file ' + f);
@@ -97,7 +97,7 @@ else ok('manifest icons resolve; save key neu.save.v1 is in the shell bundle');
 
 /* 7. Allowlist: nothing unknown, nothing huge. */
 const rootAllowed = new Set(['index.html', '404.html', 'CNAME', '.nojekyll', 'og.png', 'robots.txt',
-  'sitemap.xml', 'llms.txt', 'humans.txt', 'manifest.json', 'apple-touch-icon.png', 'icon-512.png']);
+  'sitemap.xml', 'llms.txt', 'humans.txt', 'manifest.json', 'icon-512.png']);
 const unknown = files.filter((f) =>
   !rootAllowed.has(f) && !/^assets\/(?:shell|game)\.[a-f0-9]+\.js$/.test(f) &&
   !/^assets\/scene(?:-chunk)?[-.][A-Z0-9]+\.js$/.test(f) && !/^css\/[a-z]+\.[a-f0-9]+\.css$/.test(f) &&

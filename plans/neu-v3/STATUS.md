@@ -13,7 +13,7 @@ Snapshot date: 2026-11-09. Remote public main: `bbb4331e9ded30a9160bee3d087d6f08
 | B03 seamless transition core | UNVERIFIED | `engine.go()` still irises; needs isolated implementation and tests |
 | B04 first forest seamless slice | UNVERIFIED | Exact design brief staged; needs art + code + browser test |
 | B05–B13 redesign | UNVERIFIED | Phased plan only |
-| Screenshot and mobile evidence | BLOCKED | Browser/workstation playtest session needed |
+| Screenshot evidence | BLOCKED | Browser/workstation playtest session needed |
 | Commercial asset redistribution rights | UNVERIFIED | Existing asset folders include franchise names; permission requires primary-source review |
 | Remote public checkout CI | UNVERIFIED | `npm run check/build/verify` exists; no claim executed in this session |
 

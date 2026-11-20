@@ -20,9 +20,7 @@
    once you have missed, home moves to a ledge in the last screenful
    you were looking at, so a miss costs a step, not a commute.
 
-   Coarse pointers get a different contract — see CARRY below. You
-   cannot hold a finger down and scroll with the same finger, so on
-   touch it is tap-to-carry rather than press-and-hold.             */
+   Press and hold is the carry contract.                              */
 
 (function () {
   'use strict';
@@ -50,7 +48,6 @@
      plays. Reduced motion used to silence it too, which left people with
      calm motion on their device and no sound they had never asked to lose. */
   function hush() { return !!(NEU.settings && NEU.settings.muted); }
-  var CARRY   = matchMedia('(pointer: coarse)').matches;   // tap-to-carry
 
   /* ── scene timers (F4) ──────────────────────────────────────────
      A timer set in one room of the bedroom loop is a promise about the
@@ -78,21 +75,9 @@
     laters = [];
   }
 
-  /* The contract follows the pointer that made THIS gesture, not a
-     fact frozen at page load. A phone with a bluetooth mouse and an
-     iPad with a trackpad both get press-and-hold on the mouse and
-     tap-to-carry on the finger, in the same session. CARRY survives
-     only as the fallback for engines that do not fill pointerType. */
-  function tapCarry(e) {
-    var t = e && e.pointerType;
-    if (t === 'touch' || t === 'pen') return true;
-    if (t === 'mouse') return false;
-    return CARRY;
-  }
-
-  /* Where a carried thing rides when there is no finger on it.
-     Bottom-centre: clear of sans (bottom right), the #chips stack
-     (bottom left), and touch.js's stick and buttons. Re-derived every
+  /* Where a carried thing rides when there is no click on it.
+     Bottom-centre: clear of sans (bottom right) and the #chips stack
+     (bottom left). Re-derived every
      frame by its callers rather than set once, so a scroll, a rotation
      or the URL bar collapsing can never strand it off screen. */
   function handX() { return innerWidth / 2; }
@@ -1140,8 +1125,8 @@
     state = 'held';
     NEU.sword && NEU.sword.setPose('held');
     px = e.clientX; py = e.clientY;
-    grabId = e.pointerId; grabTap = tapCarry(e);
-    if (!grabTap) sword.setPointerCapture && sword.setPointerCapture(e.pointerId);
+    grabId = e.pointerId; grabTap = false;
+    sword.setPointerCapture && sword.setPointerCapture(e.pointerId);
     tellCarry('sword');
     if (sans && !hilt) sans.classList.add('is-armed');
     paintPips();
@@ -1533,7 +1518,7 @@
     kel.addEventListener('pointerdown', function (e) {
       if (kstate === 'off' || kstate === 'held') return;
       e.preventDefault();
-      kGrabId = e.pointerId; kGrabTap = tapCarry(e);
+      kGrabId = e.pointerId;
       kGrabX = e.clientX; kGrabY = e.clientY;
       kFromCarry = (kstate === 'carry');
       kstate = 'held'; trk.length = 0;
@@ -1558,12 +1543,10 @@
       var v = heldVel(now, e.clientX, e.clientY + scrollY); kvx = v.vx; kvy = v.vy;
       kx = e.clientX; ky = e.clientY + scrollY;
 
-      /* On a finger, a stationary tap is not a throw — it is picking the
-         thing up or putting it down. Anything that actually travelled is a
-         throw, even a weak one: a slow drag still earns "put some shoulder
-         into it" from keyHit, which is the correct answer to a bad throw. */
-      /* A click that did not travel is a tap on any pointer, a mouse
-         included: it picks up, or puts down if it was already carried. */
+      /* Anything that actually travelled is a throw, even a weak one: a
+         slow drag still earns "put some shoulder into it" from keyHit. */
+      /* A click that did not travel picks up, or puts down if it was
+         already carried. */
       var moved = Math.hypot(e.clientX - kGrabX, e.clientY - kGrabY);
       if (moved < TAP_SLOP && Math.hypot(kvx, kvy) < THROW_MIN) {
         kvx = 0; kvy = 0;
@@ -1829,17 +1812,8 @@
     });
   }
 
-  /* Touch: you cannot hold a finger down and scroll with it, so the
-     press-and-hold contract is impossible. Tap to pick up, tap sans to
-     swing, tap anywhere else to send it home. The ONLY new rule is that
-     the pointerup which closes the pickup tap does not count as a drop —
-     without that guard the sword goes home the instant you lift, and
-     tap-to-carry never engages at all. */
-  /* Where each finger came down, so a lift can be told apart from the
-     end of a scroll. With the sword riding at the bottom of the screen,
-     the thumb that scrolls the page lands on or near it constantly; when
-     every lift counted as a tap, scrolling swung it (or sent it home) and
-     you could never get to the bottom of the page while carrying it. */
+  /* Where each pointer came down, so a lift can be told apart from the
+     end of a drag. */
   var downAt = {};
   addEventListener('pointerdown', function (e) {
     downAt[e.pointerId] = { x: e.clientX, y: e.clientY };
@@ -1857,14 +1831,10 @@
     if (!grabTap && grabId !== null && e.pointerId === grabId && !scrolled) { grabTap = true; grabId = null; carrySword(); return; }
     if (grabTap && grabId !== null && e.pointerId === grabId) { grabId = null; carrySword(); return; }
     if (grabTap && state !== 'held') return;
-    /* Carrying on a finger: only a TAP drops or swings. A finger that
-       travelled was scrolling the page, and the sword stays in your hand. */
+    /* Carrying by click: only a click that did not travel drops or swings. */
     if (grabTap && grabId === null && scrolled) return;
-    /* The dialogue box is modal and sits over the page; tapping it means
-       "advance the text", never "drop what you are holding". Without this
-       the hint that explains tap-to-carry is itself what drops the sword,
-       on the player's very first pickup. Touch only: on a mouse, letting
-       go IS letting go, wherever the cursor happens to be. */
+    /* The dialogue box is modal and sits over the page; clicking it means
+       "advance the text", never "drop what you are holding". */
     if (grabTap && tbox && !tbox.hidden && e.target && tbox.contains(e.target)) return;
     attempt(e.clientX, e.clientY);
   });
@@ -1890,8 +1860,8 @@
   addEventListener('pointercancel', function (e) {
     delete downAt[e.pointerId];
     if (state !== 'held') return;
-    /* The browser cancels a touch the moment it turns into a scroll. That
-       is the page moving, not the player letting go: keep carrying. */
+    /* A browser-cancelled pointer is the page moving, not the player
+       letting go: keep carrying. */
     if (grabTap && grabId === null) return;
     /* A cancelled PICKUP still leaves it in your hand — that is the
        recoverable state, and a tap elsewhere still drops it. A cancelled

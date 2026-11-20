@@ -22,7 +22,7 @@
    540 contact        1113 the show           1664 larger text (zoom)
    552 reveals        1158 through the crack  1650 gear button
    573 no-webgl       1162 the crack
-   587 sans           1209 craft ready        1667 thumb controls
+   587 sans           1209 craft ready
    664 the sword                              (line numbers drift —
                                               keep the names current)
    685 the textbox
@@ -107,11 +107,6 @@ body.is-lit-mode {
 }
 
 * { box-sizing: border-box; }
-
-/* Every button is a game control. manipulation keeps scrolling working
-   but kills the 300ms tap delay and the double-tap zoom — rapid taps on
-   quiz answers or shop rows must never read as "zoom the page". */
-button { touch-action: manipulation; }
 
 /* The browser's own rule for the hidden attribute is `[hidden] {
    display: none }` in the UA stylesheet, which ANY author rule setting
@@ -225,7 +220,6 @@ html { scrollbar-color: #3A3548 #14141C; scrollbar-width: thin; }
   display: grid; justify-items: center; gap: 8px;
   background: none; border: 0; padding: 0;
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
 }
 .sw__plate {
   width: 34px; height: 56px;
@@ -408,8 +402,6 @@ html { scrollbar-color: #3A3548 #14141C; scrollbar-width: thin; }
   width: 100%; height: 100%;
   pointer-events: auto;
   cursor: grab;
-  touch-action: none;            /* or a drag on a phone scrolls the page
-                                    instead of turning the object */
 }
 #glassCanvas.dragging { cursor: grabbing; }
 
@@ -710,7 +702,7 @@ html.is-lite .glass { display: none; }
 .sword {
   position: fixed; left: 0; top: 0; z-index: 42;
   width: clamp(74px, 9vw, 104px); height: clamp(74px, 9vw, 104px);
-  cursor: grab; touch-action: none;
+  cursor: grab;
   will-change: transform;
   filter: drop-shadow(0 6px 18px rgba(0,0,0,.5));
 }
@@ -883,12 +875,11 @@ html.is-jolt { animation: neuJolt .26s steps(2, end); }
 
 /* ── the key, once it exists ──────────────────────────────────────
    Same contract as the sword: position:fixed, moved only by transform,
-   so the physics never touches layout. touch-action:none because a
-   throw is a drag and the page must not scroll underneath it. */
+   so the physics never touches layout. */
 .keyobj {
   position: fixed; left: 0; top: 0; z-index: 43;
   width: clamp(30px, 3.6vw, 44px); height: clamp(30px, 3.6vw, 44px);
-  cursor: grab; touch-action: none;
+  cursor: grab;
   will-change: transform;
   filter: drop-shadow(0 4px 12px rgba(0,0,0,.55));
 }
@@ -916,11 +907,6 @@ html.is-jolt { animation: neuJolt .26s steps(2, end); }
   background: radial-gradient(ellipse at center, rgba(255,236,160,.55) 0%, rgba(255,236,160,0) 70%);
   animation: carried-glow 1.7s ease-in-out infinite;
 }
-/* Riding at the bottom of a phone screen, a carried thing sits right
-   where the thumb scrolls. touch-action:none there meant a swipe that
-   started on it moved nothing, so you could not reach the bottom of the
-   page. Let the page pan through it; sans.js tells a tap from a scroll. */
-.sword.is-carried, .keyobj.is-carried { touch-action: pan-x pan-y; }
 
 /* key on the floor: gold pulse until the door is open; green aura while dragged */
 .keyobj.is-idle::after,.keyobj.is-held::after{content:'';position:absolute;inset:-10px;z-index:-1;pointer-events:none;border-radius:50%;background:radial-gradient(circle,rgba(255,216,107,.6) 0%,rgba(255,216,107,0) 70%);animation:carried-glow 1.2s ease-in-out infinite}
@@ -1224,7 +1210,6 @@ body.is-blackout::before {
   background: #000;
   transform-origin: 50% 50%;
 }
-@media (pointer: coarse) { .quiz__tv { padding-bottom: 200px; } }
 
 /* Deltarune's 640x480 split: a 2:1 stage over the dialog box, laid out in
    percentages of the 640x320 picture (x / 6.4, y / 3.2). */
@@ -1297,11 +1282,6 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
   background: #000;
   image-rendering: pixelated;
 }
-/* phone: the board sits under the stage */
-@media (max-width: 759px) {
-  .quiz__set { margin-bottom: 56px; }
-  .quiz__board { top: 100%; left: 0; width: 100%; padding: 4px 0; background: #000; z-index: 2; }
-}
 .quiz__canvas.is-hit { animation: quizWrong .25s linear; }
 
 /* the dialog box: a 16px 9-slice, 2x on a wide stage */
@@ -1332,7 +1312,6 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 .quiz__q { margin: 0; font: 400 16px/1.4 var(--font); color: #FFF; }
 .quiz__q.is-in { animation: quizIn .2s steps(2) both; }
 .quiz__opts { display: grid; gap: 4px 32px; grid-template-columns: 1fr 1fr; }
-@media (max-width: 479px) { .quiz__opts { grid-template-columns: 1fr; } }
 .quiz__o {
   position: relative;
   display: flex; align-items: center; gap: 12px;
@@ -1340,7 +1319,6 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
   border: 0; background: none; color: #FFF;
   font: 400 16px/1.3 var(--font); cursor: pointer;
 }
-@media (pointer: coarse) { .quiz__o { min-height: 44px; } }
 .quiz__o b { color: #808080; }
 .quiz__o:hover, .quiz__o:focus { color: #FFFF00; outline: none; }
 .quiz__o.is-sel::before, .quiz__o:hover::before, .quiz__o.is-right::before {
@@ -1376,8 +1354,6 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 .quiz.is-finale .quiz__opts, .quiz.is-finale .quiz__timer { display: none; }
 /* the answer keys mean nothing now; the go button says what does */
 .quiz.is-finale .bh__keys { visibility: hidden; }
-/* On a phone the line names keys there are none of, and the pad sits on it. */
-@media (pointer: coarse) { .bh__keys { display: none; } }
 .quiz__end {
   position: absolute; z-index: 3; inset: 0; overflow: auto;
   display: grid; justify-items: center; align-content: center; gap: 8px;
@@ -1594,20 +1570,6 @@ html.rm .quiz__beam { animation: none; }
   padding-top: 12px; border-top: 2px solid var(--shop-line);
 }
 .shop__keys { font: 400 13px/1.2 var(--font); color: var(--shop-dim); }
-@media (max-width: 479px) {
-  .shop { place-items: start center; overflow-x: hidden; }
-  .shop__win { width: 100%; max-height: calc(100dvh - 32px); padding: 12px; box-shadow: 4px 4px 0 #000; }
-  .shop__h { font-size: 22px; }
-  .shop__say { font-size: 16px; }
-  .shop__row { font-size: 16px; padding: 8px; }
-  .shop__row b { overflow-wrap: anywhere; }
-  .shop__q { font-size: 16px; }
-  .shop__keys { display: none; }
-}
-@media (max-width: 359px) {
-  .shop__p { grid-column: 2; justify-self: start; }
-}
-@media (pointer: coarse) { .shop__win { max-height: calc(100dvh - 232px); } }
 
 /* ── the pot ──────────────────────────────────────────────────────
    A crafting grid is a spatial idea, so it is a real grid of real
@@ -2118,11 +2080,6 @@ html.rm .sword.is-burst::after { animation: none; display: none; }
   background: var(--accent); border: 0; border-radius: 0;
 }
 .sett__rng:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-@media (pointer: coarse) {
-  .sett__rng { min-height: 44px; }
-  .sett__rng::-webkit-slider-thumb { width: 32px; height: 32px; margin-top: -15px; }
-  .sett__rng::-moz-range-thumb { width: 32px; height: 32px; }
-}
 
 /* ── the frame-time meter ────────────────────────────────────────────
    z-index 84: above the dev panel (80) and every scene, below the
@@ -2221,109 +2178,6 @@ kbd { font: 400 16px/1 var(--font); padding: 2px 6px; border: 2px solid var(--ed
 html.text-lg { zoom: 1.25; }
 html.text-lg .eng { zoom: 0.8; }
 
-/* ═══════════════════════════════════════════════════════════════════
-   thumb controls
-
-   Act IV was keyboard-only, so on a phone the game stopped after Act
-   III. js/core/touch.js draws this and synthesises real key events, so
-   no scene needed changing.
-
-   Sits at z 92: above every scene (70-78) and above the sprite
-   inspector and the flying console, but BELOW the dialogue box at 96,
-   which stays the top layer. While the box is up the pad hides
-   entirely — the box is modal, tapping it advances it, and two
-   competing targets on a small screen is how you mis-tap.
-
-   Goth in the material, cute in the motion: the nub overshoots home. */
-
-.tpad {
-  position: fixed; inset: auto 0 0 0; z-index: 92;
-  height: 200px; pointer-events: none;
-  display: flex; align-items: flex-end; justify-content: space-between;
-  padding: 0 24px 28px;
-  /* notches and the home indicator sit exactly where thumbs land —
-     the meta viewport already asks for cover, so spend the inset here */
-  padding: 0 calc(24px + env(safe-area-inset-right))
-             calc(28px + env(safe-area-inset-bottom))
-             calc(24px + env(safe-area-inset-left));
-  /* the pad must never scroll or zoom the page under it */
-  touch-action: none;
-  -webkit-user-select: none; user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-.tpad[hidden] { display: none !important; }
-
-/* ── the stick ─────────────────────────────────────────────────── */
-.tpad__stick {
-  pointer-events: auto; touch-action: none;
-  position: relative;
-  width: 136px; height: 136px; border-radius: 50%;
-  background: rgba(12, 10, 18, 0.58);
-  border: 2px solid rgba(184, 146, 255, 0.30);
-  transition: border-color .18s ease, background .18s ease;
-}
-.tpad__stick[hidden] { display: none !important; }
-.tpad__stick.is-down {
-  border-color: rgba(184, 146, 255, 0.72);
-  background: rgba(18, 14, 28, 0.72);
-}
-.tpad__nub {
-  position: absolute; left: 50%; top: 50%;
-  width: 58px; height: 58px; margin: -29px 0 0 -29px;
-  border-radius: 50%;
-  background: rgba(184, 146, 255, 0.34);
-  border: 2px solid rgba(184, 146, 255, 0.62);
-  /* overshoot on the way home — the one cute thing on an otherwise
-     flat control */
-  transition: transform .22s cubic-bezier(.34, 1.56, .64, 1);
-}
-.tpad__stick.is-down .tpad__nub { transition: transform .04s linear; }
-
-/* ── the buttons ───────────────────────────────────────────────── */
-.tpad__acts {
-  pointer-events: auto;
-  display: grid; gap: 12px;
-  grid-template-columns: auto auto;
-  align-items: end;
-}
-.tpad__b {
-  pointer-events: auto; touch-action: none;
-  font: 16px/1 'Determination Mono', ui-monospace, monospace;
-  color: var(--text);
-  min-width: 72px; min-height: 72px;      /* >= 44px, comfortably */
-  padding: 0 10px;
-  border-radius: 50%;
-  background: rgba(12, 10, 18, 0.58);
-  border: 2px solid rgba(184, 146, 255, 0.30);
-  cursor: pointer;
-  transition: transform .12s cubic-bezier(.34, 1.56, .64, 1),
-              background .12s ease, border-color .12s ease;
-}
-.tpad__b[hidden] { display: none !important; }
-.tpad__b.is-down {
-  transform: scale(.9);
-  background: rgba(184, 146, 255, 0.28);
-  border-color: rgba(184, 146, 255, 0.75);
-}
-/* the primary action is the big one, bottom-right under the thumb */
-.tpad__b--a { grid-column: 2; grid-row: 2; min-width: 88px; min-height: 88px; font-size: 16px; }
-.tpad__b--b { grid-column: 1; grid-row: 2; opacity: .82; }
-.tpad__b--x { grid-column: 2; grid-row: 1; opacity: .82; }
-
-/* Short screens: a 200px pad eats a phone in landscape. Shrink rather
-   than overlap the play area. */
-@media (max-height: 480px) {
-  .tpad { height: 148px; padding: 0 16px 14px; }
-  .tpad__stick { width: 104px; height: 104px; }
-  .tpad__nub { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
-  .tpad__b { min-width: 60px; min-height: 60px; }
-  .tpad__b--a { min-width: 72px; min-height: 72px; }
-}
-
-/* calm motion: html.rm is set by motion.js (device default OR the
-   settings choice), so the player can override the device. */
-html.rm .tpad__nub, html.rm .tpad__b { transition: none; }
-
 
 /* ── print ───────────────────────────────────────────────────────
    Printed, the page should give you the words and not the room. The
@@ -2333,47 +2187,20 @@ html.rm .tpad__nub, html.rm .tpad__b { transition: none; }
    only thing the page says on paper. */
 @media print {
   .stars, .glass, .ctl, .bh, .dk, .eng, .quiz, .fnf, .craft, .polt,
-  .shop, .deck, .tpad, .tbox { display: none !important; }
+  .shop, .deck, .tbox { display: none !important; }
   body::after {
     content: '...printed. the stars did not come with it.';
     display: block; font-size: 16px; margin-top: 16px;
   }
 }
 
-/* ── portrait fight hint ─────────────────────────────────────────────
-   Shown only while touch.js has set body.is-portrait-fight: a fight is
-   live and the phone is held upright. It is a pseudo-element, so there
-   is no markup for it. z-index 95 is one below the dialogue box (96),
-   and pointer-events are off so it never takes a tap meant for the
-   fight. It stays for a few seconds and fades. Under reduced motion it
-   stays the same length and is cut instead of faded.                */
-body.is-portrait-fight::before {
-  content: "turn your phone sideways for more room";
-  position: fixed; top: 72px; left: 50%;
-  transform: translateX(-50%);
-  z-index: 95;
-  pointer-events: none;
-  padding: 6px 10px;
-  font-size: 16px; line-height: 1.3;
-  white-space: nowrap;
-  color: var(--bone); background: var(--void);
-  animation: portraitHint 4s ease-out forwards;
-}
-@keyframes portraitHint {
-  0%, 60% { opacity: 1; }
-  100% { opacity: 0; }
-}
-/* calm motion: html.rm is set by motion.js (device default OR the
-   settings choice), so the player can override the device. */
-html.rm body.is-portrait-fight::before { animation: portraitHint 4s step-end forwards; }
 
 
 /* ── the one-line error ──────────────────────────────────────────────
    main.js adds this line once when something throws. It never shows
    the error itself. It is pinned to the bottom of the viewport on the
    page's own bone-on-void, and it sits one step below the dialogue box
-   (96) so the box still wins if both are up. The 16px gutter holds at
-   phone width. The slide-in is cut under reduced motion.             */
+   (96) so the box still wins if both are up. The slide-in is cut under reduced motion.             */
 .errline {
   position: fixed; left: 0; right: 0; bottom: 0;
   z-index: 94;

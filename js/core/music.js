@@ -218,17 +218,12 @@
   }
   addEventListener('pointerdown', arm, true);
   addEventListener('keydown', arm, true);
-  /* passive: arm() never cancels a touch. */
-  addEventListener('touchstart', arm, { capture: true, passive: true });
-  /* pointerup/touchend are the activation triggers the spec names;
-     the down-phase ones above are Safari leniency. Both fire on
-     one tap, and a repeat costs nothing but coverage. */
+  /* pointerup is the activation trigger the spec names; the pointerdown
+     one above is Safari leniency. A repeat costs nothing but coverage. */
   addEventListener('pointerup', arm, true);
-  addEventListener('touchend', arm, true);
 
-  /* Every gesture gets another swing: iOS spends touchstarts on
-     scrolls without granting activation, so one failure must not
-     be permanent. */
+  /* Every gesture gets another swing: a browser can refuse
+     activation, so one failure must not be permanent. */
   function unlock(fresh) {
     if (!actx || failed) return;
     var parked = false;

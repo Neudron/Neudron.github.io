@@ -755,21 +755,11 @@
   }
 
   /* Funkin's classic placement: his strumline from 48px on the left,
-     yours from 48px past the middle, receptors at the top, notes rising.
-     On a phone (taller than wide) yours is four big arrows across 90% of
-     the width, his shrinks to a half-size row at the top left, and the
-     singers stand below. */
+     yours from 48px past the middle, receptors at the top, notes rising. */
   function geom() {
-    var w = innerWidth, h = innerHeight, tall = h > w, s, hs, hisX, hisY, mineX, strumY;
-    if (tall) {
-      s = Math.max(2, Math.min(6, Math.floor(w * 0.9 / (4 * N))));
-      mineX = Math.round((w - 4 * N * s) / 2);
-      hs = Math.max(1, s >> 1); hisX = 12; hisY = 84;   /* under the valance and truss */
-      strumY = hisY + N * hs + 14;
-    } else {
-      s = Math.max(2, Math.min(6, Math.floor((w / 2 - 56) / (4 * N))));
-      hs = s; hisX = 48; hisY = 72; mineX = Math.round(w / 2 + 48); strumY = 72;
-    }
+    var w = innerWidth, h = innerHeight, s, hs, hisX, hisY, mineX, strumY;
+    s = Math.max(2, Math.min(6, Math.floor((w / 2 - 56) / (4 * N))));
+    hs = s; hisX = 48; hisY = 72; mineX = Math.round(w / 2 + 48); strumY = 72;
     var pitch = N * s, pitchH = N * hs;
     var floor = h - 16;
     if (msg && !msg.hidden && !msgCentered && msg.getBoundingClientRect) {
@@ -783,32 +773,27 @@
     }
     var by = floor - 56;               /* the health bar, with the score line under it */
     var cx = mineX + 2 * pitch;
-    /* the two singers: on a phone the soul stands centre, his stall to the left */
-    var who = tall ? [Math.round(w * 0.22), Math.round(w / 2)] : [hisX + 2 * pitchH, cx];
+    var who = [hisX + 2 * pitchH, cx];
     var g = { w: w, h: h, s: s, hs: hs, pitch: pitch, pitchH: pitchH, hisX: hisX, hisY: hisY, mineX: mineX,
-              cx: cx, strumY: strumY, by: by, stage: by - 40, tall: tall, who: who,
+              cx: cx, strumY: strumY, by: by, stage: by - 40, who: who,
               popY: 0, head: 0, spk: [], crowdN: 0,
               K: 1000 * PIXELS_PER_MS * SPEED[Math.min(round, SPEED.length - 1)] };
     /* the soul's strumline hangs above the soul's head, centred on the soul */
     g.head = g.stage + 8 - 13 * peopleCs(g);
     /* never under the valance or on top of his strumline (the box can lift the stage) */
-    g.strumY = Math.max(g.head - N * s - 48, tall ? hisY + N * hs + 14 : 72);
+    g.strumY = Math.max(g.head - N * s - 48, 72);
     g.mineX = Math.round(who[1] - 2 * pitch);
-    if (tall) g.mineX = Math.round((w - 4 * pitch) / 2);
     g.cx = g.mineX + 2 * pitch;
     g.popY = Math.max(60, g.strumY - 64);      /* ratings and the 3-2-1 hang above the arrows, off the singers */
     /* two large speakers stand in the gap between the singers, behind them */
-    /* between the singers on a wide screen. On a phone they nearly touch, so
-       there is no gap to stand in: the stacks go to the two edges at half size.
-       ponytail: phone speakers sit at the edges, not between. Space the singers to bring them back. */
     var mid = (who[0] + who[1]) / 2;
-    g.sk = tall ? 0.5 : 1;
-    g.spw = Math.round(64 * g.sk);
-    g.spk = tall ? [0, w - g.spw] : [Math.round(mid - 72), Math.round(mid + 8)];
+    g.sk = 1;
+    g.spw = 64;
+    g.spk = [Math.round(mid - 72), Math.round(mid + 8)];
     g.crowdN = Math.floor(w / 56);
     g.cs = peopleCs(g);
     g.kid = Math.max(4, Math.round(g.cs / 3));      /* dancers: 4px a cell at least, 44px tall (66px at 720p) */
-    g.scoreY = by + (w < 600 ? 40 : 32);            /* the score line, clear of the head icons */
+    g.scoreY = by + 32;                             /* the score line, clear of the head icons */
     return g;
   }
 
@@ -842,7 +827,6 @@
   }
   function peopleCs(g) {
     var cs = Math.ceil(g.h * 0.30 / 13);
-    if (g.tall) cs = Math.min(cs, Math.floor(g.w * 0.28 / 9));   /* two 9-cell singers must not overlap */
     return Math.max(3, cs);
   }
   /* one speaker stack, 64x112 with a bevel and two stepped woofers, plus its
@@ -1268,8 +1252,8 @@
     ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = '#EDE7DE';
     ctx.fillText('SCORE ' + Math.floor(S.score) + ' · MISSES ' + S.misses + ' · ' +
-                 (S.acc * 100).toFixed(1) + '%' + (g.w < 600 ? '' : ' · ROUND ' +
-                 Math.min(round + 1, CHARTS.length) + '/' + CHARTS.length), g.w / 2 | 0, g.scoreY);
+                 (S.acc * 100).toFixed(1) + '%' + ' · ROUND ' +
+                 Math.min(round + 1, CHARTS.length) + '/' + CHARTS.length, g.w / 2 | 0, g.scoreY);
   }
 
   /* A hold's tail: a stepped trail of blocks that scrolls with its note. */
@@ -1319,9 +1303,8 @@
   }
   function introFx(g, el) {
     var mv = still() ? 0 : 1, cx = g.w / 2, cs = peopleCs(g), u = Math.max(7, cs * 0.5 | 0);
-    /* the mics meet above the speakers at head height: clear curtain behind them, and on a
-       phone, above the two close singers rather than on their faces */
-    var my = g.tall ? g.head - 9 * u : g.head + 3 * cs;
+    /* the mics meet above the speakers at head height: clear curtain behind them */
+    var my = g.head + 3 * cs;
     var ease = function (v) { v = Math.max(0, Math.min(1, v)); return 1 - (1 - v) * (1 - v); };
     var k = mv ? ease(el / 0.8) : 1;
     var mx0 = g.who[0] + 4 * cs, mx1 = g.who[1] - 4 * cs;
@@ -1429,8 +1412,7 @@
       var dn = dirOf(n), y = yAt(n.t, n.mine, sp, g, dn), ye = yAt(n.end, n.mine, sp, g, dn);
       if (ye < -64 || y > g.h + 64) continue;
       /* a hold's trail is intended, not a stray draw: it hangs below the receptor
-         while the hold lasts, in the lane colour. His holds trail too, so on a
-         phone his lane-0 hold is the purple dotted column down the left edge. */
+         while the hold lasts, in the lane colour. His holds trail too. */
       if (n.end > n.t && (n.mine ? !n.done : sp < n.end)) {
         tail(x, y, n.hit ? Math.max(y, nrec) : y, Math.min(ye, lim), n.lane, nd.s);
       }
@@ -1456,7 +1438,7 @@
 
     if (won) {
       ctx.globalAlpha = still() ? 1 : Math.min(1, (performance.now() - winAt) / 300);
-      text('SONG CLEAR', g.w / 2, g.popY, g.w < 600 ? 48 : 96, '#FFD34E');
+      text('SONG CLEAR', g.w / 2, g.popY, 96, '#FFD34E');
       ctx.globalAlpha = 1;
     }
     /* 3-2-1-GO in big numerals over your lane, fading through each beat */
@@ -1473,7 +1455,7 @@
       if (age > life + 0.2) { pops.splice(k, 1); continue; }
       var dy = still() ? 0 : Math.round(-160 * age + 275 * age * age);
       ctx.globalAlpha = age < life ? 1 : 1 - (age - life) / 0.2;
-      var sz2 = g.w < 600 ? o.size - 16 : o.size;          /* a phone gets 32/16 */
+      var sz2 = o.size;
       ctx.font = sz2 + 'px "Determination Sans","Pixelify Sans",monospace';
       var hw = Math.ceil(ctx.measureText(o.text).width / 2) || 0;
       text(o.text, Math.min(o.x, g.w - 12 - hw), o.y + dy, sz2, o.col);
@@ -1492,7 +1474,7 @@
         var bt = S.brk === 'in' ? 1 : Math.max(0, 1 - (sp - BREAK_AT[S.brkI]) / 1.2);
         if (bt > 0) {
           ctx.globalAlpha = still() ? bt : bt * (0.75 + 0.25 * Math.sin(sp * 6));
-          text(PAT_NAME[S.brkI], g.w / 2, 96, g.w < 600 ? 24 : 40, PAT_COL[S.brkI]);
+          text(PAT_NAME[S.brkI], g.w / 2, 96, 40, PAT_COL[S.brkI]);
           ctx.globalAlpha = 1;
         }
       }

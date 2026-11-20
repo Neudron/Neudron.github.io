@@ -46,13 +46,6 @@
 .fnf__msg::before { content: '*'; position: absolute; left: 32px; top: 16px; }
 .fnf__msg small { font-size: 16px; color: #c8c8c8; }
 .fnf .bh__keys { left: 16px; right: auto; top: 20px; bottom: auto; text-align: left; }
-@media (max-width: 600px) {
-  .fnf__msg { font-size: 16px; padding-left: 40px; }
-  .fnf__msg::before { left: 20px; }
-  .fnf .bh__keys { display: none; }
-}
-/* the touch pad owns the bottom 200px on a phone */
-@media (pointer: coarse) { .fnf__msg { bottom: 216px; } }
 
 /* The one textbox (#tbox, sans.js say()), Deltarune style: black,
    the same two-step white frame as .inv (box-shadow, never
@@ -90,12 +83,6 @@
 .tbox__txt::before { content: '*'; position: absolute; left: 0; top: 0; }
 /* Sans: a real 23x30 crop at integer scale. */
 .sans__btn img { width: 69px; height: auto; image-rendering: pixelated; }
-@media (max-width: 600px) {
-  .tbox { gap: 16px; padding: 16px; font-size: 16px; }
-  .tbox__face img { width: 72px; }
-  .tbox__txt { padding-left: 24px; }
-  .sans__btn img { width: 46px; }
-}
 
 /* Act II: the bullet room and the dark come in from black in three hard
    steps (one transition, never a flash) instead of popping on. */
@@ -114,11 +101,6 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 }
 .sleep__shelf { left: -136px; bottom: 12px; width: 104px; }
 .sleep__lamp  { left: -30px;  bottom: 12px; width: 34px; }
-@media (max-width: 600px) {
-  .sleep__rug   { left: -52px; }
-  .sleep__shelf { left: -52px; width: 52px; }
-  .sleep__lamp  { left: -4px; }
-}
 
 /* The deck (js/game/deck.js), Deltarune style: the selected game's
    panel is the black two-step box, the selected caption is yellow, and
@@ -611,19 +593,6 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .inv__fight-text { flex: 1 1 240px; color: #fff; white-space: pre-line; line-height: 2; }
 .inv__fight-text::first-line { color: #ff0; }
 .inv__body[hidden], .inv__body section[hidden] { display: none; }
-/* Phone: one column, the stats as a row, a shorter list, so the whole menu
-   including the description fits the phone screen without a scroll. */
-@media (max-width: 800px) {
-  .inv { top: 0; transform: translateX(-50%); max-height: 100vh; max-height: 100dvh; padding: 8px 8px 24px; }
-  .inv.is-equip .inv__body { grid-template-columns: 1fr; gap: 8px; padding: 8px 0; }
-  .inv.is-equip .inv__body > section { grid-column: 1; grid-row: auto; }
-  .inv.is-equip .inv__list { max-height: 120px; }
-  .inv.is-equip .inv__slot { min-height: 0; padding: 2px 8px; }
-  .inv.is-equip .inv__statlines { grid-auto-flow: column; justify-content: start; gap: 16px; }
-  .inv.is-equip .inv__preview { margin-top: 0; padding: 6px 8px; }
-  .inv.is-equip .inv__preview h2 { margin-bottom: 4px; }
-  .inv.is-equip .inv__desc { margin-top: 0; min-height: 0; }
-}
 @media (prefers-reduced-motion: reduce) {
   .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
 }
@@ -666,12 +635,6 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 }
 .mage__p { float: right; color: #fff; }
 .mage__gold { margin-top: 16px; padding-top: 8px; border-top: 4px solid #fff; color: #E4C46A; }
-@media (max-width: 640px) {
-  .mage__art { flex: 0 0 auto; aspect-ratio: 320 / 192; margin: 8px 8px 0; }
-  .mage__dock { flex: 1 1 auto; flex-direction: column; gap: 8px; padding: 8px; }
-  .mage__box { order: -1; flex: 0 0 auto; min-height: 96px; padding: 8px; }
-  .mage__menu { flex: 1 1 auto; padding: 8px; }
-}
 @media (prefers-reduced-motion: reduce) {
   .mage, .mage * { animation: none !important; transition: none !important; }
 }
@@ -703,17 +666,6 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .shop__row { min-height: 32px; padding: 0 8px; align-items: center; }
 .shop__row::before { font-size: 16px; }
 .shop__keys { color: #bbb; }
-@media (max-width: 640px) {
-  .shop { padding: 8px; place-items: start center; }
-  .shop__win { width: 100%; padding: 8px; gap: 8px; grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "top" "scene" "say" "board" "bar"; }
-  .shop__scene { width: 100%; }
-  .shop__say { min-height: 96px; padding: 8px; }
-  .shop__board { max-height: 184px; }
-  .shop__h { font-size: 16px; }
-  .shop__keys { display: block; }
-}
-@media (pointer: coarse) { .shop__win { max-height: none; } }
 @media (prefers-reduced-motion: reduce) {
   .shop *, .shop *::before, .shop *::after { animation: none !important; transition: none !important; }
 }

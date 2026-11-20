@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>neu</title>
 <meta name="description" content="neu — a small corner of the internet.">
 <meta name="theme-color" content="#08080B">
@@ -41,7 +41,6 @@
   "description": "neu — a small corner of the internet." }
 </script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2308080B'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='19' font-style='italic' text-anchor='middle' fill='%23EDE7DE'%3En%3C/text%3E%3C/svg%3E">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -621,15 +620,12 @@
 <script src="js/act4/elevator.js"></script>
 <script src="js/act4/inventory.js"></script>
 <script src="js/game/deck.js"></script>
-<!-- after every scene, before settings: like touch.js it polls the
-     scenes to decide what to play, and settings.js reads its volume
-     when the panel is built. -->
+<!-- after every scene, before settings: it polls the scenes to decide
+     what to play, and settings.js reads its volume when the panel is built. -->
 <script src="js/core/music.js"></script>
 <!-- samples nothing until the dev console asks; dev.js exposes it -->
 <script src="js/core/perf.js"></script>
 <script src="js/core/settings.js"></script>
-<!-- after every scene: it polls them to decide which buttons to show -->
-<script src="js/core/touch.js"></script>
 <script src="js/core/dev.js"></script>
 <script type="module" src="js/page/scene.js"></script>
 </body>

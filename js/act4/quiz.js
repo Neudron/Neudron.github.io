@@ -838,9 +838,8 @@
   }
 
   /* Held arrows, not keydown counts. A step per keydown meant the soul
-     moved once, waited out the keyboard's repeat delay, then lurched —
-     and on a phone it moved once and stopped, because the touch stick
-     sends one keydown per push and a keyup on release. */
+     moved once, waited out the keyboard's repeat delay, then lurched.
+     Held keys keep it steady, and a keyup on release stops it. */
   var held = {};
   var SOUL_SPEED = 240, AIM_SPEED = 300;
   function axis(neg, pos) { return (held[pos] ? 1 : 0) - (held[neg] ? 1 : 0); }
@@ -958,8 +957,8 @@
   /* ── the physical challenge: SHOOT THE TARGETS ──
      Round 2 Phase B. Tenna faces appear in windows; the player shoots
      them before they shoot back. Redder = about to shoot. This is the
-     Cowboy minigame from the Tenna battle, adapted. Arrow keys (or
-     the stick) move the crosshair; Space or Enter (or A) fires.
+     Cowboy minigame from the Tenna battle, adapted. Arrow keys move
+     the crosshair; Space or Enter fires.
      Like dodge, gated behind `fast`: in test mode it's a no-op. */
   var shootTime = 0, shootHits = 0, shootMisses = 0;
   var targets = [], crosshair = { x: 240, y: 120 };
@@ -1068,10 +1067,8 @@
   addEventListener('blur', function () { held = {}; });
 
   /* Arrows walk the caret between the four answers and Enter picks the
-     one it is on. The touch stick and A button arrive as synthetic
-     key events, which never activate a focused button by themselves —
-     so without this, a phone could see the answers and not pick one
-     with the pad. */
+     one it is on. Key events never activate a focused button by
+     themselves, so this handles the pick. */
   function options() {
     return elOpts ? Array.prototype.slice.call(elOpts.querySelectorAll('.quiz__o')) : [];
   }

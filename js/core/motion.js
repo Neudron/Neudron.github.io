@@ -75,8 +75,6 @@
      A guess is fine: every answer also says where the in-game switch is. */
   function os() {
     var ua = (navigator.userAgent || '') + ' ' + (navigator.platform || '');
-    if (/iPhone|iPad|iPod/.test(ua) || (/Mac/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
-    if (/Android/.test(ua)) return 'android';
     if (/CrOS/.test(ua)) return 'chromeos';
     if (/Mac/.test(ua)) return 'mac';
     if (/Win/.test(ua)) return 'windows';
@@ -88,8 +86,6 @@
   var STEPS = {
     windows:  'Windows 11: Settings > Accessibility > Visual effects > Animation effects (on = motion). Windows 10: Settings > Ease of Access > Display > Show animations.',
     mac:      'Mac: System Settings > Accessibility > Display (Motion on newer Macs) > Reduce motion (off = motion).',
-    ios:      'iPhone / iPad: Settings > Accessibility > Motion > Reduce Motion (off = motion).',
-    android:  'Android: Settings > Accessibility > Remove animations (off = motion).',
     linux:    'GNOME: Settings > Accessibility > Seeing > Reduced animation. KDE: System Settings > Workspace Behavior > General Behavior > Animation speed.',
     chromeos: 'ChromeOS: Settings > Accessibility > Display and magnification.',
     other:    'Look for "reduce motion" or "animations" in your device\'s accessibility settings.'

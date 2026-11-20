@@ -68,7 +68,7 @@ to GitHub Pages. The workflow can also be run manually from GitHub Actions.
 index.html              every <script> tag, in load order
 css/style.css           one stylesheet, ~1900 lines, with a TOC at the top
 js/
-  core/   quest save juice danmaku engine(-look,-kinds) music perf settings touch dev
+  core/   quest save juice danmaku engine(-look,-kinds) music perf settings dev
   page/   main stars scene            the website itself
   game/   sword sans bullet dark deck  interactive components
   act4/   act4 rooms-* boss-* quiz rhythm craft crack shop
@@ -115,8 +115,6 @@ commands above describe the public artifact workflow.
 
 ## Roadmap
 
-- **Real phones.** A walk through every page on Android Chrome and iOS
-  Safari, portrait and landscape, by hand.
 - **Field numbers.** Core Web Vitals from real visits once there are
   enough of them; the lab numbers (LCP about 0.1–0.2 s, CLS 0) are not
   the same thing.

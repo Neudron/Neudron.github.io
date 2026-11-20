@@ -4,8 +4,8 @@
    rAF loop, but no scene has migrated yet — every scene still drives its own
    loop and opens/closes itself. Migration happens one scene per slice
    (dark, bullet, deck, rhythm/craft/crack, quiz, boss-polt, boss-scal,
-   engine, sans last). The `k.legacy` adapter is what keeps music.js and
-   touch.js (which poll scene `.running`) working while a scene migrates.
+   engine, sans last). The `k.legacy` adapter is what keeps music.js (which polls
+   scene `.running`) working while a scene migrates.
 
    Public surface (stable; slices add to it, never rename):
      NEU.kernel.register(name, api)   api = { tick(dt), open(), close(), running() }
@@ -76,7 +76,7 @@
   function after(ms, fn) { afterQueue.push({ due: now() + (ms || 0), fn: fn }); }
 
   // Adapter for an unmigrated scene: delegates open/close/running/tick to it
-  // so music.js and touch.js (which poll `.running`) keep working.
+  // so music.js (which polls `.running`) keeps working.
   function legacy(scene) {
     if (!scene) return null;
     return {

@@ -9,7 +9,7 @@
    entries are stored. A key the player moved away from is swallowed,
    so the old key does nothing. Quiz letters are answers, so they are
    never swallowed. Trust is checked after the capture and the reveals,
-   so touch input counts the same as the keyboard. */
+   so every input counts the same. */
 
 (function () {
   'use strict';
