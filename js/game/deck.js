@@ -156,7 +156,7 @@
       /* The story game opens through its own Play/Config/Save menu;
          the endless titles launch straight into their scene. */
       run: function () {
-        if (NEU.menu) return NEU.menu.open('root');
+        if (NEU.menu) return NEU.menu.title ? NEU.menu.title() : NEU.menu.open('root');
         return NEU.act4 && NEU.act4.open();
       } },
 
