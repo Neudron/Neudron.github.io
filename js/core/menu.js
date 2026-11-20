@@ -436,10 +436,7 @@
     open('root');
   });
 
-  /* Built at load, the way settings.js builds its panel: an overlay that
-     only exists after the first open can never be found by a screen reader
-     or by CSS until someone presses a key. */
-  build();
+  /* Built on first open (open() guards it), so the portfolio carries no menu node. */
 
   NEU.menu = {
     open: open, close: close, toggle: toggle,
