@@ -2247,6 +2247,8 @@ kbd { font: 400 16px/1 var(--font); padding: 2px 6px; border: 2px solid var(--ed
    typeface. Scaling the whole page keeps the grid intact. */
 html.text-lg { zoom: 1.25; }
 html.text-lg .eng { zoom: 0.8; }
+html.text-xl { zoom: 1.5; }
+html.text-xl .eng { zoom: 0.6667; }
 
 /* ═══════════════════════════════════════════════════════════════════
    thumb controls

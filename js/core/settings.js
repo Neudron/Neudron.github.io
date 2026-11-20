@@ -39,6 +39,7 @@
   var K_SHAKEPCT = 'opt_shakePct';  /* 0..100, default 100              */
   var K_FLASH = 'opt_noFlash';
   var K_TEXT  = 'opt_largeText';
+  var K_TEXTSIZE = 'opt_textSize';   /* 100 | 125 | 150; old saves: opt_largeText = 125 */
   var K_HINTS = 'opt_hints';
   var K_STOP  = 'opt_hitstop';      /* on = juice skips the held frame   */
   var K_PART  = 'opt_particles';    /* on = juice spawns no debris       */
@@ -82,6 +83,11 @@
     return Math.max(0, Math.min(100, v));
   }
 
+  function textSize() {
+    var n = num(K_TEXTSIZE, 0);
+    return n === 125 || n === 150 ? n : (state(K_TEXT) ? 125 : 100);
+  }
+
   function apply() {
     if (NEU.juice) {
       NEU.juice.setNoShake(shakePct() === 0);
@@ -96,7 +102,8 @@
       if (NEU.juice.setOverlayIntensity) NEU.juice.setOverlayIntensity(num(K_OVERLAY, 50) / 100);
       if (NEU.juice.setPhotosensitive) NEU.juice.setPhotosensitive(state(K_PHOTOSENS));
     }
-    document.documentElement.classList.toggle('text-lg', !!state(K_TEXT));
+    document.documentElement.classList.toggle('text-lg', textSize() === 125);
+    document.documentElement.classList.toggle('text-xl', textSize() === 150);
     document.documentElement.classList.toggle('neu-hints-off', !state(K_HINTS));
     /* Music reads the flag itself. Sound effects (sans.js) read this
        attribute, so they need no import from this file. */
@@ -356,7 +363,7 @@
     M.set('auto', 'auto');
     if (NEU.save) {
       NEU.save.flag(K_SHAKEPCT, 100); NEU.save.flag(K_SHAKE, 0); NEU.save.flag(K_STOP, 0);
-      NEU.save.flag(K_PART, 0); NEU.save.flag(K_TEXT, 0); NEU.save.flag(K_RELAX, 0);
+      NEU.save.flag(K_PART, 0); NEU.save.flag(K_TEXT, 0); NEU.save.flag(K_TEXTSIZE, 100); NEU.save.flag(K_RELAX, 0);
       NEU.save.flag(K_HINTS, 0);
       NEU.save.flag(K_PHOTOSENS, 0); NEU.save.flag(K_PARTCAP, 500); NEU.save.flag(K_OVERLAY, 50);
     }
@@ -541,6 +548,8 @@
         'how hard the fights press you. takes effect on the next fight.',
         function () { return NEU.diff ? NEU.diff.index() : 2; },
         function (v) {
+          if (v >= 5 && NEU.diff && v !== NEU.diff.index()) { askTier(v); return; }
+          hideAsk();
           if (NEU.diff && NEU.diff.list) NEU.diff.set(NEU.diff.list()[v]);
           paintDiff(v);
         }, null,
@@ -551,7 +560,35 @@
     fx.id = 'settDiffFx';
     fx.setAttribute('aria-live', 'polite');
     diffRow.querySelector('.sett__lbl').appendChild(fx);
+    diffRow.id = 'settDiffRow';
     pConfig.appendChild(diffRow);
+
+    /* The two top tiers cost something real, so the slider asks first and
+       writes nothing until yes. */
+    var ask = document.createElement('div');
+    ask.id = 'settDiffConfirm';
+    ask.setAttribute('role', 'group');
+    ask.setAttribute('aria-live', 'polite');
+    ask.hidden = true;
+    var askMsg = document.createElement('span');
+    var askYes = document.createElement('button');
+    askYes.type = 'button'; askYes.id = 'settDiffYes'; askYes.className = 'sett__opt'; askYes.textContent = 'yes';
+    var askNo = document.createElement('button');
+    askNo.type = 'button'; askNo.id = 'settDiffNo'; askNo.className = 'sett__opt'; askNo.textContent = 'no';
+    ask.appendChild(askMsg); ask.appendChild(askYes); ask.appendChild(askNo);
+    var askTier_ = 0;
+    function hideAsk() { ask.hidden = true; }
+    function askTier(v) {
+      askTier_ = v;
+      askMsg.textContent = v === 5 ? 'ultrakill: half your HP, faster everything. sure?' :
+                                     'final breath: 1 HP. no heals. sure?';
+      ask.hidden = false;
+    }
+    askYes.addEventListener('click', function () {
+      NEU.diff.set(NEU.diff.list()[askTier_]); hideAsk(); paintDiff(askTier_);
+    });
+    askNo.addEventListener('click', function () { hideAsk(); paintDiff(NEU.diff.index()); });
+    pConfig.appendChild(ask);
 
     pConfig.appendChild(seg('settMotion', 'motion',
         'calm keeps things still unless you move them. the game works either way.',
@@ -631,10 +668,14 @@
 
     /* 4. Display pane */
     var pDisplay = panes.display;
-    pDisplay.appendChild(row('settText', 'larger text',
-        'zooms the whole page 1.25x', function (on) {
-      set(K_TEXT, on);
-    }));
+    pDisplay.appendChild(seg('settTextSize', 'text size', 'zooms the whole page',
+        [['100', '100%'], ['125', '125%'], ['150', '150%']],
+        function () { return String(textSize()); },
+        function (v) {
+          if (!NEU.save) return;
+          NEU.save.flag(K_TEXTSIZE, +v); NEU.save.flag(K_TEXT, +v === 125 ? 1 : 0);
+          apply();
+        }));
     pDisplay.appendChild(slider('settOverlay', 'visual overlay',
         'full-screen flashes. drag to zero for none; middle is normal.',
         function () { return num(K_OVERLAY, 50); },
@@ -714,7 +755,6 @@
   function refresh() {
     if (!panel) return;
     var rows = [
-      ['settText',  state(K_TEXT)],
       ['settHints', state(K_HINTS)],
       ['settSound', !state(K_MUTE)],
       ['settHitstop',   state(K_STOP)],
@@ -744,11 +784,19 @@
     }
     var dv = document.getElementById('settDevice');
     if (dv) dv.textContent = deviceLine();
-    ['settMotion', 'settFlashing', 'settPartBudget'].forEach(function (id) {
+    ['settMotion', 'settFlashing', 'settPartBudget', 'settTextSize'].forEach(function (id) {
       var g = document.getElementById(id);
       if (g && g._paint) g._paint();
     });
     paintDiff();
+    var dr = document.getElementById('settDiffRow');
+    if (dr) {
+      var seen = !!(NEU.save && (NEU.save.flagged('opt_seenTitle') || NEU.save.flagged('a1_seen')));
+      dr.hidden = !seen;
+      dr.style.display = seen ? '' : 'none';   /* .sett__row sets display, which beats [hidden] */
+      var cf = document.getElementById('settDiffConfirm');
+      if (!seen && cf) cf.hidden = true;
+    }
   }
 
   /* The panel's focusables. Disabled ones are skipped: a trap that wraps
