@@ -915,6 +915,13 @@
     e8_larder: { w: 10, h: 8, paint: function (P) { paintNook(P, 10, 2); } },
     e9_cellar: { w: 10, h: 8, paint: function (P) { paintNook(P, 10, 3); } }
   };
+  ROOMS.w_spike = { w: 101, h: 14, paint: function (P) {
+    var bands = ['#232838', '#2A2033', '#3A2E28', '#212127'], i;
+    paintCity(P);
+    P(1072, 0, 192, 224, '#0E1018');
+    for (i = 0; i < 4; i++) P(1072 + i * 48, 144, 48, 48, bands[i]);
+    paintHall(clipTo(P, 1248, 96, 1264, 1616), 3, 384);
+  } };
   function roomArt(id) {
     var r = ROOMS[id];
     if (!r) return null;
