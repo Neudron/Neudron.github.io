@@ -77,7 +77,7 @@
   var movedFor = 0, settle = 0;
   var camX = 0, camY = 0, camFocusX = 0, camFocusY = 0, camLeadX = 0, camLeadY = 0;
   var camHold = false, camPan = null, camZoomState = null, kickX = 0, kickY = 0;
-  var S = 3, padH = 0, padPoll = 0;
+  var S = 3;
   var fade = 0, fadeDir = 0, fadeThen = null;
   /* Seconds the iris takes. A door is quick (0.22); arriving from a
      scene that has just played its own ending can ask for a slower one
@@ -1115,20 +1115,8 @@
     var s = Math.floor(Math.min(innerWidth / (20 * TILE), innerHeight / (12 * TILE)));
     return Math.max(2, Math.min(12, s || 2));
   }
-  /* How much of the bottom of the screen the touch pad covers. */
-  function measurePad() {
-    var el = document.querySelector && document.querySelector('.tpad');
-    if (!el || el.hidden) return 0;
-    try {
-      var cs = getComputedStyle(el);
-      if (cs.display === 'none' || cs.visibility === 'hidden') return 0;
-    } catch (e) {}
-    var r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
-    if (!r || !r.height) return 0;
-    return Math.max(0, Math.min(r.height, innerHeight - r.top, innerHeight * 0.45));
-  }
   function view() {
-    return { w: innerWidth / S, h: innerHeight / S, uh: Math.max(1, innerHeight - padH) / S };
+    return { w: innerWidth / S, h: innerHeight / S, uh: Math.max(1, innerHeight) / S };
   }
   function camClamp() {
     var v = view();
@@ -1209,7 +1197,6 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
     S = chooseScale();
-    padH = measurePad();
     if (room) camClamp();
   }
   /* A window drag fires resize dozens of times a frame; lay out once per frame. */
@@ -1230,7 +1217,6 @@
     }
     if (physical) advancePhysical(dt);
     else if (transitionPlayer && NEU.engineTrans && NEU.engineTrans.active && !NEU.engineTrans.step(dt)) { busy = false; transitionPlayer = null; }
-    if ((padPoll -= dt) <= 0) { padPoll = 0.5; var ph = measurePad(); if (ph !== padH) padH = ph; }
     if (!room) return;
 
     if (!busy) { if (!NEU.activeMinigame) move(dt); walkExits(); }
@@ -1552,7 +1538,7 @@
       var pn = entAt(n);
       var a = reduced ? 1 : Math.min(1, promptT / 0.12);
       ctx.globalAlpha = a;
-      L.drawPrompt(ctx, sx(pn.x), sy(pn.y - 18), S, clock, padH > 0);
+      L.drawPrompt(ctx, sx(pn.x), sy(pn.y - 18), S, clock);
       ctx.globalAlpha = 1;
     }
 
@@ -1955,7 +1941,7 @@
     REACH: REACH, PLAYER_H: PLAYER_H, PLAYER_W: PLAYER_W, SPEED: SPEED,
     /* read-only internals for tests and the dev console */
     get debug() {
-      return { scale: S, cam: { x: camX, y: camY }, focus: { x: camFocusX, y: camFocusY }, camLead: { x: camLeadX, y: camLeadY }, vel: { x: vx, y: vy }, padH: padH,
+      return { scale: S, cam: { x: camX, y: camY }, focus: { x: camFocusX, y: camFocusY }, camLead: { x: camLeadX, y: camLeadY }, vel: { x: vx, y: vy },
                baked: !!(room && (chunked || layers[room.id])), fade: fade, iris: fadeSpan, transition: transitionCategory, prompt: promptFor,
                lights: (room && look()) ? lightsFor(0, camX, camY, view()).list.length : 0,
                cine: cine, seat: sitting ? { x: sitting.x, y: sitting.y } : null,
