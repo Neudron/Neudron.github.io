@@ -1922,6 +1922,7 @@
   NEU.engine = {
     register: register, alias: alias, merge: merge, tileset: tileset, decor: decor, enter: enter, leave: leave, resume: resume, go: go,
     confirmExit: confirmExit,
+    clearKeys: function () { keys = {}; if (physical) physical.heldKeys = {}; },
     partInfo: partInfo,
     where: function () { return room ? { room: currentArea || room.id, spawn: room.__spawn } : null; },
     get running() { return running; },

@@ -32,6 +32,7 @@
   var box = null, screen = 'root', active = false, returnTo = null;
   var list = [], index = 0, announce = null;
   var pending = null, importText = '';
+  var paused = false;
 
   function reduced() {
     try {
@@ -158,7 +159,8 @@
   function root() {
     clear();
     var save = NEU.save && NEU.save.load ? NEU.save.load() : null;
-    heading(save ? 'the woods are still there.' : 'something is hidden down here.');
+    heading(paused ? 'MENU' : (save ? 'the woods are still there.' : 'something is hidden down here.'));
+    if (paused) box._body.appendChild(button('Resume', 'menu__primary', close));
     box._body.appendChild(button('Play', 'menu__primary', function () {
       if (NEU.save && NEU.save.load && NEU.save.load()) continueGame();
       else setScreen('difficulty');
@@ -167,6 +169,10 @@
       if (NEU.settings && NEU.settings.open) NEU.settings.open();
     }));
     box._body.appendChild(button('Save', '', function () { setScreen('save'); }));
+    if (paused) box._body.appendChild(button('Exit', 'menu__danger', function () {
+      NEU.engine.confirmExit('the game', function () { close(); NEU.engine.leave(); },
+        'leave the game? your save is kept.');
+    }));
     note('');
   }
 
@@ -388,6 +394,7 @@
 
   function open(name) {
     if (!box) build();
+    if (NEU.engine && NEU.engine.clearKeys) NEU.engine.clearKeys();
     if (!active) { returnTo = document.activeElement; active = true; }
     box.hidden = false;
     box.classList.toggle('is-calm', reduced());
@@ -397,6 +404,7 @@
   function close() {
     if (!active) return;
     active = false;
+    paused = false;
     box.hidden = true;
     var back = returnTo;
     returnTo = null;
@@ -459,13 +467,18 @@
       !!(NEU.save && NEU.save.data && NEU.save.data.room);
     if (!inRoom) return;
     e.preventDefault();
-    open('root');
+    NEU.menu.pause();
   });
 
   /* Built on first open (open() guards it), so the portfolio carries no menu node. */
 
   NEU.menu = {
     open: open, close: close, toggle: toggle,
+    /* A fresh page opens the title menu; Escape in a room pauses into the
+       same root screen with Resume/Exit and the MENU heading. Neither path
+       claims the keyboard or sets activeMinigame (R26). */
+    title: function () { if (NEU.save) NEU.save.flag('opt_seenTitle', 1); paused = false; open('root'); },
+    pause: function () { paused = true; open('root'); },
     /* The settings slider shows the same one-line description as the
        tier picker: one copy of the copy, read lazily after both load. */
     effect: function (id) { return FX[id] || FALLBACK_FX; },
