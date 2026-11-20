@@ -296,7 +296,7 @@
   var POSES = {
     idle:  ['tvTenPodium', [0], 0, 0],
     point: ['tvTenPoint',  [0], 0, 0],
-    cheer: ['tvTenCheer',  [0, 1, 2, 3], 3, 0],
+    cheer: ['tvTenCheer',  [0, 1, 2, 3, 4], 3, 2],
     shrug: ['tvTenShrug',  [0], 0, 0],
     shock: ['tvTenShock',  [0], 0, 0],
     bow:   ['tvTenBow',    [0, 1, 2], 2, 0]
@@ -335,10 +335,19 @@
   function paint() { paintPose(clock); drawFace(clock); }
   function hide(e) { if (e && e.__k) { e.__k = ''; e.style.display = 'none'; } }
 
+  /* index into P[1]: play once, or (loopTail P[3]) play the head once then
+     cycle the last P[3] frames, 3 sheet ticks each = 2.67 changes/s, under the 3 Hz flash ceiling */
+  function poseIdx(P, fps, age) {
+    var n = P[1].length, step = Math.floor(age * fps), head;
+    if (!P[3]) return Math.min(n - 1, step);
+    head = n - P[3];
+    if (step < head) return step;
+    return head + Math.floor((step - head) / 3) % P[3];
+  }
   function paintPose(clock) {
     var P = POSES[look.pose] || POSES.idle, sh = NEU.sheets[P[0]];
     var k = P[2];
-    if (!reduced && sh.fps) k = Math.min(P[1].length - 1, Math.floor((clock - poseAt) * sh.fps));
+    if (!reduced && sh.fps) k = poseIdx(P, sh.fps, clock - poseAt);
     var bob = reduced ? 0 : Math.floor(clock * 2.5) % 2;
     /* the point pose stands 1 px further right, as in the game */
     put(tSpr, P[0], P[1][k], 70 + (look.pose === 'point' ? 1 : 0) - sh.ax, 146 - sh.ay - bob, 140, 146);
