@@ -17,7 +17,7 @@
   'use strict';
 
   var NEU = window.NEU = window.NEU || {};
-  var el = null, fill = null, num = null, chips = {}, hpEl = null, useEl = null, dock = false, hpShown = -1, hpMax = 0, useSig = '', hurtT = 0;
+  var el = null, fill = null, num = null, deltaEl = null, tierEl = null, chips = {}, hpEl = null, useEl = null, dock = false, hpShown = -1, hpMax = 0, useSig = '', hurtT = 0;
   var shown = 0, kit = null;
   var flashT = 0, last = 0, raf = 0;
 
@@ -34,9 +34,9 @@
     el = document.createElement('div');
     el.id = 'tphud'; el.className = 'tphud'; el.hidden = true;
     el.setAttribute('aria-hidden', 'true');
-    var html = '<div class="tphud__hp"></div><div class="tphud__tp"><span class="tphud__label">TP</span>'
+    var html = '<div class="tphud__hp"></div><span class="tphud__tier"></span><div class="tphud__tp"><span class="tphud__label">TP</span>'
       + '<div class="tphud__bar"><div class="tphud__fill"></div></div>'
-      + '<span class="tphud__num">0%</span></div><div class="tphud__acts">';
+      + '<span class="tphud__num">0%</span><span class="tphud__delta"></span></div><div class="tphud__acts">';
     for (var i = 0; i < SLOTS.length; i++) {
       html += '<div class="tphud__chip" data-slot="' + SLOTS[i].key + '">'
         + '<canvas class="tphud__icon" width="16" height="16"></canvas>'
@@ -46,6 +46,7 @@
     document.body.appendChild(el);
     fill = el.querySelector('.tphud__fill');
     num = el.querySelector('.tphud__num');
+    deltaEl = el.querySelector('.tphud__delta'); tierEl = el.querySelector('.tphud__tier');
     var nodes = el.querySelectorAll('.tphud__chip');
     for (i = 0; i < nodes.length; i++) chips[SLOTS[i].key] = nodes[i];
     hpEl = el.querySelector('.tphud__hp'); useEl = el.querySelector('.tphud__use');
@@ -84,7 +85,7 @@
       for (i = 0; i < max; i++) { cv = document.createElement('canvas'); cv.width = 7; cv.height = 7; cv.className = 'tphud__heart'; hpEl.appendChild(cv); }
     }
     if (hp === hpShown) return;
-    if (hpShown > hp && !reduced()) { hurtT = 0.35; hpEl.classList.add('is-hurt'); }
+    if (hpShown > hp && !reduced() && !(NEU.motion && NEU.motion.calmFlash && NEU.motion.calmFlash())) { hurtT = 0.35; hpEl.classList.add('is-hurt'); }
     nodes = hpEl.children;
     for (i = 0; i < nodes.length; i++) { nodes[i].width = 7; heartPaint(nodes[i], i < hp); }
     hpShown = hp; hpEl.setAttribute('data-hp', hp);
@@ -167,6 +168,13 @@
     return null;
   }
 
+  /* one signed percent for the gain/spend flash; text, so calm motion keeps it */
+  function deltaT(evs) {
+    var sum = 0, i;
+    for (i = 0; i < evs.length; i++) sum += evs[i];
+    deltaEl.textContent = (sum > 0 ? '+' : '-') + Math.abs(Math.round(sum * 100)) + '%';
+  }
+
   function frame(ts) {
     raf = requestAnimationFrame(frame);
     if (!el) return;
@@ -174,6 +182,9 @@
     last = now;
     var k = pick(), isDock = !!k && k === dungeonKit();
     if (isDock !== dock) { dock = isDock; el.classList.toggle('is-dock', dock); hpShown = -1; if (k && !el.hidden) paintChips(k); }
+    /* the tier tag is a dock-only reading of the one difficulty authority */
+    if (dock && NEU.diff && NEU.diff.glyph) tierEl.textContent = NEU.diff.glyph() + ' ' + NEU.diff.name().toUpperCase();
+    else if (tierEl.textContent) tierEl.textContent = '';
     if (k !== kit) {
       kit = k; shown = kit ? kit.tp : 0;
       if (kit && !el.hidden) paintChips(kit);
@@ -190,10 +201,20 @@
       else if (evs[i] < -0.0001) hasSpend = true;
     }
     /* A gain and a spend inside one frame still reads as a spend: the
-       player just paid TP, whatever grazed in the same beat. */
-    if (hasSpend) { flashT = 0.4; el.classList.add('is-spend'); el.classList.remove('is-gain'); }
-    else if (hasGain) { flashT = 0.4; el.classList.add('is-gain'); el.classList.remove('is-spend'); }
-    if (flashT > 0) { flashT -= dt; if (flashT <= 0) { el.classList.remove('is-gain'); el.classList.remove('is-spend'); } }
+       player just paid TP, whatever grazed in the same beat. Gain -> spend
+       upgrades at once; spend -> gain waits out the flash, so colour flips
+       at most every 0.4 s (<= 3 Hz). */
+    if (hasSpend) {
+      if (flashT <= 0 || el.classList.contains('is-gain')) {
+        flashT = 0.4; el.classList.add('is-spend'); el.classList.remove('is-gain'); deltaT(evs);
+      }
+    } else if (hasGain && flashT <= 0) {
+      flashT = 0.4; el.classList.add('is-gain'); el.classList.remove('is-spend'); deltaT(evs);
+    }
+    if (flashT > 0) {
+      flashT -= dt;
+      if (flashT <= 0) { el.classList.remove('is-gain'); el.classList.remove('is-spend'); deltaEl.textContent = ''; }
+    }
     if (reduced()) shown = target;
     else shown += (target - shown) * Math.min(1, dt * 10);
     if (Math.abs(target - shown) < 0.0005) shown = target;
