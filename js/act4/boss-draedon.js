@@ -78,7 +78,7 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.imageSmoothingEnabled = false;
     }
-    ar = NEU.danmaku && NEU.danmaku.arena ? NEU.danmaku.arena(w, h, 760, 500, 20) : null;
+    ar = NEU.danmaku && NEU.danmaku.arenaFor ? NEU.danmaku.arenaFor(w, h) : null;
     if (ar) { box.AX = ar.AX; box.AY = ar.AY; box.AW = ar.AW; box.AH = ar.AH; }
     else { box.AX = 20; box.AY = 40; box.AW = 760; box.AH = 480; }
     /* keep the arena floor above the floating TP strip (#tphud: bottom 24px + 80px tall + 8px gap)
