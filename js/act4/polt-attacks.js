@@ -6,7 +6,7 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
-  function dp(k) { return NEU.diff ? NEU.diff.f(k) : 1; }
+  function dp(k) { return NEU.boss && NEU.boss.mul ? NEU.boss.mul(k) : 1; }
   var ATK = {};
   var A = null, phase = 1, index = 0, current = null, signature = false;
   var TAU = Math.PI * 2;

@@ -28,7 +28,10 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
-  function dp(k) { return NEU.diff ? NEU.diff.f(k) : 1; }
+  /* the one tier surface (core/boss.js); identity values for a lone-file harness */
+  var ident = function (n) { return n; };
+  var B = NEU.boss || { open: ident, close: ident, hit: ident, iframes: ident, hp: ident, playerHp: ident,
+    healCd: ident, heals: function () { return true; }, mul: function () { return 1; } };
 
   var wrap = document.getElementById('polt');
   if (!wrap) { NEU.polt = { open: function () {} }; return; }
@@ -54,15 +57,15 @@
      both read this table, so the bar can never disagree with the fight. */
   var PHASE_GATES = [1, 0.65, 0.35];
   var VULN_COL = '#FFC46A';            /* same gold as her VULNERABLE banner */
-  var REDUCE_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  /* VIP-01: the device query is only an initial value. The shared motion
-     store is authority at runtime, so flipping the in-game switch (or the
-     OS setting) mid-fight takes effect on the very next frame. */
+  /* VIP-01: the shared motion store is authority at runtime, so flipping
+     the in-game switch (or the OS setting) mid-fight takes effect on the
+     very next frame. The device query is only the last fallback. */
   function liveReduced() {
     if (NEU.juice && typeof NEU.juice.reduced === 'boolean') return NEU.juice.reduced;
     if (NEU.motion && NEU.motion.reduced) return !!NEU.motion.reduced();
     return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
+  var REDUCE_MOTION = liveReduced();
   /* WK2: every Polt hit's shake rides the 8-frame budget in polt-fx; undefined = the tier's own. */
   function cap(tier) { return NEU.poltFx ? NEU.poltFx.shake(tier) : undefined; }
   /* PLAN 9.5: the boss reads at 2x so his legs and hooks are legible. */
@@ -143,18 +146,6 @@
   }
   addEventListener('resize', function () { if (running) layout(); });
 
-  function stamp(rows, cx, cy, s, col) {
-    if (dm.soul && dm.soul.stamp) {
-      dm.soul.stamp(ctx, rows, cx, cy, s, col);
-      return;
-    }
-    var h = rows.length, w = rows[0].length;
-    var x0 = (cx - w * s / 2) | 0, y0 = (cy - h * s / 2) | 0;
-    ctx.fillStyle = col;
-    for (var r = 0; r < h; r++) for (var c = 0; c < w; c++)
-      if (rows[r][c] === '#') ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
-  }
-
   /* Depth is a scalar, not a matrix. Everything sits on one plane and
      `z` only scales and offsets — enough for parallax and sorting,
      none of the cost or the readability problems of real 3D. */
@@ -232,7 +223,8 @@
     attackFrameAcc += dt;
     while (attackFrameAcc >= 1 / 60) {
       attackFrameAcc -= 1 / 60;
-      if (NEU.poltAtk.step({ x: bx, y: by, tx: px, ty: py, ax: AX, ay: AY, aw: AW, ah: AH })) {
+      /* the attack record owns the signature: it ends once, here */
+      if (NEU.poltAtk.step({ x: bx, y: by, tx: px, ty: py, ax: AX, ay: AY, aw: AW, ah: AH }) && sig > 0) {
         sig = 0; sigDone = true; say('* it holds on. one more.');
       }
     }
@@ -433,14 +425,6 @@
     if (glow > 0) glow -= dt;
     if (vuln > 0) vuln -= dt;
     if (phaseFlash > 0) phaseFlash = Math.max(0, phaseFlash - dt);
-    /* The attack record owns the signature's hitboxes. This is only the
-       countdown to the kill gate - one authority, no second untelegraphed
-       ring (the old `!NEU.poltAtk` branch duplicated it). */
-    if (sig > 0) {
-      sig -= dt;
-      if (sig <= 0) { sig = 0; sigDone = true; say('* it holds on. one more.'); }
-    }
-
     moveBullets(dt * dm.slow(F));
     draw(nowMs);
   }
@@ -474,6 +458,14 @@
     say('* it makes one last thing of itself.');
   }
 
+  /* swept test: a fast shot cannot step over the soul between two frames */
+  function segHit(ox, oy, x, y, rr) {
+    var sx = x - ox, sy = y - oy, l2 = sx * sx + sy * sy;
+    var u = l2 ? ((px - ox) * sx + (py - oy) * sy) / l2 : 0;
+    u = u < 0 ? 0 : u > 1 ? 1 : u;
+    var dx = ox + sx * u - px, dy = oy + sy * u - py;
+    return dx * dx + dy * dy < rr * rr;
+  }
   function moveBullets(dt) {
     var keep = [];
     for (var i = 0; i < bullets.length; i++) {
@@ -488,12 +480,12 @@
         var a = Math.atan2(py - b.y, px - b.x), s = Math.hypot(b.vx, b.vy);
         b.vx = Math.cos(a) * s; b.vy = Math.sin(a) * s;
       }
+      var ox = b.x, oy = b.y;
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.x < AX - 50 || b.x > AX + AW + 50 || b.y < AY - 50 || b.y > AY + AH + 50) continue;
       keep.push(b);
       if (kit) kit.graze(b);                          /* near misses fill TP, so the C strip has something to spend */
-      var dx = b.x - px, dy = b.y - py, rr = b.r + PLAYER_R;
-      if (dx * dx + dy * dy < rr * rr && hurt(b.vx, b.vy)) return;
+      if (segHit(ox, oy, b.x, b.y, b.r + PLAYER_R) && hurt(b.vx, b.vy)) return;
     }
     bullets = keep;
     /* contact damage while charging */
@@ -502,19 +494,22 @@
 
   /* One damage path; a dash or the i-frames pass through. True = dead. */
   function immune() { return inv > 0 || F.dashI > 0 || (NEU.cheat && NEU.cheat.god); }
-  function hurtRaw(dx, dy) {
+  function hurtRaw(dx, dy, n) {
     if (immune()) return false;   /* dev `god` (dev.js) */
-    hp--; inv = IFRAMES;
+    hp -= n || 1; inv = IFRAMES;
     dm.hurt(F, px, py - 12);
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
     if (NEU.juice) { NEU.juice.hit('medium', { dx: dx, dy: dy, shake: cap('medium') }); NEU.juice.burst(px, py, 10, COL.soul); }
     if (hp <= 0) { startDeath(); return true; }
     return false;
   }
+  /* the kit's adapter lands the damage; it reads the knockback and the dead flag from here */
+  var hitDx = 0, hitDy = 0, hitDead = false;
   function hurt(dx, dy) {
     if (immune()) return false;                                /* a shield is not spent on a hit that cannot land */
-    if (kit && kit.hit(1)) { inv = IFRAMES; return false; }    /* one pop, then real i-frames */
-    return hurtRaw(dx, dy);
+    hitDx = dx; hitDy = dy; hitDead = false;
+    if (kit) { if (kit.hit(1)) { inv = IFRAMES; return false; } return hitDead; }   /* one pop, then real i-frames */
+    return hurtRaw(dx, dy, 1);
   }
 
   function bossHurtable() { return running && sig <= 0; }
@@ -545,7 +540,7 @@
     /* Six blade damage is normalized to one boss point: 900 HP at the
        kit's 0.3 s cadence is 270 s of clean hits; movement and dodging put
        real runs near the requested 4–6 minute window. */
-    var dmg = dm.mul(F) * (amount || 1) * (vuln > 0 ? 2 : 1) * dp('dmg');
+    var dmg = dm.mul(F) * (amount || 1) * (vuln > 0 ? 2 : 1) * B.hit(1) * ((NEU.cheat && NEU.cheat.dmgMul) || 1);
     bossHP -= dmg;
     dm.bossHit(F, bx, by, dmg);
     if (NEU.sfx && NEU.sfx.hit) NEU.sfx.hit();
@@ -1270,16 +1265,17 @@
     if (NEU.quest) NEU.quest.lock(true);
     if (msg) msg.hidden = true;
     layout();
-    if (NEU.diff) NEU.diff.begin(); MAXHP = NEU.diff ? NEU.diff.fpick([12, 9, 6, 5, 4, 3, 1]) : 6; IFRAMES = (dm.IFRAMES || 1.1) * dp('iframes');
+    B.open('polt'); MAXHP = B.playerHp(6); IFRAMES = B.iframes(dm.IFRAMES || 1.1);
     t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; attackWarns.length = 0; attackFrameAcc = 0; keys = {}; dying = 0;
     moveIntent = null; bossHidden = false;
     seq = null; dim = 0;                   /* VIP-04: no bar/timer/blackout survives a replay */
     if (NEU.poltFx) { NEU.poltFx.clear(); NEU.poltFx.card(BOSS_NAMES[1]); }   /* replay starts with no stale warning */
-    bossMax = Math.round(900 * dp('bossHp')); bossHP = bossMax; phase = 1; clone = null; mode = 'fight';
+    bossMax = B.hp(900); bossHP = bossMax; phase = 1; clone = null; mode = 'fight';
+    if (NEU.cheat && NEU.cheat.startFrac) { bossHP = bossMax * NEU.cheat.startFrac; NEU.cheat.startFrac = 0; }
     phaseFlash = 0; phaseFlashes = 0; flashedPhase = 0;
     px = AX + AW / 2; py = AY + AH - 70;
     F = dm.fight(px, py);
-    kit = NEU.kit ? NEU.kit.create({ F: F, box: kitBox, danmakuMovement: true, maxHp: MAXHP, healCd: 30 * dp('healCd'), noHeal: dp('heals') <= 0,
+    kit = NEU.kit ? NEU.kit.create({ F: F, box: kitBox, danmakuMovement: true, maxHp: MAXHP, healCd: B.healCd(30), noHeal: !B.heals(),
       theme: { rim: '#2E6F62', acc: '#7FE3C4', hot: '40,150,120', hotLine: '#7FE3C4', well: '#10302A', title: 'SOUL  ACTIONS' }, adapter: {
       targets: function () {
         bossTarget.x = bx; bossTarget.y = by; bossTarget.r = 22;
@@ -1288,7 +1284,7 @@
         return out;
       },
       damage: function (target, n) { tryHit(target, Math.max(1, Math.round(n / 6))); },
-      hurtPlayer: function (n) { hurtRaw(0, 0); },
+      hurtPlayer: function (n) { hitDead = hurtRaw(hitDx, hitDy, n); },
       sfx: function (n) { if (NEU.sfx && NEU.sfx[n]) NEU.sfx[n](); }
     } }) : null;
     bx = AX + AW / 2; by = AY + 80; bz = 0;
@@ -1308,7 +1304,7 @@
   function close() {
     var status = document.getElementById('poltTell');
     if (status) status.textContent = '';
-    running = false; dying = 0;
+    running = false; dying = 0; B.close('polt');
     if (NEU.kernel && NEU.kernel.current() === 'polt') NEU.kernel.pop();
     warnAt = 0; charging = 0; vuln = 0; sig = 0; chargePath = null;
     moveIntent = null; bossHidden = false;
