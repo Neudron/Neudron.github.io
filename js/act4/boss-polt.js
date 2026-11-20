@@ -98,6 +98,7 @@
   /* VIP-04: the ordered phase transition. seq is non-null from the gate until
      the playable beat at f90; dim is the blackout alpha, lifting by f90. */
   var seq = null, dim = 0;
+  var cine = true;                          /* QA/capture can force the hard cut; open() leaves it set */
   /* VIP-05: boss movement driven by named attacks through the adapter.
      moveIntent is consumed in update; bossHidden hides only the body sprite. */
   var moveIntent = null, bossHidden = false;
@@ -699,7 +700,7 @@
   }
   function beginTransition(to, msg) {
     REDUCE_MOTION = liveReduced();
-    if (REDUCE_MOTION) { applyPhase(to, msg); return; }   /* hard cut, no flash/shake */
+    if (REDUCE_MOTION || !cine) { applyPhase(to, msg); return; }   /* hard cut, no flash/shake */
     seq = { f: 0, to: to, msg: msg, stage: 'finish' };
     dim = 0.6;                             /* blackout peaks at 0.6 alpha */
     if (NEU.poltAtk && NEU.poltAtk.transition) NEU.poltAtk.transition.start(to);
@@ -1342,6 +1343,7 @@
                get look() { return PHASE_LOOK[phase]; },
                get dim() { return dim; },
                get signatureFrames() { return SIG_FRAMES; },
+               get cine() { return cine; }, set cine(v) { cine = !!v; },
                get transition() {
                  return seq ? { f: seq.f, to: seq.to, stage: seq.stage, dim: dim } : null;
                },
