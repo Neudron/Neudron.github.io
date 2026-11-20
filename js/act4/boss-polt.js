@@ -83,7 +83,16 @@
   var AX = 0, AY = 0, AW = 0, AH = 0;
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
   var bullets = [], hooks = [], legs = [];
-  var autoN = 0, assisting = false, assistSet = { left: false, right: false, up: false, down: false };
+  var autoN = 0, assistSet = { left: false, right: false, up: false, down: false };
+  /* Assistant-owned directions last one frame only. Dropping them before the
+     guard keeps the guard reading real player keys, so the planner re-fires. */
+  function dropAssistKeys() {
+    if (assistSet.left) keys.left = false;
+    if (assistSet.right) keys.right = false;
+    if (assistSet.up) keys.up = false;
+    if (assistSet.down) keys.down = false;
+    assistSet.left = assistSet.right = assistSet.up = assistSet.down = false;
+  }
   /* VIP-02: polt-fx owns the warning list; the local array is the same
      object, so the existing `state.warns` surface keeps working. The
      fallback keeps the fight whole in harnesses that load its files by
@@ -325,16 +334,18 @@
     t += dt;
     if (inv > 0) inv -= dt;
 
-    /* Bot tier: the planner steers only while the player holds no direction.
-       A player keypress drops the stale assist keys before the real one lands. */
-    if (B.tier === 'bot' && !keys.left && !keys.right && !keys.up && !keys.down) {
-      var as = dm.assist(F, bullets, { AX: AX, AY: AY, AW: AW, AH: AH });
-      keys.left = as.left; keys.right = as.right; keys.up = as.up; keys.down = as.down;
-      assistSet.left = as.left; assistSet.right = as.right; assistSet.up = as.up; assistSet.down = as.down;
-      assisting = as.left || as.right || as.up || as.down;
-      if (as.dash) dm.key(F, { key: 'x' });
-      autoN++;
-      if (autoN % 18 === 0) tryHit();
+    /* Bot tier: drop last frame's assistant-owned keys first so the guard
+       reads only the player, then let the planner re-decide every frame. */
+    if (B.tier === 'bot') {
+      dropAssistKeys();
+      if (!keys.left && !keys.right && !keys.up && !keys.down) {
+        var as = dm.assist(F, bullets, { AX: AX, AY: AY, AW: AW, AH: AH });
+        keys.left = as.left; keys.right = as.right; keys.up = as.up; keys.down = as.down;
+        assistSet.left = as.left; assistSet.right = as.right; assistSet.up = as.up; assistSet.down = as.down;
+        if (as.dash) dm.key(F, { key: 'x' });
+        autoN++;
+        if (autoN % 18 === 0) tryHit();
+      }
     }
 
     /* player; rage builds inside ~300px of his 40px strike reach */
@@ -1247,11 +1258,7 @@
     if (running && dm.key(F, e)) { e.preventDefault(); return; }
     var n = dm.keyName(e);
     if (n) {
-      if (assisting) {
-        if (assistSet.left) keys.left = false; if (assistSet.right) keys.right = false;
-        if (assistSet.up) keys.up = false; if (assistSet.down) keys.down = false;
-        assisting = false;
-      }
+      dropAssistKeys();                    /* a real key ends assist ownership at once */
       keys[n] = true; e.preventDefault();
     }
   });
@@ -1261,7 +1268,7 @@
   });
   /* A key let go outside the tab never sends keyup, so a Shift released
      there would leave the soul slow. Losing focus drops every held key. */
-  addEventListener('blur', function () { keys = {}; assisting = false; });
+  addEventListener('blur', function () { keys = {}; dropAssistKeys(); });
 
   function open() {
     wrap.hidden = false;
@@ -1272,7 +1279,7 @@
     layout();
     B.open('polt'); MAXHP = B.playerHp(6); IFRAMES = B.iframes(dm.IFRAMES || 1.1);
     t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; attackWarns.length = 0; attackFrameAcc = 0; keys = {}; dying = 0;
-    autoN = 0; assisting = false; assistSet.left = assistSet.right = assistSet.up = assistSet.down = false;
+    autoN = 0; dropAssistKeys();
     moveIntent = null; bossHidden = false;
     seq = null; dim = 0;                   /* VIP-04: no bar/timer/blackout survives a replay */
     if (NEU.poltFx) { NEU.poltFx.clear(); NEU.poltFx.card(BOSS_NAMES[1]); }   /* replay starts with no stale warning */
