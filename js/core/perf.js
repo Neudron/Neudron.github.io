@@ -48,6 +48,9 @@
   var FAIL   = 1000 / 30;     /* 33.33 */
   var WINDOW = 180;           /* ~3s at 60fps */
   var DRAW_EVERY = 250;       /* ms between DOM writes */
+  var DROP = 25;               /* 1.5 x TARGET: a frame this long counts as dropped */
+  var WORK_TARGET = 8;         /* informational engine update+draw budget, ms; not a gate */
+  var wtimes = [], whead = 0, wn = 0;
 
   /* THE PACE CAP — why draws skip frames on fast panels.
      Everything on screen advances at 60 Hz (the engine's fixed step)
@@ -103,11 +106,26 @@
     if (dt > worstEver) worstEver = dt;
   }
 
+  function work(ms) {
+    if (!running) return;
+    wtimes[whead] = ms;
+    whead = (whead + 1) % WINDOW;
+    if (wn < WINDOW) wn++;
+  }
+
+  function workStats() {
+    if (!wn) return { n: 0, mean: 0, p99: 0 };
+    var a = wtimes.slice(0, wn).sort(function (x, y) { return x - y; }), sum = 0, i;
+    for (i = 0; i < wn; i++) sum += a[i];
+    return { n: wn, mean: sum / wn, p99: a[Math.min(wn - 1, (wn * 0.99) | 0)] };
+  }
+
   function stats() {
-    if (!n) return { n: 0, fps: 0, mean: 0, p50: 0, p95: 0, p99: 0, worst: 0, verdict: 'no data' };
+    if (!n) return { n: 0, fps: 0, dropped: 0, mean: 0, p50: 0, p95: 0, p99: 0, worst: 0, verdict: 'no data' };
     var a = times.slice(0, n).sort(function (x, y) { return x - y; });
     var sum = 0, i;
-    for (i = 0; i < n; i++) sum += a[i];
+    var dropped = 0;
+    for (i = 0; i < n; i++) { sum += a[i]; if (a[i] > DROP) dropped++; }
     var mean = sum / n;
     var p50 = a[(n * 0.50) | 0];
     var p95 = a[Math.min(n - 1, (n * 0.95) | 0)];
@@ -116,7 +134,7 @@
     /* Judged on the 1% low, not the mean and not p95. See the header. */
     /* +1 ms: a vsync-locked 60 Hz frame lands at 16.67 ms plus rAF jitter and is on budget */
     var verdict = p99 <= TARGET + 1 ? 'ok' : p99 <= WARN ? 'warn' : p99 <= FAIL ? 'over' : 'fail';
-    return { n: n, fps: mean ? 1000 / mean : 0, mean: mean, p50: p50, p95: p95, p99: p99,
+    return { n: n, fps: mean ? 1000 / mean : 0, mean: mean, p50: p50, p95: p95, p99: p99, dropped: dropped,
              worst: worst, worstEver: worstEver, verdict: verdict };
   }
 
@@ -148,7 +166,7 @@
     if (!el) return;
     el.setAttribute('data-v', s.verdict);
     el.textContent =
-      Math.round(s.fps) + ' fps   ' +
+      'mean ' + Math.round(s.fps) + ' fps   ' +
       s.p50.toFixed(1) + ' / ' + s.p99.toFixed(1) + ' / ' + s.worst.toFixed(1) + ' ms' +
       '   ' + scene();
   }
@@ -165,6 +183,7 @@
     if (running) return true;
     running = true;
     times = []; head = 0; n = 0; worstEver = 0;
+    wtimes = []; whead = 0; wn = 0;
     last = 0; lastDraw = 0;
     build();
     el.hidden = false;
@@ -186,10 +205,12 @@
   function line() {
     var s = stats();
     if (!s.n) return 'no frames sampled yet';
-    return Math.round(s.fps) + ' fps · p50 ' + s.p50.toFixed(1) +
+    var w = workStats();
+    return 'mean ' + Math.round(s.fps) + ' fps · p50 ' + s.p50.toFixed(1) +
            'ms · p95 ' + s.p95.toFixed(1) + 'ms · p99 ' + s.p99.toFixed(1) + 'ms · worst ' + s.worst.toFixed(1) +
            'ms · ' + s.n + ' frames · ' + scene() + ' · ' + s.verdict +
-           ' (budget ' + TARGET.toFixed(1) + '/' + WARN.toFixed(1) + '/' + FAIL.toFixed(1) + ')';
+           ' (budget ' + TARGET.toFixed(1) + '/' + WARN.toFixed(1) + '/' + FAIL.toFixed(1) + ')' +
+           (w.n ? ' · work p99 ' + w.p99.toFixed(1) + 'ms (target ' + WORK_TARGET + ')' : '');
   }
 
   /* Backgrounding is not a stutter. Drop the stale timestamp so the
@@ -200,7 +221,7 @@
 
   NEU.perf = {
     start: start, stop: stop, toggle: function () { return running ? (stop(), false) : (start(), true); },
-    stats: stats, line: line, scene: scene, paced: paced, PACE: PACE,
+    stats: stats, line: line, work: work, workStats: workStats, WORK_TARGET: WORK_TARGET, scene: scene, paced: paced, PACE: PACE,
     _pacedReset: function () { pacedLast = 0; pacedNow = -1; pacedOk = true; },
     get running() { return running; },
     TARGET: TARGET, WARN: WARN, FAIL: FAIL, WINDOW: WINDOW,
