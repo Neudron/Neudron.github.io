@@ -1039,8 +1039,13 @@
     document.body.appendChild(note);
     var tboxEl = document.getElementById('tbox');
     if (tboxEl && typeof MutationObserver !== 'undefined') {
-      note.__tuckObs = new MutationObserver(tuckNote);
-      note.__tuckObs.observe(tboxEl, { attributes: true, attributeFilter: ['hidden'] });
+      /* re-tuck after the box's text settles: its top can shift after `hidden` clears */
+      note.__tuckObs = new MutationObserver(function () {
+        tuckNote();
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tuckNote);
+      });
+      note.__tuckObs.observe(tboxEl, { attributes: true, attributeFilter: ['hidden'],
+        childList: true, subtree: true, characterData: true });
       addEventListener('resize', tuckNote);
     }
     tuckNote();
