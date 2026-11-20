@@ -70,7 +70,7 @@
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
   var rage = 0, tp = 0, shieldT = 0;
   var rageMode = 0, rageModeT = 0;
-  var stripOpen = false, stripSel = 0, stripAt = 0, healCd = 0, healToast = 0, healsOn = true;
+  var stripOpen = false, stripSel = 0, healCd = 0, healToast = 0, healsOn = true;
   var meleeCd = 0, grazeAt = -9;
   var STRIP_SCALE = 0.2, MELEE_DMG = 6, MELEE_R = 56, FIRE_DMG = 4;
   var MINI_N = 4, MINI_DMG = 1, MINI_SPEED = 160, MINI_LIFE = 1.2;
@@ -1976,7 +1976,7 @@
       ctx.textAlign = 'left';
     }
     drawBroBars(w);
-    if (stripOpen) drawStrip(ctx);
+    if (stripOpen || stripVis() > 0) drawStrip(ctx);
     if (healToast > 0) {
       ctx.font = FONT_UI; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       ctx.fillStyle = '#B8FFD0';
@@ -2066,12 +2066,6 @@
      used now, the cost shown in TP orange when it can, and the reason
      shown in grey when it cannot. cost: the TP share it spends (for the
      gauge's preview). */
-  var ICON = {
-    heal:   ['..#..', '..#..', '#####', '..#..', '..#..'],
-    buster: ['..#....', '.##..#.', '.###.#.', '######.', '#######', '.#####.', '..###..'],
-    shield: ['#######', '#######', '#######', '.#####.', '.#####.', '..###..', '...#...'],
-    rage:   ['...##..', '..##...', '.#####.', '...##..', '..##...', '.##....', '##.....']
-  };
   var STRIP = [
     { name: 'HEAL', icon: 'heal', col: '#5CF08C', cost: 0,
       ok: function () { return healsOn && hp < MAXHP && healCd <= 0; },
@@ -2153,6 +2147,8 @@
     stripOpen = false;
   }
   var stripShake = -1e9;
+  /* strip transition state: open/close anim, cursor glide, per-row fade, gauge lag band, full-TP sweep */
+  var sAnim = null, sLast = 0, sDt = 0, selFrom = 0, selTo = 0, selAt = 0, rowA = [], tpLag = 0, tpFull = false, sweepAt = -1e9;
   function stripKey(e) {
     var k = e.key, d = arrowName(e);
     if (d === 'up' || d === 'left') stripSel = (stripSel + STRIP.length - 1) % STRIP.length;
@@ -2162,66 +2158,85 @@
     else return;
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
   }
-  /* Deltarune's battle menu, in her colours. A black panel with a double
-     rim (white outside, brimstone inside), a tab with the title, one row
-     per action: its icon, its name, the TP cost right-aligned in orange,
-     or, greyed, why it cannot be used. The selected row carries a stepped
-     brimstone highlight and the soul as the cursor, bobbing. Under the
-     rows: HP, and a segmented TP gauge that previews what the selected
-     action would spend. It drops in with a small overshoot. */
+  /* The TP menu in her colours, drawn with the shared look (NEU.kit.art): a
+     chamfered brimstone rim, a slanted tab with the title, one row per action
+     (icon, name, TP cost right-aligned in orange, or, dimmed, why it cannot be
+     used), a stepped highlight the soul glides along, HP, and a segmented TP
+     gauge that previews what the selected action would spend. It slides 12 px
+     and scales 0.92 -> 1 in and out (one NEU.anim); reduced motion cuts all of
+     it. Input acts on stripOpen at once, never on the animation. */
+  var SCAL_T = { rim: '#8C1A22', acc: '#FF9E30' };
+  function stripVis() {
+    if (sAnim && sAnim.state !== null) return sAnim.state === 'open' ? sAnim.k : 1 - sAnim.k;
+    return stripOpen ? 1 : 0;
+  }
+  function stripSync(now) {
+    sDt = sLast && now - sLast < 100 ? (now - sLast) / 1000 : 0;   /* a gap means it was not drawn: restart the clock */
+    sLast = now;
+    if (!sAnim && NEU.anim) {
+      sAnim = NEU.anim.make({ states: { closed: { dur: 0 }, open: { dur: 0 } },
+        trans: { 'closed>open': { dur: 0.18, ease: 'backOut' }, 'open>closed': { dur: 0.18, ease: 'outCubic' } } });
+      sAnim.set('closed');
+    }
+    if (sAnim) {
+      /* a finished fight shows no strip, so it cuts instead of easing out */
+      if (!running || dying || mode === 'won') sAnim.set('closed', true);
+      else sAnim.set(stripOpen ? 'open' : 'closed');
+      sAnim.step(sDt);
+    }
+    return stripVis();
+  }
+  function stripGlide(now, reduce) {
+    var k = reduce || !selAt ? 1 : Math.min(1, (now - selAt) / 90);
+    return selFrom + (selTo - selFrom) * (NEU.juice && NEU.juice.outCubic ? NEU.juice.outCubic(k) : k);
+  }
   function drawStrip(ctx) {
-    var now = performance.now(), u = Math.min(1, (now - stripAt) / 140);
-    var ease = 1 + 0.12 * Math.sin(u * Math.PI) * (1 - u);       /* overshoot, then rest */
+    var art = NEU.kit && NEU.kit.art;
+    if (!art) return;                          /* kit.js ships before this file; absent only in partial test pages */
+    var now = performance.now(), v = stripSync(now), fa = Math.max(0, Math.min(1, v));
     var reduce = !!(NEU.juice && NEU.juice.reduced);
-    var i, o, y, can, sel;
-    ctx.fillStyle = 'rgba(4,0,2,' + (0.62 * u).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH);
+    if (fa <= 0) return;
+    var i, o, y, can, sel, g, step, st;
     var rowH = 40, bw = Math.min(AW - 48, 464) | 0, bh = rowH * STRIP.length + 132;
     var bx = (AX + (AW - bw) / 2) | 0;
-    var by = (AY + Math.max(40, (AH - bh) / 2) - (reduce ? 0 : (1 - u) * 24)) | 0;
+    var by = (AY + Math.max(40, (AH - bh) / 2) + (1 - v) * 12) | 0;
+    var sc = 0.92 + 0.08 * v;
     var shake = now - stripShake < 180 && !reduce ? Math.round(Math.sin((now - stripShake) * 0.12) * 4) : 0;
     bx += shake;
+    if (selTo !== stripSel) { selFrom = stripGlide(now, reduce); selTo = stripSel; selAt = now; }
+    g = Math.max(0, Math.min(STRIP.length - 1, stripGlide(now, reduce)));
+    ctx.fillStyle = 'rgba(4,0,2,' + (0.62 * fa).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH);
     ctx.save();
-    if (!reduce && ease !== 1) {
-      ctx.translate(bx + bw / 2, by + bh / 2); ctx.scale(ease, ease); ctx.translate(-(bx + bw / 2), -(by + bh / 2));
+    ctx.globalAlpha = fa;
+    if (sc !== 1) {
+      ctx.translate(bx + bw / 2, by + bh / 2); ctx.scale(sc, sc); ctx.translate(-(bx + bw / 2), -(by + bh / 2));
     }
-    /* drop shadow, panel, double rim */
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(bx + 6, by + 6, bw, bh);
-    ctx.fillStyle = '#050104'; ctx.fillRect(bx, by, bw, bh);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(bx, by, bw, 3); ctx.fillRect(bx, by + bh - 3, bw, 3);
-    ctx.fillRect(bx, by, 3, bh); ctx.fillRect(bx + bw - 3, by, 3, bh);
-    ctx.fillStyle = '#8C1A22';
-    ctx.fillRect(bx + 6, by + 6, bw - 12, 2); ctx.fillRect(bx + 6, by + bh - 8, bw - 12, 2);
-    ctx.fillRect(bx + 6, by + 6, 2, bh - 12); ctx.fillRect(bx + bw - 8, by + 6, 2, bh - 12);
-    /* corner studs */
-    ctx.fillStyle = '#FF9E30';
-    ctx.fillRect(bx + 6, by + 6, 4, 4); ctx.fillRect(bx + bw - 10, by + 6, 4, 4);
-    ctx.fillRect(bx + 6, by + bh - 10, 4, 4); ctx.fillRect(bx + bw - 10, by + bh - 10, 4, 4);
+    art.frame(ctx, bx, by, bw, bh, SCAL_T);
     /* the title tab, sat on the top rim */
     ctx.font = FONT_UI; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
     var title = 'TP  ACTIONS', tw = (ctx.measureText ? ctx.measureText(title).width : 120) + 24 | 0;
-    ctx.fillStyle = '#050104'; ctx.fillRect(bx + 20, by - 12, tw, 24);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(bx + 20, by - 12, tw, 2); ctx.fillRect(bx + 20, by - 12, 2, 14); ctx.fillRect(bx + 18 + tw, by - 12, 2, 14);
+    art.tab(ctx, bx + 20, by - 12, tw, SCAL_T);
     ctx.fillStyle = '#FF9E30'; ctx.fillText(title, bx + 32, by - 8);
+    /* a stepped highlight: three bands, hot at the cursor end; it and the soul ride the glide */
+    y = Math.round(by + 28 + g * rowH);
+    ctx.fillStyle = 'rgba(192,20,10,0.42)'; ctx.fillRect(bx + 12, y - 4, (bw - 24) * 0.34 | 0, 32);
+    ctx.fillStyle = 'rgba(192,20,10,0.24)'; ctx.fillRect(bx + 12 + ((bw - 24) * 0.34 | 0), y - 4, (bw - 24) * 0.33 | 0, 32);
+    ctx.fillStyle = 'rgba(192,20,10,0.12)'; ctx.fillRect(bx + 12 + ((bw - 24) * 0.67 | 0), y - 4, (bw - 24) * 0.33 | 0, 32);
+    ctx.fillStyle = STRIP[stripSel].ok() ? '#FF3A1A' : '#5A5668'; ctx.fillRect(bx + 12, y - 4, 2, 32);
+    stamp(['.##.##.', '#######', '#######', '#######', '.#####.', '..###..', '...#...'],
+          bx + 28 + (reduce ? 0 : Math.round(Math.sin(now * 0.008) * 2)), y + 12, 2, COL.soul);
     for (i = 0; i < STRIP.length; i++) {
       o = STRIP[i]; y = by + 28 + i * rowH; can = o.ok(); sel = i === stripSel;
-      if (sel) {
-        /* a stepped highlight: three bands, hot at the cursor end */
-        ctx.fillStyle = 'rgba(192,20,10,0.42)'; ctx.fillRect(bx + 12, y - 4, (bw - 24) * 0.34 | 0, 32);
-        ctx.fillStyle = 'rgba(192,20,10,0.24)'; ctx.fillRect(bx + 12 + ((bw - 24) * 0.34 | 0), y - 4, (bw - 24) * 0.33 | 0, 32);
-        ctx.fillStyle = 'rgba(192,20,10,0.12)'; ctx.fillRect(bx + 12 + ((bw - 24) * 0.67 | 0), y - 4, (bw - 24) * 0.33 | 0, 32);
-        ctx.fillStyle = can ? '#FF3A1A' : '#5A5668'; ctx.fillRect(bx + 12, y - 4, 2, 32);
-        var bob = reduce ? 0 : Math.round(Math.sin(now * 0.008) * 2);
-        stamp(['.##.##.', '#######', '#######', '#######', '.#####.', '..###..', '...#...'],
-              bx + 28 + bob, y + 12, 2, COL.soul);
-      }
-      /* the icon in a small socket */
-      ctx.fillStyle = can ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)';
-      ctx.fillRect(bx + 46, y - 1, 22, 22);
-      stamp(ICON[o.icon], bx + 57, y + 10, 2, can ? o.col : '#3E3A48');
-      ctx.fillStyle = can ? (sel ? '#FFFF00' : '#FFFFFF') : '#5A5668';
+      /* a row that flips usable/unusable fades to 0.45 over 120 ms */
+      st = can ? 1 : 0.45; step = 0.55 * sDt / 0.12;
+      if (rowA[i] === undefined || reduce || Math.abs(st - rowA[i]) <= step) rowA[i] = st;
+      else rowA[i] += can ? step : -step;
+      ctx.globalAlpha = fa * rowA[i];
+      ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(bx + 46, y - 1, 22, 22);
+      art.icon(ctx, o.icon, bx + 57, y + 10, o.col);
+      ctx.fillStyle = can && sel ? '#FFFF00' : '#FFFFFF';
       ctx.fillText(o.name, bx + 80, y + 2);
+      ctx.globalAlpha = fa;
       ctx.textAlign = 'right';
       ctx.fillStyle = can ? '#FF9E30' : '#6A6480';
       ctx.fillText(can ? o.tag() : o.why(), bx + bw - 24, y + 2);
@@ -2243,11 +2258,15 @@
     }
     ctx.textAlign = 'right'; ctx.fillStyle = '#FF9E30';
     ctx.fillText((NEU.glyph && NEU.glyph.compact() ? '' : 'TP ') + (tp >= 1 && !(NEU.glyph && NEU.glyph.compact()) ? 'MAX' : Math.floor(tp * 100) + '%'), bx + bw - 24, fy + 14);
-    /* the TP gauge: cells across the panel, orange; the share the
-       selected action would spend blinks pale over the top of the fill */
+    /* the TP gauge: cells across the panel, orange; the share the selected action
+       would spend pulses pale (1.5 Hz) over the fill; a gain/drain band trails
+       tp (80 ms constant); a gold sweep runs once when the bar first fills */
     var gx = bx + 24, gy = fy + 40, gw = bw - 48, cells = 25, cw = gw / cells, fill = tp * cells;
     var cost = STRIP[stripSel].ok() ? STRIP[stripSel].cost : 0;
-    var blink = reduce ? 1 : (Math.floor(now / 260) % 2 ? 1 : 0.55);
+    var blink = reduce ? 1 : 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(now * 0.009425));
+    tpLag = reduce ? tp : tpLag + (tp - tpLag) * (1 - Math.exp(-sDt / 0.08));
+    if (Math.abs(tp - tpLag) < 0.004) tpLag = tp;
+    if (tp >= 1) { if (!tpFull) { tpFull = true; sweepAt = reduce ? -1e9 : now; } } else tpFull = false;
     ctx.fillStyle = '#3A1016'; ctx.fillRect(gx - 2, gy - 2, gw + 2, 16);
     for (i = 0; i < cells; i++) {
       var cx0 = Math.round(gx + i * cw), cx1 = Math.round(gx + (i + 1) * cw) - 2;
@@ -2259,6 +2278,16 @@
         ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(cx0, gy, cx1 - cx0, 3);
         ctx.fillStyle = 'rgba(90,0,0,0.35)'; ctx.fillRect(cx0, gy + 9, cx1 - cx0, 3);
       }
+    }
+    if (tpLag !== tp) {
+      var ba = Math.round(gx + Math.min(tp, tpLag) * gw), bb = Math.round(gx + Math.max(tp, tpLag) * gw);
+      ctx.globalAlpha = fa * 0.8; ctx.fillStyle = tpLag < tp ? '#FFFFFF' : '#5A0A14';
+      ctx.fillRect(ba, gy, Math.max(1, bb - ba), 12); ctx.globalAlpha = fa;
+    }
+    var sk = (now - sweepAt) / 450;
+    if (sk >= 0 && sk < 1 && tp >= 1) {
+      var sx = Math.round(gx + sk * (gw + 16)) - 16, sa = Math.max(gx, sx), sb = Math.min(gx + gw, sx + 10);
+      if (sb > sa) { ctx.globalAlpha = fa * 0.75; ctx.fillStyle = '#FFF3B0'; ctx.fillRect(sa, gy, sb - sa, 12); ctx.globalAlpha = fa; }
     }
     ctx.textAlign = 'left'; ctx.fillStyle = COL.dim;
     ctx.fillText(NEU.glyph && NEU.glyph.compact() ? NEU.glyph.key('z') + '  ·  ' + NEU.glyph.key('x') : kn('z') + ' use  ·  ' + kn('x') + ' back', bx + 24, fy + 64);
@@ -2337,7 +2366,11 @@
     if (e.key === 'x' || e.key === 'X') { e.preventDefault(); if (!e.repeat) dashKey(); return; }
     if (e.key === 'c' || e.key === 'C') {
       e.preventDefault();
-      if (!e.repeat && !dying) { stripOpen = true; stripSel = 0; stripAt = performance.now(); keys = {}; }
+      if (!e.repeat && !dying) {
+        stripOpen = true; stripSel = 0; keys = {};
+        selFrom = selTo = 0; selAt = 0; tpLag = tp; rowA = []; sLast = 0;
+        if (sAnim) sAnim.set('closed', true);          /* a stale open state must still animate in */
+      }
     }
   });
   addEventListener('keyup', function (e) {
@@ -2441,6 +2474,8 @@
     rageMode = 0; rageModeT = 0;
     rageShown = 0; tpShown = 0;
     stripOpen = false; stripSel = 0; healCd = 0; healToast = 0;
+    selFrom = selTo = 0; selAt = 0; tpLag = 0; tpFull = false; sweepAt = -1e9; rowA = [];
+    if (sAnim) sAnim.set('closed', true);
     meleeCd = 0; grazeAt = -9;
     myShots = []; charging = false; chargeF = 0; shotCd = 0; myBeam = null;
     willCharge = false;

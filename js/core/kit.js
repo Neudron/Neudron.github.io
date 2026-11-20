@@ -4,13 +4,61 @@
 
   var NEU = window.NEU = window.NEU || {};
 
+  /* The TP strip's look, drawn in code and shared by both strips (kit.js and
+     Scal's boss-scal.js): a chamfered double rim with side latches, a slanted
+     tab, and 9 px icons with a shadow pass and a highlight cell ('+'). */
+  var ART_ICON = {
+    heal:   ['...###...', '...#+#...', '.###+###.', '.#+++++#.', '.###+###.', '...#+#...', '...###...'],
+    buster: ['.....###.', '....##+..', '...##+...', '..#####+.', '....###..', '...###...', '..###....', '..##.....'],
+    shield: ['#########', '#+++#####', '#+#######', '#########', '.#######.', '.#######.', '..#####..', '...###...', '....#....'],
+    nova:   ['#...#...#', '.#..#..#.', '..#.#.#..', '...###...', '####+####', '...###...', '..#.#.#..', '.#..#..#.', '#...#...#'],
+    rage:   ['....#....', '...##....', '..###.#..', '..####+#.', '.#+#####.', '.#######.', '.#######.', '..#####..', '...###...']
+  };
+  var art = {
+    frame: function (ctx, x, y, w, h, T) {
+      var c = 6, k;
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x + 6, y + 6, w, h);
+      ctx.fillStyle = '#050104'; ctx.fillRect(x + c, y, w - 2 * c, h); ctx.fillRect(x, y + c, w, h - 2 * c);
+      ctx.fillStyle = T.rim;
+      ctx.fillRect(x + c, y, w - 2 * c, 2); ctx.fillRect(x + c, y + h - 2, w - 2 * c, 2);
+      ctx.fillRect(x, y + c, 2, h - 2 * c); ctx.fillRect(x + w - 2, y + c, 2, h - 2 * c);
+      for (k = 0; k < c; k += 2) {                      /* stepped chamfers */
+        ctx.fillRect(x + c - k - 2, y + k, 2, 2); ctx.fillRect(x + w - c + k, y + k, 2, 2);
+        ctx.fillRect(x + c - k - 2, y + h - k - 2, 2, 2); ctx.fillRect(x + w - c + k, y + h - k - 2, 2, 2);
+      }
+      ctx.fillRect(x + c + 4, y + 5, w - 2 * c - 8, 1); ctx.fillRect(x + c + 4, y + h - 6, w - 2 * c - 8, 1);
+      ctx.fillStyle = T.acc;                            /* latches */
+      ctx.fillRect(x + ((w - 24) >> 1), y + h - 3, 24, 4);
+      ctx.fillRect(x - 1, y + ((h - 24) >> 1), 4, 24); ctx.fillRect(x + w - 3, y + ((h - 24) >> 1), 4, 24);
+    },
+    tab: function (ctx, x, y, w, T) {
+      ctx.fillStyle = '#050104'; ctx.fillRect(x + 4, y, w - 8, 24); ctx.fillRect(x, y + 4, w, 20);
+      ctx.fillStyle = T.rim; ctx.fillRect(x + 4, y, w - 8, 2);
+      ctx.fillRect(x + 2, y + 2, 2, 2); ctx.fillRect(x + w - 4, y + 2, 2, 2);
+      ctx.fillRect(x, y + 4, 2, 10); ctx.fillRect(x + w - 2, y + 4, 2, 10);
+      ctx.fillStyle = T.acc; ctx.fillRect(x + 4, y + 2, 6, 2);
+    },
+    icon: function (ctx, name, cx, cy, col) {
+      var rows = ART_ICON[name] || ART_ICON.buster, s = 2, x0 = (cx - rows[0].length * s / 2) | 0, y0 = (cy - rows.length * s / 2) | 0, r, c, ch, p;
+      for (p = 0; p < 2; p++) for (r = 0; r < rows.length; r++) for (c = 0; c < rows[r].length; c++) {
+        ch = rows[r].charAt(c);
+        if (ch === '.') continue;
+        if (!p) { ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x0 + c * s + 1, y0 + r * s + 1, s, s); continue; }
+        ctx.fillStyle = col; ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
+        if (ch === '+') { ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(x0 + c * s, y0 + r * s, s, s); }
+      }
+    }
+  };
+
   function create(opts) {
     opts = opts || {};
     var MAXH = opts.maxHp || 6, HEALCD = opts.healCd || 30;
     var F = opts.F || (NEU.danmaku && NEU.danmaku.fight ? NEU.danmaku.fight(0, 0) : { x: 0, y: 0, fx: 0, fy: -1, swings: [] });
     var box = opts.box || { AX: 0, AY: 0, AW: 800, AH: 600 };
     var adapter = opts.adapter || {};
-    var tp = 0, shield = false, stripOpen = false, stripSel = 0, stripAt = 0, stripShake = -1e9;
+    var tp = 0, shield = false, stripOpen = false, stripSel = 0, stripShake = -1e9;
+    /* strip transition state: open/close anim, cursor glide, per-row fade, gauge lag band and full-TP sweep */
+    var sAnim = null, sLast = 0, sDt = 0, selFrom = 0, selTo = 0, selAt = 0, rowA = [], tpLag = 0, full = false, sweepT = -1;
     /* TP bar ghosts. Deltarune's obj_tensionbar_Draw_0: apparent chases the
        real value by 20 internal units a frame, current follows apparent
        after 15 frames. TP ceiling here is 250 units, so 20/250 = 0.08. */
@@ -21,12 +69,6 @@
     var T = { rim: th.rim || '#8C1A22', acc: th.acc || '#FF9E30', hot: th.hot || '192,20,10', hotLine: th.hotLine || '#FF3A1A',
       soul: th.soul || '#E23B55', title: th.title || 'TP  ACTIONS', well: th.well || '#3A1016' };
     var FONT_UI = '16px "Determination Mono","Pixelify Sans",monospace';
-    var ICON = {
-      heal:   ['..#..', '..#..', '#####', '..#..', '..#..'],
-      buster: ['..#....', '.##..#.', '.###.#.', '######.', '#######', '.#####.', '..###..'],
-      shield: ['#######', '#######', '#######', '.#####.', '.#####.', '..###..', '...#...'],
-      nova:   ['#..#..#', '.#.#.#.', '..###..', '#######', '..###..', '.#.#.#.', '#..#..#']
-    };
     var HEART = ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'];
     var charge = false, chargeT = 0, meleeCd = 0, rangedCd = 0, healCd = 0;
     /* hold Z this long and the release also swings a charged melee arc */
@@ -75,6 +117,7 @@
        directly by tests. */
     function stepGauge(n) {
       n = Math.max(0, Math.min(8, Math.round(Number(n) || 0)));
+      var frames = n, still = !!(NEU.juice && NEU.juice.reduced);
       while (n-- > 0) {
         var diff = tp - tpApp, d, step, ad;
         if (Math.abs(diff) < TP_CHASE) tpApp = tp;
@@ -95,6 +138,12 @@
         tpCur += (d > 0 ? step : -step) / TP_UNITS;
         if (Math.abs(tpApp - tpCur) < 3 / TP_UNITS) tpCur = tpApp;
       }
+      /* gain/drain band: tpLag trails tp with a 80 ms time constant (~250 ms to settle) */
+      tpLag = still ? tp : tpLag + (tp - tpLag) * (1 - Math.exp(-frames / 4.8));
+      if (Math.abs(tp - tpLag) < 0.004) tpLag = tp;
+      /* full-TP gold sweep: once per fill, never looped */
+      if (tpApp >= 1 - 1e-6) { if (!full) { full = true; if (!still) sweepT = 0; } } else full = false;
+      if (sweepT >= 0) { sweepT += frames / 60 / 0.45; if (sweepT >= 1 || still) sweepT = -1; }
     }
     function heal(n) { hp = Math.min(MAXH, hp + n); }
     function melee() {
@@ -219,7 +268,11 @@
         if (moved) sfx('tick');
         return;
       }
-      if (key.toLowerCase() === 'c') { stripOpen = true; stripSel = 0; stripAt = performance.now(); return; }
+      if (key.toLowerCase() === 'c') {
+        stripOpen = true; stripSel = 0; selFrom = selTo = 0; selAt = 0; tpLag = tp; rowA = []; sLast = 0;
+        if (sAnim) sAnim.set('closed', true);          /* a stale open state must still animate in */
+        return;
+      }
       if (key.toLowerCase() === 'z' && !charge) { charge = true; chargeT = 0; }
     }
     function keyup(key) { if (String(key || '').toLowerCase() === 'z') release(); }
@@ -320,6 +373,16 @@
       ad = Math.min(curX, appX);
       g.fillStyle = 'rgba(255,255,255,0.28)'; g.fillRect(0, 0, ad, 3);
       g.fillStyle = 'rgba(90,0,0,0.35)'; g.fillRect(0, 9, ad, 3);
+      if (tpLag !== tp) {                       /* gain: white band, drain: dark red band */
+        x = Math.round(Math.min(tp, tpLag) * w); i = Math.round(Math.max(tp, tpLag) * w);
+        g.globalAlpha = 0.8; g.fillStyle = tpLag < tp ? '#FFFFFF' : '#5A0A14'; g.fillRect(x, 0, Math.max(1, i - x), 12); g.globalAlpha = 1;
+      }
+      if (sweepT >= 0 && curX > 0) {            /* the gold sweep, over the filled part only */
+        x = Math.round(sweepT * (w + 16)) - 16;
+        if (Math.min(curX, x + 10) > Math.max(0, x)) {
+          g.globalAlpha = 0.75; g.fillStyle = '#FFF3B0'; g.fillRect(Math.max(0, x), 0, Math.min(curX, x + 10) - Math.max(0, x), 12); g.globalAlpha = 1;
+        }
+      }
       if (cost > 0 && blink > 0 && tpCur > cost) {
         x = Math.max(0, Math.round((tpCur - cost) * w));
         g.globalAlpha = blink * 0.85;
@@ -341,46 +404,76 @@
       }
     }
 
-    /* Scal's TP menu, shared: double rim, title tab, icon + name + cost per row,
-       stepped highlight with the bobbing soul, HP hearts, TP gauge that previews
-       the selected cost. Drops in with a small overshoot; reduced motion skips it. */
+    /* The strip's transition is one NEU.anim (closed <-> open). stripOpen is
+       the target and acts at once, so a key is never held back; the anim
+       only shapes how the panel arrives and leaves. v runs 0..1 (a little
+       over 1 while backOut overshoots). Reduced motion: anim durs are 0. */
+    function stripVis() {
+      if (sAnim && sAnim.state !== null) return sAnim.state === 'open' ? sAnim.k : 1 - sAnim.k;
+      return stripOpen ? 1 : 0;
+    }
+    function stripSync(now) {
+      sDt = sLast && now - sLast < 100 ? (now - sLast) / 1000 : 0;   /* a gap means it was not drawn: restart the clock */
+      sLast = now;
+      if (!sAnim && NEU.anim) {
+        sAnim = NEU.anim.make({ states: { closed: { dur: 0 }, open: { dur: 0 } },
+          trans: { 'closed>open': { dur: 0.18, ease: 'backOut' }, 'open>closed': { dur: 0.18, ease: 'outCubic' } } });
+        sAnim.set('closed');
+      }
+      if (sAnim) { sAnim.set(stripOpen ? 'open' : 'closed'); sAnim.step(sDt); }
+      return stripVis();
+    }
+    /* the HEART cursor row, as a float: outCubic over 90 ms between rows */
+    function glide(now, reduce) {
+      var k = reduce || !selAt ? 1 : Math.min(1, (now - selAt) / 90);
+      return selFrom + (selTo - selFrom) * (NEU.juice && NEU.juice.outCubic ? NEU.juice.outCubic(k) : k);
+    }
+
+    /* The shared TP menu: chamfered double rim, slanted title tab, icon + name
+       + cost per row, a stepped highlight with the HEART cursor gliding between
+       rows, HP hearts, and a TP gauge that previews the selected cost. It slides
+       12 px and scales 0.92 -> 1 in and out; reduced motion skips all of it. */
     function drawStrip(ctx) {
-      var now = performance.now(), u = Math.min(1, (now - stripAt) / 140), reduce = !!(NEU.juice && NEU.juice.reduced);
+      var now = performance.now(), v = stripSync(now), fa = Math.max(0, Math.min(1, v));
+      var reduce = !!(NEU.juice && NEU.juice.reduced);
+      if (fa <= 0) return;
       if (!gaugeLast) gaugeLast = now;
       stepGauge((now - gaugeLast) * 60 / 1000);
       gaugeLast = now;
       var rows = stripItems(), rowH = 40, bw = Math.min(box.AW - 48, 464) | 0, bh = rowH * rows.length + 132;
-      var bx = (box.AX + (box.AW - bw) / 2) | 0, by = (box.AY + Math.max(40, (box.AH - bh) / 2) - (reduce ? 0 : (1 - u) * 24)) | 0;
-      var ease = 1 + 0.12 * Math.sin(u * Math.PI) * (1 - u), i, st, y, sel, tw, fy, gx, gy, gw, cost, blink, c0, c1;
+      var bx = (box.AX + (box.AW - bw) / 2) | 0, by = (box.AY + Math.max(40, (box.AH - bh) / 2) + (1 - v) * 12) | 0;
+      var sc = 0.92 + 0.08 * v, i, st, y, sel, tw, fy, gx, gy, gw, cost, blink, c0, c1, g, step;
+      if (selTo !== stripSel) { selFrom = glide(now, reduce); selTo = stripSel; selAt = now; }
+      g = Math.max(0, Math.min(rows.length - 1, glide(now, reduce)));
       if (now - stripShake < 180 && !reduce) bx += Math.round(Math.sin((now - stripShake) * 0.12) * 4);
-      ctx.fillStyle = 'rgba(4,0,2,' + (0.62 * u).toFixed(2) + ')'; ctx.fillRect(box.AX, box.AY, box.AW, box.AH);
+      ctx.fillStyle = 'rgba(4,0,2,' + (0.62 * fa).toFixed(2) + ')'; ctx.fillRect(box.AX, box.AY, box.AW, box.AH);
       ctx.save();
-      if (!reduce && ease !== 1) { ctx.translate(bx + bw / 2, by + bh / 2); ctx.scale(ease, ease); ctx.translate(-(bx + bw / 2), -(by + bh / 2)); }
-      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(bx + 6, by + 6, bw, bh);
-      ctx.fillStyle = '#050104'; ctx.fillRect(bx, by, bw, bh);
-      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(bx, by, bw, 3); ctx.fillRect(bx, by + bh - 3, bw, 3); ctx.fillRect(bx, by, 3, bh); ctx.fillRect(bx + bw - 3, by, 3, bh);
-      ctx.fillStyle = T.rim; ctx.fillRect(bx + 6, by + 6, bw - 12, 2); ctx.fillRect(bx + 6, by + bh - 8, bw - 12, 2);
-      ctx.fillRect(bx + 6, by + 6, 2, bh - 12); ctx.fillRect(bx + bw - 8, by + 6, 2, bh - 12);
-      ctx.fillStyle = T.acc; ctx.fillRect(bx + 6, by + 6, 4, 4); ctx.fillRect(bx + bw - 10, by + 6, 4, 4);
-      ctx.fillRect(bx + 6, by + bh - 10, 4, 4); ctx.fillRect(bx + bw - 10, by + bh - 10, 4, 4);
+      ctx.globalAlpha = fa;
+      if (sc !== 1) { ctx.translate(bx + bw / 2, by + bh / 2); ctx.scale(sc, sc); ctx.translate(-(bx + bw / 2), -(by + bh / 2)); }
+      art.frame(ctx, bx, by, bw, bh, T);
       ctx.font = FONT_UI; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
       tw = (ctx.measureText ? ctx.measureText(T.title).width : 120) + 24 | 0;
-      ctx.fillStyle = '#050104'; ctx.fillRect(bx + 20, by - 12, tw, 24);
-      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(bx + 20, by - 12, tw, 2); ctx.fillRect(bx + 20, by - 12, 2, 14); ctx.fillRect(bx + 18 + tw, by - 12, 2, 14);
+      art.tab(ctx, bx + 20, by - 12, tw, T);
       ctx.fillStyle = T.acc; ctx.fillText(T.title, bx + 32, by - 8);
+      /* the highlight and cursor ride the glide, so the move is one slide, not a snap */
+      st = rowState(rows[stripSel] || rows[0]); y = Math.round(by + 28 + g * rowH);
+      c0 = ((bw - 24) * 0.34) | 0; c1 = ((bw - 24) * 0.33) | 0;
+      ctx.fillStyle = 'rgba(' + T.hot + ',0.42)'; ctx.fillRect(bx + 12, y - 4, c0, 32);
+      ctx.fillStyle = 'rgba(' + T.hot + ',0.24)'; ctx.fillRect(bx + 12 + c0, y - 4, c1, 32);
+      ctx.fillStyle = 'rgba(' + T.hot + ',0.12)'; ctx.fillRect(bx + 12 + c0 + c1, y - 4, bw - 24 - c0 - c1, 32);
+      ctx.fillStyle = st.ok ? T.hotLine : '#5A5668'; ctx.fillRect(bx + 12, y - 4, 2, 32);
+      stamp(ctx, HEART, bx + 28 + (reduce ? 0 : Math.round(Math.sin(now * 0.008) * 2)), y + 12, 2, T.soul);
       for (i = 0; i < rows.length; i++) {
         st = rowState(rows[i]); y = by + 28 + i * rowH; sel = i === stripSel;
-        if (sel) {
-          c0 = ((bw - 24) * 0.34) | 0; c1 = ((bw - 24) * 0.33) | 0;
-          ctx.fillStyle = 'rgba(' + T.hot + ',0.42)'; ctx.fillRect(bx + 12, y - 4, c0, 32);
-          ctx.fillStyle = 'rgba(' + T.hot + ',0.24)'; ctx.fillRect(bx + 12 + c0, y - 4, c1, 32);
-          ctx.fillStyle = 'rgba(' + T.hot + ',0.12)'; ctx.fillRect(bx + 12 + c0 + c1, y - 4, bw - 24 - c0 - c1, 32);
-          ctx.fillStyle = st.ok ? T.hotLine : '#5A5668'; ctx.fillRect(bx + 12, y - 4, 2, 32);
-          stamp(ctx, HEART, bx + 28 + (reduce ? 0 : Math.round(Math.sin(now * 0.008) * 2)), y + 12, 2, T.soul);
-        }
-        ctx.fillStyle = st.ok ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)'; ctx.fillRect(bx + 46, y - 1, 22, 22);
-        stamp(ctx, ICON[st.icon], bx + 57, y + 10, 2, st.ok ? st.col : '#3E3A48');
-        ctx.fillStyle = st.ok ? (sel ? '#FFFF00' : '#FFFFFF') : '#5A5668'; ctx.fillText(rows[i].name, bx + 80, y + 2);
+        /* a row that flips usable/unusable fades to 0.45 over 120 ms */
+        step = 0.55 * sDt / 0.12;
+        if (rowA[i] === undefined || reduce || Math.abs((st.ok ? 1 : 0.45) - rowA[i]) <= step) rowA[i] = st.ok ? 1 : 0.45;
+        else rowA[i] += st.ok ? step : -step;
+        ctx.globalAlpha = fa * rowA[i];
+        ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(bx + 46, y - 1, 22, 22);
+        art.icon(ctx, st.icon, bx + 57, y + 10, st.col);
+        ctx.fillStyle = st.ok && sel ? '#FFFF00' : '#FFFFFF'; ctx.fillText(rows[i].name, bx + 80, y + 2);
+        ctx.globalAlpha = fa;
         ctx.textAlign = 'right'; ctx.fillStyle = st.ok ? T.acc : '#6A6480'; ctx.fillText(st.ok ? st.tag : st.why, bx + bw - 24, y + 2); ctx.textAlign = 'left';
         if (rows[i].kind === 'heal-free' && healCd > 0) {
           ctx.fillStyle = '#1A3A24'; ctx.fillRect(bx + 80, y + 21, 128, 3);
@@ -395,7 +488,8 @@
       ctx.textAlign = 'right'; ctx.fillStyle = T.acc; ctx.fillText((NEU.glyph && NEU.glyph.compact() ? '' : 'TP ') + (tp >= 1 && !(NEU.glyph && NEU.glyph.compact()) ? 'MAX' : Math.floor(tp * 100) + '%'), bx + bw - 24, fy + 14);
       gx = bx + 24; gy = fy + 40; gw = bw - 48;
       st = rowState(rows[stripSel] || rows[0]); cost = st.ok ? st.cost : 0;
-      blink = reduce ? 1 : (Math.floor(now / 260) % 2 ? 1 : 0.55);
+      /* cost preview: a soft 1.5 Hz pulse, not a hard 1.9 Hz blink */
+      blink = reduce ? 1 : 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(now * 0.009425));
       ctx.fillStyle = T.well; ctx.fillRect(gx - 2, gy - 2, gw + 2, 16);
       if (!gaugeCv || gaugeCv.width !== gw) {
         gaugeCv = typeof document !== 'undefined' && document.createElement ? document.createElement('canvas') : null;
@@ -466,7 +560,7 @@
         ctx.fillStyle = '#FFF4D0'; ctx.fillRect((beam.x - 1) | 0, (beam.y - 1) | 0, 3, 3);
       }
       for (i = 0; i < casts.length; i++) if (NEU.fxBurst) NEU.fxBurst(ctx, casts[i].k, casts[i].x, casts[i].y, 1 - casts[i].t / casts[i].d, 1.6);
-      if (stripOpen) drawStrip(ctx);
+      if (stripOpen || stripVis() > 0) drawStrip(ctx);
     }
     function graze(bullet) {
       if (!bullet || bullet.grazed) return false;
@@ -513,5 +607,5 @@
   }
 
   /* ponytail: Scal keeps its inline copy until its gzip budget allows the later merge. */
-  NEU.kit = { create: create };
+  NEU.kit = { create: create, art: art };
 })();
