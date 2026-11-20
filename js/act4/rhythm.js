@@ -387,7 +387,7 @@
     S.drainTo = S.health / HEALTH_MAX;
     S.drainT = performance.now();
     S.mercHit = now();                     /* he flinches when the soul connects */
-    if (soulF) soulF.dashI = 0.45;
+    if (soulF) soulF.dashI = NEU.boss ? NEU.boss.iframes(0.45) : 0.45;
     if (NEU.juice) {
       NEU.juice.hit('medium');
       NEU.juice.burst(soulF.x, soulF.y - 10, 9, '#E04A6B', 1.3);
@@ -630,7 +630,7 @@
   /* the dodge's spawns: each pattern drops its next wave once its gap has passed */
   function spawnHazards(i, tb, g) {
     if (hazBreak !== i) { hazBreak = i; S.pattern = i; S.spawnN = 0; S.hazards = []; S.wind = 0; S.windN = 0; }
-    var n = S.spawnN, wt = WIND_UP + n * PAT_GAP[i];
+    var n = S.spawnN, wt = WIND_UP + n * PAT_GAP[i] * (NEU.boss ? NEU.boss.mul('gap') : 1);
     if (tb >= wt - WIND_UP && tb < wt) {
       /* he leans back and raises a hand before every wave — the tell is the
          same length as the arrows' fold, so the player can read it */
@@ -670,25 +670,25 @@
       var box = { AX: 64, AY: 64, AW: Math.max(32, g.w - 128), AH: Math.max(32, g.h - 128) };
       if (NEU.danmaku && NEU.danmaku.move) NEU.danmaku.move(soulF, mk, dt, box);
       else if (soulF.dashI > 0) soulF.dashI -= dt;
-      var hi;
+      var hi, hdt = dt * (NEU.boss ? NEU.boss.mul('bulletSpeed') : 1);   /* tier scales hazard motion as time */
       for (hi = 0; hi < S.hazards.length; hi++) {
         var h = S.hazards[hi];
-        h.x += h.vx * dt; h.y += h.vy * dt;
-        if (h.grav) h.vy += 280 * dt;
-        if (h.kind === 'axe') h.spin += dt * 4;
+        h.x += h.vx * hdt; h.y += h.vy * hdt;
+        if (h.grav) h.vy += 280 * hdt;
+        if (h.kind === 'axe') h.spin += hdt * 4;
         if (h.kind === 'wisp') {
-          h.age += dt;
+          h.age += hdt;
           /* curves toward the soul, capped: it rewards keeping moving.
              vx/vy were already integrated above; only the sway is added */
           var want = Math.max(-50, Math.min(50, (soulF.x - h.x) * 0.35));
-          h.vx += (want - h.vx) * Math.min(1, dt * 3);
-          h.x += Math.sin(h.age * 2.6) * 36 * dt;
+          h.vx += (want - h.vx) * Math.min(1, hdt * 3);
+          h.x += Math.sin(h.age * 2.6) * 36 * hdt;
         }
         if (h.kind === 'bottle' && !h.broke && h.y > g.h - 80) {
           h.broke = true; h.vx = 0; h.vy = 0;
           if (NEU.juice) NEU.juice.burst(h.x, h.y, 10, '#C8E8FF', 1);
         }
-        if (h.broke) h.age += dt;
+        if (h.broke) h.age += hdt;
         var dx = soulF.x - h.x, dy = soulF.y - h.y;
         if (!h.broke && dx * dx + dy * dy < HIT_R * HIT_R && !(soulF.dashI > 0)) {
           soulHit();
@@ -1753,6 +1753,7 @@
     draw(songPos());
   }
   function open() {
+    if (NEU.boss) NEU.boss.open('rhythm');   /* latch the tier once per song (diff.js owns it) */
     refocusClick = false;
     wrap.hidden = false;
     NEU.activeMinigame = 'rhythm';      /* the room underneath must not move or take Escape */
@@ -1793,6 +1794,7 @@
   }
   function leave() {
     running = false;
+    if (NEU.boss) NEU.boss.close('rhythm');
     if (raf && window.cancelAnimationFrame) cancelAnimationFrame(raf);
     raf = 0;
     stopBacking();                      /* the backing loop must not outlive the overlay */

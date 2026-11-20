@@ -131,7 +131,7 @@
     if (player.dead > 0 || player.inv > 0) return false;
     if (NEU.cheat && NEU.cheat.god) return false;
     if (!current || !current.hp) { die(); return true; }
-    player.hp = Math.max(0, player.hp - (n || 1)); player.inv = C.hurtInv; player.hurtFlash = 0.14;
+    player.hp = Math.max(0, player.hp - (n || 1)); player.inv = C.hurtInv * (NEU.boss ? NEU.boss.iframes(1) : 1); player.hurtFlash = 0.14;
     player.vx = (dir || -player.face) * C.kbX; player.vy = C.kbY; player.st = 0; player.varJump = 0;
     if (NEU.juice && NEU.juice.hit && !replaying) { NEU.juice.hit('medium', { colour: '#FF5577', dx: player.vx, dy: player.vy }); if (NEU.juice.burst) NEU.juice.burst(player.x, player.y - HH / 2, 10, '#FF5577', 140); }
     if (NEU.sfx && NEU.sfx.hit && !replaying) NEU.sfx.hit(0.8);
@@ -969,6 +969,7 @@
   function open(id, opts) {
     var i, carry;
     if (!levels[id]) return false;
+    if (NEU.boss) NEU.boss.open('plat');   /* latch the tier for this run (diff.js owns it) */
     clearLevelSlide();
     opts = opts || {};
     carry = live && opts.carry ? { vx: player.vx, vy: player.vy, dashes: player.dashes, face: player.face } : null;
@@ -1029,6 +1030,7 @@
   }
   function close() {
     if (!live) return;
+    if (NEU.boss) NEU.boss.close('plat');
     clearLevelSlide();
     live = false;
     if (overlay) overlay.hidden = true;
