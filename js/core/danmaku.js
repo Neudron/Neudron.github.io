@@ -106,6 +106,15 @@
     return { AX: AX, AY: AY, AW: AW, AH: AH };
   }
 
+  /* Boss arena: 760x500 at <=800px tall, scaled up to 1.4x on taller
+     viewports so the fight fills the screen (A14). One authority so polt,
+     exo, draedon and the twins' sub-arenas all agree on the geometry. */
+  function arenaFor(w, h) {
+    var winH = h || window.innerHeight || 600;
+    var k = Math.min(1.4, Math.max(1, winH / 800));
+    return arena(w, h, (760 * k) | 0, (500 * k) | 0, 20);
+  }
+
   function shot(list, x, y, vx, vy, r, colour, kind, maxCap) {
     if (list.length >= (maxCap || 900)) return null;
     var b = {
@@ -720,6 +729,7 @@
 
   NEU.danmaku = {
     arena: arena,
+    arenaFor: arenaFor,
     assist: assist,
     fight: fight, move: move, dash: dash, tap: tap, key: key, keyName: keyName,
     tick: tick, hurt: hurt, mul: mul, slow: slow, pop: pop, bossHit: bossHit,

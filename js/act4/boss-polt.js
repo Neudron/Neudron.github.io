@@ -119,9 +119,8 @@
     cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    /* OP-D02: 760x500 at <=800px tall, up to 1.4x (1064x700) on 1080p so the arena fills the screen */
-    var k = Math.min(1.4, Math.max(1, innerHeight / 800));
-    var ar = dm.arena ? dm.arena(innerWidth, innerHeight, (760 * k) | 0, (500 * k) | 0, 20) : null;
+    /* OP-D02: 760x500 at <=800px tall, up to 1.4x on 1080p so the arena fills the screen */
+    var ar = dm.arenaFor ? dm.arenaFor(innerWidth, innerHeight) : null;
     if (ar) {
       AW = ar.AW; AH = ar.AH; AX = ar.AX; AY = ar.AY;
     } else {
@@ -1203,8 +1202,8 @@
     }
 
     if (line && !cardUp && nowMs - lineT < 5000) {
-      /* 8px of gap below the 16px line, clear of the arena frame */
-      var ty = (AY - 24) | 0;
+      /* plate clears the arena frame by 8px; ty is still clamped below */
+      var ty = (AY - 28) | 0;
       var hudTop = Math.min(AY + AH + 24, innerHeight - 52) | 0;
       if (ty + 16 > hudTop) ty = (hudTop - 16) | 0;
       if (ty < 32) ty = 32;

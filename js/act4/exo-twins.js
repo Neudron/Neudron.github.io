@@ -130,7 +130,7 @@
 
   function arena() {
     var w = window.innerWidth || 800, h = window.innerHeight || 600, ar;
-    if (NEU.danmaku && NEU.danmaku.arena) ar = NEU.danmaku.arena(w, h, 760, 500, 20);
+    if (NEU.danmaku && NEU.danmaku.arenaFor) ar = NEU.danmaku.arenaFor(w, h);
     if (!ar) ar = { AX: 20, AY: 40, AW: 760, AH: 480 };
     return ar;
   }
