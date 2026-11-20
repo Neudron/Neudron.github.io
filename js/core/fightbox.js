@@ -44,10 +44,22 @@
     IFRAME: 22, WARN: 20, INSET: 6,
     POINTS: 72, PASSES: 6, TOL: 0.5,
     GRAZE_R: 14.4,                      /* kept for callers that graze the soul */
-    CULL_R: 170
+    CULL_R: 170, CULL_K: 0.75,
+    RETREAT_BOX: 10, RETREAT_FX: 20,    /* ticks: box shrink, then retreat FX to 20 */
+    SPAWN_BOX: 10, SPAWN_FX: 12,
+    RETURN_TRAVEL: 4.6666665, RETURN_TICKS: 12.333333,
+    GRAZE_RING: 5,                      /* ticks the graze ring shows */
+    DMG_RISE: 12, DMG_SHOW: 40, SHAKE: 4  /* damage number: rises 12, gone at 40 */
   };
   var SHAPES = ['RECT', 'CIRCLE', 'HEX', 'TRI', 'DIAMOND', 'OCT', 'TRAP', 'TRI_DOWN', 'HEX_FLAT'];
   var N = K.POINTS, TAU = Math.PI * 2, HALF_PI = Math.PI / 2;
+
+  /* Reduced motion cuts every ease, morph and tween to its end frame. */
+  function reduced() {
+    var m = NEU.motion, s = NEU.settings;
+    return !!((m && m.reduced && m.reduced()) || (s && s.reduced));
+  }
+  function toward(v, t, d) { return v < t ? Math.min(t, v + d) : Math.max(t, v - d); }
 
   /* Unit corners, half-extent 0.5. The circle has no corners; rayHit then
      falls back to 0.5, which the 72-point sampler turns into an ellipse. */
@@ -169,20 +181,127 @@
       a: 0, b: 0, m: 0,
       poly: new Float32Array(N * 2),
       soul: { x: 0, y: 0, iframe: 0 },
-      tick: 0
+      tick: 0,
+      tw: o.w || K.BOX_W, th: o.h || K.BOX_H,   /* ease target size */
+      rt: -1, sp: -1,                           /* retreat / spawn tick, -1 idle */
+      mdur: 0, mt: 0, ring: 0, placed: false,
+      back: null,                               /* soul return tween */
+      warns: [], due: [], dmgs: []
     };
-    f.setRect = function (w, h) { f.w = w; f.h = h; return f; };
-    f.setShape = function (a, b, m) { f.a = a | 0; f.b = b | 0; f.m = m || 0; return f; };
+    f.setRect = function (w, h) { f.w = f.tw = w; f.h = f.th = h; return f; };
+    f.setShape = function (a, b, m) { f.a = a | 0; f.b = b | 0; f.m = m || 0; f.mdur = 0; return f; };
     f.setAngle = function (r) { f.ang = r || 0; return f; };
-    f.centre = function (x, y) { f.cx = x; f.cy = y; return f; };
+    /* Moving the centre carries the soul by the same delta (ReplicaBox.apply);
+       the first placement carries nothing. */
+    f.centre = function (x, y) {
+      if (f.placed) { f.soul.x += x - f.cx; f.soul.y += y - f.cy; }
+      f.cx = x; f.cy = y; f.placed = true;
+      return f;
+    };
+    /* Box size eases toward the target at BOX_ANIM_SPEED px per tick. */
+    f.ease = function (w, h) {
+      f.tw = w; f.th = h;
+      if (reduced()) { f.w = w; f.h = h; }
+      return f;
+    };
+    f.retreat = function () { f.rt = 0; f.sp = -1; return f.ease(0, 0); };
+    f.spawn = function (w, h) {
+      f.w = f.h = 0; f.sp = 0; f.rt = -1;
+      return f.ease(w, h);
+    };
+    f.retreating = function () { return f.rt >= 0 && f.rt < K.RETREAT_BOX; };
+    f.retreatFx = function () { return f.rt >= K.RETREAT_BOX; };
+    f.spawning = function () { return f.sp >= 0 && f.sp < K.SPAWN_BOX; };
+    f.spawnFx = function () { return f.sp >= 0; };
+    /* Live morph: m runs 0 -> 1 linearly over ticks. Starting one mid-morph
+       restarts from the nearer shape (a pop of at most half the morph). */
+    f.morph = function (b, ticks) {
+      b = b | 0;
+      var from = f.m >= 0.5 ? f.b : f.a;
+      if (from === b && f.m === 0) return f;
+      if (reduced() || !(ticks > 0)) return f.setShape(b, b, 0);
+      f.a = from; f.b = b; f.m = 0; f.mt = 0; f.mdur = ticks;
+      return f;
+    };
+    f.morphing = function () { return f.mdur > 0; };
+    /* The heart flies to its anchor over RETURN_TICKS (linear tween). */
+    f.recall = function (x, y) {
+      if (reduced()) { f.soul.x = x; f.soul.y = y; f.back = null; return f; }
+      f.back = { fx: f.soul.x, fy: f.soul.y, ax: x, ay: y, t: 0 };
+      return f;
+    };
+    f.returning = function () { return !!f.back; };
+    /* Out-of-box spawn telegraph. A point outside the INSET-shrunk target rect
+       queues a WARN-tick warning and returns true; the caller then spawns it
+       only when f.take() hands it back. Inside returns false: spawn now. */
+    f.warn = function (x, y, data) {
+      var hw = f.tw / 2 - K.INSET, hh = f.th / 2 - K.INSET;
+      if (x > f.cx - hw && x < f.cx + hw && y > f.cy - hh && y < f.cy + hh) return false;
+      f.warns.push({ x: x, y: y, t: K.WARN, data: data });
+      return true;
+    };
+    f.take = function () { var d = f.due; f.due = []; return d; };
+    /* A bullet this far from the box centre is spent. */
+    f.gone = function (b) {
+      var dx = b.x - f.cx, dy = b.y - f.cy, r = Math.max(f.w, f.h) * K.CULL_K + K.CULL_R;
+      return dx * dx + dy * dy > r * r;
+    };
+    /* Graze: within GRAZE_R of the soul centre, once per bullet. */
+    f.graze = function (b) {
+      if (!b || b.grazed) return false;
+      var dx = b.x - f.soul.x, dy = b.y - f.soul.y;
+      if (dx * dx + dy * dy > K.GRAZE_R * K.GRAZE_R) return false;
+      b.grazed = true; f.ring = K.GRAZE_RING;
+      return true;
+    };
+    f.dmg = function (x, y, n) { f.dmgs.push({ x: x, y: y, n: n, t: 0 }); return f; };
+    /* Graze ring and damage numbers. Reduced motion: ring does not shrink,
+       numbers do not rise or shake (they still fade out). */
+    f.draw = function (ctx) {
+      var i, d, still = reduced(), r, dx, dy, al;
+      ctx.save();
+      if (f.ring > 0) {
+        r = still ? K.GRAZE_R : K.GRAZE_R * (0.6 + 0.4 * f.ring / K.GRAZE_RING);
+        ctx.globalAlpha = f.ring / K.GRAZE_RING;
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(f.soul.x, f.soul.y, r, 0, TAU); ctx.stroke();
+      }
+      ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = '#ff4040';
+      for (i = 0; i < f.dmgs.length; i++) {
+        d = f.dmgs[i];
+        dy = still ? K.DMG_RISE : Math.min(d.t, K.DMG_RISE);
+        dx = still || d.t >= K.DMG_RISE ? 0 : ((d.t & 1) ? 1 : -1) * K.SHAKE * (1 - d.t / K.DMG_RISE);
+        al = d.t < K.DMG_RISE ? 1 : 1 - (d.t - K.DMG_RISE) / (K.DMG_SHOW - K.DMG_RISE);
+        ctx.globalAlpha = al;
+        ctx.fillText(String(d.n), d.x + dx, d.y - dy);
+      }
+      ctx.restore();
+      return f;
+    };
     f.rebuild = function () { return buildPoly(f.cx, f.cy, f.w, f.h, f.ang, f.a, f.b, f.m, f.poly); };
     f.inside = function (x, y) { return inside(x, y, f.poly); };
     f.clampPoint = function (x, y, r) { return clampPoint(x, y, r === undefined ? K.SOUL_HALF : r, f.poly); };
     f.clampSoul = function () { var p = clampPoint(f.soul.x, f.soul.y, K.SOUL_HALF, f.poly); f.soul.x = p.x; f.soul.y = p.y; return f; };
     f.hit = function () { f.soul.iframe = K.IFRAME; return f; };
     f.step = function (input) {
-      var sp = input && input.focus ? K.SNEAK : K.SPEED;
+      var sp = input && input.focus ? K.SNEAK : K.SPEED, i, w, bk, p;
       f.tick++;
+      f.w = toward(f.w, f.tw, K.BOX_ANIM_SPEED);
+      f.h = toward(f.h, f.th, K.BOX_ANIM_SPEED);
+      if (f.rt >= 0 && ++f.rt >= K.RETREAT_FX) f.rt = -1;
+      if (f.sp >= 0 && ++f.sp >= K.SPAWN_FX) f.sp = -1;
+      if (f.mdur > 0) {
+        f.m = ++f.mt / f.mdur;               /* integer count: m hits 1 exactly */
+        if (f.mt >= f.mdur) { f.a = f.b; f.m = 0; f.mdur = 0; }
+      }
+      bk = f.back;
+      if (bk) {
+        bk.t++;
+        p = Math.min(1, bk.t / K.RETURN_TICKS);
+        f.soul.x = bk.fx + (bk.ax - bk.fx) * p; f.soul.y = bk.fy + (bk.ay - bk.fy) * p;
+        if (bk.t >= K.RETURN_TICKS) f.back = null;
+        input = null;                       /* the heart is in flight */
+      }
       if (input) {
         if (input.left) f.soul.x -= sp;
         if (input.right) f.soul.x += sp;
@@ -191,6 +310,12 @@
       }
       f.rebuild(); f.clampSoul();
       if (f.soul.iframe > 0) f.soul.iframe--;
+      if (f.ring > 0) f.ring--;
+      for (i = f.warns.length - 1; i >= 0; i--) {
+        w = f.warns[i];
+        if (--w.t <= 0) { f.warns.splice(i, 1); f.due.unshift(w); }
+      }
+      for (i = f.dmgs.length - 1; i >= 0; i--) if (++f.dmgs[i].t >= K.DMG_SHOW) f.dmgs.splice(i, 1);
       return f;
     };
     f.rebuild();
