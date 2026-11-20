@@ -64,8 +64,59 @@
       warns[i].age += dt;
       if (warns[i].age >= warns[i].life / 60) warns.splice(i, 1);
     }
+    gCool -= dt;
+    for (i = 0; i < GHOSTS; i++) if (ghosts[i].a > 0) ghosts[i].a = Math.max(0, ghosts[i].a - dt * GHOST_A / GHOST_LIFE);
+    if (card.text) { card.age += dt; if (card.age >= CARD_F / 60) card.text = ''; }
   }
-  function clear() { warns.length = 0; }
+  function clear() {
+    warns.length = 0; card.text = '';
+    for (var i = 0; i < GHOSTS; i++) ghosts[i].a = 0;
+  }
+
+  /* WK2: shake budget. NEU.juice decays trauma at 1.5/s, so 0.2 trauma is
+     gone in 8 frames; a Polt hit passes shake(tier) as its opts.shake, which tops
+     trauma up to that ceiling, never past it. Reduced motion / photosensitive stay gated inside juice.hit. */
+  var SHAKE_MAX = 0.2;
+  function shake(tier) {
+    var j = NEU.juice, t;
+    if (!j) return undefined;
+    t = j.tiers[tier] || j.tiers.small;
+    return Math.min(t.shake, Math.max(0, SHAKE_MAX - j.trauma));
+  }
+
+  /* WK2: charge afterimages. Four pooled ghosts, one per 4 frames, fading
+     over 12 frames from 0.4 alpha; no flicker. The caller skips both
+     ghost() and eachGhost() under reduced motion. */
+  var GHOSTS = 4, GHOST_LIFE = 0.2, GHOST_A = 0.4, ghosts = [], gCool = 0, gi;
+  for (gi = 0; gi < GHOSTS; gi++) ghosts.push({ x: 0, y: 0, a: 0 });
+  function ghost(x, y) {
+    if (gCool > 0.001) return;   /* float slack: 4 frames of dt land at ~0 */
+    for (var i = 0; i < GHOSTS; i++) if (ghosts[i].a <= 0) {
+      ghosts[i].x = x; ghosts[i].y = y; ghosts[i].a = GHOST_A; gCool = 4 / 60;
+      return;
+    }
+  }
+  function eachGhost(fn) {
+    for (var i = 0; i < GHOSTS; i++) if (ghosts[i].a > 0) fn(ghosts[i]);
+  }
+
+  /* WK2: phase title card, 90 frames. Fades in/out; reduced motion shows
+     it static for the same time. Draw-only, never touches input. */
+  var CARD_F = 90, card = { text: '', age: 0 };
+  function titleCard(text) { card.text = text || ''; card.age = 0; }
+  function drawCard(ctx, cx, cy, o) {
+    if (!ctx || !card.text) return;
+    o = o || {};
+    var t = card.age / (CARD_F / 60);
+    var a = o.reduced ? 1 : clamp(t / 0.15, 0, 1) * clamp((1 - t) / 0.25, 0, 1);
+    ctx.font = '32px "Determination Mono","Pixelify Sans",monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.globalAlpha = a; ctx.fillStyle = WARN.ink;
+    ctx.fillText(card.text, cx + 2, cy + 2);
+    ctx.fillStyle = (pal(o.pal) || PAL.ECTO).ramp[4];
+    ctx.fillText(card.text, cx, cy);
+    ctx.globalAlpha = 1; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
 
   /* Straight runs: the under-stroke is 2px black, the tell is 1px. `dots`
      is the old dotted read, kept as a redundant channel (VIP-02 proof and
@@ -231,6 +282,8 @@
     rampStep: rampStep,
     bump: bump, clamp: clamp,
     warn: warn, step: step, clear: clear, drawWarns: drawWarns,
+    shake: shake, SHAKE_MAX: SHAKE_MAX, ghosts: ghosts, ghost: ghost, eachGhost: eachGhost,
+    card: titleCard, drawCard: drawCard,
     glow: {
       stamp: glowStamp,
       begin: beginGlow,

@@ -63,6 +63,8 @@
     if (NEU.motion && NEU.motion.reduced) return !!NEU.motion.reduced();
     return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
+  /* WK2: every Polt hit's shake rides the 8-frame budget in polt-fx; undefined = the tier's own. */
+  function cap(tier) { return NEU.poltFx ? NEU.poltFx.shake(tier) : undefined; }
   /* PLAN 9.5: the boss reads at 2x so his legs and hooks are legible. */
   var BOSS_SCALE = 2;
   /* VIP-03: every new VFX colour comes from the fight palette in polt-fx. */
@@ -352,6 +354,7 @@
     if (charging > 0) {
       charging -= dt;
       bx += cvx * dt; by += cvy * dt;
+      if (!REDUCE_MOTION && NEU.poltFx) NEU.poltFx.ghost(bx, by);
       if (charging <= 0) { vuln = 1; chargePath = null; }   /* the punish window opens */
     } else {
       if (!warnAt) {                     /* a warning holds still: the drawn path is the real one */
@@ -504,7 +507,7 @@
     hp--; inv = IFRAMES;
     dm.hurt(F, px, py - 12);
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
-    if (NEU.juice) { NEU.juice.hit('medium', { dx: dx, dy: dy }); NEU.juice.burst(px, py, 10, COL.soul); }
+    if (NEU.juice) { NEU.juice.hit('medium', { dx: dx, dy: dy, shake: cap('medium') }); NEU.juice.burst(px, py, 10, COL.soul); }
     if (hp <= 0) { startDeath(); return true; }
     return false;
   }
@@ -546,7 +549,7 @@
     bossHP -= dmg;
     dm.bossHit(F, bx, by, dmg);
     if (NEU.sfx && NEU.sfx.hit) NEU.sfx.hit();
-    if (NEU.juice) { NEU.juice.hit('small', { dx: bx - px, dy: by - py }); NEU.juice.burst(bx, by, 7, COL.ectoHi); }
+    if (NEU.juice) { NEU.juice.hit('small', { dx: bx - px, dy: by - py, shake: cap('small') }); NEU.juice.burst(bx, by, 7, COL.ectoHi); }
     if (bossHP <= 0 && sigDone) { win(); return; }
     /* the killing blow leaves him at 1 HP; the kill lands after the signature */
     var killing = bossHP <= 0;
@@ -632,7 +635,7 @@
   function win() {
     running = false; mode = 'won'; bullets = [];
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', -1);
-    if (NEU.juice) { NEU.juice.hit('huge', { colour: '#7FE3C4' });
+    if (NEU.juice) { NEU.juice.hit('huge', { colour: '#7FE3C4', shake: cap('huge') });
                      NEU.juice.burst(bx, by, 60, COL.ecto, 260); }
     if (NEU.save) NEU.save.flag('polt_dead', 1);
     if (NEU.save) NEU.save.flag('tv_restored', 1);
@@ -707,6 +710,7 @@
   function applyPhase(to, msg) {
     phase = to;
     pulsePhase();                          /* body reaction: one white frame */
+    if (NEU.poltFx) NEU.poltFx.card(BOSS_NAMES[to]);
     if (!sig && NEU.poltAtk) NEU.poltAtk.phase(to);
     hooks.forEach(function (h) { h.free = to === 2; if (to === 2) h.t = 1.5; });
     if (to === 3) clone = { x: bx, y: by, t: 2 };
@@ -732,7 +736,7 @@
     dim = f < TR_CLOSE ? 0.6 : 0.6 * (TR_KICK - f) / (TR_KICK - TR_CLOSE);
     if (dim < 0) dim = 0;
     if (f >= TR_KICK) {                    /* large kick + hit-stop on the playable beat */
-      if (!REDUCE_MOTION && NEU.juice) NEU.juice.hit('large', { dx: px - bx, dy: py - by });
+      if (!REDUCE_MOTION && NEU.juice) NEU.juice.hit('large', { dx: px - bx, dy: py - by, shake: cap('large') });
       seq = null; dim = 0;
     } else seq.f++;
   }
@@ -1112,6 +1116,10 @@
         outline(tinted('polter', fr, COL.red, 1), bxp, byp, bs);
         ctx.globalAlpha = 1;
       }
+      if (isBody && !REDUCE_MOTION && NEU.poltFx) NEU.poltFx.eachGhost(function (g) {
+        var gp = proj(g.x, g.y, o.z);
+        ctx.globalAlpha = g.a; drawSheet('polter', Math.round(gp.x), Math.round(gp.y), bs, null, 0, fr); ctx.globalAlpha = 1;
+      });
       var drew = drawSheet('polter', bxp, byp, bs * 1.0, glows, 0, fr);
       /* the clone is the same body, flooded red by a baked copy */
       if (o.kind === 'clone' && drew) putTint(tinted('polter', fr, COL.red, 0.5), bxp, byp, bs);
@@ -1190,6 +1198,8 @@
       ctx.globalAlpha = 1;
     }
 
+    if (NEU.poltFx && mode === 'fight') NEU.poltFx.drawCard(ctx, AX + AW / 2, AY + 40, { reduced: REDUCE_MOTION, pal: phase === 3 ? 'RED' : 'ECTO' });
+
     if (line && nowMs - lineT < 5000) {
       /* 8px of gap below the 16px line, clear of the arena frame */
       var ty = (AY - 24) | 0;
@@ -1249,7 +1259,7 @@
     t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; attackWarns.length = 0; attackFrameAcc = 0; keys = {}; dying = 0;
     moveIntent = null; bossHidden = false;
     seq = null; dim = 0;                   /* VIP-04: no bar/timer/blackout survives a replay */
-    if (NEU.poltFx) NEU.poltFx.clear();   /* replay starts with no stale warning */
+    if (NEU.poltFx) { NEU.poltFx.clear(); NEU.poltFx.card(BOSS_NAMES[1]); }   /* replay starts with no stale warning */
     bossMax = Math.round(900 * dp('bossHp')); bossHP = bossMax; phase = 1; clone = null; mode = 'fight';
     phaseFlash = 0; phaseFlashes = 0; flashedPhase = 0;
     px = AX + AW / 2; py = AY + AH - 70;
