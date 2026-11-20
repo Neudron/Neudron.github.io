@@ -688,10 +688,6 @@
         'twenty-four seconds a question, not twelve', function (on) {
       set(K_RELAX, on);
     }));
-    pA11y.appendChild(row('settTouch', 'thumb controls',
-        'on-screen stick and buttons for the game scenes', function (on) {
-      if (NEU.touch) NEU.touch.set(on ? 'on' : 'off');
-    }));
 
     var foot = document.createElement('div');
     foot.className = 'sett__foot';
@@ -772,8 +768,7 @@
       ['settHitstop',   state(K_STOP)],
       ['settParticles', state(K_PART)],
       ['settPhotosens', state(K_PHOTOSENS)],
-      ['settRelaxed', state(K_RELAX)],
-      ['settTouch', NEU.touch ? NEU.touch.visible || NEU.touch.mode === 'on' : false]
+      ['settRelaxed', state(K_RELAX)]
     ];
     for (var i = 0; i < rows.length; i++) {
       var el = document.getElementById(rows[i][0]);
