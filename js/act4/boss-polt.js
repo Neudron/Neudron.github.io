@@ -112,7 +112,9 @@
     cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    var ar = dm.arena ? dm.arena(innerWidth, innerHeight, 760, 500, 20) : null;
+    /* OP-D02: 760x500 at <=800px tall, up to 1.4x (1064x700) on 1080p so the arena fills the screen */
+    var k = Math.min(1.4, Math.max(1, innerHeight / 800));
+    var ar = dm.arena ? dm.arena(innerWidth, innerHeight, (760 * k) | 0, (500 * k) | 0, 20) : null;
     if (ar) {
       AW = ar.AW; AH = ar.AH; AX = ar.AX; AY = ar.AY;
     } else {

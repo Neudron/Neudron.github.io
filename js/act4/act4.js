@@ -174,8 +174,8 @@
     return true;
   }
   /* the only claims and kernel scenes the potion may close; every fight and
-     story scene refuses, claim or not (cards and bolt claim nothing) */
-  var CLOSEABLE = { plat: 1, rhythm: 1, shop: 1, craft: 1, dark: 1, deck: 1 };
+     story scene refuses, claim or not (bolt claims nothing) */
+  var CLOSEABLE = { plat: 1, cards: 1, rhythm: 1, shop: 1, craft: 1, dark: 1, deck: 1 };
   var KSAFE = { engine: 1, plat: 1, cards: 1, rhythm: 1, craft: 1, dark: 1, deck: 1 };
   function onlySafe() {
     var st = NEU.kernel && NEU.kernel.stack, i;

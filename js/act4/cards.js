@@ -232,6 +232,7 @@
     if (wrap) wrap.hidden = false;
     if (canvas) { canvas.width = 640; canvas.height = 480; }
     stackPush();
+    NEU.activeMinigame = 'cards';       /* the room underneath must not move; act4.js claims stack hands back plat */
     draw();
   }
 
@@ -246,6 +247,7 @@
     active = false;
     if (wrap) wrap.hidden = true;
     stackPop();
+    if (NEU.activeMinigame === 'cards') NEU.activeMinigame = null;
   }
 
   function close() {
