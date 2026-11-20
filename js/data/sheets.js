@@ -446,7 +446,26 @@
        smite). Holy is row 2 of sheet 00 re-sliced vertical; BDragon free
        tier = non-commercial only, fine while neu.ac stays free. */
     fxGigSmoke:{ src: IMG + 'vfx/GigSmoke.png', w: 64, h: 1024, frames: 16, fw: 64, fh: 64, fps: 5 },
-    fxHolySmite:{ src: IMG + 'vfx/FxHoly.png',  w: 64, h: 832,  frames: 13, fw: 64, fh: 64, fps: 0 }
+    fxHolySmite:{ src: IMG + 'vfx/FxHoly.png',  w: 64, h: 832,  frames: 13, fw: 64, fh: 64, fps: 0 },
+
+    /* ── OWNER-ACCEPTED FAN-USE, NOT CLEARED (DL-RIGHTS-AUDIT.md) ──────
+       The one visual swap allowed here: Week 4 bright arrows only, a single
+       vertical 160x160 strip in lane order LEFT, DOWN, UP, RIGHT. fps 0 so
+       the caller picks the frame; rhythm.js keeps its procedural 4x4 sheet
+       as the fallback until this file is ready. No other FNF variant ships. */
+    fanWeek4:{ src: IMG + 'fan/fnf-week4/strip.png', w: 160, h: 640, frames: 4, fw: 160, fh: 160, fps: 0 },
+
+    /* One PNG per frame, sorted by trailing number — `cols`/`lin` cannot
+       express that, so `seq` carries a filename template. NEU.seqReady
+       resolves it through the SAME NEU.sheetImg cache: still one blitter,
+       no second loader. `src` points at the first frame so the file-exists
+       gate has a real path to check. fps 0: the caller owns the clock. */
+    fanBox:  { src: IMG + 'fan/deltarune/box/frame-000.png',  seq: IMG + 'fan/deltarune/box/frame-%03d.png',
+               w: 320, h: 240, frames: 1, seqFrames: 46,  fw: 320, fh: 240, fps: 0 },
+    fanBg:   { src: IMG + 'fan/deltarune/bg/frame-000.png',   seq: IMG + 'fan/deltarune/bg/frame-%03d.png',
+               w: 320, h: 240, frames: 1, seqFrames: 100, fw: 320, fh: 240, fps: 0 },
+    fanIntro:{ src: IMG + 'fan/deltarune/intro/frame-000.png', seq: IMG + 'fan/deltarune/intro/frame-%03d.png',
+               w: 320, h: 240, frames: 1, seqFrames: 158, fw: 320, fh: 240, fps: 0 }
   };
 
   /* THE DUNGEON (B5): its own map because none of these files ship yet, and fixes7 wants
@@ -546,12 +565,24 @@
     return (im.complete && im.naturalWidth && !im.__failed) ? im : null;
   };
 
+  /* Filename-sorted frame sequences. Same cache, same ready contract as a
+     grid sheet; only the source is per frame instead of a cell inside one
+     file. Returns null until the requested frame has loaded, so callers
+     keep their own fallback exactly as they do for a grid sheet. */
+  function pad3(n) { n = n | 0; return (n < 10 ? '00' : n < 100 ? '0' : '') + n; }
+  NEU.seqReady = function (sh, fr) {
+    if (!sh || !sh.seq) return null;
+    var im = NEU.sheetImg(sh.seq.replace('%03d', pad3(fr)));
+    return (im.complete && im.naturalWidth && !im.__failed) ? im : null;
+  };
+
   NEU.sheetDraw = function (ctx, key, x, y, o) {
     o = o || {};
     var sh = NEU.sheets[key];
-    var im = NEU.sheetReady(sh);
-    if (!im) return false;
-    var n = sh.frames || 1;
+    if (!sh) return false;
+    /* a sequence is one frame per file, so its grid `frames` stays 1 and
+       the loop length lives in seqFrames */
+    var n = sh.seq ? (sh.seqFrames || 1) : (sh.frames || 1);
     var cols = sh.cols || 1;
     var clock = sh.fps ? (((o.now === undefined ? Date.now() : o.now) / (1000 / sh.fps)) | 0) : 0;
     /* cols is the whole point: source x moves across the sheet instead
@@ -564,7 +595,16 @@
     } else {
       fr = (o.frame === undefined || o.frame === null) ? clock % n : (((o.frame % n) + n) % n);
     }
-    var sxi = col * sh.fw, syi = fr * sh.fh;
+    var im, sxi, syi;
+    if (sh.seq) {
+      im = NEU.seqReady(sh, fr);
+      if (!im) return false;
+      sxi = 0; syi = 0;                 /* each file is already one frame */
+    } else {
+      im = NEU.sheetReady(sh);
+      if (!im) return false;
+      sxi = col * sh.fw; syi = fr * sh.fh;
+    }
     var sc = o.scale || 1, fl = sc < 0;
     if (fl) sc = -sc;
     var dw = sh.fw * sc, dh = sh.fh * sc;
