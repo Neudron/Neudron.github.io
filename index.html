@@ -284,6 +284,14 @@
 
 <!-- ═══ the mage ═════════════════════════════════════════════════════ -->
 <div class="mage" id="mage" hidden aria-label="mage">
+  <div class="mage__warn" id="mageWarn" role="alert" hidden>
+    <p class="mage__warnBig">THE CARDS</p>
+    <p class="mage__warnSub">a spell cast at the mage is answered in cards</p>
+  </div>
+  <div class="mage__head">
+    <span class="mage__name">THE MAGE</span>
+    <span class="mage__sub">a stone shop, and the cards</span>
+  </div>
   <div class="mage__art">
     <canvas id="mageCanvas" width="320" height="192"></canvas>
   </div>
@@ -291,6 +299,7 @@
     <div class="mage__menu" id="mageMenu" role="listbox" aria-label="shop menu"></div>
     <div class="mage__box">
       <p class="mage__say" id="mageSay"></p>
+      <p class="mage__keys">arrows move &middot; <kbd data-k="z">z</kbd> choose &middot; <kbd data-k="x">x</kbd> back &middot; <kbd data-k="c">c</kbd> cast brimstone</p>
     </div>
   </div>
 </div>

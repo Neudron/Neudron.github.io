@@ -636,41 +636,91 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .cards { position: fixed; inset: 0; z-index: 80; background: #000; }
 .cards canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; image-rendering: pixelated; }
 
-/* Mage shop (js/act4/mage.js). Undertale split: art, menu, dialogue. z 76, under .tbox. */
+/* Mage shop (js/act4/mage.js). Undertale split: header, art, menu,
+   dialogue. Deep violet and ember — the room is dark stone, the mage is
+   violet pin and gold trim, the warning is blood red. z 76, under .tbox. */
 .mage {
   position: fixed; inset: 0; z-index: 76;
   display: flex; flex-direction: column;
-  background: #000; color: #fff;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #1B1030 0%, #0D0818 55%, #07040D 100%);
+  color: #F0E8FF;
   font: 400 16px/1.25 var(--font, monospace);
+  animation: mageIn 160ms steps(4) both;
 }
+@keyframes mageIn { from { opacity: 0; } to { opacity: 1; } }
 .mage[hidden] { display: none !important; }
-.mage__art { flex: 3 1 60%; min-height: 0; margin: 16px 16px 0; border: 4px solid #fff; background: #1C1814; }
+.mage__head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; padding: 16px 24px 8px; flex: none;
+}
+.mage__name {
+  font: 700 32px/1.2 var(--font, monospace); letter-spacing: 3px;
+  color: #E8C878; text-shadow: 0 0 12px rgba(232, 200, 120, 0.4), 0 2px 0 #2A1248;
+}
+.mage__sub { font: 400 16px/1.2 var(--font, monospace); color: #9A86B8; }
+.mage__art {
+  flex: 3 1 60%; min-height: 0; margin: 8px 24px 0;
+  border: 4px solid #7A52B8; background: #1C1814;
+  box-shadow: 0 0 0 4px #0B0714, 0 0 32px rgba(122, 82, 184, 0.3);
+}
 .mage__art canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; image-rendering: pixelated; }
-.mage__dock { flex: 2 1 40%; display: flex; gap: 16px; padding: 16px; min-height: 0; }
+.mage__dock { flex: 2 1 40%; display: flex; gap: 16px; padding: 16px 24px 24px; min-height: 0; }
 .mage__menu, .mage__box {
-  border: 4px solid #fff; padding: 16px; min-width: 0; overflow: auto; background: #000;
+  border: 4px solid #4B2A78; padding: 16px; min-width: 0; overflow: auto;
+  background: #140B20;
+  box-shadow: inset 0 0 0 2px #1E0F33, 0 4px 0 rgba(0, 0, 0, 0.45);
 }
 .mage__menu { flex: 2 1 40%; }
-.mage__box { flex: 3 1 60%; }
-.mage__say { margin: 0; font: 400 16px/1.35 var(--font, monospace); color: #fff; }
+.mage__box { flex: 3 1 60%; display: flex; flex-direction: column; }
+.mage__say { margin: 0; font: 400 16px/1.4 var(--font, monospace); color: #F0E8FF; flex: 1 1 auto; }
+.mage__keys {
+  margin: 16px 0 0; padding-top: 8px; flex: none;
+  border-top: 2px solid #3A2414; color: #9A86B8;
+  font: 400 16px/1.4 var(--font, monospace);
+}
+.mage__keys kbd { color: #E8C878; }
 .mage__row {
   position: relative; display: block; width: 100%;
   margin: 0; padding: 0 0 0 32px; min-height: 32px;
-  text-align: left; color: #fff; background: transparent;
+  text-align: left; color: #C8B8E0; background: transparent;
   border: 0; font: 400 16px/2 var(--font, monospace); cursor: pointer;
+  transition: background-color 120ms steps(3), color 120ms steps(3);
 }
-.mage__row.is-sel { color: #ff0; }
+.mage__row:hover { color: #F0E8FF; background: rgba(122, 82, 184, 0.12); }
+.mage__row.is-sel { color: #FFE080; background: rgba(122, 82, 184, 0.2); }
 .mage__row.is-sel::before {
   content: '\2665'; position: absolute; left: 0; top: 0;
-  color: #f00; font-size: 16px;
+  color: #FF6A6A; font-size: 16px;
 }
-.mage__p { float: right; color: #fff; }
-.mage__gold { margin-top: 16px; padding-top: 8px; border-top: 4px solid #fff; color: #E4C46A; }
+.mage__p { float: right; color: #E8C878; }
+.mage__gold {
+  margin-top: 16px; padding-top: 8px; border-top: 4px solid #4B2A78;
+  color: #E4C46A; font: 700 16px/1.4 var(--font, monospace);
+}
+/* The warning before the card battle: impossible to mistake for talk. */
+.mage__warn {
+  position: absolute; inset: 0; z-index: 3;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; padding: 16px; box-sizing: border-box; text-align: center;
+  background: rgba(30, 0, 4, 0.88);
+  border: 8px solid #FF2A1A; outline: 4px solid #5A0008;
+}
+.mage__warn[hidden] { display: none !important; }
+.mage__warnBig {
+  margin: 0; font: 700 64px/1.1 var(--font, monospace);
+  letter-spacing: 6px; color: #FF2A1A;
+  text-shadow: 0 0 16px rgba(255, 42, 26, 0.9), 0 0 48px rgba(255, 42, 26, 0.5), 0 4px 0 #4A0008;
+}
+.mage__warnSub { margin: 0; font: 400 16px/1.4 var(--font, monospace); color: #FFB0A0; }
 @media (max-width: 640px) {
+  .mage__head { padding: 8px 8px 0; flex-direction: column; gap: 0; }
+  .mage__name { font-size: 32px; }
   .mage__art { flex: 0 0 auto; aspect-ratio: 320 / 192; margin: 8px 8px 0; }
   .mage__dock { flex: 1 1 auto; flex-direction: column; gap: 8px; padding: 8px; }
   .mage__box { order: -1; flex: 0 0 auto; min-height: 96px; padding: 8px; }
   .mage__menu { flex: 1 1 auto; padding: 8px; }
+  .mage__warnBig { font-size: 48px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mage, .mage * { animation: none !important; transition: none !important; }
@@ -951,4 +1001,80 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .photo__mark { color: #b01018; }
 @media (prefers-reduced-motion: reduce) {
   .photo, .photo * { animation: none !important; transition: none !important; }
+}
+
+
+/* ── W10: the rift and the sky arrival are fullscreen fixed layers.
+   The rift canvas renders at 1/4 res and stretches; pixelated keeps it
+   chunky. The sky cinematic is pure CSS (dusk gradient, star field,
+   ridge, jagged crack, offset-path hero) so the JS stays tiny; only the
+   hero sprite is a canvas, redrawn by a slow interval. */
+.crack-rift, .crack-sky { position: fixed; inset: 0; z-index: 82; }
+.crack-rift canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.crack-sky {
+  background: linear-gradient(#0B0716 0%, #1A1230 22%, #2A1B44 44%, #3A2652 62%, #4E3260 72%, #0E1A0E 74%, #0E1A0E 100%);
+  animation: crackSky 3.05s linear forwards; pointer-events: none;
+}
+@keyframes crackSky { 0% { opacity: 0; } 8% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+.crack-sky.is-rm { animation: none; background: #0B0716; }
+.crack-sky__stars {
+  position: absolute; left: 0; top: 0; width: 2px; height: 2px;
+  box-shadow: 9vw 7vh #B8A8D8, 17vw 16vh #B8A8D8, 26vw 5vh #E8DCC8, 34vw 21vh #B8A8D8,
+    43vw 9vh #B8A8D8, 51vw 26vh #E8DCC8, 58vw 12vh #B8A8D8, 66vw 30vh #B8A8D8,
+    74vw 6vh #E8DCC8, 82vw 18vh #B8A8D8, 90vw 27vh #B8A8D8, 95vw 10vh #B8A8D8;
+  animation: crackTw 1.1s steps(2) infinite;
+}
+@keyframes crackTw { 50% { opacity: .35; } }
+.crack-sky__ridge {
+  position: absolute; left: 0; right: 0; top: 55%; height: 19%; background: #140D26;
+  clip-path: polygon(0 34%, 5% 8%, 11% 30%, 18% 2%, 26% 26%, 34% 10%, 43% 32%, 52% 4%, 61% 28%, 70% 12%, 79% 30%, 87% 6%, 94% 24%, 100% 14%, 100% 100%, 0 100%);
+}
+.crack-sky__ground {
+  position: absolute; left: 0; right: 0; top: 74%; bottom: 0; background: #0E1A0E;
+}
+.crack-sky__ground::after {
+  content: ''; position: absolute; left: 0; right: 0; top: -6px; height: 6px;
+  background: repeating-linear-gradient(90deg, #2E4A22 0 3px, #0E1A0E 3px 9px);
+}
+.crack-sky__crack {
+  position: absolute; left: 50%; top: 13%; width: 120px; height: 72px;
+  transform: translateX(-50%); overflow: visible;
+}
+.crack-sky__crack path {
+  fill: none; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 70; stroke-dashoffset: 70;
+  animation: crackGrow .5s ease-out forwards;
+}
+.crack-sky__crack .glow { stroke: #FF2A3A; stroke-width: 7; opacity: .45; }
+.crack-sky__crack .core { stroke: #050008; stroke-width: 5; }
+.crack-sky__crack .rim { stroke: #FFB0A0; stroke-width: 1.4; }
+@keyframes crackGrow { to { stroke-dashoffset: 0; } }
+.crack-sky__hero {
+  position: absolute; left: 0; top: 0; width: 80px; height: 96px;
+  image-rendering: pixelated; transform-origin: 50% 85%;
+  animation: skyTumble 1.9s cubic-bezier(.5, .05, .75, .4) forwards;
+}
+@keyframes skyTumble {
+  0%   { transform: translate(45vw, 4vh) rotate(-160deg); }
+  45%  { transform: translate(55vw, 34vh) rotate(170deg); }
+  75%  { transform: translate(61vw, 55vh) rotate(340deg); }
+  100% { transform: translate(61vw, 61vh) rotate(360deg); }
+}
+.crack-sky__hero.is-landed { animation: skySettle .6s ease-out forwards; }
+@keyframes skySettle {
+  0%   { transform: translate(61vw, 61vh) rotate(360deg) scaleY(1); }
+  30%  { transform: translate(61vw, 61vh) rotate(360deg) scaleY(.6); }
+  100% { transform: translate(61vw, 61vh) rotate(360deg) scaleY(1); }
+}
+.crack-sky.is-rm .crack-sky__stars, .crack-sky.is-rm .crack-sky__ridge,
+.crack-sky.is-rm .crack-sky__ground, .crack-sky.is-rm .crack-sky__crack,
+.crack-sky.is-rm .crack-sky__hero { display: none; }
+.crack-sky__cap {
+  position: absolute; left: 0; right: 0; bottom: 14%;
+  text-align: center; color: #E8DCC8; font-size: 16px;
+  opacity: 0; transition: opacity .3s; pointer-events: none;
+}
+.crack-sky__cap.is-on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .crack-sky__cap { transition: none; }
 }

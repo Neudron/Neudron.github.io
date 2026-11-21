@@ -342,6 +342,23 @@
     if (!on) { c.globalAlpha = 0.5; P.fr(c, x, y - 64, 16, 80, '#05030A'); c.globalAlpha = 1; }
   };
   kd('leave').draw = function () {};
+  /* the surface bed (W10): wooden frame, pillow, faded wool blanket. */
+  function bedSpr() {
+    return P.spr('dbed', 32, 16, function (R) {
+      var x;
+      R(0, 12, 32, 4, INK); R(1, 11, 30, 3, '#4A3018');            /* frame + legs shadow */
+      R(0, 4, 4, 8, INK); R(1, 4, 2, 8, '#6B4A2E');               /* headboard */
+      R(1, 5, 30, 6, INK); R(2, 6, 28, 4, '#E8DCC8');             /* mattress */
+      R(2, 6, 8, 4, '#F4F0E8');                                   /* pillow */
+      R(10, 6, 20, 4, '#5A6A9A'); R(10, 6, 20, 1, '#7A8ABA');     /* blanket */
+      for (x = 12; x < 30; x += 4) R(x, 9, 1, 2, '#4A5A8A');       /* blanket fold */
+      R(1, 11, 30, 1, '#8A5A32');                                 /* frame top edge */
+    });
+  }
+  kd('bed').draw = function (c, x, y) {
+    var s = bedSpr();
+    c.drawImage(s.cv, 0, 0, 32, 16, x - 8, y, 32, 16);
+  };
   var crumbleDraw = kd('crumble').draw;
   kd('crumble').draw = function (c, x, y, e, now) {
     var L = P.level0(), f, j;
