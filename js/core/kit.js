@@ -389,9 +389,10 @@
       }
       fy = by + 28 + rows.length * rowH + 4;
       ctx.fillStyle = T.well; ctx.fillRect(bx + 16, fy, bw - 32, 2);
-      ctx.fillStyle = '#C0BCC8'; ctx.fillText('HP', bx + 24, fy + 14);
+      ctx.fillStyle = '#C0BCC8'; if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'heart', bx + 24, fy + 10);
+      else ctx.fillText('HP', bx + 24, fy + 14);
       for (i = 0; i < MAXH; i++) stamp(ctx, HEART, bx + 66 + i * 16, fy + 22, 2, i < hp ? T.soul : '#2A1A20');
-      ctx.textAlign = 'right'; ctx.fillStyle = T.acc; ctx.fillText('TP ' + (tp >= 1 ? 'MAX' : Math.floor(tp * 100) + '%'), bx + bw - 24, fy + 14);
+      ctx.textAlign = 'right'; ctx.fillStyle = T.acc; ctx.fillText((NEU.glyph && NEU.glyph.compact() ? '' : 'TP ') + (tp >= 1 && !(NEU.glyph && NEU.glyph.compact()) ? 'MAX' : Math.floor(tp * 100) + '%'), bx + bw - 24, fy + 14);
       gx = bx + 24; gy = fy + 40; gw = bw - 48;
       st = rowState(rows[stripSel] || rows[0]); cost = st.ok ? st.cost : 0;
       blink = reduce ? 1 : (Math.floor(now / 260) % 2 ? 1 : 0.55);
@@ -411,8 +412,9 @@
         ctx.restore();
       }
       var kn = function (d) { return NEU.keys && NEU.keys.label ? NEU.keys.label(d) : d; };
-      ctx.textAlign = 'left'; ctx.fillStyle = '#8A8598'; ctx.fillText(kn('z') + ' use  ·  ' + kn('x') + ' back', bx + 24, fy + 64);
-      ctx.textAlign = 'right'; ctx.fillStyle = '#5A5668'; ctx.fillText('graze bullets for TP', bx + bw - 24, fy + 64); ctx.textAlign = 'left';
+      ctx.textAlign = 'left'; ctx.fillStyle = '#8A8598'; ctx.fillText(NEU.glyph && NEU.glyph.compact() ? NEU.glyph.key('z') + '  ·  ' + NEU.glyph.key('x') : kn('z') + ' use  ·  ' + kn('x') + ' back', bx + 24, fy + 64);
+      ctx.textAlign = 'right'; ctx.fillStyle = '#5A5668'; if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'graze', bx + bw - 40, fy + 61);
+      else ctx.fillText('graze bullets for TP', bx + bw - 24, fy + 64); ctx.textAlign = 'left';
       ctx.restore();
     }
     function draw(ctx) {

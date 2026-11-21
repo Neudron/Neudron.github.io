@@ -1539,7 +1539,8 @@
 
     if (won) {
       ctx.globalAlpha = still() ? 1 : Math.min(1, (performance.now() - winAt) / 300);
-      text('SONG CLEAR', g.w / 2, g.popY, g.w < 600 ? 48 : 96, '#FFD34E');
+      if (NEU.glyph && NEU.glyph.compact()) { ctx.fillStyle = '#FFD34E'; NEU.glyph.draw(ctx, 'check', g.w / 2 - 7, g.popY - 16); }
+      else text('SONG CLEAR', g.w / 2, g.popY, g.w < 600 ? 48 : 96, '#FFD34E');
       ctx.globalAlpha = 1;
     }
     /* 3-2-1-GO in big numerals over your lane, fading through each beat */
@@ -1603,9 +1604,9 @@
     if (S.paused) {                     /* ESC pauses: the held frame under a veil */
       ctx.globalAlpha = 0.6; ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, g.w, g.h); ctx.globalAlpha = 1;
       text('PAUSED', g.w / 2, g.h / 2 - 16, 48, '#FFFFFF');
-      text('ESC to resume', g.w / 2, g.h / 2 + 32, 16, '#EDE7DE');
-      text('R to restart', g.w / 2, g.h / 2 + 56, 16, '#EDE7DE');
-      text('X or tap to leave', g.w / 2, g.h / 2 + 80, 16, '#EDE7DE');
+      text(NEU.glyph && NEU.glyph.compact() ? 'Esc' : 'ESC to resume', g.w / 2, g.h / 2 + 32, 16, '#EDE7DE');
+      text(NEU.glyph && NEU.glyph.compact() ? NEU.glyph.key('r') : 'R to restart', g.w / 2, g.h / 2 + 56, 16, '#EDE7DE');
+      text(NEU.glyph && NEU.glyph.compact() ? NEU.glyph.key('x') : 'X or tap to leave', g.w / 2, g.h / 2 + 80, 16, '#EDE7DE');
     }
     ctx.restore();
     if (NEU.juice && NEU.juice.drawParts) NEU.juice.drawParts(ctx, 1 / 60);

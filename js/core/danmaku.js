@@ -526,12 +526,15 @@
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillStyle = '#FF8A1E';
     if (!slim) {
-      ctx.fillText('T', x - 16, y + (h >> 1) - 20);
-      ctx.fillText('P', x - 16, y + (h >> 1));
+      if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'graze', x - 23, y + (h >> 1) - 8);
+      else {
+        ctx.fillText('T', x - 16, y + (h >> 1) - 20);
+        ctx.fillText('P', x - 16, y + (h >> 1));
+      }
     }
     ctx.fillStyle = max ? '#FFD84A' : '#EDE7DE';
     if (slim) ctx.textAlign = 'left';
-    ctx.fillText((slim ? 'TP ' : '') + (max ? 'MAX' : Math.floor(f * 100) + '%'), slim ? x - 2 : x + w / 2, y - 24);
+    ctx.fillText((slim && !(NEU.glyph && NEU.glyph.compact()) ? 'TP ' : '') + (max && !(NEU.glyph && NEU.glyph.compact()) ? 'MAX' : Math.floor(f * 100) + '%'), slim ? x - 2 : x + w / 2, y - 24);
     ctx.textAlign = 'center';
     if (max) { ctx.fillStyle = '#EDE7DE'; ctx.fillText('100%', x + w / 2, y + h + 6); }
     ctx.textAlign = 'left';
@@ -586,18 +589,22 @@
     ctx.fillRect(px, py, pw, 2); ctx.fillRect(px, py + ph - 2, pw, 2);
     ctx.fillRect(px, py, 2, ph); ctx.fillRect(px + pw - 2, py, 2, ph);
     ctx.fillRect(px + 8, py - 18, 56, 18);
-    ctx.textAlign = 'left'; ctx.fillStyle = '#000000'; ctx.fillText('YOU', px + 18, py - 17);
-    ctx.fillStyle = '#EDE7DE'; ctx.fillText('HP', px + 10, py + 6);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#000000'; if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'player', px + 18, py - 17);
+    else ctx.fillText('YOU', px + 18, py - 17);
+    ctx.fillStyle = '#EDE7DE'; if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'heart', px + 10, py + 3);
+    else ctx.fillText('HP', px + 10, py + 6);
     ctx.textAlign = 'right'; ctx.fillText(Math.max(0, o.php) + '/' + o.pmax, px + pw - 10, py + 6);
     bar(ctx, px + 40, py + 8, pw - 110, 12, o.php / o.pmax, '#800000', '#FFFF00');
     var rg = o.rage !== undefined ? o.rage : F.rage;
     var rgOn = o.rageOn !== undefined ? o.rageOn : F.rageT > 0;
     var half = pw - 20;
-    ctx.textAlign = 'left'; ctx.fillStyle = COL_RAGE; ctx.fillText('RAGE', px + 10, py + 26);
+    ctx.textAlign = 'left'; ctx.fillStyle = COL_RAGE; if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'fire', px + 10, py + 23);
+    else ctx.fillText('RAGE', px + 10, py + 26);
     bar(ctx, px + 58, py + 30, half - 152, 8, rgOn ? 1 : rg, '#3A0E0E', rgOn ? '#FFC46A' : COL_RAGE);
     /* DASH: the cooldown, moved off the soul */
     var dk = F.dashCd > 0 ? 1 - F.dashCd / (F.dashCdMax || DASH_CD) : 1;
-    ctx.fillStyle = dk >= 1 ? '#B8E6FF' : '#6A6480'; ctx.fillText('DASH', px + pw - 102, py + 26);
+    ctx.fillStyle = dk >= 1 ? '#B8E6FF' : '#6A6480'; if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'dash', px + pw - 102, py + 23);
+    else ctx.fillText('DASH', px + pw - 102, py + 26);
     bar(ctx, px + pw - 54, py + 30, 44, 8, dk, '#1A2230', dk >= 1 ? '#B8E6FF' : '#5A7A90');
     if (o.tp !== undefined) tpMeter(ctx, o.tp, o.AX, o.AY, o.AH);
     var gx = px - 22, ar = F.adrenT > 0 ? F.adrenT / ADREN_ON : F.adren;

@@ -110,7 +110,7 @@
     if (which === '0') {
       if (phase !== 'cabin' && phase !== 'floor') return;
       phase = 'floor';
-      if (screen) screen.textContent = 'YOU ARE ON FLOOR 0';
+      if (screen) paintFloor();
       if (NEU.save) NEU.save.flag('elevator_floor', 1);
       if (NEU.talk) NEU.talk(['* YOU ARE ON FLOOR 0.'], 'narr');
       draw();
@@ -448,7 +448,21 @@
     if (NEU.juice && NEU.juice.drawParts) NEU.juice.drawParts(ctx, STEP);
     if (NEU.juice && NEU.juice.end) NEU.juice.end(ctx, shook);
     if (NEU.juice && NEU.juice.overlay) NEU.juice.overlay(ctx, W, H);
-    if (screen && phase === 'floor' && !screen.textContent) screen.textContent = 'YOU ARE ON FLOOR 0';
+    if (screen && phase === 'floor' && !screen.textContent) paintFloor();
+  }
+  function paintFloor() {
+    screen.textContent = 'YOU ARE ON FLOOR 0';
+    if (!NEU.glyph) return;
+    var copy = document.createElement('span');
+    copy.className = 'glyph__copy';
+    copy.textContent = screen.textContent;
+    var floor = document.createElement('span');
+    floor.className = 'glyph__shape glyph__key';
+    floor.setAttribute('aria-hidden', 'true');
+    floor.textContent = '0';
+    screen.textContent = '';
+    screen.appendChild(copy);
+    screen.appendChild(floor);
   }
   function getState() {
     if (!live) return null;

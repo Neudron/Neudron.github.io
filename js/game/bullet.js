@@ -50,6 +50,11 @@
     pop.innerHTML = '<b class="bh__pop-t">' + (win ? 'you made it' : 'so close') + '</b> ' +
       '<b class="bh__pop-n" style="letter-spacing:-.06em">' + secs.toFixed(1) + ' s</b> ' +
       '<span class="bh__pop-s">' + (win ? 'survived the whole clock' : 'left to win') + '</span>';
+    if (NEU.glyph) {
+      var title = pop.querySelector('.bh__pop-t');
+      NEU.glyph.put(title, win ? 'check' : 'cross', title.textContent);
+      pop.querySelector('.bh__pop-s').classList.add('glyph__copy');
+    }
     pop.hidden = false;
     if (msg) msg.classList.add('is-low');
   }
@@ -676,7 +681,8 @@
     if (!carrying()) {
       if (emptyFx && performance.now() - emptyFx < 2200) {
         ctx.fillStyle = PAL.dim;
-        ctx.fillText('nothing on you to charge', x, y + 6);
+        if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'battery', x, y + 3);
+        else ctx.fillText('nothing on you to charge', x, y + 6);
       }
       return;
     }
@@ -711,7 +717,8 @@
       if (!i) { ctx.fillStyle = PAL.panel; ctx.fillRect(ix + half - 1, iy, 1, ih); }
     }
     ctx.fillStyle = PAL.ui;
-    ctx.fillText(charge + '%' + (charge < 100 ? '  stay on the ground in the blue one' : ''),
+    if (charge < 100 && NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'ground', x + w - 24, y + 2);
+    ctx.fillText(charge + '%' + (charge < 100 && !(NEU.glyph && NEU.glyph.compact()) ? '  stay on the ground in the blue one' : ''),
                  x + w + 8, y + 5, Math.max(40, AW - w - 8));
   }
 
@@ -753,7 +760,8 @@
     var x = BAX + BAW - 120, y = AY - BORDER - 34;
     ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
     ctx.fillStyle = PAL.ui;
-    ctx.fillText('graze', x - 64, y + 4);
+    if (NEU.glyph && NEU.glyph.compact()) NEU.glyph.draw(ctx, 'graze', x - 64, y + 1);
+    else ctx.fillText('graze', x - 64, y + 4);
     ctx.fillStyle = PAL.slot; ctx.fillRect(x, y + 7, 100, 12);
     ctx.fillStyle = meter >= 100 || (meter >= 80 && !reducedFx() && ((t / 0.25) | 0) % 2) ? PAL.full : PAL.meter;
     ctx.fillRect(x, y + 7, meter, 12);
@@ -967,7 +975,7 @@
     if (phase && t - transitionAt < LULL) {
       ctx.font = FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
       ctx.fillStyle = PAL.ui;
-      ctx.fillText('PHASE ' + phase, AX + AW / 2, AY - BORDER - 24);
+      ctx.fillText((NEU.glyph && NEU.glyph.compact() ? '' : 'PHASE ') + phase, AX + AW / 2, AY - BORDER - 24);
       ctx.textAlign = 'left';
     }
 
@@ -1011,7 +1019,7 @@
       ctx.fillStyle = PAL.ui;
       ctx.font = FONT; ctx.textBaseline = 'top';
       ctx.textAlign = 'center';
-      ctx.fillText('CHARGING  ' + charge + '%', w / 2, by2 + bh2 + 12);
+      ctx.fillText((NEU.glyph && NEU.glyph.compact() ? '' : 'CHARGING  ') + charge + '%', w / 2, by2 + bh2 + 12);
       ctx.textAlign = 'left';
       ctx.globalAlpha = 1;
     }
