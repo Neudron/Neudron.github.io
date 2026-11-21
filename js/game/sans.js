@@ -2479,7 +2479,19 @@
     if (NEU.quest) NEU.quest.mark('a4_smash');
     say(["you put the hilt of a broken sword through the television.",
          "something climbs out of it."], 'narr');
-    setTimeout(function () { if (NEU.quiz) NEU.quiz.open(); }, 2600);
+    if (tvEl && !reduced) tvEl.classList.add('is-cracking');
+    setTimeout(function () { if (tvEl && !reduced) tvEl.classList.add('is-static'); }, 1700);
+    setTimeout(function () {
+      var stage = document.getElementById('quiz'), screen = tvEl && tvEl.querySelector('img'), r = screen && screen.getBoundingClientRect();
+      if (NEU.talk && NEU.talk.close) NEU.talk.close();
+      if (NEU.quiz) NEU.quiz.open();
+      if (!reduced && stage && stage.animate && r) {
+        stage.style.transformOrigin = 'top left';
+        stage.animate([{ transform: 'translate(' + (r.left + 8) + 'px,' + (r.top + 7) + 'px) scale(' + 68 / innerWidth + ',' + 48 / innerHeight + ')' },
+                       { transform: 'translate(0,0) scale(1,1)' }], { duration: 600, easing: 'steps(6, end)' });
+      }
+    }, 2000);
+    setTimeout(function () { if (tvEl) { tvEl.classList.remove('is-cracking'); tvEl.classList.remove('is-static'); } }, 2600);
     return true;
   };
 

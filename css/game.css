@@ -1153,3 +1153,11 @@ html.rm .inv, html.rm .inv *, html.rm .inv *::before, html.rm .inv *::after { an
   30%  { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 88px)) rotate(360deg) scaleY(.6); }
   100% { transform: translate(calc(var(--fx) - 40px), calc(var(--fy) - 88px)) rotate(360deg) scaleY(1); }
 }
+
+/* The broken screen splits once, then a static burst before the stage expands. */
+.tv.is-cracking::after { content: ''; position: absolute; left: 8px; top: 7px; width: 68px; height: 48px; pointer-events: none; background: linear-gradient(35deg, transparent 47%, #dce8ff 48%, #dce8ff 50%, transparent 51%), linear-gradient(135deg, transparent 47%, #dce8ff 48%, #dce8ff 50%, transparent 51%); transform-origin: center; animation: tv-crack 1.7s steps(6, end) both; }
+.tv.is-static::after { background: repeating-linear-gradient(0deg, #dce8ff 0 2px, #111321 2px 4px); opacity: .65; }
+@keyframes tv-crack { from { transform: scale(.1); } to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .tv.is-cracking::after { animation: none; } }
+
+.tv.is-cracking img { transform: none; }
