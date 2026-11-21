@@ -878,7 +878,30 @@
     }
   }
 
+  function onClick(e) {
+    var r, x, y, i, px;
+    if (!active || !state) return;
+    if (NEU.kernel && NEU.kernel.current && NEU.kernel.current() !== 'cards') return;
+    if (state.over) { close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (!canvas || !canvas.getBoundingClientRect) return;
+    r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    x = (e.clientX - r.left) * (canvas.width / r.width);
+    y = (e.clientY - r.top) * (canvas.height / r.height);
+    if (y < 344 || y > 464) return;
+    for (i = 0; i < state.you.hand.length; i++) {
+      px = 196 + i * 86;
+      if (x >= px && x <= px + CW) {
+        if (state.sel !== i) { state.sel = i; draw(); }
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+    }
+  }
+
   window.addEventListener('keydown', onKey, true);
+  if (canvas && canvas.addEventListener) canvas.addEventListener('click', onClick, true);
 
   NEU.cards = {
     open: open,
