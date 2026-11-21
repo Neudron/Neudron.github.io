@@ -24,7 +24,7 @@
     m3: [[4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
     m4: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [4, 'right']],
     m5: [[4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right']],
-    m6: [[4, 'dash up right'], [12, 'right']],
+    m6: [[4, 'dash up'], [5, ''], [10, 'dash up'], [12, ''], [30, 'right']],
     m7: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'right down melee'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right']]
   };
 
@@ -198,12 +198,11 @@
       spawn = { x: 4, y: 13 };
       ents = [{ t: 'pogo', x: 8, y: 13 }, { t: 'exit', x: 24, y: 12 }];
     } else if (n === 6) {
-      fill(rows, 0, 10, 16, '#');
-      fill(rows, 11, 20, 16, '^');
-      fill(rows, 0, 20, 17, '#');
-      fill(rows, 2, 14, 11, '=');
+      fill(rows, 0, 9, 16, '#');
+      fill(rows, 0, 9, 17, '#');
+      fill(rows, 5, 13, 7, '=');
       spawn = { x: 6, y: 15 };
-      ents = [{ t: 'refill', x: 8, y: 10 }, { t: 'exit', x: 12, y: 10 }];
+      ents = [{ t: 'refill', x: 6, y: 10 }, { t: 'exit', x: 12, y: 6 }];
     } else {
       fill(rows, 0, 15, 14, '#');
       fill(rows, 16, 18, 15, '^');
@@ -222,8 +221,8 @@
     ascent(n, rows, ents, spawn);
   }
 
-  var LANTERN = [[22, 11], [8, 13], [20, 13], [24, 13], [24, 13], [20, 12], [6, 10], [22, 11]];
-  var BANNER = [[5, 11], [28, 11], [33, 13], [5, 13], [9, 13], [28, 12], [13, 10], [33, 11]];
+  var LANTERN = [[22, 11], [8, 13], [20, 13], [24, 13], [24, 13], [20, 12], [2, 15], [22, 11]];
+  var BANNER = [[5, 11], [28, 11], [33, 13], [5, 13], [9, 13], [28, 12], [9, 15], [33, 11]];
   var n;
   for (n = 0; n <= 7; n++) build(n);
 
