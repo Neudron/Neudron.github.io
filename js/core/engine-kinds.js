@@ -215,10 +215,10 @@
          dialog ESC gives every minigame. Walking into it and pressing Z both
          land here, so the question cannot be skipped by either. */
       if (e.confirm && NEU.engine && NEU.engine.confirmExit) {
-        NEU.engine.confirmExit(e.confirm, function () { sys.go(e.to, e.spawn); }, e.confirmNote);
+        NEU.engine.confirmExit(e.confirm, function () { sys.go(e.to, e.spawn, e.via, e); }, e.confirmNote);
         return;
       }
-      sys.go(e.to, e.spawn);
+      sys.go(e.to, e.spawn, e.via, e);
     },
     /* An exit carrying a `sheet` is a THING (b7_altar's fire door); a
        labelled one takes a plate. Every bare exit still draws a small

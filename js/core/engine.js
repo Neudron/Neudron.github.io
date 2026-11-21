@@ -76,6 +76,7 @@
      through enter()'s opts, and it goes back to quick when it is done. */
   var IRIS = 0.22, fadeSpan = IRIS;
   var busy = false;                    // a cutscene owns input
+  var hideTransitionPlayer = false, transitionCanvas = null, transitionNewCanvas = null, transitionPlayer = null;
   var playerAct = null;                // { name, t, max } — a held player pose (the recall drink)
   var sitting = null;                  // { ent, x, y } — seated on a seat entity until a move key
   var cine = false;                    // a scripted walk owns the stick (api.drive)
@@ -496,7 +497,7 @@
 
   var SYS = {
     say: function (l, w) { say(l, w); },
-    go: function (id, sp) { go(id, sp); },
+    go: function (id, sp, via, exit) { go(id, sp, via, exit); },
     flag: function (k, v) { return flag(k, v); },
     room: function () { return room; },
     burst: function (e, n, col) {
@@ -531,10 +532,41 @@
   }
 
   /* ── transitions ──────────────────────────────────────────────── */
-  function go(id, spawn) {
+  function go(id, spawn, via, exit) {
     if (!rooms[id]) { say(['there is nothing through there. yet.'], 'narr'); return; }
-    if (fadeDir) return;                    // already moving
+    if (fadeDir || busy) return;            // already moving
+    var T = NEU.engineTrans, kind = null, dir = face;
+    if (T && room && T.enabled[room.tileset]) {
+      if (!exit) for (var ei = 0; ei < ents.length; ei++) if (ents[ei].t === 'exit' && ents[ei].to === id) { exit = ents[ei]; break; }
+      var doors = NEU.engineDoors, pick = doors && doors.byExit[room.id + '>' + id];
+      var resolved = exit && doors && doors.resolve(exit, doorCtx({}, exit));
+      via = via || (exit && exit.via) || (pick && pick.via);
+      var style = (resolved && resolved.name) || exit && exit.style || (pick && pick.style) || '';
+      if (!via) via = /^(door|gate|curtain|alley)$/.test(style) ? 'door' : style === 'stairs' ? 'stairs' : style === 'hatch' ? 'fall' : /^(path|tunnel|arch)$/.test(style) ? 'slide' : /^(portal|rift|frame)$/.test(style) ? 'portal' : '';
+      if (via === 'slide' && T.get('slide')) kind = 'slide';
+    }
     busy = true;
+    if (kind) {
+      if (reduced) { land(id, spawn); busy = false; return; }
+      if (!transitionCanvas) transitionCanvas = document.createElement('canvas');
+      transitionCanvas.width = cv.width; transitionCanvas.height = cv.height;
+      var fromX = Math.round(px * S) - Math.round((camX + kickX) * S);
+      var fromY = Math.round(py * S) - Math.round((camY + kickY) * S);
+      hideTransitionPlayer = true; draw(Date.now()); hideTransitionPlayer = false;
+      var tc = transitionCanvas.getContext('2d');
+      if (tc) tc.drawImage(cv, 0, 0);
+      land(id, spawn);
+      if (!transitionNewCanvas) transitionNewCanvas = document.createElement('canvas');
+      transitionNewCanvas.width = cv.width; transitionNewCanvas.height = cv.height;
+      hideTransitionPlayer = true; draw(Date.now()); hideTransitionPlayer = false;
+      tc = transitionNewCanvas.getContext('2d');
+      if (tc) tc.drawImage(cv, 0, 0);
+      T.start(kind, transitionCanvas, dir, reduced, transitionNewCanvas);
+      transitionPlayer = { x: fromX, y: fromY,
+        toX: Math.round(px * S) - Math.round((camX + kickX) * S),
+        toY: Math.round(py * S) - Math.round((camY + kickY) * S) };
+      return;
+    }
     fadeDir = 1;
     fadeThen = function () {
       land(id, spawn);
@@ -710,10 +742,13 @@
       if (fade >= 1 && fadeDir > 0) { fade = 1; fadeDir = 0; fadeSpan = IRIS; var f = fadeThen; fadeThen = null; if (f) f(); }
       else if (fade <= 0 && fadeDir < 0) { fade = 0; fadeDir = 0; fadeSpan = IRIS; var g = fadeThen; fadeThen = null; if (g) g(); }
     }
+    if (NEU.engineTrans && NEU.engineTrans.active) {
+      walked += SPEED * dt; moving = true;
+      if (!NEU.engineTrans.step(dt)) { busy = false; transitionPlayer = null; }
+    }
     if ((padPoll -= dt) <= 0) { padPoll = 0.5; var ph = measurePad(); if (ph !== padH) padH = ph; }
     if (!room) return;
-
-    if (!busy) { if (!NEU.activeMinigame) move(dt); walkExits(); } else { vx = 0; vy = 0; moving = false; }
+    if (!busy) { if (!NEU.activeMinigame) move(dt); walkExits(); } else { vx = 0; vy = 0; moving = !!(NEU.engineTrans && NEU.engineTrans.active); }
     camFollow(dt);
     var decay = Math.exp(-14 * dt);
     kickX *= decay; kickY *= decay;
@@ -877,6 +912,18 @@
     var w = innerWidth, h = innerHeight;
     ctx.fillStyle = '#050507'; ctx.fillRect(0, 0, w, h);
     if (!room) return;
+    var trans = NEU.engineTrans && NEU.engineTrans.active ? NEU.engineTrans.motion(w, h, S) : null;
+    if (trans) {
+      var tl = look(), tr = NEU.engineTrans.active, tp = transitionPlayer;
+      NEU.engineTrans.draw(ctx, w, h, S);
+      if (tl && tp) {
+        var pt = 1 - Math.pow(1 - tr.t, 3);
+        var tx = Math.round((tp.x + (tp.toX - tp.x) * pt) / S) * S;
+        var ty = Math.round((tp.y + (tp.toY - tp.y) * pt) / S) * S;
+        tl.drawPlayer(ctx, tx, ty, face, walked, true, S, now);
+      }
+      return;
+    }
     var L = look(), K = kinds();
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
     var v = view();
@@ -936,7 +983,7 @@
       if (k && (k.floor || k.hidden)) continue;
       drawn.push({ e: e, k: k, y: (e.y + 1) * TILE });
     }
-    drawn.push({ e: null, y: py });
+    if (!hideTransitionPlayer && !trans) drawn.push({ e: null, y: py });
     drawn.sort(function (a, b) { return a.y - b.y; });
     /* shadows under all of it, then the things themselves */
     if (L) {
@@ -1027,7 +1074,8 @@
     if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
     if (e.key === 'z' || e.key === 'Z' || e.key === 'Enter' || e.key === 'x' || e.key === 'X') {
       e.preventDefault();
-      NEU.talk.ff();
+      if (e.key === 'x' || e.key === 'X') NEU.talk.holdStart ? NEU.talk.holdStart() : NEU.talk.ff();
+      else NEU.talk.ff();
     }
   });
   addEventListener('keydown', function (e) {
@@ -1055,18 +1103,17 @@
       return;
     }
     if (e.key === 'x' || e.key === 'X') {
-      /* X fast-forwards a textbox (whole line, then the next one) and
-         does nothing else. Escape is what closes it. */
+      /* X hold timing lives with the shared dialogue box. */
       if (NEU.tboxOpen && NEU.tboxOpen() && NEU.talk) {
         e.preventDefault();
-        if (NEU.talk.ff) NEU.talk.ff(); else { var tbx = document.getElementById('tbox'); if (tbx) tbx.click(); }
+        if (NEU.talk.holdStart) NEU.talk.holdStart(); else if (NEU.talk.ff) NEU.talk.ff();
       }
       return;
     }
     if (e.key === 'z' || e.key === 'Z') {
       e.preventDefault();
-      /* Z advances an open textbox through the same path a click takes. */
-      if (NEU.tboxOpen && NEU.tboxOpen()) { var tb = document.getElementById('tbox'); if (tb) tb.click(); return; }
+      /* Z reveals the current line before it advances dialogue. */
+      if (NEU.tboxOpen && NEU.tboxOpen()) { if (NEU.talk && NEU.talk.ff) NEU.talk.ff(); return; }
       if (busy) return;
       /* Interact first, push second. A block you are standing next to
          is almost never what you meant when there is an npc in reach. */
@@ -1095,6 +1142,8 @@
   /* opts.iris: seconds for the iris to open on arrival (default 0.22). */
   function enter(id, spawn, opts) {
     if (!rooms[id]) return false;
+    if (NEU.engineTrans) NEU.engineTrans.cut();
+    transitionPlayer = null;
     if (NEU.kernel) NEU.kernel.push('engine');
     if (NEU.settings && NEU.settings.warnFlash) NEU.settings.warnFlash();
     wrap.hidden = false;
@@ -1244,7 +1293,7 @@
     /* Scripted input for cinematics: real keys die, drive() walks. */
     cine: function (on) { cine = !!on; keys = {}; },
     drive: function (ix, iy) {
-      if (!cine) return;
+      if (!cine && !(NEU.engineTrans && NEU.engineTrans.active)) return;
       keys.left = ix < 0; keys.right = ix > 0; keys.up = iy < 0; keys.down = iy > 0;
     },
     entHere: entHere, reset: resetPuzzle, check: checkPuzzle,
