@@ -642,6 +642,24 @@
       g.drawImage(lit.cv, ox, oy + h - 48);
     });
     g.drawImage(vigLayer(w, h, phase).cv, ox, oy);
+    /* D8: plated walls, circuit traces and a warning strip. All static,
+       all inside the clip, so reduced motion keeps the same structure. */
+    (function () {
+      var i, x;
+      for (i = 8; i < w - 8; i += 48) {
+        px(g, ox + i, oy + 10, 44, 2, '#3A4450');
+        px(g, ox + i, oy + 12, 44, 1, '#5A6878');
+        px(g, ox + i, oy + h - 58, 44, 2, '#3A4450');
+        px(g, ox + i, oy + h - 56, 44, 1, '#5A6878');
+      }
+      for (i = 0; i < w - 24; i += 96) {
+        px(g, ox + 12 + i, oy + 22, 40, 1, '#20C8D0');
+        px(g, ox + 52 + i, oy + 22, 1, 6, '#20C8D0');
+        px(g, ox + 51 + i, oy + 28, 3, 3, '#48E0E8');
+      }
+      stripes(g, ox, oy + h - 54, w, 6);
+      for (x = ox; x < ox + w; x += 96) px(g, x + 8, oy + 36, 1, 8, '#5A6878');
+    }());
     g.restore();
     /* compat markers for fixes163: recorded in raster calls, not drawn */
     (function () {
@@ -653,10 +671,11 @@
       px(g, ox + ((off + 64) % Math.max(1, w - 64)), oy + 80, 96, 8, '#243240');
       g.globalCompositeOperation = prev;
     }());
-    px(g, ox - 2, oy - 2, w + 4, 2, '#3A4450');
-    px(g, ox - 2, oy + h, w + 4, 2, '#0A0C10');
-    px(g, ox - 2, oy - 2, 2, h + 4, '#232A33');
-    px(g, ox + w, oy - 2, 2, h + 4, '#0A0C10');
+    /* the box edge is always the brightest line (D8) */
+    px(g, ox - 2, oy - 2, w + 4, 2, '#EEF3F6');
+    px(g, ox - 2, oy + h, w + 4, 2, '#EEF3F6');
+    px(g, ox - 2, oy - 2, 2, h + 4, '#EEF3F6');
+    px(g, ox + w, oy - 2, 2, h + 4, '#EEF3F6');
   }
 
   /* ── Ares: hex torso, reactor, head, pauldrons, 4 two-segment arms ──── */

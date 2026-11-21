@@ -171,9 +171,11 @@
     mode = 'wake';
     soulY = bodyY;
     if (NEU.save) NEU.save.flag('draedon_won', 1);
-    state.room = 'a1_clearing';
+    /* Wake in the village (s1_gate) so the lockdown chase can start:
+       chase.js only ticks in `s` rooms and its figure waits in s11_elder. */
+    state.room = 's1_gate';
     if (sleep) sleep.hidden = false;
-    if (NEU.engine && NEU.engine.enter) NEU.engine.enter('a1_clearing', 'default');
+    if (NEU.engine && NEU.engine.enter) NEU.engine.enter('s1_gate', 'south');
     close();
     if (NEU.exo && NEU.exo.close) NEU.exo.close();
   }
@@ -438,7 +440,7 @@
     ctx.globalAlpha = p;
   }
   function draw() {
-    var w, h, can, nuke, wy, fx, fy;
+    var w, h, can, nuke, wy, fx, fy, p;
     if (!ctx) return;
     if (shatterBusy > 0) { shatterBusy--; }
     ctx.imageSmoothingEnabled = false;
@@ -447,6 +449,18 @@
     ctx.fillStyle = '#06080C';
     ctx.fillRect(0, 0, w, h);
     if (art()) art().arena(ctx, box, phase, frame, REDUCE);
+    /* D9 shot 2: green atmosphere thickens across the countdown. Confined to
+       the box rect; the bright edge is drawn after restore, so it stays the
+       outermost line. Monotonic, so it never flashes and reduced motion
+       simply holds it at full. */
+    if (mode === 'nuke' && haze > 0) {
+      p = ctx.globalAlpha;
+      ctx.globalAlpha = Math.min(1, haze) * 0.32;
+      band(box.AX, box.AY, box.AW, box.AH, '#0C2814');
+      ctx.globalAlpha = Math.min(1, haze) * 0.12;
+      band(box.AX, box.AY, box.AW, box.AH * 0.6, '#12383C');
+      ctx.globalAlpha = p;
+    }
     nuke = mode === 'nuke' || mode === 'fall' || mode === 'wake';
     can = ctx.save && ctx.beginPath && ctx.rect && ctx.clip && ctx.restore;
     if (can) {

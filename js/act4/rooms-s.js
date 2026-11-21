@@ -833,21 +833,35 @@
     tick: function (dt) { NEU.house.step(dt); }
   });
 
-  E.register('x0_foyer', {
-    tileset: 'exo',
-    tiles: exoHall(),
-    spawns: sp('west', 'north'),
-    entities: exoDress([
+  /* D8: the foyer and the arena are one hall. Both ids keep their name for
+     saves, reach checks and older suites, but share one definition. */
+  function hallSpawns() {
+    var o = sp('west', 'east', 'north', 'south');
+    o.stair = { x: 5, y: 2, face: 'down' };
+    return o;
+  }
+  function hallEnts() {
+    return exoDress([
       gate('west', 's12_termite', 'east'),
       gate('north', 'x1_spiral', 'south'),
-      { t: 'sign', x: 3, y: 6, lines: ['a stair. the chair at the top has already turned.'] }
-    ]),
-    onEnter: function (c) {
-      if (c.flagged('x0_seen')) return;
-      c.flag('x0_seen', 1);
-      c.say(['steel, and a stair that does not trust you.',
-        'something at the top is already looking down.']);
-    }
+      { t: 'npc', x: 5, y: 4, colour: '#20C8D0',
+        run: function (c) {
+          if (NEU.exo && NEU.exo.open) NEU.exo.open();
+          else c.say(['the arena door is shut.']);
+        } },
+      { t: 'sign', x: 3, y: 6,
+        lines: ['steel, a stair and a door. the chair at the top has already turned.'] }
+    ]);
+  }
+  function hallEnter(c) {
+    if (c.flagged('x0_seen')) return;
+    c.flag('x0_seen', 1);
+    c.say(['steel, and a stair that does not trust you.',
+      'something at the top is already looking down.']);
+  }
+  E.register('x0_foyer', {
+    tileset: 'exo', tiles: exoHall(), spawns: hallSpawns(),
+    entities: hallEnts(), onEnter: hallEnter
   });
   E.register('x1_spiral', {
     tileset: 'exo',
@@ -859,17 +873,8 @@
     onEnter: function () { if (NEU.house) NEU.house.open(); }
   });
   E.register('x2_arena', {
-    tileset: 'exo',
-    tiles: exoHall(),
-    spawns: { stair: { x: 5, y: 7, face: 'up' }, south: { x: 5, y: 7, face: 'up' } },
-    entities: exoDress([
-      { t: 'npc', x: 5, y: 3, colour: '#20C8D0',
-        run: function (c) {
-          if (NEU.exo && NEU.exo.open) NEU.exo.open();
-          else c.say(['the arena door is shut.']);
-        } },
-      { t: 'exit', x: 5, y: 8, to: 'x0_foyer', spawn: 'north', style: 'hatch' }
-    ])
+    tileset: 'exo', tiles: exoHall(), spawns: hallSpawns(),
+    entities: hallEnts(), onEnter: hallEnter
   });
   NEU.act4RoomsX = ['x0_foyer', 'x1_spiral', 'x2_arena'];
 })();
