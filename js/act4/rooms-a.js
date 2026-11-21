@@ -139,10 +139,10 @@
       ['start from the brazier the plaque says comes before another.',
        'the fourth one hangs off the first. the rest falls in around them.']],
     b4_ice: [
-      ['every slide ends on ice. the ice decides where you stop, not you.',
-       'a plate only locks when a slide dies on it.'],
-      ['the ring runs both ways. the last plate is the one you have not stood beside.',
-       'walk round the south band before you step onto the ice.']],
+      ['the mouse is slow: it takes one step for every two of yours.',
+       'it scurries straight away from you, and it runs along whatever is in the way.'],
+      ['stand on the far side of the mouse from the cheese, and walk towards it.',
+       'it cannot leave the ice. drive it through the channels at the top and the bottom.']],
     b5_two: [
       ['the mirror holds a plate. you hold the other one.',
        'press e on the mirror until it looks at a plate, then stand on the opposite plate.'],
@@ -848,53 +848,79 @@
     }
   }
 
-  /* ══ B4 — the ice ring ═══════════════════════════════════════════
-     The floor teaches the slide: step onto ice and you commit to that
-     line of travel until the ice runs out — no turning, no stopping,
-     no walking across a corner. Three plates sit on the last ice cell
-     of three different slide lines, and a plate only locks when a
-     slide dies on it (slideOnly). Walking up to one is the wrong move
-     by design; the whole room is about reading the lines the ice
-     gives you.
+  /* ══ B4 — the mouse under the ice ════════════════════════════════
+     The slide is gone. What replaces it is a living thing: a mouse
+     under the frozen pool, and a cheese under the ice on the far side
+     of it. The mouse is afraid of you and it is slow — it takes one
+     step for every two of yours — and it scurries straight away from
+     you; if something is in the way it runs along it. You cannot
+     touch it through the ice. You herd it.
 
-     Four plates on the four ends of the ring, so the three-slide lap
-     the room teaches you is not enough: it ends on (5,8) with three
-     locks and a shut door. The fourth end is (5,3), and the only way
-     to die there is to walk round to the south band and step UP onto
-     (5,8) — the ring runs both ways, which is the whole lesson. The
-     naive lap plus the walk round is the minimum (BFS-checked over
-     position × armed-mask, see tests/fixes54.mjs):
-       1. walk up to (4,3), step east onto (5,3) → slide east along the
-          top row, which dies on its last ice cell (13,3) → plate locks.
-       2. step south: the ice underfoot commits you again → slide down
-          the east column, dying on (13,8) → plate locks.
-       3. step west → slide along the bottom row, dying on (5,8)
-          → plate locks.
-       4. walk down to (5,9), step up onto the bottom-left corner → the
-          column carries you the other way, dying on (5,3) → opens.
-     The puzzle is not "find the plates", it is "understand that the
-     ice decides where you stop, in every direction". The old version
-     was a block-push with the block born on the ice; that read as a
-     physics quirk and was retired with the rest of the castle's blocks.
+     LAYOUT. The pool is three chambers joined at the top and bottom
+     by a channel. The mouse is born in the west chamber, the cheese
+     sits in the middle one, and a knight frozen solid stands beside
+     it. The player walks the flagstones round the pool (stepping onto
+     the ice still slides, which is a hazard here, not a tool). Every
+     second step the player takes, the mouse takes one.
 
-     LAYOUT. A frozen cloister: the ring is the same shape it always
-     was, moved one cell in and down to sit under a two-row north wall
-     hung with icicles and two frosted windows. A knight frozen solid
-     stands on the pillar in the middle of the ring. Each plate is a
-     frost rune inside a pale ring painted where its slide dies, so the
-     three "destinations" are visible from the door. */
+     The rule is deliberately slow: the player walks at six cells a
+     second and the mouse at three, so you can get round it, head it
+     off, and drive it. That is the whole puzzle — observation (which
+     way does it go), positioning (stand where you want it to flee),
+     and the patience to walk behind it. R resets the room. */
+
+  /* The mouse. One step for every two the player takes, straight away
+     from the player; if that cell is not open ice it runs along the
+     obstruction, preferring the direction that still increases the
+     distance. It never leaves the ice and it never crosses a block. */
+  function stepMouse(room, c, px, py) {
+    var m = room.mouse, g = room.grid, es = c.ents(), i, x, y;
+    var dx = m.x - px, dy = m.y - py;
+    var cand = [], seen = {};
+    function sgn(v) { return v > 0 ? 1 : (v < 0 ? -1 : 0); }
+    function push(ax, ay) {
+      if (!ax && !ay) return;
+      var k = ax + ',' + ay;
+      if (seen[k]) return;
+      seen[k] = 1; cand.push([ax, ay]);
+    }
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      var vy = dy === 0 ? 1 : sgn(dy);
+      push(sgn(dx), 0); push(0, vy); push(0, -vy); push(-sgn(dx), 0);
+    } else {
+      var hx = dx === 0 ? 1 : sgn(dx);
+      push(0, sgn(dy)); push(hx, 0); push(-hx, 0); push(0, -sgn(dy));
+    }
+    function free(ax, ay) {
+      if (ay < 0 || ay >= g.length) return false;
+      var row = g[ay];
+      if (ax < 0 || ax >= row.length) return false;
+      if (row.charAt(ax) !== 'i') return false;
+      for (var j = 0; j < es.length; j++) {
+        var e = es[j];
+        if (e.dead || !e.solid) continue;
+        if (e.x === ax && e.y === ay) return false;
+      }
+      return true;
+    }
+    for (i = 0; i < cand.length; i++) {
+      x = m.x + cand[i][0]; y = m.y + cand[i][1];
+      if (free(x, y)) { m.x = x; m.y = y; return; }
+    }
+  }
+
   E.register('b4_ice', {
     tileset: 'castle',
     tiles: [
       '####################',
       '####################',
       '#..................#',
-      '#....iiiiiiiii.....#',
-      '#....i.......i.....#',
-      '#....i...|...i.....#',
-      '#....i.......i,,,,,#',
-      '#....i.......i.....#',
-      '#....iiiiiiiii.....#',
+      '#..iiiiiiiiiiiiii..#',
+      '#..iii|iiii|iiiii..#',
+      '#..iii|iiii|iiiii..#',
+      '#..iii|iiii|iiiii..#',
+      '#..iii|iiii|iiiii..#',
+      '#..iiiiiiiiiiiiii..#',
       '#..................#',
       '#..................#',
       '####################'
@@ -903,43 +929,65 @@
     shade: 0.35,
     spawns: { west: { x: 1, y: 6, face: 'right' }, east: { x: 18, y: 6, face: 'left' } },
     entities: castleLook(12).concat([
-      { t: 'plate', x: 13, y: 3, slideOnly: true, skin: 'iceplate' },
-      { t: 'plate', x: 13, y: 8, slideOnly: true, skin: 'iceplate' },
-      { t: 'plate', x: 5, y: 8, slideOnly: true, skin: 'iceplate' },
-      { t: 'plate', x: 5, y: 3, slideOnly: true, skin: 'iceplate' },
-      { t: 'sign', x: 16, y: 3, skin: 'lectern',
-        lines: ['step onto the ice and you will not stop until it runs out.',
-                'every corner of the ring is a dead end.'] },
+      { t: 'sign', x: 2, y: 2, skin: 'lectern',
+        lines: ['something small moves under the ice.',
+                'it is afraid of you, and it is slow: it takes one step for every two of yours.',
+                'it scurries straight away from you. if something is in the way, it runs along it.',
+                'the cheese is under the ice too. you cannot touch it. you herd it.'] },
       { t: 'exit', x: 19, y: 6, to: 'b5_two', spawn: 'west', locked: 'solved:b4_ice', style: 'door',
         lines: ['the door is frozen into its frame.',
-                'it opens when a slide has landed on every plate on the ice.'] },
+                'it opens when the mouse reaches the cheese.'] },
       { t: 'exit', x: 0, y: 6, to: 'b3_braziers', spawn: 'east', style: 'arch' },
-      Q('statue', 9, 5, { frozen: true }),
+      Q('statue', 9, 5, { frozen: true, solid: true }),
       Q('glow', 3, 4, { r: 46, col: '#BFE0FF' }), Q('glow', 16, 4, { r: 46, col: '#BFE0FF' }),
       Q('sconce', 9, 1), Q('armour', 1, 2, { solid: true }), Q('armour', 18, 10, { solid: true }),
       Q('rubble', 2, 10)
     ]),
+    mouse: { x: 4, y: 5 },
+    cheese: { x: 9, y: 6 },
+    _cell: null, _steps: 0,
+    mouseAt: function () { return { x: this.mouse.x, y: this.mouse.y }; },
+    cheeseAt: function () { return { x: this.cheese.x, y: this.cheese.y }; },
     onEnter: function (c) {
+      /* Leaving and coming back resets the mouse, exactly as the blocks
+         in the other rooms go back to their birth cells. */
+      this.mouse.x = 4; this.mouse.y = 5;
+      this._cell = null; this._steps = 0;
       if (c.flagged('b4_seen')) return;
       c.flag('b4_seen', 1);
-      say(c, ['the middle of the room is polished to a mirror.',
-              'step onto the ice and you will not stop until the ice runs out.',
-              'every plate on the ice has to feel a slide land on it.']);
+      say(c, ['the middle of the room is a frozen pool, and something small moves under it.',
+              'it is afraid of you, and it is slow: it takes one step for every two of yours.',
+              'it scurries straight away from you. if something is in the way, it runs along it.',
+              'there is cheese under the ice. you cannot touch it. you herd it.']);
     },
     /* The engine's default "every plate has a block" rule cannot know
-       about slides, so this room owns its win condition: every
-       slide-only plate must be armed. */
+       about a mouse, so this room owns its win condition — and the
+       mouse itself is driven from here, once per cell the player
+       crosses, so it moves at exactly half their pace. */
     solved: function (c) {
-      var es = c.ents(), any = false;
-      for (var i = 0; i < es.length; i++)
-        if (es[i].t === 'plate') { any = true; if (!es[i].armed) return false; }
-      return any;
+      var m = this.mouse, ch = this.cheese;
+      var p = c.player;
+      var cx = Math.floor(p.x / 16), cy = Math.floor((p.y - 1) / 16);
+      /* The first call only records where you are standing: the engine
+         asks every tick while you move, and the mouse must count
+         cells crossed, not frames. */
+      if (!this._cell) this._cell = { x: cx, y: cy };
+      else if (this._cell.x !== cx || this._cell.y !== cy) {
+        this._cell = { x: cx, y: cy };
+        this._steps++;
+        if (this._steps >= 2) { this._steps = 0; stepMouse(this, c, cx, cy); }
+      }
+      return m.x === ch.x && m.y === ch.y;
     },
-    onReset: function () { resetHint('b4_ice'); },
+    onReset: function () {
+      this.mouse.x = 4; this.mouse.y = 5;
+      this._cell = null; this._steps = 0;
+      resetHint('b4_ice');
+    },
     onSolved: function (c) {
       c.markSolved('b4_ice');
       if (NEU.quest) NEU.quest.bump('a4_rooms', 3);
-      say(c, ['the last plate locks with a heavy clunk.',
+      say(c, ['the mouse reaches the cheese and stops, perfectly still.',
               'the east wall slides open.']);
     }
   });
