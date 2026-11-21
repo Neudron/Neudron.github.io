@@ -415,8 +415,20 @@
   kd('bossdoor', { touch: function (e, input, melee) {
     if (!melee || e.dead || P.replaying()) return;
     if (NEU.save && NEU.save.has && NEU.save.has('boss_key')) {
+      var snap = null, cv, g;
+      /* D3: keep the kept contract instant (bossOpen / close / polt.open), but take a
+         mode-bridge snapshot first so the opening can play over the incoming fight. */
+      try { snap = NEU.kernel && NEU.kernel.bridge && NEU.kernel.bridge(); } catch (sErr) { snap = null; }
+      if (!snap) {
+        cv = document.getElementById('platCanvas');
+        if (cv && cv.getContext) {
+          snap = document.createElement('canvas'); snap.width = cv.width || 640; snap.height = cv.height || 360;
+          g = snap.getContext('2d'); if (g && g.drawImage) g.drawImage(cv, 0, 0);
+        }
+      }
       e.dead = true; NEU.dungeon.bossOpen = true; P.close();
       if (NEU.polt && NEU.polt.open) NEU.polt.open();
+      playDoorOpening(snap, e);
     } else { NEU.dungeon.bossOpen = false; NEU.dungeon.bossLine = '* a bone lock. it wants a key.'; talk([NEU.dungeon.bossLine]); }
   } });
   kd('painting', { touch: function (e, input, melee) {
@@ -595,9 +607,58 @@
     if (melee && !e.opened) talk(['* press ' + kn('c') + ' to open the chest and equipment.']);
   } });
 
+  /* ── D3: the bone door opening ─────────────────────────────────────────
+     The fight switch stays instant (fixes201/161 keep their contract). What is
+     new is a mode-bridge snapshot of the dungeon laid over the incoming fight:
+     key turn -> two chains drop -> the panels open over 1.2 s, the view pans
+     down the corridor, then a Deltarune-style fight box grows from the doorway
+     (obj_growtangle: growcon 1 animate-in, growth 0..1). */
+  var DOOR_T = { key: [0, 200], chains: [200, 500], open: [500, 1700], pan: [900, 1700], box: [1500, 1900] };
+  var doorFx = { active: false, reduced: false, done: false, snap: null, canvas: null, elapsed: 0, timeline: DOOR_T };
+  function seg(ms, r) { return Math.max(0, Math.min(1, (ms - r[0]) / (r[1] - r[0]))); }
+  function doorProgress(ms) {
+    return { key: seg(ms, DOOR_T.key), chains: seg(ms, DOOR_T.chains), open: seg(ms, DOOR_T.open),
+      pan: seg(ms, DOOR_T.pan), box: seg(ms, DOOR_T.box) };
+  }
+  function finishDoorFx() {
+    doorFx.active = false; doorFx.done = true;
+    var cv = doorFx.canvas;
+    if (cv && cv.parentNode) cv.parentNode.removeChild(cv);
+    doorFx.canvas = null;
+  }
+  function playDoorOpening(snap, e) {
+    doorFx.snap = snap; doorFx.elapsed = 0; doorFx.done = false;
+    doorFx.reduced = !!(P.reduced && P.reduced());
+    doorFx.active = !doorFx.reduced;
+    if (doorFx.reduced) { doorFx.done = true; return; }
+    var cv = document.createElement('canvas');
+    cv.id = 'boneDoorFx';
+    cv.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:79;image-rendering:pixelated;';
+    document.body.appendChild(cv);
+    doorFx.canvas = cv;
+    var g = cv.getContext('2d');
+    var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    function frame(now) {
+      if (!doorFx.active) return;
+      var ms = Math.max(0, Math.min(DOOR_T.box[1], now - t0)), pr = doorProgress(ms);
+      doorFx.elapsed = ms;
+      if (e) e.unlock = pr.open;
+      if (g && NEU.dungeonLook && NEU.dungeonLook.drawOpening) {
+        cv.width = window.innerWidth || 640; cv.height = window.innerHeight || 360;
+        NEU.dungeonLook.drawOpening(g, cv.width, cv.height, snap, pr);
+      }
+      if (ms >= DOOR_T.box[1]) { finishDoorFx(); return; }
+      if (window.requestAnimationFrame) window.requestAnimationFrame(frame);
+      else setTimeout(function () { frame(t0 + ms + 16); }, 16);
+    }
+    if (window.requestAnimationFrame) window.requestAnimationFrame(frame);
+    else setTimeout(function () { frame(t0); }, 16);
+  }
+
   NEU.dungeon = {
     recordings: REC, bossOpen: false, bossLine: '', mageSign: '', sign: '', lastDeath: null,
     zones: zones, lifts: lifts, zoneAt: zoneAt,
+    doorFx: doorFx, doorProgress: doorProgress, finishDoorFx: finishDoorFx,
     here: function () { return P.running() && P.levelId() === 'dgn' ? here : ''; },
     spawnPx: function (id) { var n = dN(id); return n < 0 ? null : px(zones[n].spawn); },
     savePx: function () { return px(save); },

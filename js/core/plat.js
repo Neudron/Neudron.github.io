@@ -18,6 +18,7 @@
   var keys = {}, accumulator = 0, simClock = 0, camera = { x: 0, y: 0 }, prevX = 0, prevY = 0, prevCamX = 0, prevCamY = 0, baked = null, afterimages = [], bakeCache = {};
   var reduced = redNow(), view = { w: 640, h: 360, scale: 1 }, area = { x0: 0, y0: 0, x1: 640, y1: 360 };
   var painters = [], padB = {}, sprCache = {}, lastDraw = 0, chunks = {}, chunkOrder = [], CHUNK = 32, LRU = 12;
+  var levelSlide = null;   /* D4: a 400 ms snapshot slide between mountain levels; holds the hero in place */
   function redNow() {
     if (NEU.motion && NEU.motion.reduced) return NEU.motion.reduced();
     try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
@@ -348,6 +349,12 @@
   function step(dt, raw) {
     var input = parseInput(raw), prev = player.prev, mx, my, i, e;
     if (!current || current.exited) return getState();
+    /* D4: during the level slide the hero is held in place — a Celeste-style
+       screen change, not a physics step with the new room already live. */
+    if (levelSlide) {
+      if (!NEU.engineTrans || !NEU.engineTrans.active) levelSlide = null;
+      else { player.vx = 0; player.vy = 0; keys = {}; return getState(); }
+    }
     if (NEU.inv && NEU.inv.isOpen()) { keys = {}; player.prev = {}; return getState(); }
     dt = clamp(Number(dt) || STEP, 0, 0.1);
     prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y;
@@ -634,6 +641,11 @@
       ctx.setTransform(view.scale, 0, 0, view.scale, ox, oy);
     }
     wipe(ctx);
+    if (levelSlide && NEU.engineTrans && NEU.engineTrans.active) {
+      /* the snapshots are device-pixel canvases; draw them in device-pixel space */
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      NEU.engineTrans.draw(ctx, w, h, view.scale);
+    }
   }
   /* Celeste DeathEffect: eight orbs fly out on a ring and shrink, then a wipe covers the screen */
   function deathRing(c, x, y, t) {
@@ -857,6 +869,7 @@
   function open(id, opts) {
     var i, carry;
     if (!levels[id]) return false;
+    levelSlide = null;
     opts = opts || {};
     carry = live && opts.carry ? { vx: player.vx, vy: player.vy, dashes: player.dashes, face: player.face } : null;
     if (live) close();
@@ -881,6 +894,24 @@
     NEU.activeMinigame = 'plat';
     if (NEU.kernel && NEU.kernel.current() !== 'plat') NEU.kernel.push('plat'); return true;
   }
+  /* D4: change level with the shared snapshot slide. Same engineTrans 'slide'
+     used by the engine rooms, but driven from the platformer's own draw/tick so
+     the incoming mountain frame is the outgoing picture's neighbour. */
+  function slideOpen(id, opts) {
+    opts = opts || {};
+    if (!levels[id]) return false;
+    var ms = opts.ms == null ? 400 : opts.ms;
+    if (reduced || !NEU.engineTrans || !document.createElement || !canvas || !ctx) return open(id, opts);
+    var before = mk(canvas.width, canvas.height), c = before.getContext('2d');
+    if (c) c.drawImage(canvas, 0, 0);
+    levelSlide = null;
+    if (!open(id, opts)) return false;
+    var after = mk(canvas.width, canvas.height), c2 = after.getContext('2d');
+    if (c2) c2.drawImage(canvas, 0, 0);
+    NEU.engineTrans.start('slide', before, opts.dir || 'right', false, after, { ms: ms });
+    levelSlide = { ms: ms };
+    return true;
+  }
   function cloneLevel(src) {
     var out = {}, k;
     for (k in src) if (Object.prototype.hasOwnProperty.call(src, k) && k !== 'entities') out[k] = src[k];
@@ -889,6 +920,7 @@
   }
   function close() {
     if (!live) return;
+    levelSlide = null;
     live = false;
     if (overlay) overlay.hidden = true;
     if (current && current.onClose) current.onClose();
@@ -901,6 +933,7 @@
     accumulator += Math.min(0.25, Math.max(0, dt) / 1000) * (current.slow ? current.slow() : 1);
     var n = 0;
     while (accumulator >= STEP && n++ < MAX_STEPS && live) { step(STEP, keys); accumulator -= STEP; }
+    if (levelSlide && NEU.engineTrans && NEU.engineTrans.active) NEU.engineTrans.step(dt / 1000);
     draw();
   }
   function replay(id, recording, opts) {
@@ -996,7 +1029,7 @@
   kinds.door = { touch: function (e, input, melee) { if (!melee) return; var ok = !e.locked || (NEU.save && (NEU.save.flagged(e.locked) || NEU.save.has(e.locked))); if (ok) { e.dead = true; } else if (NEU.talk) NEU.talk([e.waits || ('It waits for ' + e.locked + '.')], 'narr'); } };
   kinds.barrier = { touch: function () {} };
 
-  var api = { level: level, open: open, close: close, running: function () { return live; },
+  var api = { level: level, open: open, slideOpen: slideOpen, close: close, running: function () { return live; },
     painters: painters, pad: padB, spr: spr, rows: rowsOf, ell: ell, mod: mod, spike: spikeShape, glow: glow, fr: fr, steel: STEEL,
     mk: mk, C: C, TILE: TILE, hw: HW, hh: HH,
     hash: function (x, y, z) {
