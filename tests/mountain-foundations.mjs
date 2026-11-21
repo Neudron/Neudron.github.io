@@ -109,6 +109,32 @@ check('checkpoint selection survives deterministic restart', () => {
   assert.equal(p.state.y, checkpoint.y * 16);
   assert.equal(p.level0().entities.find(e => e.t === 'checkpoint').active, true);
 });
+check('checkpoint revisits select spawn in legacy and prototype rooms', () => {
+  const failures = [];
+  for (const id of ['m0', 'mtest_medium']) {
+    assert.ok(p.open(id));
+    const room = p.level0();
+    // Legacy rooms have no authored checkpoints; add two to the real room.
+    const a = room.entities.find(e => e.t === 'checkpoint') || { t: 'checkpoint', x: 4, y: 11 };
+    if (!room.entities.includes(a)) room.entities.push(a);
+    const b = { t: 'checkpoint', x: a.x + 5, y: a.y };
+    room.entities.push(b);
+    const callbacks = [];
+    room.onCheckpoint = e => callbacks.push(e);
+    for (const checkpoint of [a, b, a]) {
+      const hero = p.hero();
+      hero.x = (checkpoint.x + 0.5) * 16;
+      hero.y = (checkpoint.y + 1) * 16;
+      hero.vx = hero.vy = 0;
+      p.step(1 / 60, '');
+      if (room.spawn.x !== checkpoint.x || room.spawn.y !== checkpoint.y - 1) failures.push(id + ': spawn did not follow checkpoint');
+    }
+    assert.deepEqual(callbacks, [a, b], id + ': callback fires only on first activation');
+    p.restartRoom();
+    if (p.state.x !== (a.x + 0.5) * 16 || p.state.y !== a.y * 16) failures.push(id + ': restart missed revisited checkpoint');
+  }
+  assert.deepEqual(failures, []);
+});
 check('author-configured wind accelerates an airborne player reproducibly', () => {
   function run(noWind) {
     assert.ok(neu.mountain.openPrototype('medium'));
