@@ -244,7 +244,15 @@
   }
 
   /* ── the dusk sky and the cliff around the room ─────────────────── */
-  function drawSky(g, ox, oy, cw, station) {
+  /* How many village roofs the horizon has earned by world column x.
+     Pure function of the landmark data in rooms-s.js: no clock, so it
+     holds still under reduced motion. */
+  function horizonHeight(room, x) {
+    var marks = (room && room.landmarks) || [], i, n = 0;
+    for (i = 0; i < marks.length; i++) if (x >= marks[i].x) n++;
+    return n;
+  }
+  function drawSky(g, ox, oy, cw, station, room) {
     var cols = cw / T, cx, px, y0, i, k, h0 = oy - 14, bands, b, yy, sx, wf, wn;
     if (station) { rc(g, 0, 0, cw, oy, INK); return; }
     bands = [[C.k0, 0], [C.k1, h0 - 35], [C.k2, h0 - 23], [C.k3, h0 - 11], [C.k4, h0 - 1]];
@@ -275,6 +283,22 @@
         px = cx * T + 4; y0 = h0 - 3 + wave(px, 11, 40, 5) - 2;
         rc(g, px + 3, y0 - 5, 1, 5, INK);
         rc(g, px, y0 - 8, 8, 2, INK); rc(g, px + 2, y0 - 9, 4, 1, INK);
+      }
+    }
+    /* the village silhouette grows at each sand-path landmark: one more
+       roof band past every mark, back-to-front over the far dunes */
+    var marks = (room && room.landmarks) || [], mi, bx, span, hh, i, yy, bw;
+    for (mi = 0; mi < marks.length; mi++) {
+      bx = ox + marks[mi].x * T;
+      if (bx >= cw) break;
+      span = mi + 1 < marks.length ? (marks[mi + 1].x - marks[mi].x) * T : cw - bx;
+      if (span > cw - bx) span = cw - bx;
+      hh = 3 + (mi + 1) * 2;
+      for (i = 0; i < span; i += 12) {
+        yy = h0 - 3 - hh - ((hs(i + marks[mi].x, mi, 840) * 3) | 0);
+        bw = 8 + ((hs(i + marks[mi].x, mi, 850) * 5) | 0);
+        rc(g, bx + i, yy, bw, Math.max(1, oy - yy), C.k1);
+        rc(g, bx + i - 1, yy - 1, bw + 2, 1, C.k2);
       }
     }
     /* bank ridge running off to the sides, above the cliff */
@@ -308,6 +332,16 @@
     }
   }
 
+  /* The merged village keeps one station interior as a zone, not a second
+     room: the tileset is still savanna, so the bake asks per cell. */
+  function inStation(room, x, y) {
+    var z = room.stationZones || [], i, s;
+    for (i = 0; i < z.length; i++) {
+      s = z[i];
+      if (x >= s.x0 && x <= s.x1 && y >= s.y0 && y <= s.y1) return true;
+    }
+    return false;
+  }
   function bake(room) {
     var hit = paints[room.id];
     if (hit) return hit;
@@ -321,13 +355,13 @@
     if (!g) return cv;
     g.imageSmoothingEnabled = false;
     var x, y, ch2, px, py, i, k, es, e, n, fl;
-    drawSky(g, ox, oy, cw, station);
+    drawSky(g, ox, oy, cw, station, room);
     drawCliff(g, ox, oy, cw, ch, station, rw, rh);
     for (y = 0; y < room.h; y++) {
       for (x = 0; x < room.w; x++) {
         ch2 = tk(room, x, y);
         px = ox + x * T; py = oy + y * T;
-        if (station) { stationTile(g, room, x, y, px, py, ch2 === '#'); continue; }
+        if (station || inStation(room, x, y)) { stationTile(g, room, x, y, px, py, ch2 === '#'); continue; }
         if (ch2 === '#') wallTile(g, room, x, y, px, py);
         else if (isPath(ch2)) pathTile(g, room, x, y, px, py);
         else sandTile(g, room, x, y, px, py);
@@ -337,7 +371,7 @@
       /* dithered seams, tufts and the contact shadow of the bank */
       for (y = 0; y < room.h; y++) for (x = 0; x < room.w; x++) {
         ch2 = tk(room, x, y);
-        if (!isFloor(ch2)) continue;
+        if (!isFloor(ch2) || inStation(room, x, y)) continue;
         px = ox + x * T; py = oy + y * T;
         fl = baseOf(room, x, y);
         for (i = 0; i < 4; i++) {
@@ -574,9 +608,62 @@
     R(2, -15, 10, 3, '#E8DCC0'); R(2, -15, 10, 1, '#FFFFFF'); R(2, -13, 10, 1, '#A89878');
     R(2, -10, 10, 1, '#3A2410'); R(3, -9, 2, 1, '#3A2410'); R(6, -8, 2, 1, '#3A2410'); R(9, -9, 2, 1, '#3A2410'); R(2, -2, 10, 1, '#3A2410');
   }
+  /* The five sand-path landmarks. Back-to-front, sparse silhouettes: the
+     same horizon stack the sky already uses, stepped into the walk. */
+  function pDeadTree(R) {
+    var i;
+    R(-3, -48, 6, 48, '#3A2410'); R(-2, -48, 2, 48, '#7A4E24');
+    for (i = 0; i < 11; i++) R(-4 + (i & 1), -46 + i * 4, 8 - (i & 1) * 2, 1, '#5C3A18');
+    ln(R, -2, -40, -22, -52, '#3A2410', 3); ln(R, -2, -40, -20, -51, '#7A4E24', 1);
+    ln(R, 2, -44, 20, -56, '#3A2410', 3); ln(R, 2, -44, 18, -55, '#7A4E24', 1);
+    ln(R, 0, -33, -12, -43, '#3A2410', 2); ln(R, 1, -28, 14, -37, '#3A2410', 2);
+    for (i = 0; i < 7; i++) R(-14 + i * 5 + ((hs(i, 2, 810) * 3) | 0), -3, 3, 2, '#E8DCC0');
+    R(-15, -6, 4, 3, '#C8B898'); R(9, -5, 3, 2, '#C8B898');
+  }
+  function pBrokenSign(R) {
+    R(-3, -34, 5, 34, '#5C3A18'); R(-2, -34, 2, 34, '#8A5A28');
+    R(-20, -40, 40, 3, '#6A3A1C'); R(-20, -40, 40, 1, '#A87038');
+    R(-20, -37, 14, 3, '#6A3A1C'); R(-6, -37, 1, 3, '#3A2410');
+    R(8, -37, 12, 3, '#6A3A1C'); R(19, -41, 2, 5, '#3A2410');
+    R(-17, -32, 12, 1, '#C8904A'); R(9, -32, 8, 1, '#C8904A');
+    ln(R, 2, -34, 7, -28, '#3A2410', 2);
+  }
+  function pRustCar(R) {
+    var i;
+    R(-26, -20, 52, 14, '#6A2A10'); R(-26, -20, 52, 2, '#A85E2C');
+    R(-16, -31, 30, 12, '#8A3A14'); R(-14, -30, 12, 10, '#3A2A34');
+    R(0, -30, 12, 10, '#3A2A34'); R(-14, -30, 1, 10, '#C8904A'); R(0, -30, 1, 10, '#C8904A');
+    R(-26, -12, 52, 3, '#3A1A0C'); R(-20, -9, 8, 6, '#2A1810'); R(12, -9, 8, 6, '#2A1810');
+    for (i = 0; i < 9; i++) R(-24 + i * 6 + ((hs(i, 3, 820) * 2) | 0), -18 + ((hs(i, 4, 820) * 6) | 0), 3, 1, '#D8925A');
+    ln(R, -24, -20, -30, -24, '#3A1A0C', 2);
+  }
+  function pDuneCrest(R) {
+    var i, hw;
+    for (i = 0; i < 30; i++) {
+      hw = Math.round(36 * Math.pow(1 - i / 30, 0.7)) + 1;
+      R(-hw, -i, hw * 2, 1, i < 12 ? C.sd2 : C.sd3);
+      R(hw - 6, -i, 4, 1, C.sd5);
+    }
+    for (i = 0; i < 5; i++) {
+      R(20 + i * 5, -12 - i * 2, 4, 1, C.sd5);
+      R(24 + i * 5, -13 - i * 2, 2, 1, '#F4E2A8');
+    }
+    for (i = 0; i < 6; i++) R(-30 + i * 11, -2, 3, 1, C.g2);
+  }
+  function pRoofs(R) {
+    var i, x, h;
+    for (i = 0; i < 5; i++) {
+      x = -40 + i * 18; h = 12 + ((hs(i, 5, 830) * 12) | 0);
+      R(x, -h, 16, h, '#5C3A18'); R(x, -h - 1, 16, 1, '#8A5A28');
+      R(x + 2, -h + 3, 4, 4, '#D8925A'); R(x + 10, -h + 3, 4, 4, '#D8925A');
+      R(x - 2, -h - 2, 20, 1, '#3A2410');
+    }
+  }
   var PROPS = {
     acacia: [48, 40, pAcacia], hut: [44, 38, pHut], well: [38, 32, pWell], baobab: [40, 52, pBaobab],
-    kraal: [64, 16, pKraal], stall: [40, 38, pStall], mound: [30, 30, pMound], stool: [26, 16, pStool]
+    kraal: [64, 16, pKraal], stall: [40, 38, pStall], mound: [30, 30, pMound], stool: [26, 16, pStool],
+    deadtree: [50, 58, pDeadTree], brokensign: [44, 42, pBrokenSign], rustcar: [64, 34, pRustCar],
+    dunecrest: [84, 32, pDuneCrest], roofs: [100, 34, pRoofs]
   };
   var spr = {};
   function propSprite(v) {
@@ -607,6 +694,7 @@
 
   /* ── station lantern: chain, frame, a real flame, a pool of light ── */
   function lanternSprite() {
+    if (!A()) return null;
     return A().sprite('vzs:lantern', 16, 26, 8, 24, function (R, g) {
       R(0, -22, 1, 8, '#12081E');
       R(-3, -14, 7, 2, '#3A2414'); R(-3, -3, 7, 2, '#3A2414');
@@ -623,7 +711,7 @@
       var S = d.S || 1, s = lanternSprite(), L2 = L();
       if (s) A().blit(g, s, d, 0, 0);
       if (L2 && L2.glow) L2.glow(g, d.sx, d.sy - 8 * S, 14 * S, '#E89060', 0.24);
-      A().flame(g, d.sx, d.sy - 4 * S, S, 1, d.now || 0, (e.x * 3 + e.y) | 0);
+      if (A() && A().flame) A().flame(g, d.sx, d.sy - 4 * S, S, 1, d.now || 0, (e.x * 3 + e.y) | 0);
     },
     light: function () { return { r: 54, col: '#E89060', glow: 0.22, a: 0.9 }; }
   });
@@ -668,5 +756,6 @@
     }
   });
 
-  NEU.savannaLook = { bake: bake, paints: paints, T: T, MX: MX, MY: MY, props: PROPS, propSprite: propSprite };
+  NEU.savannaLook = { bake: bake, paints: paints, T: T, MX: MX, MY: MY, props: PROPS,
+    propSprite: propSprite, horizonHeight: horizonHeight };
 })();
