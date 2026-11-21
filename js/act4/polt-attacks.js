@@ -121,6 +121,15 @@
     signature: function () { start(phase, true); },
     reset: function () { current = null; index = 0; signature = false; },
     cycles: function () { return CYCLES; },
+    /* B4 first step: the measured lead of every attack, in 60 Hz frames.
+       The warn is issued at events[i] - TELEF and the hit at events[i]. */
+    leads: function () {
+      var out = [], k, i;
+      for (k in SPECS) if (SPECS.hasOwnProperty(k)) {
+        out.push({ name: k, frames: TELEF, events: SPECS[k].events.slice() });
+      }
+      return out;
+    },
     records: ATK,
     D: D,
     V: V,

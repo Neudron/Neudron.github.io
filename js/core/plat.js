@@ -1031,6 +1031,7 @@
     backdrop: null, live: null, foreground: null, hud: null, skin: null,
     get state() { return getStateSafe(); }, step: step, replay: replay, tick: tick,
     hurt: hurt, die: die, heal: function (n) { if (current && current.hp) player.hp = Math.min(current.hp, player.hp + n); },
+    grantInvuln: function (s) { if (player) player.inv = Math.max(player.inv || 0, s || 0); },
     hero: function () { return player; }, level0: function () { return current; },
     wind: windNow, time: function () { return simClock; },
     restartRoom: function () { if (!current) return false; respawn(); return true; },

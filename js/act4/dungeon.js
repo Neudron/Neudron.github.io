@@ -597,6 +597,21 @@
 
   NEU.dungeon = {
     recordings: REC, bossOpen: false, bossLine: '', mageSign: '', sign: '', lastDeath: null,
+    /* B3: a won mage duel hands the dungeon back safely. calmUntil is the
+       foe-stun window; the shared plat hook grants player i-frames. */
+    calmUntil: 0,
+    calm: function (invSec, stunSec) {
+      var fs, i, f, n;
+      if (P.grantInvuln) P.grantInvuln(invSec || 1.5);
+      n = stunSec || 1;
+      NEU.dungeon.calmUntil = Date.now() + n * 1000;
+      fs = NEU.dgnFoes && NEU.dgnFoes.foes;
+      if (fs) for (i = 0; i < fs.length; i++) {
+        f = fs[i];
+        f.vx = 0; f.vy = 0;
+        if (typeof f.cd === 'number') f.cd = Math.max(f.cd, n);
+      }
+    },
     zones: zones, lifts: lifts, zoneAt: zoneAt,
     here: function () { return P.running() && P.levelId() === 'dgn' ? here : ''; },
     spawnPx: function (id) { var n = dN(id); return n < 0 ? null : px(zones[n].spawn); },
