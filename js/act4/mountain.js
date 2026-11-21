@@ -187,8 +187,8 @@
       ];
     } else if (n === 4) {
       fill(rows, 0, 47, 14, '#');
-      fill(rows, 18, 18, 12, 'x');
-      fill(rows, 18, 18, 13, 'x');
+      var k;
+      for (k = 0; k < 14; k++) put(rows, 18, k, 'x');
       spawn = { x: 2, y: 13 };
       ents = [{ t: 'exit', x: 40, y: 13 }];
     } else if (n === 5) {
