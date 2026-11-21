@@ -17,6 +17,18 @@
   var flakes = [], cache = {}, i;
   for (i = 0; i < 28; i++) flakes.push({ x: (i * 53) % 768, y: (i * 37) % 320, v: 18 + (i % 5) * 8 });
 
+  /* ── mtest_reference only: "Shattered Meridian" ──────────────────────────
+     An ice observatory torn open onto a star-lit abyss. One thin irregular
+     broken rim half-swallowed by a jagged ridge; cold slab facets and stone
+     remnants frame an open corridor; amber lives only at the exit. Everything
+     is baked at viewport size and drawn screen-relative, so it survives any
+     room dimensions/path the gameplay pass chooses. */
+  var BW = 768, BH = 416;            /* baked vista exceeds the largest view area (642x362) */
+  var RCX = 454, RCY = 122, RR = 116; /* occultation rim: offset, irregular, never concentric */
+  var TW = [[120, 70], [330, 54], [600, 92]];
+  var REF_ICE = { ink: '#08161F', dark: '#2E5A6C', mid: '#BFE6F0', light: '#EAF8FF', tip: '#FFFFFF' };
+  function isRef(level) { return !!(level && level.id === 'mtest_reference'); }
+
   function reducedNow() { return P.reduced(); }
   function hs(x, y, z) { return P.hash(x, y, z); }
   function vnoise(x, period, spacing, seed) {
@@ -143,7 +155,242 @@
     }
     return o.cv;
   }
+
+  /* flat polygon + soft radial light, both baked once */
+  function poly(g, pts, col) {
+    var i;
+    g.fillStyle = col; g.beginPath(); g.moveTo(pts[0], pts[1]);
+    for (i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]);
+    g.closePath(); g.fill();
+  }
+  function refGlow(g, x, y, r, hex, a) {
+    var gr, h, p;
+    if (!g.createRadialGradient) return;
+    h = hex.charAt(0) === '#' ? hex.substr(1) : hex;
+    p = parseInt(h.substr(0, 2), 16) + ',' + parseInt(h.substr(2, 2), 16) + ',' + parseInt(h.substr(4, 2), 16);
+    gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, 'rgba(' + p + ',1)');
+    gr.addColorStop(1, 'rgba(' + p + ',0)');
+    g.globalAlpha = a; g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); g.globalAlpha = 1;
+  }
+
+  /* The torn aperture: one thin broken rim, radius warped by angle, chunked
+     into pixel steps and interrupted by gaps. Never a set of concentric bands. */
+  function paintRim(g) {
+    var x, y, dx, dy, d, ang, rr, th, seg, i, px, py;
+    for (y = RCY - RR - 26; y <= RCY + RR + 26; y += 2) {
+      for (x = RCX - RR - 26; x <= RCX + RR + 26; x += 2) {
+        dx = x - RCX; dy = y - RCY; d = Math.sqrt(dx * dx + dy * dy);
+        if (d < RR - 30 || d > RR + 30) continue;
+        ang = Math.atan2(dy, dx);
+        rr = RR + 9 * Math.sin(ang * 3 + 0.6) + 6 * Math.sin(ang * 5 - 1.1) + (hs(x >> 2, y >> 2, 91) - 0.5) * 7;
+        th = 3 + ((hs(x >> 3, y >> 3, 92) * 3) | 0);
+        if (Math.abs(d - rr) > th) continue;
+        seg = ((((ang + Math.PI) / (2 * Math.PI)) * 9) | 0);
+        if (hs(seg, 0, 93) < 0.24) continue;
+        F(g, d < rr ? '#EAF8FF' : (d < rr + 2 ? '#9FE8FF' : '#5E86B8'), x, y, 2, 2);
+      }
+    }
+    for (i = 0; i < 10; i++) {
+      ang = -Math.PI + (i / 10) * Math.PI * 2;
+      rr = RR + 9 * Math.sin(ang * 3 + 0.6) + 6 * Math.sin(ang * 5 - 1.1);
+      px = Math.round(RCX + Math.cos(ang) * rr); py = Math.round(RCY + Math.sin(ang) * rr);
+      if (hs(i, 0, 94) < 0.5) F(g, '#FFFFFF', px, py, 2, 2);
+    }
+  }
+
+  /* Two jagged horizons, drawn after the rim so they occlude its lower arc. */
+  function paintFarRidges(g) {
+    var far = [[60, 150, 46], [230, 170, 62], [420, 140, 40], [600, 160, 54], [760, 150, 44]];
+    var main = [[40, 120, 34], [190, 150, 72], [340, 110, 44], [500, 160, 84], [660, 130, 52], [780, 120, 40]];
+    var spire = [[118, 214], [318, 232], [566, 206], [706, 226]];
+    var x, y, k, d, hh, h, top, prev = 0, s;
+    for (x = 0; x < BW; x += 2) {
+      h = 0;
+      for (k = 0; k < far.length; k++) { d = Math.abs(x - far[k][0]); if (d > far[k][1]) continue; hh = far[k][2] * (1 - d / far[k][1]); if (hh > h) h = hh; }
+      top = 246 - Math.round(h / 4) * 4;
+      F(g, '#121E34', x, top, 2, BH - top); F(g, '#223450', x, top, 2, Math.min(8, h));
+    }
+    prev = 0;
+    for (x = 0; x < BW; x += 2) {
+      h = 0;
+      for (k = 0; k < main.length; k++) { d = Math.abs(x - main[k][0]); if (d > main[k][1]) continue; hh = main[k][2] * (1 - d / main[k][1]); if (hh > h) h = hh; }
+      h = Math.max(6, Math.round((h + ((hs(x >> 3, 0, 95) * 10) | 0) - 4) / 2) * 2);
+      top = 296 - h;
+      F(g, '#0B1526', x, top, 2, BH - top);
+      if (h > prev) { F(g, '#3A5C74', x, top, 2, 3); F(g, '#6E9BB0', x, top, 2, 1); }
+      else F(g, '#1A2B40', x, top, 2, 3);
+      if (h > 70 && hs(x >> 2, 1, 96) < 0.35) { s = 2 + ((hs(x >> 1, 2, 97) * 4) | 0); F(g, '#9FC4D4', x, top, 2, s); F(g, '#D6EAF2', x, top, 2, 1); }
+      prev = h;
+    }
+    for (k = 0; k < spire.length; k++) {
+      x = spire[k][0]; y = spire[k][1];
+      poly(g, [x - 6, 296, x, y, x + 7, 296], '#0A1322');
+      poly(g, [x, y, x + 2, y + 9, x - 2, y + 9], '#4A7186');
+      F(g, '#A8D0DE', x, y, 1, 6);
+    }
+  }
+
+  /* Deepest layer: abyss, sparse stars, the broken rim, distant ridges. */
+  function refDeep() {
+    var o = canvasOf(BW, BH), g = o.g;
+    var sky = ['#05060D', '#070915', '#0A0E1E', '#0D1326', '#10192E', '#0D162A', '#0A1222', '#070C18'];
+    var k, x, i, sx, sy, band = 52;
+    for (k = 0; k < 8; k++) F(g, sky[k], 0, k * band, BW, band + 1);
+    for (k = 1; k < 8; k++) for (x = 0; x < BW; x += 2) {
+      F(g, sky[k - 1], x + (k & 1), k * band, 1, 1);
+      F(g, sky[k], x + (k & 1), k * band - 1, 1, 1);
+      F(g, sky[k], x + ((k + 1) & 1), k * band + 1, 1, 1);
+      F(g, sky[k - 1], x + ((k + 1) & 1), k * band - 2, 1, 1);
+    }
+    refGlow(g, 250, 150, 190, '#1B1B3A', 0.30);
+    refGlow(g, 560, 96, 160, '#0E2E38', 0.26);
+    refGlow(g, 430, 300, 210, '#10263A', 0.30);
+    for (i = 0; i < 86; i++) {
+      sx = (hs(i, 1, 71) * BW) | 0; sy = (hs(i, 2, 72) * (BH * 0.78)) | 0;
+      if (i % 11 === 0) {
+        F(g, '#FFFFFF', sx, sy, 2, 2);
+        F(g, '#DCEBFF', sx - 1, sy, 1, 1); F(g, '#DCEBFF', sx + 2, sy, 1, 1);
+        F(g, '#DCEBFF', sx, sy - 1, 1, 1); F(g, '#DCEBFF', sx, sy + 2, 1, 1);
+      } else F(g, i % 3 ? '#6E82AE' : '#B9CFF0', sx, sy, 1, 1);
+    }
+    for (i = 0; i < 40; i++) {
+      sx = (120 + hs(i, 3, 73) * 430) | 0; sy = (60 + hs(i, 4, 74) * 150 + hs(i, 5, 75) * 40) | 0;
+      F(g, i % 4 ? '#7E93BE' : '#CFE2FF', sx, sy, 1, 1);
+    }
+    refGlow(g, RCX, RCY, RR + 44, '#4E7EC0', 0.15);
+    refGlow(g, RCX, RCY, RR + 16, '#9FE8FF', 0.11);
+    paintRim(g);
+    paintFarRidges(g);
+    return o.cv;
+  }
+
+  /* Mid depth: shattered observatory masonry, floating debris, cold bounce. */
+  function refStruct() {
+    var o = canvasOf(BW, BH), g = o.g, x, y, k;
+    poly(g, [300, 96, 372, 88, 380, 100, 306, 110], '#1B2A3C');
+    poly(g, [300, 96, 372, 88, 374, 92, 302, 100], '#46617C');
+    F(g, '#7FB6C6', 302, 100, 70, 1);
+    for (x = 312; x < 374; x += 14) F(g, '#0C1524', x, 100, 1, 8);
+    poly(g, [498, 80, 540, 72, 546, 84, 520, 92, 504, 90], '#1B2A3C');
+    poly(g, [498, 80, 540, 72, 542, 76, 500, 84], '#46617C');
+    /* left leaning tower stub */
+    poly(g, [34, 300, 40, 176, 92, 168, 104, 300], '#141F30');
+    poly(g, [40, 176, 52, 160, 60, 174, 72, 152, 82, 170, 92, 168], '#141F30');
+    poly(g, [40, 176, 92, 168, 90, 180, 42, 188], '#3A546E');
+    F(g, '#070E1A', 60, 206, 6, 22); F(g, '#2E7E88', 62, 209, 2, 15); F(g, '#6FE0D8', 63, 211, 1, 10);
+    for (y = 200; y < 296; y += 16) { F(g, '#0B1422', 40, y, 64, 1); F(g, '#22344A', 40, y + 1, 64, 1); }
+    F(g, '#1E5A64', 96, 232, 8, 64); F(g, '#2E8C92', 100, 250, 4, 46);
+    /* right buttress with a broken arch springing toward the corridor */
+    poly(g, [700, 300, 690, 150, 730, 142, 752, 300], '#141F30');
+    poly(g, [690, 150, 730, 142, 728, 154, 692, 162], '#3A546E');
+    poly(g, [700, 158, 654, 150, 650, 162, 702, 172], '#182538');
+    poly(g, [700, 158, 654, 150, 656, 154, 700, 162], '#46617C');
+    for (k = 0; k < 4; k++) F(g, '#9FC4D4', 652 + k * 5, 162, 1, 5 + (k % 2) * 4);
+    F(g, '#1E5A64', 690, 236, 7, 60); F(g, '#2E8C92', 692, 252, 4, 42);
+    /* dangling chain + drifting chunks silhouetted against the rim */
+    for (k = 0; k < 8; k++) F(g, '#2E4258', 372, 112 + k * 5, 2, 3);
+    F(g, '#4E6E86', 371, 150, 4, 3);
+    poly(g, [404, 150, 418, 144, 424, 154, 412, 160], '#16243A');
+    poly(g, [404, 150, 418, 144, 419, 148, 406, 154], '#46617C');
+    poly(g, [452, 178, 462, 172, 468, 180, 458, 186], '#16243A');
+    poly(g, [452, 178, 462, 172, 463, 175, 454, 181], '#3E5E74');
+    return o.cv;
+  }
+
+  /* Near depth: asymmetric cold-slab cliffs, icicles and cyan bounce. The
+     middle stays empty so the real route stays legible at any viewport size. */
+  function refFrame() {
+    var o = canvasOf(BW, BH), g = o.g, k, x;
+    poly(g, [0, BH, 0, 52, 30, 40, 62, 64, 88, 54, 104, 96, 84, 134, 98, 176, 72, 220, 82, 266, 54, 306, 64, 356, 36, BH], '#0A1522');
+    poly(g, [0, 52, 30, 40, 62, 64, 40, 92, 0, 104], '#3E7184');
+    poly(g, [30, 40, 62, 64, 88, 54, 104, 96, 70, 108, 40, 92], '#8FCAD8');
+    poly(g, [62, 64, 88, 54, 104, 96, 84, 134, 70, 108], '#BFE6F0');
+    poly(g, [0, 104, 40, 92, 70, 108, 50, 160, 0, 176], '#2E5A6C');
+    poly(g, [70, 108, 84, 134, 98, 176, 72, 220, 50, 160], '#5E9BAB');
+    poly(g, [84, 134, 98, 176, 72, 220, 60, 182], '#BFE6F0');
+    poly(g, [0, 176, 50, 160, 72, 220, 40, 262, 0, 280], '#1E3E50');
+    poly(g, [72, 220, 82, 266, 54, 306, 40, 262], '#3E7184');
+    poly(g, [0, 280, 40, 262, 54, 306, 30, 350, 0, 366], '#2E5A6C');
+    poly(g, [54, 306, 64, 356, 36, BH, 20, 352], '#3E7184');
+    F(g, '#EAF8FF', 30, 40, 32, 1); F(g, '#EAF8FF', 88, 54, 16, 1);
+    F(g, '#123044', 40, 92, 1, 30); F(g, '#123044', 72, 220, 1, 28);
+    for (k = 0; k < 5; k++) { x = 8 + k * 14; F(g, '#CFEAF2', x, 104 + (k % 2) * 6, 1, 8 + (k % 3) * 5); F(g, '#8FCAD8', x + 1, 104 + (k % 2) * 6, 1, 5); }
+    /* right cliff: narrower, more slate than ice */
+    poly(g, [BW, 84, BW - 40, 70, BW - 64, 96, BW - 30, 124, BW, 138], '#5E9BAB');
+    poly(g, [BW - 64, 96, BW - 52, 140, BW - 72, 180, BW - 30, 124], '#3E7184');
+    poly(g, [BW, 138, BW - 30, 124, BW - 72, 180, BW - 40, 214, BW, 226], '#2E5A6C');
+    poly(g, [BW - 72, 180, BW - 58, 226, BW - 76, 268, BW - 40, 214], '#3E7184');
+    poly(g, [BW, 226, BW - 40, 214, BW - 76, 268, BW - 48, 310, BW, 326], '#1E3E50');
+    poly(g, [BW - 76, 268, BW - 54, 312, BW - 66, 360, BW - 40, 300], '#3E7184');
+    poly(g, [BW, 326, BW - 48, 310, BW - 66, 360, BW - 40, BH, BW, BH], '#2E5A6C');
+    F(g, '#CFEAF2', BW - 40, 70, 40, 1);
+    for (k = 0; k < 4; k++) { x = BW - 22 - k * 12; F(g, '#CFEAF2', x, 140 + (k % 2) * 5, 1, 7 + (k % 3) * 4); }
+    /* colored bounce light: cyan welling up from the abyss and cliff bases */
+    for (k = 0; k < 5; k++) { g.globalAlpha = 0.03 + k * 0.012; F(g, '#3FD8E0', 0, BH - 8 - k * 12, BW, 12); }
+    g.globalAlpha = 1;
+    refGlow(g, 92, 190, 70, '#3FD8E0', 0.12);
+    refGlow(g, 60, 310, 80, '#3FD8E0', 0.10);
+    refGlow(g, BW - 70, 200, 70, '#3FD8E0', 0.10);
+    refGlow(g, BW - 60, 320, 80, '#3FD8E0', 0.09);
+    return o.cv;
+  }
+  /* Amber astrolabe: the only warm light in the room, found at the exit. */
+  function refFinish() {
+    var o = canvasOf(24, 42), g = o.g;
+    refGlow(g, 12, 26, 20, '#FFB45A', 0.34);
+    poly(g, [4, 42, 6, 12, 18, 12, 20, 42], '#101A2A');
+    poly(g, [6, 12, 18, 12, 16, 8, 8, 8], '#2E4058');
+    F(g, '#5A4A2E', 10, 8, 4, 10);
+    poly(g, [7, 18, 12, 12, 17, 18, 12, 26], '#C85A18');
+    poly(g, [9, 18, 12, 14, 15, 18, 12, 23], '#FFB45A');
+    F(g, '#FFE0A0', 11, 16, 2, 4);
+    F(g, '#0B1422', 6, 12, 12, 2); F(g, '#EAF8FF', 8, 11, 8, 1);
+    return o.cv;
+  }
+  function refExit(level) {
+    var es = level && level.entities, i, e;
+    if (!es) return null;
+    for (i = 0; i < es.length; i++) { e = es[i]; if (e && e.t === 'exit') return e; }
+    return null;
+  }
+  /* Flatten the three depth layers into one viewport-sized canvas. Scaling is
+     non-uniform by design: a slightly oval torn rim reads more irregular, and
+     the whole composition stays visible on any view size (the raw 768x416 bake
+     would push the right cliff off a 640-wide view). Cached per view size. */
+  function refScene(w, h) {
+    var key = 'refScene:' + w + 'x' + h, o, g;
+    if (cache[key]) return cache[key];
+    o = canvasOf(w, h); g = o.g;
+    g.save(); g.setTransform(w / 768, 0, 0, h / 416, 0, 0);
+    g.drawImage(layer('refDeep', refDeep), 0, 0);
+    g.drawImage(layer('refStruct', refStruct), 0, 0);
+    g.drawImage(layer('refFrame', refFrame), 0, 0);
+    g.restore();
+    cache[key] = o.cv;
+    return o.cv;
+  }
+  /* Vista is baked at viewport size and pinned to the view; no world constants,
+     so any new room dimensions/path still get the same composed picture. The
+     single amber marker tracks the exit entity in world space. */
+  function refBackdrop(c, camX, camY, level, now, a) {
+    var vw = a.x1 - a.x0 + 8, vh = a.y1 - a.y0 + 8;
+    var ox = (a.x0 - 4) | 0, oy = (a.y0 - 4) | 0, ex = refExit(level), k, sx, sy;
+    c.drawImage(refScene(vw, vh), ox, oy);
+    if (!reducedNow()) for (k = 0; k < TW.length; k++) if ((((now / 900) | 0) % 6) === k) {
+      F(c, '#FFFFFF', ((TW[k][0] / 768) * vw + a.x0) | 0, ((TW[k][1] / 416) * vh + a.y0) | 0, 2, 2);
+    }
+    if (ex) {
+      sx = ex.x * 16 + 8 - camX; sy = ex.y * 16 - camY;
+      if (sx > a.x0 - 64 && sx < a.x1 + 64) {
+        P.glow(c, sx, sy - 12, 42, '#FFB45A', reducedNow() ? 0.16 : 0.20);
+        c.drawImage(layer('refFinish', refFinish), (sx - 12) | 0, (sy - 42) | 0);
+      }
+    }
+  }
+
   function backdrop(c, camX, camY, level, now, a) {
+    if (isRef(level)) return refBackdrop(c, camX, camY, level, now, a);
     var k, w = a.x1 - a.x0, dim = reducedNow() ? -1 : ((now / 700) | 0) % STARS.length, drift = reducedNow() ? 0 : now * 0.004;
     for (k = 0; k < 8; k++) {
       c.fillStyle = SKY[k];
@@ -306,8 +553,17 @@
       }
     }
   }
+  /* Cold one-way slab for the observatory room: bright top, ice-blue body,
+     cyan bounce underneath. Plain mountain rooms keep the wooden plank. */
+  function refPlatform(g, px, py) {
+    F(g, '#F4FCFF', px, py, 16, 1); F(g, '#BFE6F0', px, py + 1, 16, 2);
+    F(g, '#5E9BAB', px, py + 3, 16, 3); F(g, '#2E5A6C', px, py + 6, 16, 1);
+    F(g, '#8FCAD8', px + 2, py + 4, 1, 2); F(g, '#8FCAD8', px + 12, py + 4, 1, 2);
+    F(g, '#3FD8E0', px, py + 7, 16, 1);
+    g.globalAlpha = 0.14; F(g, '#3FD8E0', px, py + 8, 16, 4); g.globalAlpha = 1;
+  }
   function paintTiles(g, level) {
-    var y, x, row, ch, px, py;
+    var y, x, row, ch, px, py, ref = isRef(level);
     for (y = 0; y < level.h; y++) {
       row = level.grid[y] || '';
       for (x = 0; x < level.w; x++) {
@@ -316,8 +572,8 @@
         if (ch === '.' || ch === ' ') continue;
         if (ch === '#') granite(g, level, x, y);
         else if (ch === 'x') crackedBlock(g, px, py);
-        else if (ch === '=') plank(g, level, px, py);
-        else if (ch === '^' || ch === 'v' || ch === '<' || ch === '>') P.spike(g, px, py, ch, ICE);
+        else if (ch === '=') { if (ref) refPlatform(g, px, py); else plank(g, level, px, py); }
+        else if (ch === '^' || ch === 'v' || ch === '<' || ch === '>') P.spike(g, px, py, ch, ref ? REF_ICE : ICE);
         else if (ch === 'l') lantern(g, px, py);
         else if (ch === 'f') flagPole(g, px, py);
         else if (ch === '`') grassTuft(g, px, py);
