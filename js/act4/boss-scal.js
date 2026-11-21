@@ -1159,6 +1159,7 @@
     var keep = [], fire = [];
     for (var i = 0; i < bullets.length; i++) {
       var b = bullets[i];
+      if (b.x >= AX && b.x <= AX + AW && b.y >= AY && b.y <= AY + AH) b.inside = true;
       b.age += dt;
       if (b.fuse !== undefined) {
         b.fuse -= dt;
@@ -1199,7 +1200,11 @@
         if (b.onEnd) fire.push(b);
         continue;
       }
-      if (b.x < AX - 60 || b.x > AX + AW + 60 || b.y < AY - 60 || b.y > AY + AH + 60) {
+      /* a bullet that has been inside the box dies on crossing its border (B2);
+         one that has not keeps the 60 px margin, so it can still fly in */
+      var out = b.x < AX || b.x > AX + AW || b.y < AY || b.y > AY + AH;
+      if (!out) b.inside = true;
+      if ((out && b.inside) || b.x < AX - 60 || b.x > AX + AW + 60 || b.y < AY - 60 || b.y > AY + AH + 60) {
         /* leaving the arena ends the bullet AND its flare record */
         if (b.fuse !== undefined) b.fuse = 0;
         continue;
@@ -1753,6 +1758,8 @@
     }
 
     NEU.scalAtk.draw(ctx);
+    /* bullets are drawn clipped to the fight box (B2): the glow composite too */
+    ctx.save(); ctx.beginPath(); ctx.rect(AX, AY, AW, AH); ctx.clip();
     var gl = (dm.glow && (bullets.length || booms.length)) ? glowCtx() : null;
     if (gl) {
       for (var gi = 0; gi < bullets.length; gi++)
@@ -1808,6 +1815,7 @@
         if (b.k === 2) { ctx.fillStyle = COL.brimHi; ctx.fillRect((b.x - 3) | 0, (b.y - 3) | 0, 6, 6); }
       }
     }
+    ctx.restore();
     for (var bm = 0; bm < booms.length; bm++) {
       var o = booms[bm];
       if (!gl && dm.glow) dm.glow(ctx, o.x, o.y, 56, '#FF5A2A', 1 - o.t / 0.8);
@@ -2536,6 +2544,8 @@
                get soulX() { return px; },
                get broDash() { return bros.map(function (b) { return b.dash; }); },
                get floorY() { return AY + AH - 7; },
+               /* the fight box (B2 tests: bullets clip and die on its border) */
+               get box() { return { x: AX, y: AY, w: AW, h: AH }; },
                /* test-only: place the soul and her, and make the fight
                   strikeable (mode 'fight', not invulnerable) */
                arm: function (sx, sy, bx2, by2) {
@@ -2546,7 +2556,7 @@
                /* test-only: one hit on the soul (the caller owns god) and
                   one stationary bullet at (x, y) */
                hurtSoul: function () { return hitPlayer(); },
-               shotAt: function (x, y, r) { bullets.push({ x: x, y: y, vx: 0, vy: 0, r: r, c: COL.brim, k: 0, age: 0 }); },
+               shotAt: function (x, y, r, vx, vy) { bullets.push({ x: x, y: y, vx: vx || 0, vy: vy || 0, r: r, c: COL.brim, k: 0, age: 0 }); },
                 /* test-only read (same class as wormSegs): the damage
                    numbers in flight, copied so a caller cannot write into
                    the live list */

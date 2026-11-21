@@ -1193,8 +1193,8 @@
      the aim fixed at the last frame. Then she charges at 900 px/s, leaving an
      afterimage every 4 f and two wake darts every 6 f, and stops with a ring. */
   ATK.PredictiveCharge = function (st) {
-    var f = st.f - (st.p.f0 || 0), k, dx, dy, L, s, pa, p, T = st.p.f0 ? 26 : 40;
-    if (f === 0) { st.p.tl = { x: A.bx, y: A.by, a: 0, at: G.fr, life: Math.min(30, T), bw: 24 }; G.tele.push(st.p.tl); }
+    var f = st.f - (st.p.f0 || 0), k, dx, dy, L, s, pa, p, T = st.p.f0 ? 26 : 30;
+    if (f === 0) { st.p.tl = { x: A.bx, y: A.by, a: 0, at: G.fr, life: T, bw: 24 }; G.tele.push(st.p.tl); }
     if (f < T) {
       A.anim('charge_telegraph'); A.willCharge(true);
       p = predict(A.bx, A.by, 900);
