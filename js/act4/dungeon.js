@@ -57,8 +57,8 @@
       '########..........S...............######',
       '########..........=====...........######',
       '########..........................######',
-      '########..........................######',
-      '########....=====.........u.......######',
+      '########....$$$...................######',
+      '########....=====.........u...u...######',
       '########..........................######',
       '########..........................######',
       '########..................=====...######',
@@ -89,9 +89,9 @@
       '#....c.........b........c..........#####',
       '#....c..................c..........#####',
       '#....L..................L..........#####',
-      '#..................................#####',
-      '#..............=====...............#####',
       '#...............$$$................#####',
+      '#..............=====...............#####',
+      '#..........................a.......#####',
       '...................................#####',
       '...................................#####',
       '..S......w..........p.....a.w......#####',
@@ -99,13 +99,13 @@
       '#####^^^^^^#######^^^^^^######....######',
       '##############################....######'],
     d3: ['##############################....######',
-      '######################..O.............##',
+      '######################................##',
       '######################............c...##',
       '######################............c...##',
       '######################............L...##',
       '######################................##',
       '......................................##',
-      '....a.....w...........................##',
+      '..........w...........................##',
       '......................................##',
       '######################................##',
       '######################................##',
@@ -136,8 +136,8 @@
       '##.....c..........c...........c...######',
       '##.....L..........c...........L...######',
       '##................L...............######',
-      '##...........w....................######',
-      '##..........=========.............######',
+      '##..........$$$...................######',
+      '##......G...=========.............######',
       '##................................######',
       '##................................######',
       '##................................######',
@@ -166,7 +166,7 @@
       '##..................................####',
       '....................................####',
       '....................................####',
-      '..n...w.......E....p....w......M....####',
+      '..n...w............p....w......M....####',
       '########################################',
       '########################################',
       '########################################'],
@@ -187,10 +187,10 @@
       '##..................................####',
       '##..................................####',
       '##..................................####',
-      '##......................$.$.$.......####',
+      '##......h..........................####',
+      '##..................O...................',
       '##......................................',
-      '##......................................',
-      '##.....G..........t.................S.l.',
+      '##.....G..........$$$.........t.....S.l.',
       '##....###........####............#######',
       '##....###^^^^^^^^####^^^^^^^^^^^^#######',
       '##....##################################'],
@@ -208,13 +208,13 @@
       '##..c.........b.........b.........c..###',
       '##..L.............................L..###',
       '##...................................###',
-      '##................................y..###',
-      '##..............................=====###',
+      '##...........#...........#......$$.y$###',
+      '##..............................==k==###',
       '##...................................###',
       '##...................................###',
       '##......................................',
       '##........#......#......#...............',
-      '##.S..p...#..w...#..T...#..........y....',
+      '##.S..p...#..w...#..T...#...#......y....',
       '########################################',
       '########################################',
       '########################################'],
@@ -224,12 +224,12 @@
       '########################################',
       '########################################',
       '########################################',
-      '##..c...........b..........c......######',
-      '##..c......................c......######',
+      '##..c...........b.........Yc......######',
+      '##..c.....................=c......######',
       '##..L......................L......######',
       '##................................######',
       '##................................######',
-      '##.........$$.....................######',
+      '##.........$$$.......t............######',
       '##........====....................######',
       '##................................######',
       '##................................######',
@@ -248,12 +248,12 @@
       '##...c............................c...##',
       '##...L.........................S..L...##',
       '##............................====....##',
-      '##....................................##',
-      '##.........U..........................##',
-      '##....................................##',
+      '##...................Q................##',
+      '##.........U...............E..........##',
+      '##............................W.......##',
       '##....=======............=======......##',
       '##....................................##',
-      '##....................................##',
+      '##...............$$$O.................##',
       '##..............=======...............##',
       '##....................................##',
       '##....................................##',
@@ -262,7 +262,7 @@
       '##....................................##',
       '##......................................',
       '##......................................',
-      '##..w....C.........Y....p.....l..w......',
+      '##..w....C.....Q.......p.....l..w......',
       '########################################',
       '########################################',
       '########################################'],
@@ -281,7 +281,7 @@
       '#....c............................c.####',
       '#....L............................L.####',
       '#...................................####',
-      '#..........Q.........Q..............####',
+      '#...................................####',
       '#...................................####',
       '#...................................####',
       '....................................####',
@@ -373,7 +373,7 @@
     return GRID[r].charAt(c);
   }
   function build() {
-    var g = [], x, y, i, n, z, rows, ch, wx, wy, row, id;
+    var g = [], x, y, i, n, z, rows, ch, wx, wy, row, id, cacheSeen = {}, cfac;
     for (y = 0; y < H; y++) { row = []; for (x = 0; x < W; x++) row.push(y < SURF ? ' ' : y < ZH ? 'g' : '#'); g.push(row); }
     for (n = 0; n < CELL.length; n++) {
       id = 'd' + n; rows = ZONES[id];
@@ -383,7 +383,13 @@
         ch = rows[y].charAt(x); wx = z.x + x; wy = z.y + y;
         g[wy][wx] = (ch === ' ' || ch === '#' || ch === 'g' || ch === '=' || '^v<>'.indexOf(ch) >= 0) ? ch : rows[y].charAt(x - 1) === ' ' || rows[y].charAt(x + 1) === ' ' ? ' ' : '.';
         if (ch === 'S') z.spawn = { x: wx, y: wy };
-        else if (ch === 'k') { ents.push({ t: 'crumble', x: wx, y: wy }); cracks[wy + ',' + wx] = 'k'; }
+        else if (ch === 'k') {
+          /* D6: one hidden five-coin cache per wall faction (B/G/P). */
+          cfac = faction(wx, wy);
+          var ke = { t: 'crumble', x: wx, y: wy };
+          if (!cacheSeen[cfac]) { ke.cache = 5; cacheSeen[cfac] = 1; }
+          ents.push(ke); cracks[wy + ',' + wx] = 'k';
+        }
         else if (DECOR.indexOf(ch) >= 0) decor.push({ k: ch, x: wx, y: wy, f: z.wall });
         else if (FOE.indexOf(ch) >= 0) spawners.push({ k: ch, x: wx, y: wy, zone: id, rest: n % 3 === 2 });
         else if (ch === 'P') { save = { x: wx, y: wy }; ents.push({ t: 'dsave', x: wx, y: wy }); }
@@ -456,7 +462,10 @@
       g[y][HUT.x0] = 'g'; g[y][HUT.x1] = 'g';
       for (x = HUT.x0 + 1; x < HUT.x1; x++) g[y][x] = ' ';
     }
-    g[HUT.wall1 - 1][HUT.x0] = ' '; g[HUT.wall1][HUT.x0] = ' ';   /* the door */
+    g[HUT.wall1 - 1][HUT.x0] = ' '; g[HUT.wall1][HUT.x0] = ' ';   /* the west door */
+    /* a high east window: dash up and out to the lift heads; rows 12-14 stay solid so
+       the hut wall and the tutorial-door walk still behave as tested (fixes216/fixes561). */
+    g[HUT.wall0][HUT.x1] = ' '; g[HUT.wall0 + 1][HUT.x1] = ' ';
     ents.push({ t: 'bed', x: 18, y: HUT.wall1 });
     ents.push({ t: 'tdoor', x: 31, y: HUT.wall1 });   /* W20: the door to the tutorial room t0 */
     decor.push({ k: 'L', x: 26, y: HUT.wall0, f: 'B' });
@@ -478,6 +487,7 @@
   var def = P.level('dgn', {
     rows: build(), spawn: zones[0].spawn, entities: ents, tileset: 'dungeon', view: 'terraria', chunked: true, hp: 6, solid: '#g',
     onOpen: function (opts) {
+      finishDoorFx();
       live = P.level0(); here = ''; goal = opts.goal || '';
       /* saved max-hearts raise only the LIVE cap; the template stays at 6 so
          older suites and fresh saves keep the original contract. */
@@ -512,6 +522,7 @@
   function track() {
     var h = P.hero(), z = zoneAt(h.x, h.y - 11), id, depth;
     reveal(h);
+    if (NEU.dungeon && NEU.dungeon._liftFrames > 0) NEU.dungeon._liftFrames--;
     /* the open surface band is d0's: castle and hut both live there */
     if (!z && h.y - 11 < ZH * T) z = zones[0];
     id = z ? z.id : here;
@@ -520,7 +531,10 @@
       if (z) {
         depth = NEU.save && NEU.save.flag ? NEU.save.flag('dgn_depth') : undefined;
         if (depth === undefined || depth === null || z.n > depth) flag('dgn_depth', z.n);
-        if (z.n === 3 || z.n === 6 || z.n === 9) flag('dgn_lift_' + z.n, 1);
+        if (z.n === 3 || z.n === 6 || z.n === 9) {
+          flag('dgn_lift_' + z.n, 1);
+          if (!flagged('dgn_lift_woke_' + z.n)) { flag('dgn_lift_woke_' + z.n, 1); talk(['* a chain lift wakes.']); }
+        }
         if (z.n === 10) {
           NEU.dungeon.bossOpen = false; NEU.dungeon.bossLine = '';
           /* BUG-0032b: the descent pays once at the bottom, through the one coin authority. */
@@ -546,6 +560,15 @@
   }
 
   function kd(name, d) { var k = kinds[name] || (kinds[name] = {}), q; for (q in d) k[q] = d[q]; return k; }
+  /* D6: a cracked wall hides a five-coin cache, paid once and kept across reloads. */
+  var prevCrumbleTick = kinds.crumble && kinds.crumble.tick;
+  if (prevCrumbleTick) kd('crumble', { tick: function (e, dt) {
+    prevCrumbleTick(e, dt);
+    if (e.dead && e.cache && !flagged('dgn_cache_' + e.x + ',' + e.y)) {
+      flag('dgn_cache_' + e.x + ',' + e.y, 1);
+      if (NEU.save && NEU.save.addCoins && !P.replaying()) NEU.save.addCoins(e.cache);
+    }
+  } });
   kd('dsave', { touch: function (e) {
     if (e.active) return;
     e.active = true; P.heal(6); flag('dgn_saved', 1);
@@ -621,17 +644,18 @@
     cv = document.getElementById('platCanvas');
     if (cv && NEU.juice && NEU.juice.shakeEl) NEU.juice.shakeEl(cv);
   } });
-  /* a chain lift: the one below only goes up; the head at the door rides down once that lift is open */
+  /* a chain lift: the one below only goes up; the head at the door rides down once that lift is open.
+     The ride is replay-safe: a recorded bed->d9 input chain must be able to take the lifts. */
   kd('lift', { touch: function (e, input, melee) {
     var to;
-    if (!melee || P.replaying()) return;
-    if (NEU.dungeon && NEU.dungeon._liftLock) return;
+    if (!melee) return;
+    if (NEU.dungeon && NEU.dungeon._liftFrames > 0) return;
     if (e.top && !flagged('dgn_lift_' + e.n)) { talk(['* the chain is slack. it hangs from somewhere deep.']); return; }
     to = lifts[e.n + (e.top ? '' : 'top')];
     if (!to) return;
     if (!flagged('dgn_lift_' + e.n)) talk(['* a chain lift wakes.']);
     flag('dgn_lift_' + e.n, 1);
-    if (NEU.dungeon) NEU.dungeon._liftLock = true;
+    if (NEU.dungeon) NEU.dungeon._liftFrames = 2;
     P.hero().x = (to.x + 0.5) * T; P.hero().y = (to.y + 1) * T; P.hero().vx = 0; P.hero().vy = 0; P.hero().wipe = 0.25; P.snap();
   } });
   kd('pot', {});
@@ -647,17 +671,17 @@
 
   /* one input recording per zone, spawn to the next zone (d10: to the bone door); fixes201 replays each twice */
   var REC = {
-    d0: [[4, 'dash down right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, ''], [4, 'dash down right'], [4, 'right'], [16, 'left down melee'], [4, 'right']],
-    d1: [[4, 'dash down right'], [4, 'right'], [4, 'jump right'], [4, 'dash down right'], [4, 'right'], [16, 'right down melee'], [4, 'left down melee'], [8, 'right down melee'], [4, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right']],
-    d2: [[4, 'dash down right'], [8, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'dash down right'], [4, 'right'], [4, 'jump right'], [4, 'right'], [8, 'jump'], [4, 'dash down left'], [8, 'right']],
-    d3: [[4, 'dash left'], [4, 'right'], [4, 'jump right'], [4, 'jump left'], [8, 'jump right'], [4, 'dash up'], [4, 'right'], [8, 'left'], [4, 'grab up left'], [12, 'jump'], [4, ''], [4, 'left'], [4, 'dash down left'], [4, 'jump left'], [8, 'left'], [4, 'jump left'], [4, 'dash down left'], [4, 'right'], [4, 'jump right'], [4, 'dash down left'], [4, 'right']],
-    d4: [[4, 'dash down left'], [4, 'right'], [4, 'jump right'], [4, 'left'], [4, 'dash down left'], [4, 'right'], [4, 'jump right'], [4, 'dash down left'], [8, 'jump left'], [12, 'left'], [8, 'left down melee'], [12, 'right down melee'], [4, 'left down melee'], [4, 'right down melee'], [4, 'left down melee'], [4, 'right']],
-    d5: [[4, 'left'], [4, 'jump left'], [4, 'dash down left'], [4, 'right'], [16, 'left down melee'], [4, 'right down melee'], [8, 'left down melee'], [4, 'left'], [4, 'dash left'], [4, 'right']],
-    d6: [[4, 'dash down left'], [4, 'jump left'], [12, 'left'], [4, 'left down melee'], [4, 'left'], [4, 'dash down left'], [4, 'right'], [4, 'jump right'], [4, 'left'], [4, 'dash left'], [16, 'right'], [4, 'left down melee'], [4, 'right']],
-    d7: [[4, 'dash down right'], [4, 'right'], [4, 'jump'], [4, 'left'], [4, 'grab up right'], [4, 'jump right'], [4, 'jump left'], [4, 'dash down right'], [4, 'jump right'], [12, 'right'], [4, 'right down melee'], [4, 'jump left'], [4, 'jump right'], [4, 'right'], [4, 'dash down right'], [4, 'jump right'], [12, 'right'], [4, 'right down melee'], [4, 'dash down right'], [4, 'right']],
-    d8: [[4, 'dash down right'], [4, 'jump'], [8, ''], [4, 'jump right'], [4, 'right'], [4, 'grab up right'], [8, ''], [4, 'grab up right'], [4, 'jump right'], [8, 'right'], [8, ''], [4, 'grab up right'], [4, 'jump right'], [4, 'left'], [4, 'right'], [4, 'grab up right'], [4, 'jump right'], [8, 'right'], [4, ''], [4, 'left'], [4, 'right down melee'], [4, 'jump'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'jump'], [4, 'jump left'], [4, 'jump right'], [4, 'right'], [4, ''], [4, 'grab up right'], [12, 'jump right'], [4, 'dash down right'], [8, 'jump right'], [12, 'right'], [8, 'right down melee'], [4, 'left down melee'], [4, 'right down melee'], [4, 'left down melee'], [4, 'right']],
-    d9: [[4, 'jump right'], [4, 'right'], [4, 'dash down right'], [4, 'right'], [8, 'right down melee'], [4, 'left down melee'], [4, 'right down melee'], [4, 'left down melee'], [12, 'right down melee'], [4, 'dash right'], [4, 'right']],
-    d10: [[4, 'dash down right'], [4, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash down right'], [4, 'right'], [4, 'jump right'], [4, 'dash down right'], [4, 'right'], [4, 'jump right'], [4, 'right']]
+    d0: [[4, 'dash s d'], [4, 'space d'], [8, 'd'], [4, 'space d'], [4, ''], [4, 'dash s d'], [4, 'd'], [16, 'a s melee'], [4, 'd']],
+    d1: [[4, 'dash s d'], [4, 'd'], [4, 'space d'], [4, 'dash s d'], [4, 'd'], [16, 'd s melee'], [4, 'a s melee'], [8, 'd s melee'], [4, 'd'], [4, 'dash d'], [4, 'd'], [4, 'space d']],
+    d2: [[4, 'dash s d'], [8, 'space d'], [8, 'd'], [4, 'space d'], [4, 'dash s d'], [4, 'd'], [4, 'space d'], [4, 'd'], [8, 'space'], [4, 'dash s a'], [8, 'd']],
+    d3: [[4, 'dash a'], [4, 'd'], [4, 'space d'], [4, 'space a'], [8, 'space d'], [4, 'dash w'], [4, 'd'], [8, 'a'], [4, 'shift w a'], [12, 'space'], [4, ''], [4, 'a'], [4, 'dash s a'], [4, 'space a'], [8, 'a'], [4, 'space a'], [4, 'dash s a'], [4, 'd'], [4, 'space d'], [4, 'dash s a'], [4, 'd']],
+    d4: [[4, 'dash s a'], [4, 'd'], [4, 'space d'], [4, 'a'], [4, 'dash s a'], [4, 'd'], [4, 'space d'], [4, 'dash s a'], [8, 'space a'], [12, 'a'], [8, 'a s melee'], [12, 'd s melee'], [4, 'a s melee'], [4, 'd s melee'], [4, 'a s melee'], [4, 'd']],
+    d5: [[4, 'a'], [4, 'space a'], [4, 'dash s a'], [4, 'd'], [16, 'a s melee'], [4, 'd s melee'], [8, 'a s melee'], [4, 'a'], [4, 'dash a'], [4, 'd']],
+    d6: [[4, 'dash s a'], [4, 'space a'], [12, 'a'], [4, 'a s melee'], [4, 'a'], [4, 'dash s a'], [4, 'd'], [4, 'space d'], [4, 'a'], [4, 'dash a'], [16, 'd'], [4, 'a s melee'], [4, 'd']],
+    d7: [[4, 'dash s d'], [4, 'd'], [4, 'space'], [4, 'a'], [4, 'shift w d'], [4, 'space d'], [4, 'space a'], [4, 'dash s d'], [4, 'space d'], [12, 'd'], [4, 'd s melee'], [4, 'space a'], [4, 'space d'], [4, 'd'], [4, 'dash s d'], [4, 'space d'], [12, 'd'], [4, 'd s melee'], [4, 'dash s d'], [4, 'd']],
+    d8: [[4, 'dash s d'], [4, 'space'], [8, ''], [4, 'space d'], [4, 'd'], [4, 'shift w d'], [8, ''], [4, 'shift w d'], [4, 'space d'], [8, 'd'], [8, ''], [4, 'shift w d'], [4, 'space d'], [4, 'a'], [4, 'd'], [4, 'shift w d'], [4, 'space d'], [8, 'd'], [4, ''], [4, 'a'], [4, 'd s melee'], [4, 'space'], [8, 'd'], [4, 'space d'], [4, 'd'], [4, 'space'], [4, 'space a'], [4, 'space d'], [4, 'd'], [4, ''], [4, 'shift w d'], [12, 'space d'], [4, 'dash s d'], [8, 'space d'], [12, 'd'], [8, 'd s melee'], [4, 'a s melee'], [4, 'd s melee'], [4, 'a s melee'], [4, 'd']],
+    d9: [[4, 'space d'], [4, 'd'], [4, 'dash s d'], [4, 'd'], [8, 'd s melee'], [4, 'a s melee'], [4, 'd s melee'], [4, 'a s melee'], [12, 'd s melee'], [4, 'dash d'], [4, 'd']],
+    d10: [[4, 'dash s d'], [4, 'd'], [4, 'space d'], [4, 'd'], [4, 'dash s d'], [4, 'd'], [4, 'space d'], [4, 'dash s d'], [4, 'd'], [4, 'space d'], [4, 'd']]
   };
   var origOpen = P.open, origReplay = P.replay;
   P.open = function (id, opts) {
@@ -795,19 +819,25 @@
      down the corridor, then a Deltarune-style fight box grows from the doorway
      (obj_growtangle: growcon 1 animate-in, growth 0..1). */
   var DOOR_T = { key: [0, 200], chains: [200, 500], open: [500, 1700], pan: [900, 1700], box: [1500, 1900] };
-  var doorFx = { active: false, reduced: false, done: false, snap: null, canvas: null, elapsed: 0, timeline: DOOR_T };
+  var doorFx = { active: false, reduced: false, done: false, snap: null, canvas: null, elapsed: 0, timeline: DOOR_T,
+    raf: 0, timer: 0, token: 0 };
   function seg(ms, r) { return Math.max(0, Math.min(1, (ms - r[0]) / (r[1] - r[0]))); }
   function doorProgress(ms) {
     return { key: seg(ms, DOOR_T.key), chains: seg(ms, DOOR_T.chains), open: seg(ms, DOOR_T.open),
       pan: seg(ms, DOOR_T.pan), box: seg(ms, DOOR_T.box) };
   }
   function finishDoorFx() {
+    doorFx.token++;
     doorFx.active = false; doorFx.done = true;
+    if (doorFx.raf) { if (window.cancelAnimationFrame) window.cancelAnimationFrame(doorFx.raf); doorFx.raf = 0; }
+    if (doorFx.timer) { clearTimeout(doorFx.timer); doorFx.timer = 0; }
     var cv = doorFx.canvas;
     if (cv && cv.parentNode) cv.parentNode.removeChild(cv);
     doorFx.canvas = null;
   }
   function playDoorOpening(snap, e) {
+    finishDoorFx();
+    var tok = doorFx.token;
     doorFx.snap = snap; doorFx.elapsed = 0; doorFx.done = false;
     doorFx.reduced = !!(P.reduced && P.reduced());
     doorFx.active = !doorFx.reduced;
@@ -820,7 +850,7 @@
     var g = cv.getContext('2d');
     var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
     function frame(now) {
-      if (!doorFx.active) return;
+      if (!doorFx.active || tok !== doorFx.token) return;
       var ms = Math.max(0, Math.min(DOOR_T.box[1], now - t0)), pr = doorProgress(ms);
       doorFx.elapsed = ms;
       if (e) e.unlock = pr.open;
@@ -829,11 +859,11 @@
         NEU.dungeonLook.drawOpening(g, cv.width, cv.height, snap, pr);
       }
       if (ms >= DOOR_T.box[1]) { finishDoorFx(); return; }
-      if (window.requestAnimationFrame) window.requestAnimationFrame(frame);
-      else setTimeout(function () { frame(t0 + ms + 16); }, 16);
+      if (window.requestAnimationFrame) doorFx.raf = window.requestAnimationFrame(frame);
+      else doorFx.timer = setTimeout(function () { frame(t0 + ms + 16); }, 16);
     }
-    if (window.requestAnimationFrame) window.requestAnimationFrame(frame);
-    else setTimeout(function () { frame(t0); }, 16);
+    if (window.requestAnimationFrame) doorFx.raf = window.requestAnimationFrame(frame);
+    else doorFx.timer = setTimeout(function () { frame(t0); }, 16);
   }
 
   function enterDungeon(opts) {
