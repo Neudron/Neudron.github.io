@@ -91,12 +91,12 @@ Use one JSON record per source room and keep it in *local notes* until clearance
     "hardness": {"precision": null, "input_complexity": null, "timing": null, "resource_management": null, "failure_cost": null},
     "fun_hypotheses": [], "human_playtest": "not performed", "unknowns": []
   },
-  "neundron_translation": {"original_room_proposal": "", "distinct_from_reference": [], "controller_replay": null},
+  "neudron_translation": {"original_room_proposal": "", "distinct_from_reference": [], "controller_replay": null},
   "status": "UNVERIFIED"
 }
 ~~~
 
-The object label "neundron_translation" is historical only: use consistent locally chosen schema in implementation. Score difficulty axes individually on an **explicit 0–5 rubric** with the evidence attached (0: absent; 5: extreme/verified narrow tolerance). Never turn these into a fabricated objective "fun score".
+Score difficulty axes individually on an **explicit 0–5 rubric** with the evidence attached (0: absent; 5: extreme/verified narrow tolerance). Never turn these into a fabricated objective "fun score".
 
 ## Research gate before enlarging mountain
 
