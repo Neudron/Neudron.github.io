@@ -1079,7 +1079,7 @@
       if (ay < 0 || ay >= g.length) return false;
       var row = g[ay];
       if (ax < 0 || ax >= row.length) return false;
-      if (row.charAt(ax) !== 'i') return false;
+      if (row.charAt(ax) !== 'i' || room.cracks[ax + ',' + ay]) return false;
       for (var j = 0; j < es.length; j++) {
         var e = es[j];
         if (e.dead || !e.solid) continue;
@@ -1091,6 +1091,22 @@
       x = m.x + cand[i][0]; y = m.y + cand[i][1];
       if (free(x, y)) { m.x = x; m.y = y; return; }
     }
+  }
+
+  function mouseStage(c, n) {
+    var r = c.room, st = r.stages[n], es = c.ents(), i;
+    r.stage = n; r.cracks = {}; r._cell = null; r._steps = 0;
+    r.mouse = { x: st.mouse.x, y: st.mouse.y };
+    r.cheese = { x: st.cheese.x, y: st.cheese.y };
+    r.grid = st.grid || r.stages[0].grid;
+    for (i = es.length - 1; i >= 0; i--) if (es[i].iceTool) es.splice(i, 1);
+    if (st.block) es.push({ t: 'block', x: st.block.x, y: st.block.y, solid: true, push: true, iceTool: true });
+    for (i = 0; i < (st.plates || []).length; i++)
+      es.push({ t: 'decor', skin: 'iceplate', x: st.plates[i].x, y: st.plates[i].y, iceTool: true, crack: st.plates[i].crack });
+    for (i = 0; i < es.length; i++) if (es[i].t === 'sign') es[i].lines = n === 1 ?
+      ['step on the two rim plates to crack their ice cells.', 'the mouse cannot enter a cracked cell. r resets this stage.'] : n === 2 ?
+      ['push the stone across the ice until it stops.', 'it blocks the mouse. r resets this stage.'] : es[i].lines;
+    if (NEU.roomArt) delete NEU.roomArt._paints[r.id];
   }
 
   E.register('b4_ice', {
@@ -1127,6 +1143,16 @@
       Q('sconce', 9, 1), Q('armour', 1, 2, { solid: true }), Q('armour', 18, 10, { solid: true }),
       Q('rubble', 2, 10)
     ]),
+    stage: 0, cracks: {},
+    stages: [
+      { mouse: { x: 4, y: 5 }, cheese: { x: 9, y: 6 } },
+      { mouse: { x: 8, y: 2 }, cheese: { x: 5, y: 4 },
+        grid: ['####################', '####################', '#.....iii..........#', '#...iiii...........#', '#...iii............#', '#....ii............#', '#....iii...........#', '#..................#', '#..................#', '#..................#', '#..................#', '####################'],
+        plates: [{ x: 6, y: 7, crack: { x: 7, y: 6 } }, { x: 4, y: 2, crack: { x: 5, y: 3 } }] },
+      { mouse: { x: 8, y: 2 }, cheese: { x: 9, y: 3 },
+        grid: ['####################', '####################', '#......iiii........#', '#......iii.........#', '#........i.........#', '#..................#', '#..................#', '#..................#', '#..................#', '#..................#', '#..................#', '####################'],
+        block: { x: 10, y: 4 } }
+    ],
     mouse: { x: 4, y: 5 },
     cheese: { x: 9, y: 6 },
     _cell: null, _steps: 0,
@@ -1134,9 +1160,9 @@
     cheeseAt: function () { return { x: this.cheese.x, y: this.cheese.y }; },
     onEnter: function (c) {
       /* Unsolved visits reset; a solved room keeps the mouse at its cheese. */
-      this.mouse.x = c.flagged('solved:b4_ice') ? this.cheese.x : 4;
-      this.mouse.y = c.flagged('solved:b4_ice') ? this.cheese.y : 5;
-      this._cell = null; this._steps = 0;
+      if (!this.stages[0].grid) this.stages[0].grid = this.grid;
+      mouseStage(c, c.flagged('solved:b4_ice') ? 2 : Math.max(0, Math.min(2, Number(NEU.save.flag('b4_stage')) || 0)));
+      if (c.flagged('solved:b4_ice')) { this.mouse.x = this.cheese.x; this.mouse.y = this.cheese.y; }
       if (c.flagged('b4_seen')) return;
       c.flag('b4_seen', 1);
       say(c, ['the middle of the room is a frozen pool, and something small moves under it.',
@@ -1158,14 +1184,23 @@
       if (!this._cell) this._cell = { x: cx, y: cy };
       else if (this._cell.x !== cx || this._cell.y !== cy) {
         this._cell = { x: cx, y: cy };
+        var es = c.ents();
+        for (var i = 0; i < es.length; i++) if (es[i].crack && es[i].x === cx && es[i].y === cy) {
+          this.cracks[es[i].crack.x + ',' + es[i].crack.y] = true; es[i].armed = true;
+        }
         this._steps++;
         if (this._steps >= 2) { this._steps = 0; stepMouse(this, c, cx, cy); }
       }
-      return m.x === ch.x && m.y === ch.y;
+      if (m.x !== ch.x || m.y !== ch.y) return false;
+      if (this.stage < 2) {
+        c.flag('b4_stage', this.stage + 1);
+        mouseStage(c, this.stage + 1);
+        return false;
+      }
+      return true;
     },
     onReset: function () {
-      this.mouse.x = 4; this.mouse.y = 5;
-      this._cell = null; this._steps = 0;
+      if (E.warp) E.warp('b4_ice', 'west');
       resetHint('b4_ice');
     },
     onSolved: function (c) {

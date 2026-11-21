@@ -544,6 +544,12 @@
           W(g, o, S, x * T + ((ph * 16) | 0) + 2, y * T + 4, 1, 8, '#C8E8FA');
         }
       }
+      if (room && room.cracks) for (var key in room.cracks) if (Object.prototype.hasOwnProperty.call(room.cracks, key)) {
+        var cell = key.split(','), xx = Number(cell[0]) * T, yy = Number(cell[1]) * T;
+        W(g, o, S, xx + 7, yy + 1, 2, 6, '#30283A');
+        W(g, o, S, xx + 5, yy + 6, 2, 4, '#30283A');
+        W(g, o, S, xx + 7, yy + 9, 2, 6, '#30283A');
+      }
       if (!m || !ch) return;
       /* the cheese: a wedge under the ice, seen through it */
       var cx = ch.x * T + 8, cy = ch.y * T + 9;
