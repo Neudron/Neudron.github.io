@@ -75,10 +75,18 @@
   var MAX_MISS = 5;                  /* five notes in a row missed and the fight is lost */
   var SEC = [0, 26, 52, 78];
   var BREAK_AT = [14, 40, 66, 92];   /* four soul sections, four attack patterns */
+  /* A dodge must begin ON a bar line of its section's tempo, not at a raw
+     second: chart notes and the incoming wave then land on the same downbeat.
+     The authored seconds stay in BREAK_RAW for the test. */
+  var BREAK_RAW = BREAK_AT.slice();
+  function barOf(s) { return 4 * 60 / BPM[Math.min(s, BPM.length - 1)]; }
+  for (var bs = 0; bs < BREAK_AT.length; bs++) {
+    BREAK_AT[bs] = SEC[bs] + Math.round((BREAK_RAW[bs] - SEC[bs]) / barOf(bs)) * barOf(bs);
+  }
   var PAT_GAP = [0.55, 1.0, 1.4, 1.5];   /* seconds between hazard spawns, per pattern */
   var PAT_NAME = ['COIN VOLLEY', 'LOBS', 'RING', 'THE WALL'];
   var PAT_COL = ['#E04A6B', '#4AC2E0', '#C24AE0', '#FFD34E'];
-  var MAX_GAP = 2.0;                 /* s: the chart never leaves the player waiting longer */
+  var MAX_GAP = 1.78;                /* s: the bar-snapped chart never waits longer than this */
   var ITEMS = [
     [0.55, 1, 'bomb'], [7, 0, 'coin'], [8.2, 2, 'potion'], [9.4, 3, 'axe'],
     [10.6, 0, 'mushroom'], [11.8, 1, 'recall'],
@@ -209,6 +217,13 @@
         t = SEC[s] + ((n[3] || 4) + n[0]) * bl;
         notes.push({ t: t, end: t + (n[2] || 0) * bl, lane: n[1], mine: true, hit: false, done: false });
       }
+    }
+    /* The first note after a dodge lands on the arrows' return. Snapping the
+       break to a bar moves that window; this pickup keeps the longest wait
+       inside MAX_GAP whatever the snapping does. */
+    for (s = 0; s < SECTIONS; s++) {
+      t = BREAK_AT[s] + DODGE + EASE_OUT + 0.5 * 60 / BPM[Math.min(s, 2)];
+      notes.push({ t: t, end: t, lane: (s + 1) % 4, mine: true, hit: false, done: false });
     }
     for (i = 0; i < ITEMS.length; i++) {
       notes.push({ t: ITEMS[i][0], end: ITEMS[i][0], lane: ITEMS[i][1], mine: true,
@@ -1267,9 +1282,15 @@
     icon(1, split + 6 * is - 4, by + 8, is);
     ctx.font = '16px "Determination Mono","Pixelify Sans",monospace';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = '#EDE7DE';
-    ctx.fillText('SCORE ' + Math.floor(S.score) + ' · MISSES ' + S.misses + ' · ' +
-                 (S.acc * 100).toFixed(1) + '%' + (g.w < 600 ? '' : ' · ROUND ' +
-                 Math.min(round + 1, CHARTS.length) + '/' + CHARTS.length), g.w / 2 | 0, g.scoreY);
+    ctx.fillText(scoreLine(), g.w / 2 | 0, g.scoreY);
+  }
+
+  /* Only round 0 is ever played, so "ROUND 2/3" was a lie. The changing
+     number is the four-section split of the one song. */
+  function scoreLine() {
+    return 'SCORE ' + Math.floor(S.score) + ' · MISSES ' + S.misses + ' · ' +
+           (S.acc * 100).toFixed(1) + '% · ROUND 1/3 · SECTION ' +
+           (S.section + 1) + '/' + SECTIONS;
   }
 
   /* A hold's tail: a stepped trail of blocks that scrolls with its note. */
@@ -1317,6 +1338,41 @@
       ctx.fillRect(Math.round(cx + Math.cos(an) * r - sz / 2), Math.round(cy + Math.sin(an) * r - sz / 2), sz, sz);
     }
   }
+  /* The one disco ball. The intro drops it; sections 3 and 4 keep it lit so
+     the last half of the song still reads as the same stage. */
+  function discoBall(g, cx, sy, rr, t, d, mv) {
+    var i, ang, cell, gx, gy, ddx, ddy, dist, cellN, sw, gl;
+    ctx.globalAlpha = 0.3 * d;
+    for (i = 0; i < 6; i++) {                       /* rainbow beams fanning from the ball */
+      ang = Math.PI / 2 + (i - 2.5) * 0.22 + (mv ? Math.sin(t) * 0.05 : 0);
+      ctx.fillStyle = RAINBOW[i];
+      ctx.beginPath(); ctx.moveTo(cx, sy);
+      ctx.lineTo(cx + Math.cos(ang - 0.08) * g.h, sy + Math.sin(ang - 0.08) * g.h);
+      ctx.lineTo(cx + Math.cos(ang + 0.08) * g.h, sy + Math.sin(ang + 0.08) * g.h);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    /* a rod from the truss, then an 8px mirror grid clipped to a disc */
+    cell = Math.max(4, (rr / 4) | 0); sw = (Math.floor(t * 3) + 7) % 11;
+    ctx.fillStyle = INKC; ctx.fillRect(cx - 2, 0, 4, Math.max(0, sy - rr));
+    ctx.fillStyle = '#5A5A6A'; ctx.fillRect(cx - 1, 0, 2, Math.max(0, sy - rr));
+    ellP(ctx, cx, sy, rr + 3, rr + 3, INKC, 1);
+    for (gy = -rr; gy < rr; gy += cell) for (gx = -rr; gx < rr; gx += cell) {
+      ddx = gx + cell / 2; ddy = gy + cell / 2; dist = Math.sqrt(ddx * ddx + ddy * ddy);
+      if (dist > rr - 1) continue;
+      cellN = ((gx / cell) | 0) * 7 + ((gy / cell) | 0) * 3;
+      ctx.fillStyle = (cellN + 99) % 11 === sw ? RAINBOW[((cellN + 99) >> 1) % 6]
+                    : (ddx + ddy < -rr * 0.5) ? '#F4F4FF' : dist > rr * 0.7 ? ((ddx + ddy > 0) ? '#5A5A78' : '#8A8AA8') : ((gx / cell + gy / cell) & 1 ? '#C8C8DC' : '#9A9AB8');
+      ctx.fillRect(cx + gx, sy + gy, cell - 1, cell - 1);
+    }
+    ctx.fillStyle = '#FFFFFF';
+    if (Math.floor(t * 4) % 2 === 0) {
+      gl = (rr * 0.55) | 0;
+      ctx.fillRect(cx - gl - 1, sy - gl - 10, 3, 21); ctx.fillRect(cx - gl - 10, sy - gl - 1, 21, 3);
+    }
+  }
+  function ballLit(section) { return section >= 2; }   /* 0-based: sections 3 and 4 */
+
   function introFx(g, el) {
     var mv = still() ? 0 : 1, cx = g.w / 2, cs = peopleCs(g), u = Math.max(7, cs * 0.5 | 0);
     /* the mics meet above the speakers at head height: clear curtain behind them, and on a
@@ -1353,35 +1409,7 @@
     }
     if (el >= 1.2) {                                /* the disco sphere drops, then its light spreads */
       var d = mv ? ease((el - 1.2) / 1.2) : 1, sy = Math.round(-40 + (g.stage * 0.2 + 40) * d), rr = Math.max(24, (cs * 1.6) | 0);
-      var t = el * 3, i;
-      ctx.globalAlpha = 0.3 * d;
-      for (i = 0; i < 6; i++) {                     /* rainbow beams fanning from the ball */
-        var ang = Math.PI / 2 + (i - 2.5) * 0.22 + (mv ? Math.sin(t) * 0.05 : 0);
-        ctx.fillStyle = RAINBOW[i];
-        ctx.beginPath(); ctx.moveTo(cx, sy);
-        ctx.lineTo(cx + Math.cos(ang - 0.08) * g.h, sy + Math.sin(ang - 0.08) * g.h);
-        ctx.lineTo(cx + Math.cos(ang + 0.08) * g.h, sy + Math.sin(ang + 0.08) * g.h);
-        ctx.closePath(); ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      /* the ball: a rod from the truss, then an 8px mirror grid clipped to a disc, lit from the upper left */
-      var cell = Math.max(4, (rr / 4) | 0), gx, gy, sw = (Math.floor(t * 3) + 7) % 11;
-      ctx.fillStyle = INKC; ctx.fillRect(cx - 2, 0, 4, Math.max(0, sy - rr));
-      ctx.fillStyle = '#5A5A6A'; ctx.fillRect(cx - 1, 0, 2, Math.max(0, sy - rr));
-      ellP(ctx, cx, sy, rr + 3, rr + 3, INKC, 1);
-      for (gy = -rr; gy < rr; gy += cell) for (gx = -rr; gx < rr; gx += cell) {
-        var ddx = gx + cell / 2, ddy = gy + cell / 2, dist = Math.sqrt(ddx * ddx + ddy * ddy);
-        if (dist > rr - 1) continue;
-        var cellN = ((gx / cell) | 0) * 7 + ((gy / cell) | 0) * 3;
-        ctx.fillStyle = (cellN + 99) % 11 === sw ? RAINBOW[((cellN + 99) >> 1) % 6]
-                      : (ddx + ddy < -rr * 0.5) ? '#F4F4FF' : dist > rr * 0.7 ? ((ddx + ddy > 0) ? '#5A5A78' : '#8A8AA8') : ((gx / cell + gy / cell) & 1 ? '#C8C8DC' : '#9A9AB8');
-        ctx.fillRect(cx + gx, sy + gy, cell - 1, cell - 1);
-      }
-      ctx.fillStyle = '#FFFFFF';                     /* a four-point glint that turns on and off */
-      if (Math.floor(t * 4) % 2 === 0) {
-        var gl = (rr * 0.55) | 0;
-        ctx.fillRect(cx - gl - 1, sy - gl - 10, 3, 21); ctx.fillRect(cx - gl - 10, sy - gl - 1, 21, 3);
-      }
+      discoBall(g, cx, sy, rr, el * 3, d, mv);
     }
   }
 
@@ -1397,6 +1425,10 @@
     if (hintEl) { var hy = Math.round(g.stage + 56) + 'px'; if (hintEl.style.top !== hy) hintEl.style.top = hy; }
     stage(g, sp);
     people(g, sp, t);
+    if (S.mode !== 'intro' && ballLit(S.section)) {
+      var bcs = peopleCs(g), brr = Math.max(24, (bcs * 1.6) | 0);
+      discoBall(g, g.w / 2, Math.round(g.stage * 0.2), brr, still() ? 0 : sp * 3, 1, still() ? 0 : 1);
+    }
     if (S.mode === 'intro') {
       introFx(g, S.introT);
       ctx.restore();
@@ -1522,7 +1554,8 @@
       ctx.globalAlpha = 0.6; ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, g.w, g.h); ctx.globalAlpha = 1;
       text('PAUSED', g.w / 2, g.h / 2 - 16, 48, '#FFFFFF');
       text('ESC to resume', g.w / 2, g.h / 2 + 32, 16, '#EDE7DE');
-      text('X or tap to leave', g.w / 2, g.h / 2 + 56, 16, '#EDE7DE');
+      text('R to restart', g.w / 2, g.h / 2 + 56, 16, '#EDE7DE');
+      text('X or tap to leave', g.w / 2, g.h / 2 + 80, 16, '#EDE7DE');
     }
     ctx.restore();
     if (NEU.juice && NEU.juice.drawParts) NEU.juice.drawParts(ctx, 1 / 60);
@@ -1550,6 +1583,7 @@
       if (performance.now() - winAt > 600) close();
       return;
     }
+    if (S.paused && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); retry(); return; }
     if (S.paused && (e.key === 'x' || e.key === 'X')) { e.preventDefault(); leavePrompt(); return; }
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -1675,6 +1709,7 @@
                  state: S, pops: pops, geom: geom, noteY: noteY, dirOf: dirOf,
                  charts: CHARTS, bpm: BPM, WINDOW: WINDOW_MS / 1000,
                  sections: SECTIONS, length: SONG, soulHit: soulHit,
-                 stats: chartStats, MAX_GAP: MAX_GAP,
+                 stats: chartStats, MAX_GAP: MAX_GAP, breaks: BREAK_AT, breakRaw: BREAK_RAW,
+                  sec: SEC, barOf: barOf, scoreLine: scoreLine, ballLit: ballLit,
                  soul: function () { return soulF; } };
 })();

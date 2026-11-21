@@ -161,9 +161,10 @@
       + '<div class="inv__loadout" aria-label="Equipped gear"></div>'
       + '<div class="inv__body">'
       + '<section class="inv__equipped"><h2>CATEGORIES</h2><div class="inv__slots"></div></section>'
-      + '<section class="inv__inventory"><h2 class="inv__heading">ITEMS</h2><ul class="inv__list" role="listbox" aria-label="Items"></ul><p class="inv__hint" hidden></p></section>'
+      + '<section class="inv__inventory"><h2 class="inv__heading">ITEMS</h2><ul class="inv__list" role="listbox" aria-label="Items"></ul></section>'
       + '<section class="inv__stats"><h2>STATS</h2><div class="inv__statlines"></div></section></div>'
-      + '<section class="inv__preview"><h2>IN COMBAT</h2><div class="inv__stage"><canvas class="inv__fight" width="160" height="40" aria-hidden="true"></canvas><div class="inv__fight-text"></div></div></section>'
+      + '<footer class="inv__footer"><p class="inv__hint" hidden></p></footer>'
+       + '<section class="inv__preview"><h2>IN COMBAT</h2><div class="inv__stage"><canvas class="inv__fight" width="160" height="40" aria-hidden="true"></canvas><div class="inv__fight-text"></div></div></section>'
       + '<div class="inv__desc" aria-live="polite"></div>';
     document.body.appendChild(box);
     list = box.querySelector('.inv__list'); detail = box.querySelector('.inv__desc');
@@ -381,6 +382,7 @@
     list.innerHTML = '';
     for (i = 0; i < rows.length; i++) {
       var li = document.createElement('li'), icon = document.createElement('canvas'), span = document.createElement('span');
+      span.className = 'inv__name';
       icon.width = 16; icon.height = 16; icon.className = 'inv__icon'; icon.style.width = icon.style.height = '32px'; drawIcon(icon, rows[i]);
       li.appendChild(icon); li.appendChild(span); span.textContent = itemLabel(rows[i]);
       var kindEl = document.createElement('i');
@@ -399,7 +401,10 @@
     if (!rows.length && !(equip && !opened)) list.innerHTML = '<li>(nothing)</li>';
     current = equip ? equipped : null; chosen = selectedItem();
     shown = equip ? (opened && chosen ? chosen : current) : chosen;
-    box.querySelector('.inv__statlines').innerHTML = equip ? statText(shown, current) : '';
+    /* Full name lives here, never in the narrow list column. */
+    var statHtml = equip ? statText(shown, current) : '';
+    if (equip) statHtml = '<div class="inv__statname">' + (shown ? itemLabel(shown) : (current ? current.name : '')) + '</div>' + statHtml;
+    box.querySelector('.inv__statlines').innerHTML = statHtml;
     if (equip) {
       drawFight(box.querySelector('.inv__fight'), shown);
       box.querySelector('.inv__fight-text').textContent = fightText(shown);
