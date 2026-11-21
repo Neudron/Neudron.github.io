@@ -203,7 +203,7 @@
   .fnf__msg::before { left: 20px; }
   .fnf .bh__keys { display: none; }
 }
-/* coarse pointer: keep the message clear of the bottom strip */
+/* the touch pad owns the bottom 200px on a phone */
 @media (pointer: coarse) { .fnf__msg { bottom: 216px; } }
 
 /* The one textbox (#tbox, sans.js say()), Deltarune style: black,
