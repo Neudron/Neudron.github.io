@@ -258,6 +258,12 @@
     phase: function (n, now) {
       if (now || !current) setPhase(n); else pending = clamp(n | 0, 1, 3);
     },
+    /* true until the outgoing volley reaches its own duration: the phase
+       gate must not swap cycles while an attack is still live. */
+    busy: function () {
+      var spec = current && SPECS[current.name];
+      return !!(spec && current.f < spec.duration);
+    },
     timing: function () { return TIMING; },
     defs: defs,
     stateAt: stateAt,

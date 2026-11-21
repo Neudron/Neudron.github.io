@@ -99,6 +99,7 @@
      hand instead of through index.html. */
   var attackWarns = (NEU.poltFx && NEU.poltFx.warns) || [];
   var attackFrameAcc = 0, kit = null, bossTarget = { kind: 'boss' }, cloneTarget = { kind: 'clone' }, phase = 1, bossHP = 900, bossMax = 900;
+  var phaseWanted = 0, lastAttack = null;   /* phase gate waits for the outgoing volley */
   var bx = 0, by = 0, bz = 0, charging = 0, glow = 0, nextCharge = 0;
   var TELE = 24 / 60;                    /* hook telegraph: 24 frames before a hook can hit */
   /* game-clock state: every timer here is advanced by the update loop, so a
@@ -113,6 +114,7 @@
      moveIntent is consumed in update; bossHidden hides only the body sprite. */
   var moveIntent = null, bossHidden = false;
   var clone = null, mode = 'fight';
+  var RELEASE_F = 210, release = 0;    /* P-WO-P5-3: soul-release frames after a win */
   var line = '', lineT = 0;
 
   function say(s) {
@@ -238,6 +240,12 @@
         sig = 0; sigDone = true; say('* it holds on. one more.');
       }
     }
+    /* the outgoing volley ended: hand the held phase to the attack record
+       before the next volley's telegraph, never mid-attack */
+    if (!sig && phaseWanted && lastAttack && NEU.poltAtk && NEU.poltAtk.current() !== lastAttack) {
+      NEU.poltAtk.phase(phaseWanted, true); phaseWanted = 0;
+    }
+    if (NEU.poltAtk) lastAttack = NEU.poltAtk.current();
     if (NEU.poltFx) {
       NEU.poltFx.step(dt);
     } else {
@@ -329,7 +337,12 @@
   }
 
   function stepFn(nowMs) {
-    if (!running) { if (dying) deathStep(nowMs); return; }
+    if (!running) {
+      if (!NEU.kernel && release > 0) requestAnimationFrame(stepFn);
+      if (release > 0) releaseStep(nowMs);
+      if (dying) deathStep(nowMs);
+      return;
+    }
     REDUCE_MOTION = liveReduced();          /* VIP-01: read the live store every frame */
     /* legacy loop when the kernel is absent; the kernel tick owns the frame otherwise */
     if (!NEU.kernel) requestAnimationFrame(stepFn);
@@ -643,8 +656,23 @@
     if (NEU.kernel && NEU.kernel.after) NEU.kernel.after(2500, removeCard);
   }
 
+  /* The kill keeps the field for a 210f soul release; the last overlay clear
+     waits for it. Both sprites come from polt-fx — no new art, no flash. */
+  function releaseStep(nowMs) {
+    if (NEU.poltFx) {
+      NEU.poltFx.step(1 / 60);
+      if (!liveReduced()) NEU.poltFx.ghost(bx, by);
+    }
+    release--;
+    if (!release) {
+      line = '';
+      if (NEU.poltFx) NEU.poltFx.clear();   /* defer the final overlay clear */
+    }
+    draw(nowMs);
+  }
+
   function win() {
-    running = false; mode = 'won'; bullets = [];
+    running = false; mode = 'won'; bullets = []; release = RELEASE_F;
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', -1);
     if (NEU.juice) { NEU.juice.hit('huge', { colour: '#7FE3C4', shake: cap('huge') });
                      NEU.juice.burst(bx, by, 60, COL.ecto, 260); }
@@ -722,7 +750,8 @@
     phase = to;
     pulsePhase();                          /* body reaction: one white frame */
     if (NEU.poltFx) NEU.poltFx.card(BOSS_NAMES[to]);
-    if (!sig && NEU.poltAtk) NEU.poltAtk.phase(to);
+    if (!sig && NEU.poltAtk && !NEU.poltAtk.busy()) NEU.poltAtk.phase(to);
+    else if (!sig && NEU.poltAtk) phaseWanted = to;   /* applied at the next cycle boundary */
     hooks.forEach(function (h) { h.free = to === 2; if (to === 2) h.t = 1.5; });
     if (to === 3) clone = { x: bx, y: by, t: 2 };
     if (msg) say(msg);
@@ -1161,6 +1190,19 @@
     }
 
     var bp = proj(bx, by, bz);
+    if (release > 0 && NEU.poltFx) {
+      if (NEU.poltFx.glow) {
+        var rg = NEU.poltFx.glow.begin(innerWidth, innerHeight);
+        if (rg) {
+          NEU.poltFx.glow.draw(rg, bp.x, bp.y, 64, 'ECTO', 4, 0.3);
+          NEU.poltFx.glow.end(ctx, innerWidth, innerHeight);
+        }
+      }
+      NEU.poltFx.drawFx(ctx, 'ghost', {
+        ghost: function (gh) { dm.glow(ctx, gh.x, gh.y, 32, '#7FE3C4', gh.a); },
+        reduced: liveReduced()
+      });
+    }
     dm.drawFlash(ctx, F, bp.x, bp.y, 48);
     if (mode !== 'won') dm.drawFX(ctx, F, inv);
     if (NEU.juice) NEU.juice.drawParts(ctx, 1 / 60);
@@ -1176,7 +1218,7 @@
     }
 
     if (kit) kit.draw(ctx);
-    dm.hud(ctx, F, { w: innerWidth, h: innerHeight, AY: AY, AH: AH, name: BOSS_NAMES[phase],
+    if (mode !== 'won') dm.hud(ctx, F, { w: innerWidth, h: innerHeight, AY: AY, AH: AH, name: BOSS_NAMES[phase],
                      hp: bossHP, max: bossMax, ticks: PHASE_GATES.slice(1),
                      php: hp, pmax: MAXHP, phase: phase });
     /* phase-coloured HUD frame rule, drawn here because danmaku.js belongs
@@ -1286,7 +1328,7 @@
     if (msg) msg.hidden = true;
     layout();
     B.open('polt'); MAXHP = B.playerHp(6); IFRAMES = B.iframes(dm.IFRAMES || 1.1);
-    t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; attackWarns.length = 0; attackFrameAcc = 0; keys = {}; dying = 0;
+    t = 0; lastHit = -1; hp = MAXHP; inv = 0; bullets = []; attackWarns.length = 0; attackFrameAcc = 0; keys = {}; dying = 0; release = 0;
     autoN = 0; dropAssistKeys();
     moveIntent = null; bossHidden = false;
     seq = null; dim = 0;                   /* VIP-04: no bar/timer/blackout survives a replay */
@@ -1315,6 +1357,7 @@
     resetLegs();
     attachAttacks();
     if (NEU.poltAtk) NEU.poltAtk.start(phase, false);
+    phaseWanted = 0; lastAttack = NEU.poltAtk ? NEU.poltAtk.current() : null;
     pulsePhase();
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', 1);
     say('* something in the wall has been listening the whole time.');
@@ -1325,13 +1368,14 @@
   function close() {
     var status = document.getElementById('poltTell');
     if (status) status.textContent = '';
-    running = false; dying = 0; B.close('polt');
+    running = false; dying = 0; release = 0; B.close('polt');
     if (NEU.kernel && NEU.kernel.current() === 'polt') NEU.kernel.pop();
     warnAt = 0; charging = 0; vuln = 0; sig = 0; chargePath = null;
     moveIntent = null; bossHidden = false;
     seq = null; dim = 0;
     stopRise();
     if (NEU.poltAtk) NEU.poltAtk.reset();
+    phaseWanted = 0; lastAttack = null;
     attackWarns.length = 0;
     if (NEU.poltFx) NEU.poltFx.clear();
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', -1);
@@ -1350,7 +1394,7 @@
   if (NEU.kernel) NEU.kernel.register('polt', {
     tick: function (dt) { stepFn(performance.now()); },
     open: open, close: close,
-    running: function () { return running || !!dying; }
+    running: function () { return running || !!dying || release > 0; }
   });
 
   NEU.polt = { open: open, close: close, win: win,
@@ -1379,6 +1423,7 @@
                get look() { return PHASE_LOOK[phase]; },
                get dim() { return dim; },
                get signatureFrames() { return SIG_FRAMES; },
+               get release() { return release; },
                get cine() { return cine; }, set cine(v) { cine = !!v; },
                get transition() {
                  return seq ? { f: seq.f, to: seq.to, stage: seq.stage, dim: dim } : null;
