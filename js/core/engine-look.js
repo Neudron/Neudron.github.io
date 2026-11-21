@@ -514,6 +514,11 @@
   var LEGS = [['..c...c..', '..b...b..', '..b...b..'],   /* stand   */
               ['...c.c...', '...b.b...', '..b...b..'],   /* stride A */
               ['..c...c..', '..bb.bb..', '..b...b..']];  /* stride B */
+  /* Seated (api.sit): the 'down' torso with the legs folded forward —
+     two wide rows instead of three stray ones. Always faces the room. */
+  var SIT = ['..hhhhh..', '.hHhhhHh.', '.hsssssh.', '.hsesesh.', '.hsssssh.',
+             '..sssss..', '.cCcccCc.', 'scccccccs', '.cdcccdc.',
+             '..cccccc..', '..bbbbbb..'];
 
   var rowsMemo = {};   /* one rows array per pose, so stamp() can cache the baked sprite on it */
   function playerRows(face, phase, blink) {
@@ -549,6 +554,11 @@
         var raised = p >= 0.35;
         stamp(ctx, FLASK_ROWS, FLASK_PAL, sx + side * (raised ? 3 : 6) * s, sy - (raised ? 9 : 6) * s, s, {});
       }
+      return;
+    }
+    if (extra && extra.sit) {
+      /* seated on a throne: short pose, feet on the seat's edge */
+      stamp(ctx, SIT, PAL, sx, sy, s, { flip: face === 'right', squash: extra.settle && !reduced });
       return;
     }
     var phase = walkPhase(walked, moving);
