@@ -8,7 +8,7 @@ const [id, json] = process.argv.slice(2), info = mapInfo(id), root = new URL('..
 const tas = parseTas(readFileSync(info.tas, 'utf8')), rooms = tas.marks.filter(m => m.name.startsWith('lvl_'));
 for (const flags of JSON.parse(json || '[{}]')) {
   const ctx = { window: { NEU: { celFlags: flags } }, Math, Uint8Array, console, JSON }; vm.createContext(ctx);
-  vm.runInContext(readFileSync(new URL('js/cel/' + id + '.js', root), 'utf8'), ctx); vm.runInContext(readFileSync(new URL('js/core/cel.js', root), 'utf8'), ctx);
+  vm.runInContext(readFileSync(new URL('cel/' + id + '.js', root), 'utf8'), ctx); vm.runInContext(readFileSync(new URL('js/core/cel.js', root), 'utf8'), ctx);
   const cel = ctx.window.NEU.cel, ev = [], t0 = rooms[0].at - info.offset;
   cel.start(id, { log: (...a) => ev.push(a) });
   for (let i = t0; i < tas.frames.length; i++) { cel.step(tas.frames[i]); if (cel.level.deaths || cel.level.done) break; }

@@ -40,7 +40,7 @@ const GAME = [
   'js/act4/polt-fx.js', 'js/act4/polt-attacks.js', 'js/act4/boss-polt.js', 'js/act4/exo-thanatos.js',
   'js/act4/exo-combos.js', 'js/act4/boss-exo.js', 'js/act4/boss-draedon.js',
   'js/act4/exo-ares.js', 'js/act4/exo-twins.js', 'js/act4/crack.js',
-  'js/act4/cart.js', 'js/act4/elevator.js', 'js/act4/inventory.js',
+  'js/act4/cart.js', 'js/act4/elevator.js', 'js/core/cel.js', 'js/core/cel-view.js', 'js/act4/cel-mode.js', 'js/act4/inventory.js',
   'js/act4/shopkit.js', 'js/act4/dummy.js',
   'js/core/tphud.js', 'js/game/deck.js',
   'js/act4/gen-wex-woods.js', 'js/act4/gen-wex-city.js',

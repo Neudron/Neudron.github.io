@@ -1,6 +1,6 @@
 /* cel-mode.js — the lower shaft: imported mod rooms played 1:1 on js/core/cel.js.
    Optional, behind the elevator's -1 button after the cart ride. Kernel scene "cel".
-   Kernel and map data load on demand; when js/cel/<map>.js is missing (a deploy without
+   Kernel and map data load on demand; when cel/<map>.js is missing (a deploy without
    the local-only mod data) the shaft stays shut. Route progress lives in the save flag cel_route. */
 (function () {
   'use strict';
@@ -23,7 +23,7 @@
     var l = [];
     if (!NEU.cel) l.push('js/core/cel.js');
     if (!NEU.celView) l.push('js/core/cel-view.js');
-    if (!(NEU.celMaps && NEU.celMaps[id])) l.push('js/cel/' + id + '.js');
+    if (!(NEU.celMaps && NEU.celMaps[id])) l.push('cel/' + id + '.js');
     return l;
   }
   function ensure() {
