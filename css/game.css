@@ -554,41 +554,63 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   }
 }
 
-/* C menu: ITEMS / EQUIP (W2.2). Keep the frame under .tbox at z 76. */
+/* C menu: ITEMS / EQUIP — Deltarune-style gear screen (W21). z 76, under .tbox. */
+.inv[hidden].is-closing { display: block; }
+.inv.is-opening { animation: invOpen .18s steps(4) both; }
+.inv.is-closing { animation: invClose .14s steps(2) both; }
+@keyframes invOpen { from { opacity: 0; scale: .9; } to { opacity: 1; scale: 1; } }
+@keyframes invClose { from { opacity: 1; scale: 1; } to { opacity: 0; scale: .94; } }
 .inv {
   top: 50%; width: min(1152px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
   transform: translate(-50%, -50%); overflow: auto; padding: 16px;
   border: 2px solid #fff; box-shadow: inset 0 0 0 2px #000, inset 0 0 0 4px #fff;
-  font: 400 16px/1.25 var(--font);
+  background: rgba(4, 4, 10, .92); font: 400 16px/1.25 var(--font);
 }
-.inv__top { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; border-bottom: 2px solid #fff; }
-.inv__tabs { display: flex; align-items: stretch; gap: 16px; }
+.inv__top { display: flex; align-items: center; gap: 16px; min-height: 48px; border-bottom: 2px solid #fff; }
+.inv__soul { flex: none; width: 48px; height: 48px; background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100% no-repeat; image-rendering: pixelated; }
+.inv__tabs { display: flex; align-items: stretch; gap: 16px; margin-left: auto; }
 .inv__tab { display: inline-flex; align-items: center; gap: 8px; border: 0; padding: 8px 16px; color: #fff; background: transparent; font: inherit; cursor: pointer; }
 .inv__tab canvas { width: 16px; height: 16px; image-rendering: pixelated; }
 .inv__tab.is-sel { color: #ff0; outline: 2px solid #ff0; outline-offset: -2px; }
+.inv__tab:focus-visible { outline: 2px solid #8bd6ff; outline-offset: -2px; }
 .inv__coins { white-space: nowrap; color: #fff; }
+/* Loadout strip: the four live equipment slots, always on top. */
+.inv__loadout { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; }
+.inv__chip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 8px; border: 2px solid #555; background: #0a0a0f; }
+.inv__chipicon { flex: none; width: 32px; height: 32px; image-rendering: pixelated; }
+.inv__chip b { font-weight: normal; color: #ddd; }
 .inv__body { display: grid; grid-template-columns: 1fr; gap: 16px; padding: 16px 0; }
 /* EQUIP: categories top-left, the item list in the middle, CHAR and STATS
    down the right edge. Stats are never in the centre column. */
-.inv.is-equip .inv__body { grid-template-columns: 232px minmax(0, 1fr) 216px; align-items: stretch; }
+.inv.is-equip .inv__body { grid-template-columns: 240px minmax(0, 1fr) 232px; align-items: stretch; }
 .inv.is-equip .inv__equipped { grid-column: 1; grid-row: 1; }
 .inv.is-equip .inv__inventory { grid-column: 2; grid-row: 1; }
 .inv.is-equip .inv__stats { grid-column: 3; grid-row: 1; }
 .inv.is-equip .inv__list { max-height: 200px; }
 .inv__body section { min-width: 0; border: 2px solid #fff; padding: 8px; }
-.inv__body h2 { margin: 0 0 8px; color: #fff; font: inherit; }
+.inv__body h2 { margin: 0 0 8px; color: #ffce69; font: inherit; }
 .inv__char { text-align: center; }
 .inv__slots { display: grid; gap: 8px; }
-.inv__slot { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 4px 8px; min-height: 48px; }
+.inv__slot { display: flex; align-items: flex-start; gap: 8px; padding: 4px 8px; min-height: 48px; }
 /* Category icons: the 48x16 Deltarune strip (sword, arrow, star) shown at 2x. */
 .inv__sym { flex: none; width: 32px; height: 32px; background: url(../img/act4/deltarune/equip-icons.png) 0 0 / 96px 32px no-repeat; image-rendering: pixelated; }
 .inv__sym.sym-ranged { background-position: -32px 0; }
 .inv__sym.sym-spell { background-position: -64px 0; }
+.inv__slotbody { flex: 1; min-width: 0; display: grid; gap: 4px; }
 .inv__slot b { font-weight: normal; color: #bbb; }
-.inv__spell { flex: 0 0 100%; padding-left: 40px; color: #ddd; }
-.inv__spell.is-focus { color: #ff0; }
+/* An equipped slot row: sprite, name, kind chip, stat line. */
+.inv__gear { display: flex; align-items: center; gap: 8px; padding: 4px 6px; color: #ddd; }
+.inv__gear.is-focus { color: #ff0; box-shadow: inset 0 0 0 2px #ff0; }
+.inv__gearicon { flex: none; width: 32px; height: 32px; image-rendering: pixelated; }
+.inv__gearname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inv__kind { flex: none; font-style: normal; font-size: 16px; line-height: 1; padding: 2px 4px; border: 1px solid #555; color: #aaa; }
+.inv__kind.k-melee { color: #e9d9a6; border-color: #e9d9a6; }
+.inv__kind.k-ranged { color: #8bd6ff; border-color: #8bd6ff; }
+.inv__kind.k-spell, .inv__kind.k-heal { color: #d49aff; border-color: #d49aff; }
+.inv__kind.k-key, .inv__kind.k-quest { color: #8fe39b; border-color: #8fe39b; }
+.inv__gearstat { flex: none; font-style: normal; color: #888; font-size: 16px; }
 .inv__slot.is-focus { outline: 2px solid #ff0; }
-.inv__slot.is-focus > b { color: #ff0; }
+.inv__slot.is-focus > .inv__slotbody > b { color: #ff0; }
 .inv__hint { margin: 8px 0 0; color: #aaa; }
 .inv__statlines { display: grid; gap: 16px; }
 .inv__statlines b { font-weight: normal; }
@@ -597,10 +619,15 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .inv__statlines .is-fx { color: #fa4; }
 .inv__inventory { grid-column: 1 / -1; }
 .inv__list { max-height: 240px; overflow: auto; }
-.inv__list li { min-height: 40px; padding: 4px 4px 4px 40px; gap: 8px; }
+.inv__list li { min-height: 40px; padding: 4px 4px 4px 40px; gap: 8px; cursor: pointer; }
+.inv__list li:hover { color: #ff0; }
 .inv__list li.is-sel { box-shadow: inset 0 0 0 2px #ff0; }
 .inv__list li.is-equipped span::after { content: '  EQUIPPED'; color: #aaa; }
 .inv__icon { flex: none; width: 32px; height: 32px; image-rendering: pixelated; }
+.inv__list .inv__kind { margin-left: auto; }
+/* Confirm FX: the acted-on row/card flashes once. */
+.inv__list li.is-confirm, .inv__slot.is-confirm, .inv__gear.is-confirm { animation: invConfirm .22s steps(2); }
+@keyframes invConfirm { 0%, 60% { background: rgba(255, 224, 102, .4); } 100% { background: transparent; } }
 .inv__desc { min-height: 48px; margin-top: 16px; border: 2px solid #fff; padding: 8px; }
 /* The bottom fight preview: the combat HUD look, one target, the soul. */
 .inv__preview { margin-top: 16px; border: 2px solid #fff; padding: 8px; }
@@ -611,6 +638,28 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 .inv__fight-text { flex: 1 1 240px; color: #fff; white-space: pre-line; line-height: 2; }
 .inv__fight-text::first-line { color: #ff0; }
 .inv__body[hidden], .inv__body section[hidden] { display: none; }
+/* TP bar (js/core/tphud.js): bottom-centre, over fight canvases, under .tbox. */
+.tphud { position: fixed; z-index: 90; left: 50%; bottom: 24px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 16px; padding: 8px 16px;
+  background: #000; color: #fff; border: 4px solid #fff;
+  box-shadow: inset 0 0 0 4px #000, inset 0 0 0 6px #fff;
+  font: 400 16px/1.25 var(--font); pointer-events: none; }
+.tphud[hidden] { display: none; }
+.tphud__tp { display: flex; align-items: center; gap: 8px; }
+.tphud__label { color: #FF9E30; }
+.tphud__bar { width: 160px; height: 16px; border: 2px solid #fff; background: #1a1024; }
+.tphud__fill { display: block; height: 100%; width: 0%; background: #FF9E30; }
+.tphud.is-gain .tphud__fill { background: #8fe39b; }
+.tphud.is-spend .tphud__fill { background: #ff5a4a; }
+.tphud__num { min-width: 48px; }
+.tphud.is-gain .tphud__num { color: #8fe39b; }
+.tphud.is-spend .tphud__num { color: #ff8a7a; }
+.tphud__acts { display: flex; gap: 8px; }
+.tphud__chip { position: relative; width: 48px; height: 56px; background: #0d0d12; border: 2px solid #444; }
+.tphud__chip.is-off { opacity: .45; }
+.tphud__icon { position: absolute; left: 6px; top: 4px; width: 32px; height: 32px; image-rendering: pixelated; }
+.tphud__cd { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: rgba(0, 0, 0, .78); }
+.tphud__cost { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; text-align: center; color: #d49aff; font-style: normal; }
 /* Phone: one column, the stats as a row, a shorter list, so the whole menu
    including the description fits the phone screen without a scroll. */
 @media (max-width: 800px) {
@@ -623,9 +672,12 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   .inv.is-equip .inv__preview { margin-top: 0; padding: 6px 8px; }
   .inv.is-equip .inv__preview h2 { margin-bottom: 4px; }
   .inv.is-equip .inv__desc { margin-top: 0; min-height: 0; }
+  .tphud { gap: 8px; padding: 4px 8px; bottom: 8px; }
+  .tphud__bar { width: 96px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
+  .tphud__fill { transition: none !important; }
 }
 
 .kernel-play { display: flex; flex-direction: column; align-items: center; justify-content: center; }

@@ -37,7 +37,14 @@
       return best;
     }
     function damage(t, n, kind) { if (adapter.damage) adapter.damage(t, n, kind); }
-    function addTp(n) { tp = Math.max(0, Math.min(1, tp + n)); return tp; }
+    var tpEvents = [];
+    function addTp(n) {
+      var before = tp;
+      tp = Math.max(0, Math.min(1, tp + n));
+      if (tp !== before) tpEvents.push(tp - before);
+      return tp;
+    }
+    function drainTp() { var e = tpEvents; tpEvents = []; return e; }
     function heal(n) { hp = Math.min(6, hp + n); }
     function melee() {
       if (meleeCd > 0 || opts.noMelee) return;
@@ -101,7 +108,9 @@
       st = def.stats || {}; fx = def.fx; cost = (st.tp || 0) / 100;
       if (tp + 0.00001 < cost) return;
       if (fx === 'shield' && shield) return;
+      var tpBefore = tp;
       tp = Math.max(0, tp - cost);
+      if (tp !== tpBefore) tpEvents.push(tp - tpBefore);
       if (fx === 'beam') {
         var tg = nearest();
         beam = { x: F.x, y: F.y, ang: tg ? Math.atan2(tg.y - F.y, tg.x - F.x) : facing(), charge: 0, fire: 0, ticks: 0 };
@@ -111,7 +120,7 @@
         for (i = 0; i < n; i++) { a = i * Math.PI * 2 / n; shots.push({ kind: 'nova', x: F.x, y: F.y,
           vx: Math.cos(a) * 220, vy: Math.sin(a) * 220, r: 6, dmg: st.dmg || 1, age: 0, life: 2, hit: [], pierce: false }); }
       } else if (fx === 'heal') heal(st.heal === 'full' ? 6 : Number(st.heal) || 0);
-      else { tp += cost; return; }
+      else { var rb = tp; tp += cost; if (tp !== rb) tpEvents.push(tp - rb); return; }
       var CF = { beam: 'fxGigBrim', shield: 'fxGigWard', nova: 'fxGigNova', heal: 'fxGigMend' };
       if (CF[fx]) casts.push({ x: F.x, y: F.y - 8, t: 0.45, d: 0.45, k: CF[fx] });
       if (row.kind === 'consumable' && NEU.save) NEU.save.take(def.id);
@@ -263,18 +272,31 @@
       return false;
     }
 
-    return {
+    function cdFrac(cd, max) { return max > 0 ? Math.max(0, Math.min(1, cd / max)) : 0; }
+    /* Remaining cooldown as a 0..1 fraction for the TP bar's chips. */
+    function cooldowns() {
+      var m = item(equipped('melee')), r = item(equipped('ranged'));
+      var ms = (m && m.stats && m.stats.cd) || 0.3, rs = (r && r.stats && r.stats.cd) || 1;
+      return { melee: cdFrac(meleeCd, ms), ranged: cdFrac(rangedCd, rs), heal: cdFrac(healCd, 30) };
+    }
+
+    var api = {
       keydown: keydown, keyup: keyup, tick: tick, draw: draw,
-      addTp: addTp, graze: graze, hit: hit,
+      addTp: addTp, graze: graze, hit: hit, cooldowns: cooldowns, drainTp: drainTp,
       get tp() { return tp; },
       get stripOpen() { return stripOpen; },
       get slow() { return stripOpen ? 0.2 : 1; },
+      get noMelee() { return !!opts.noMelee; },
       shots: shots, casts: casts,
       get beam() { return beam; },
       get hp() { return hp; },
       /* a host that owns the HP (the dungeon) writes it in so HEAL and the strip read true */
       set hp(v) { hp = Math.max(0, Math.min(6, Number(v) || 0)); }
     };
+    /* The TP bar shows the newest kit while its fight (or the dungeon) is live. */
+    api._mini = NEU.activeMinigame || '';
+    NEU.kitLive = api;
+    return api;
   }
 
   /* ponytail: Scal keeps its inline copy until its gzip budget allows the later merge. */

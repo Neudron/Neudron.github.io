@@ -40,7 +40,7 @@ const GAME = [
   'js/act4/exo-combos.js', 'js/act4/boss-exo.js', 'js/act4/boss-draedon.js',
   'js/act4/exo-ares.js', 'js/act4/exo-twins.js', 'js/act4/crack.js',
   'js/act4/cart.js', 'js/act4/elevator.js', 'js/act4/inventory.js',
-  'js/game/deck.js'
+  'js/core/tphud.js', 'js/game/deck.js'
 ];
 const FILES = [
   '404.html', 'CNAME', '.nojekyll', 'og.png', 'robots.txt', 'sitemap.xml',
