@@ -59,6 +59,7 @@
   kind('fall', { ms: 520 });
   kind('mode', { ms: 320 });
   kind('portal:fire', { ms: 380 });
+  kind('portal:lightning', { ms: 400 });
   kind('portal:d_city>b7_altar', { ms: 380 });
   kind('portal:d_city>h3_trip', { ms: 380 });
   kind('portal:recall', { ms: 2850 });

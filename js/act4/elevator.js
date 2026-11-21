@@ -8,6 +8,7 @@
   var overlay, canvas, ctx, screen, live, reduced;
   var phase, y, yFrom, t, door, light, lightT, gear, piston, mountain, sent;
   var sirenOn, dust, actx, sirenOsc, sirenGain;
+  var mountainFrame, mountainOpened;
 
   function motion() {
     reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -15,6 +16,7 @@
   function reset() {
     phase = 'cabin'; y = 0; yFrom = 0; t = 0; door = 0; gear = 0; piston = 0;
     light = false; lightT = 0; mountain = false; sent = false; sirenOn = false;
+    mountainFrame = null; mountainOpened = false;
     dust = [];
     stopSiren();
     if (screen) screen.textContent = '';
@@ -125,8 +127,20 @@
     if (!reduced && NEU.juice && NEU.juice.hit) NEU.juice.hit('large', { dy: 1, colour: '#ff2040' });
     draw();
   }
+  /* the reveal is the mode-bridge snapshot of the live m0 frame, so the picture
+     behind the doors and the level the player steps into are one and the same */
+  function openMountain() {
+    if (mountainOpened) return true;
+    if (!NEU.plat || typeof NEU.plat.open !== 'function') return false;
+    if (NEU.plat.open('m0') !== true) return false;
+    mountainOpened = true;
+    if (NEU.save) NEU.save.flag('elevator_out', 1);
+    if (NEU.kernel && NEU.kernel.bridge) {
+      try { mountainFrame = NEU.kernel.bridge(); } catch (e) { mountainFrame = null; }
+    }
+    return true;
+  }
   function finish() {
-    var opened = false;
     if (sent) return;
     sent = true;
     phase = 'vista';
@@ -135,8 +149,7 @@
     mountain = true;
     stopSiren();
     if (NEU.save) NEU.save.flag('elevator_out', 1);
-    if (NEU.plat && typeof NEU.plat.open === 'function') opened = NEU.plat.open('m0') === true;
-    if (!opened) return;
+    if (!openMountain()) return;
     live = false;
     if (overlay) overlay.hidden = true;
     if (NEU.activeMinigame === 'elevator') NEU.activeMinigame = null;
@@ -405,7 +418,7 @@
     var e = 1 - Math.pow(1 - door, 3), span = Math.round((1 - e) * (W / 2)), ext = (piston * 48) | 0, gf = reduced ? 0 : (Math.floor(door * 8) & 3);
     var over = (door > 0.96 && door < 1 && !reduced) ? 2 : 0;
     var seamGlow = door > 0 && door < 1;
-    ctx.drawImage(art.vista, 0, 0);
+    ctx.drawImage(mountainFrame || art.vista, 0, 0);
     if (!reduced) drawDustLayer(0);
     if (span > 0 || over) {
       leaf(0, span, 0, over);
@@ -472,7 +485,7 @@
       if (raw > 1) raw = 1;
       u = raw * raw * (3 - 2 * raw);
       y = yFrom + (-96 - yFrom) * u;
-      if (t >= span) { phase = 'doors'; t = 0; mountain = true; }
+      if (t >= span) { phase = 'doors'; t = 0; mountain = true; openMountain(); }
     } else if (phase === 'doors') {
       span = reduced ? 0.4 : 2.8;
       raw = t / span;
