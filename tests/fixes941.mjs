@@ -77,7 +77,8 @@ for (const g of GROUPS) {
   const rs = rowFor(g.path);
   ok('row names ' + g.id, rs.length > 0, g.path);
   for (const r of rs) {
-    ok('  ' + g.id + ': OWNER-ACCEPTED-FAN-USE', /OWNER-ACCEPTED-FAN-USE/.test(r));
+    /* shipped rows carry the owner's 2026-11-21 ship decision instead */
+    ok('  ' + g.id + ': OWNER-ACCEPTED-FAN-USE', /OWNER-ACCEPTED-FAN-USE|OWNER-APPROVED FAN USE/.test(r));
     ok('  ' + g.id + ': NOT CLEARED', /NOT\s+CLEARED/.test(r));
     /* strip the negation first: only then is a remaining CLEARED a claim */
     ok('  ' + g.id + ': no bare CLEARED', !/\bCLEARED\b/.test(r.replace(/NOT\s+CLEARED/g, 'NOT')));
