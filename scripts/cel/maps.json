@@ -1,0 +1,14 @@
+{
+ "forest-path": {
+  "bin": "mods/strawberry-jam/Maps/StrawberryJam2021/1-Beginner/asteriskblue.bin",
+  "zip": "archives/strawberryjammappack_v1013.zip",
+  "tas": "tas/StrawberryJamTAS/1_Beginner/forest_path.tas",
+  "offset": 76
+ },
+ "the-squeeze": {
+  "bin": "mods/strawberry-jam/Maps/StrawberryJam2021/1-Beginner/snas.bin",
+  "zip": "archives/strawberryjammappack_v1013.zip",
+  "tas": "tas/StrawberryJamTAS/1_Beginner/the_squeeze.tas",
+  "offset": 0
+ }
+}

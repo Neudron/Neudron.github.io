@@ -22,7 +22,7 @@
     if (screen) screen.textContent = '';
   }
   function ensure() {
-    var pad, b0, bq;
+    var pad, b0, bm, bq;
     overlay = document.getElementById('elevator');
     if (!overlay) {
       overlay = document.createElement('div');
@@ -42,17 +42,23 @@
       b0.type = 'button';
       b0.id = 'elv0';
       b0.textContent = '0';
+      bm = document.createElement('button');
+      bm.type = 'button';
+      bm.id = 'elvM';
+      bm.textContent = '-1';
       bq = document.createElement('button');
       bq.type = 'button';
       bq.id = 'elvQ';
       bq.textContent = '?';
       pad.appendChild(b0);
+      pad.appendChild(bm);
       pad.appendChild(bq);
       overlay.appendChild(canvas);
       overlay.appendChild(screen);
       overlay.appendChild(pad);
       document.body.appendChild(overlay);
       b0.addEventListener('click', function () { press('0'); });
+      bm.addEventListener('click', function () { press('-1'); });
       bq.addEventListener('click', function () { press('?'); });
     }
     canvas = document.getElementById('elvCanvas');
@@ -107,6 +113,11 @@
   }
   function press(which) {
     if (!live || sent) return;
+    if (which === '-1') {   /* the lower shaft: optional mod rooms (cel-mode.js) */
+      if (phase !== 'cabin' && phase !== 'floor') return;
+      if (NEU.celMode) NEU.celMode.open();
+      return;
+    }
     if (which === '0') {
       if (phase !== 'cabin' && phase !== 'floor') return;
       phase = 'floor';
@@ -474,7 +485,7 @@
   function step(dt, key) {
     var span, raw, u, period;
     if (!live) return null;
-    if (key === '0' || key === '?') press(key);
+    if (key === '0' || key === '?' || key === '-1') press(key);
     if (!live) return null;
     if (dt > 0.05) dt = 0.05;
     if (phase === 'drop' || phase === 'rise' || phase === 'doors') {
@@ -554,6 +565,7 @@
     k = routed.to;
     if (k === '0' || k === 'Digit0') { press('0'); e.preventDefault(); }
     else if (k === '?' || k === '/') { press('?'); e.preventDefault(); }
+    else if (k === '-' || k === 'Minus') { press('-1'); e.preventDefault(); }
     else if (k === 'Escape') close();
   }
   window.addEventListener('keydown', onKey);
