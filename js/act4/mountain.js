@@ -169,8 +169,6 @@
       ents = [{ t: 'spring', x: 15, y: 13 }, { t: 'exit', x: 36, y: 11 }];
     } else if (n === 2) {
       fill(rows, 0, 19, 14, '#');
-      fill(rows, 20, 31, 15, '^');
-      fill(rows, 20, 31, 16, '#');
       fill(rows, 32, 47, 14, '#');
       spawn = { x: 2, y: 13 };
       /* ascent() does not shift targetX, so the zip target is written in absolute tiles */
