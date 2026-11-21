@@ -83,6 +83,10 @@ for (const g of GROUPS) {
     ok('  ' + g.id + ': no bare CLEARED', !/\bCLEARED\b/.test(r.replace(/NOT\s+CLEARED/g, 'NOT')));
   }
 }
+/* DL13: every named CREDITS group must also have staged files */
+for (const g of GROUPS) {
+  ok('group ' + g.id + ' has files', fanFiles.some((f) => inGroup(f, g.path)));
+}
 ok('CREDITS names the rightsholders',
   /Toby Fox/.test(credits) && /Funkin' Crew/.test(credits));
 ok('CREDITS claims no rightsholder licence for the fan art',
