@@ -24,7 +24,7 @@
     m3: [[4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
     m4: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [4, 'right']],
     m5: [[4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right']],
-    m6: [[4, 'dash up'], [5, ''], [10, 'dash up'], [12, ''], [30, 'right']],
+    m6: [[12, 'jump'], [4, 'dash up'], [8, ''], [6, 'dash up'], [36, 'right']],
     m7: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'right down melee'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right']]
   };
 
@@ -200,9 +200,9 @@
     } else if (n === 6) {
       fill(rows, 0, 9, 16, '#');
       fill(rows, 0, 9, 17, '#');
-      fill(rows, 5, 13, 7, '=');
+      fill(rows, 10, 14, 5, '=');
       spawn = { x: 6, y: 15 };
-      ents = [{ t: 'refill', x: 6, y: 10 }, { t: 'exit', x: 12, y: 6 }];
+      ents = [{ t: 'refill', x: 6, y: 9 }, { t: 'exit', x: 12, y: 4 }];
     } else {
       fill(rows, 0, 15, 14, '#');
       fill(rows, 16, 18, 15, '^');
