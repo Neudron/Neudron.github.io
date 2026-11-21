@@ -32,12 +32,11 @@
   /* Calamity's four Phantom Spirits: normal, sad, angry, happy (the only one that shoots), equal odds */
   var MOODS = [['dgPhantom', 1020, 0], ['dgPhantomS', 900, 0], ['dgPhantomM', 810, 0], ['dgPhantomL', 720, 1]];
   /* sniper: first shot 1.67 s after it sees you, then every 3.33 s; a hit sets it back to 2.17 s */
-  var GUN = { sniper: { first: 1.67, every: 3.33, hit: 2.17, range: 700, v: 1600 }, shotgun: { first: 1.5, every: 3, hit: 2, range: 420, v: 700 },
-    rocket: { first: 1.5, every: 4, hit: 2.5, range: 520, v: 300 } };
-  /* casters: first windup 1.67 s; necromancer beams every 0.83 s after, five per cycle; ragged 3 volleys of 3 souls
-     0.33 s apart, 1 s between volleys; diabolist 3 bolts, 1.67 s each, then it teleports */
-  var SPELL = { beam: { first: 1.67, next: 0.83, per: 5, cycle: 7.5, hitTp: 0.5 }, souls: { first: 1.67, next: 1, per: 3, cycle: 9, hitTp: 0 },
-    inferno: { first: 1.67, next: 1.67, per: 3, cycle: 6.67, hitTp: 1 } };
+  var TELEGRAPH = { lunge: 0.4, flame: 0.4, ghost: 0.4, ranged: 1.0, inferno: 0.5, hammer: 0.6, beam: 0.5, souls: 0.5 };
+  var GUN = { sniper: { first: TELEGRAPH.ranged, every: 3.33, hit: 2.17, range: 700, v: 1600 }, shotgun: { first: TELEGRAPH.ranged, every: 3, hit: 2, range: 420, v: 700 },
+    rocket: { first: TELEGRAPH.ranged, every: 4, hit: 2.5, range: 520, v: 300 } };
+  var SPELL = { beam: { first: TELEGRAPH.beam, next: 0.83, per: 5, cycle: 7.5, hitTp: 0.5 }, souls: { first: TELEGRAPH.souls, next: 1, per: 3, cycle: 9, hitTp: 0 },
+    inferno: { first: TELEGRAPH.inferno, next: 1.67, per: 3, cycle: 6.67, hitTp: 1 } };
   var PHANTOM = ['* Wails echo through the dilapidated dungeon halls...', '* Long-dead prisoners seek their zealous revenge...'];
   var foes = [], shots = [], pops = [], fxs = [], kit = null, F = { x: 0, y: 0, fx: 1, fy: 0 }, box = { AX: 0, AY: 0, AW: 640, AH: 360 }, lastDir = 0;
 
@@ -199,7 +198,7 @@
     if (f.st === 0) {
       w = Math.sin(f.t * 4) * 30;
       f.vx = Math.cos(a) * f.v - Math.sin(a) * w; f.vy = Math.sin(a) * f.v + Math.cos(a) * w;
-      if (f.t > 4) { f.st = 1; f.t = 0; }
+      if (f.t > 4 && onScreen(f.x, f.y, 2 * T)) { f.st = 1; f.t = 0; }
       if (f.d.flame && (f.cd -= dt) <= 0) { f.cd = 2; if ((!solidAt(f.x, f.y) || f.angry) && onScreen(f.x, f.y, 0)) f.glow = 0.4; }
     } else if (f.st === 1) { f.vx *= 0.9; f.vy *= 0.9; if (f.t > 0.4) { f.st = 2; f.t = 0; f.lx = Math.cos(a) * 240; f.ly = Math.sin(a) * 240; } }
     else { f.vx = f.lx; f.vy = f.ly; if (f.t > 0.6) { f.st = 0; f.t = 0; } }

@@ -11,6 +11,7 @@
   var CH = 104;
 
   var SPEC = [['ATTACK', 6], ['HEAL', 4], ['DEFEND', 3], ['PARRY', 3]];
+  // Opening hand (pop order): DEFEND, ATTACK, HEAL, PARRY — NOT PARRY then ATTACK.
   var ICON = {
     ATTACK: ['00100', '00100', '00100', '11111', '00100'],
     HEAL: ['00100', '00100', '11111', '00100', '00100'],

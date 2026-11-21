@@ -166,6 +166,34 @@
       + '<div class="inv__desc" aria-live="polite"></div>';
     document.body.appendChild(box);
     list = box.querySelector('.inv__list'); detail = box.querySelector('.inv__desc');
+    /* the mouse and touch do what the keys do: a tab switches, a category opens
+       on a second tap, a row selects on the first tap and acts on the second */
+    box.addEventListener('click', function (e) {
+      var n = e.target, tabEl = null, slot = null, li = null, sp = null;
+      while (n && n !== box) {
+        if (n.className && typeof n.className === 'string') {
+          if (n.className.indexOf('inv__tab') === 0 && n.getAttribute('data-tab')) tabEl = n;
+          else if (n.className.indexOf('inv__spell') === 0 && n.getAttribute('data-j')) sp = n;
+          else if (n.className.indexOf('inv__slot') === 0 && n.getAttribute('data-i') !== null) slot = n;
+        }
+        if (n.parentNode === list && n.tagName === 'LI') li = n;
+        n = n.parentNode;
+      }
+      if (drinking || (NEU.tboxOpen && NEU.tboxOpen())) return;
+      if (tabEl) { switchTab(Number(tabEl.getAttribute('data-tab'))); return; }
+      if (slot && tab === 1) {
+        var i = Number(slot.getAttribute('data-i'));
+        if (sp && cat === i && opened) { spell = Number(sp.getAttribute('data-j')); tick(); render(); return; }
+        if (cat === i && !opened) { activate(); return; }
+        cat = i; spell = 0; opened = false; tick(); render(); return;
+      }
+      if (li) {
+        var idx = Array.prototype.indexOf.call(list.children, li);
+        if (idx < 0 || idx >= rows.length) return;
+        if (idx === sel && idx === clicked && (tab === 0 || opened)) { activate(); return; }
+        sel = clicked = idx; tick(); render();
+      }
+    });
   }
 
   function live(text) { var node = document.getElementById('bhLive'); if (node) node.textContent = text; }
@@ -310,11 +338,11 @@
       html = '';
       for (i = 0; i < CATS.length; i++) {
         c = CATS[i];
-        html += '<div class="inv__slot' + (cat === i ? ' is-focus' : '') + '"><span class="inv__sym ' + c.icon + '"></span><b>' + c.label + '</b>';
+        html += '<div class="inv__slot' + (cat === i ? ' is-focus' : '') + '" data-i="' + i + '"><span class="inv__sym ' + c.icon + '"></span><b>' + c.label + '</b>';
         for (j = 0; j < c.slots.length; j++) {
           it = equippedItem(c.slots[j]);
           focus = cat === i && opened && spell === j;
-          html += '<span class="inv__spell' + (focus ? ' is-focus' : '') + '">' + (c.slots.length > 1 ? SPELL_NAMES[j] : '') + (it ? it.name : '—') + '</span>';
+          html += '<span class="inv__spell' + (focus ? ' is-focus' : '') + '" data-j="' + j + '">' + (c.slots.length > 1 ? SPELL_NAMES[j] : '') + (it ? it.name : '—') + '</span>';
         }
         html += '</div>';
       }
@@ -350,9 +378,11 @@
     detail.textContent = (shown && shown.desc) || '';
     live(shown ? itemLabel(shown) : 'no items');
   }
-  function pick(next) { if (!rows.length) return; sel = (next + rows.length) % rows.length; render(); }
-  function switchTab(next) { tab = (next + 2) % 2; sel = 0; spell = 0; opened = false; render(); }
-  function moveCat(d) { cat = (cat + d + CATS.length) % CATS.length; spell = 0; render(); }
+  var clicked = -1;   /* the row the last click selected: a second click on it acts */
+  function tick() { if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick(); }
+  function pick(next) { if (!rows.length) return; sel = (next + rows.length) % rows.length; tick(); render(); }
+  function switchTab(next) { tab = (next + 2) % 2; sel = 0; spell = 0; opened = false; tick(); render(); }
+  function moveCat(d) { cat = (cat + d + CATS.length) % CATS.length; spell = 0; tick(); render(); }
   function reduced() { return document.documentElement.classList.contains('rm'); }
 
   /* The bowl tips toward the soul, steam puffs rise off the row, the row
@@ -429,7 +459,7 @@
   }
   function open() {
     if (!box) build();
-    before = document.activeElement; box.hidden = false; tab = 0; sel = 0; cat = 0; spell = 0; opened = false;
+    before = document.activeElement; box.hidden = false; clicked = -1; tab = 0; sel = 0; cat = 0; spell = 0; opened = false;
     render(); try { box.focus(); } catch (e) {}
   }
   function close() {

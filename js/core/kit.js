@@ -9,7 +9,19 @@
     var F = opts.F || (NEU.danmaku && NEU.danmaku.fight ? NEU.danmaku.fight(0, 0) : { x: 0, y: 0, fx: 0, fy: -1, swings: [] });
     var box = opts.box || { AX: 0, AY: 0, AW: 800, AH: 600 };
     var adapter = opts.adapter || {};
-    var tp = 0, shield = false, stripOpen = false, stripSel = 0;
+    var tp = 0, shield = false, stripOpen = false, stripSel = 0, stripAt = 0, stripShake = -1e9;
+    /* strip colours: Scal's brimstone by default, a fight passes its own */
+    var th = opts.theme || {};
+    var T = { rim: th.rim || '#8C1A22', acc: th.acc || '#FF9E30', hot: th.hot || '192,20,10', hotLine: th.hotLine || '#FF3A1A',
+      soul: th.soul || '#E23B55', title: th.title || 'TP  ACTIONS', well: th.well || '#3A1016' };
+    var FONT_UI = '16px "Determination Mono","Pixelify Sans",monospace';
+    var ICON = {
+      heal:   ['..#..', '..#..', '#####', '..#..', '..#..'],
+      buster: ['..#....', '.##..#.', '.###.#.', '######.', '#######', '.#####.', '..###..'],
+      shield: ['#######', '#######', '#######', '.#####.', '.#####.', '..###..', '...#...'],
+      nova:   ['#..#..#', '.#.#.#.', '..###..', '#######', '..###..', '.#.#.#.', '#..#..#']
+    };
+    var HEART = ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'];
     var charge = false, chargeT = 0, meleeCd = 0, rangedCd = 0, healCd = 0;
     var shots = [], swings = [], beam = null, dash = null, hp = 6, casts = [];
     var grazePts = 8 / 250, grazePad = 8, playerR = 4;
@@ -89,9 +101,23 @@
       }
       return out;
     }
+    /* what a row looks like and whether it can be used now */
+    function rowState(row) {
+      var d = row.data, st = d && d.stats || {}, fx = d && d.fx, cost = (st.tp || 0) / 100, pct = Math.round(cost * 100);
+      if (row.kind === 'heal-free') return { icon: 'heal', col: '#5CF08C', cost: 0, ok: healCd <= 0 && hp < 6, tag: 'FREE',
+        why: healCd > 0 ? 'WAIT ' + Math.ceil(healCd) + 's' : 'HP FULL' };
+      if (row.kind === 'consumable') return { icon: 'heal', col: '#5CF08C', cost: 0, ok: true,
+        tag: 'x' + (NEU.save && NEU.save.count ? NEU.save.count(d.id) : 1), why: '' };
+      if (!d) return { icon: 'buster', col: '#5A5668', cost: 0, ok: false, tag: '', why: 'EMPTY' };
+      var up = fx === 'shield' && shield;
+      return { icon: fx === 'shield' ? 'shield' : fx === 'nova' ? 'nova' : fx === 'heal' ? 'heal' : 'buster',
+        col: fx === 'shield' ? '#8FD8FF' : fx === 'heal' ? '#5CF08C' : '#FF6A2A', cost: cost,
+        ok: tp + 0.00001 >= cost && !up, tag: pct + '% TP', why: up ? 'ALREADY UP' : 'NEED ' + pct + '%' };
+    }
     function useStrip() {
       var rows = stripItems(), row = rows[stripSel], def, cost, st, fx, i, a, n;
       if (!row) return;
+      if (!rowState(row).ok) { stripShake = performance.now(); sfx('tick'); return; }
       if (row.kind === 'heal-free') {
         if (healCd > 0 || hp >= 6) return;
         heal(2); healCd = 30; stripOpen = false; return;
@@ -120,13 +146,16 @@
     function keydown(key) {
       key = String(key || '');
       if (stripOpen) {
-        if (key === 'ArrowUp' || key === 'Up' || key === 'w' || key === 'W') stripSel = (stripSel + stripItems().length - 1) % stripItems().length;
-        else if (key === 'ArrowDown' || key === 'Down' || key === 's' || key === 'S') stripSel = (stripSel + 1) % stripItems().length;
-        else if (key.toLowerCase() === 'z' || key === 'Enter') useStrip();
-        else if (key.toLowerCase() === 'x' || key.toLowerCase() === 'c' || key === 'Escape') stripOpen = false;
+        var n = stripItems().length, moved = true;
+        if (key === 'ArrowUp' || key === 'Up' || key === 'w' || key === 'W') stripSel = (stripSel + n - 1) % n;
+        else if (key === 'ArrowDown' || key === 'Down' || key === 's' || key === 'S') stripSel = (stripSel + 1) % n;
+        else if (key.toLowerCase() === 'z' || key === 'Enter') { useStrip(); moved = false; }
+        else if (key.toLowerCase() === 'x' || key.toLowerCase() === 'c' || key === 'Escape') { stripOpen = false; moved = false; }
+        else moved = false;
+        if (moved) sfx('tick');
         return;
       }
-      if (key.toLowerCase() === 'c') { stripOpen = true; stripSel = 0; return; }
+      if (key.toLowerCase() === 'c') { stripOpen = true; stripSel = 0; stripAt = performance.now(); return; }
       if (key.toLowerCase() === 'z' && !charge) { charge = true; chargeT = 0; }
     }
     function keyup(key) { if (String(key || '').toLowerCase() === 'z') release(); }
@@ -200,8 +229,81 @@
         if (dead) shots.splice(i, 1);
       }
     }
+    function stamp(ctx, rows, cx, cy, s, col) {
+      var sd = NEU.danmaku && NEU.danmaku.soul;
+      if (sd && sd.stamp) { sd.stamp(ctx, rows, cx, cy, s, col); return; }
+      var x0 = (cx - rows[0].length * s / 2) | 0, y0 = (cy - rows.length * s / 2) | 0, r, c;
+      ctx.fillStyle = col;
+      for (r = 0; r < rows.length; r++) for (c = 0; c < rows[r].length; c++) if (rows[r][c] === '#') ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
+    }
+    /* Scal's TP menu, shared: double rim, title tab, icon + name + cost per row,
+       stepped highlight with the bobbing soul, HP hearts, TP gauge that previews
+       the selected cost. Drops in with a small overshoot; reduced motion skips it. */
+    function drawStrip(ctx) {
+      var now = performance.now(), u = Math.min(1, (now - stripAt) / 140), reduce = !!(NEU.juice && NEU.juice.reduced);
+      var rows = stripItems(), rowH = 40, bw = Math.min(box.AW - 48, 464) | 0, bh = rowH * rows.length + 132;
+      var bx = (box.AX + (box.AW - bw) / 2) | 0, by = (box.AY + Math.max(40, (box.AH - bh) / 2) - (reduce ? 0 : (1 - u) * 24)) | 0;
+      var ease = 1 + 0.12 * Math.sin(u * Math.PI) * (1 - u), i, st, y, sel, tw, fy, cells = 25, gx, gy, gw, cw, fill, cost, blink, c0, c1, on, spend;
+      if (now - stripShake < 180 && !reduce) bx += Math.round(Math.sin((now - stripShake) * 0.12) * 4);
+      ctx.fillStyle = 'rgba(4,0,2,' + (0.62 * u).toFixed(2) + ')'; ctx.fillRect(box.AX, box.AY, box.AW, box.AH);
+      ctx.save();
+      if (!reduce && ease !== 1) { ctx.translate(bx + bw / 2, by + bh / 2); ctx.scale(ease, ease); ctx.translate(-(bx + bw / 2), -(by + bh / 2)); }
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(bx + 6, by + 6, bw, bh);
+      ctx.fillStyle = '#050104'; ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(bx, by, bw, 3); ctx.fillRect(bx, by + bh - 3, bw, 3); ctx.fillRect(bx, by, 3, bh); ctx.fillRect(bx + bw - 3, by, 3, bh);
+      ctx.fillStyle = T.rim; ctx.fillRect(bx + 6, by + 6, bw - 12, 2); ctx.fillRect(bx + 6, by + bh - 8, bw - 12, 2);
+      ctx.fillRect(bx + 6, by + 6, 2, bh - 12); ctx.fillRect(bx + bw - 8, by + 6, 2, bh - 12);
+      ctx.fillStyle = T.acc; ctx.fillRect(bx + 6, by + 6, 4, 4); ctx.fillRect(bx + bw - 10, by + 6, 4, 4);
+      ctx.fillRect(bx + 6, by + bh - 10, 4, 4); ctx.fillRect(bx + bw - 10, by + bh - 10, 4, 4);
+      ctx.font = FONT_UI; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+      tw = (ctx.measureText ? ctx.measureText(T.title).width : 120) + 24 | 0;
+      ctx.fillStyle = '#050104'; ctx.fillRect(bx + 20, by - 12, tw, 24);
+      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(bx + 20, by - 12, tw, 2); ctx.fillRect(bx + 20, by - 12, 2, 14); ctx.fillRect(bx + 18 + tw, by - 12, 2, 14);
+      ctx.fillStyle = T.acc; ctx.fillText(T.title, bx + 32, by - 8);
+      for (i = 0; i < rows.length; i++) {
+        st = rowState(rows[i]); y = by + 28 + i * rowH; sel = i === stripSel;
+        if (sel) {
+          c0 = ((bw - 24) * 0.34) | 0; c1 = ((bw - 24) * 0.33) | 0;
+          ctx.fillStyle = 'rgba(' + T.hot + ',0.42)'; ctx.fillRect(bx + 12, y - 4, c0, 32);
+          ctx.fillStyle = 'rgba(' + T.hot + ',0.24)'; ctx.fillRect(bx + 12 + c0, y - 4, c1, 32);
+          ctx.fillStyle = 'rgba(' + T.hot + ',0.12)'; ctx.fillRect(bx + 12 + c0 + c1, y - 4, bw - 24 - c0 - c1, 32);
+          ctx.fillStyle = st.ok ? T.hotLine : '#5A5668'; ctx.fillRect(bx + 12, y - 4, 2, 32);
+          stamp(ctx, HEART, bx + 28 + (reduce ? 0 : Math.round(Math.sin(now * 0.008) * 2)), y + 12, 2, T.soul);
+        }
+        ctx.fillStyle = st.ok ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)'; ctx.fillRect(bx + 46, y - 1, 22, 22);
+        stamp(ctx, ICON[st.icon], bx + 57, y + 10, 2, st.ok ? st.col : '#3E3A48');
+        ctx.fillStyle = st.ok ? (sel ? '#FFFF00' : '#FFFFFF') : '#5A5668'; ctx.fillText(rows[i].name, bx + 80, y + 2);
+        ctx.textAlign = 'right'; ctx.fillStyle = st.ok ? T.acc : '#6A6480'; ctx.fillText(st.ok ? st.tag : st.why, bx + bw - 24, y + 2); ctx.textAlign = 'left';
+        if (rows[i].kind === 'heal-free' && healCd > 0) {
+          ctx.fillStyle = '#1A3A24'; ctx.fillRect(bx + 80, y + 21, 128, 3);
+          ctx.fillStyle = '#5CF08C'; ctx.fillRect(bx + 80, y + 21, Math.round(128 * (1 - healCd / 30)), 3);
+        }
+      }
+      fy = by + 28 + rows.length * rowH + 4;
+      ctx.fillStyle = T.well; ctx.fillRect(bx + 16, fy, bw - 32, 2);
+      ctx.fillStyle = '#C0BCC8'; ctx.fillText('HP', bx + 24, fy + 14);
+      for (i = 0; i < 6; i++) stamp(ctx, HEART, bx + 66 + i * 16, fy + 22, 2, i < hp ? T.soul : '#2A1A20');
+      ctx.textAlign = 'right'; ctx.fillStyle = T.acc; ctx.fillText('TP ' + (tp >= 1 ? 'MAX' : Math.floor(tp * 100) + '%'), bx + bw - 24, fy + 14);
+      gx = bx + 24; gy = fy + 40; gw = bw - 48; cw = gw / cells; fill = tp * cells;
+      st = rowState(rows[stripSel] || rows[0]); cost = st.ok ? st.cost : 0; blink = reduce ? 1 : (Math.floor(now / 260) % 2 ? 1 : 0.55);
+      ctx.fillStyle = T.well; ctx.fillRect(gx - 2, gy - 2, gw + 2, 16);
+      for (i = 0; i < cells; i++) {
+        c0 = Math.round(gx + i * cw); c1 = Math.round(gx + (i + 1) * cw) - 2;
+        on = i < Math.floor(fill + 1e-6); spend = cost > 0 && on && i >= Math.floor((tp - cost) * cells + 1e-6);
+        ctx.fillStyle = '#1E0E06'; ctx.fillRect(c0, gy, c1 - c0, 12);
+        if (on) {
+          ctx.fillStyle = spend ? 'rgba(255,240,208,' + blink + ')' : (tp >= 1 ? '#FFD040' : T.acc); ctx.fillRect(c0, gy, c1 - c0, 12);
+          ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(c0, gy, c1 - c0, 3);
+          ctx.fillStyle = 'rgba(90,0,0,0.35)'; ctx.fillRect(c0, gy + 9, c1 - c0, 3);
+        }
+      }
+      var kn = function (d) { return NEU.keys && NEU.keys.label ? NEU.keys.label(d) : d; };
+      ctx.textAlign = 'left'; ctx.fillStyle = '#8A8598'; ctx.fillText(kn('z') + ' use  ·  ' + kn('x') + ' back', bx + 24, fy + 64);
+      ctx.textAlign = 'right'; ctx.fillStyle = '#5A5668'; ctx.fillText('graze bullets for TP', bx + bw - 24, fy + 64); ctx.textAlign = 'left';
+      ctx.restore();
+    }
     function draw(ctx) {
-      var i, j, s, sw, x, y, rows, panel, rw, ry, p, k, a, radius;
+      var i, j, s, sw, x, y, p, k, a, radius;
       if (!ctx) return;
       for (i = 0; i < shots.length; i++) {
         s = shots[i];
@@ -236,19 +338,7 @@
         ctx.fillStyle = '#FFF4D0'; ctx.fillRect((beam.x - 1) | 0, (beam.y - 1) | 0, 3, 3);
       }
       for (i = 0; i < casts.length; i++) if (NEU.fxBurst) NEU.fxBurst(ctx, casts[i].k, casts[i].x, casts[i].y, 1 - casts[i].t / casts[i].d, 1.6);
-      if (!stripOpen) return;
-      rows = stripItems(); panel = Math.min(box.AW - 24, 464); rw = 40;
-      x = (box.AX + (box.AW - panel) / 2) | 0; y = (box.AY + Math.max(8, (box.AH - (rows.length * rw + 96)) / 2)) | 0;
-      ctx.fillStyle = 'rgba(4,0,2,0.7)'; ctx.fillRect(box.AX, box.AY, box.AW, box.AH);
-      ctx.fillStyle = '#050104'; ctx.fillRect(x, y, panel, rows.length * rw + 96);
-      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y, panel, 3); ctx.fillRect(x, y + rows.length * rw + 93, panel, 3); ctx.fillRect(x, y, 3, rows.length * rw + 96); ctx.fillRect(x + panel - 3, y, 3, rows.length * rw + 96);
-      ctx.font = '16px monospace'; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillStyle = '#FF9E30'; ctx.fillText('TP  ACTIONS', x + 20, y + 12);
-      for (i = 0; i < rows.length; i++) {
-        ry = y + 40 + i * rw;
-        if (i === stripSel) { ctx.fillStyle = 'rgba(192,20,10,0.35)'; ctx.fillRect(x + 12, ry - 4, panel - 24, 30); }
-        ctx.fillStyle = i === stripSel ? '#FFFF00' : '#FFFFFF'; ctx.fillText((i === stripSel ? '♥  ' : '   ') + rows[i].name, x + 24, ry);
-      }
-      ctx.fillStyle = '#FF9E30'; ctx.fillText('HP ' + hp + '       TP ' + Math.floor(tp * 100) + '%', x + 24, y + rows.length * rw + 54);
+      if (stripOpen) drawStrip(ctx);
     }
     function graze(bullet) {
       if (!bullet || bullet.grazed) return false;

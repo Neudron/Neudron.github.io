@@ -1,37 +1,5 @@
 /* game.css — Act IV UI that came after style.css hit its size cap. */
 
-/* ITEM box (js/act4/inventory.js): Deltarune's black menu with the
-   white two-step pixel frame. z 76 like .quiz, below .tbox (96). */
-.inv {
-  position: fixed; z-index: 76;
-  left: 50%; top: 16px; transform: translateX(-50%);
-  width: min(512px, calc(100vw - 48px)); box-sizing: border-box;
-  padding: 16px 32px 24px;
-  background: #000; color: #fff;
-  border: 4px solid #fff;
-  /* the second step: a black gap, then a thin white line inside */
-  box-shadow: inset 0 0 0 4px #000, inset 0 0 0 6px #fff;
-  font: 400 32px/1.25 var(--font);
-  outline: none;
-}
-.inv__h { margin: 0 0 8px; color: #fff; font: inherit; }
-.inv__list { list-style: none; margin: 0; padding: 0; }
-.inv__list li {
-  position: relative; display: flex; align-items: center; gap: 16px;
-  padding: 0 0 0 48px; min-height: 48px;
-}
-.inv__list li.is-sel { color: #ff0; }
-.inv__list li.is-sel::before {
-  content: ''; position: absolute; left: 0; top: 50%;
-  width: 32px; height: 32px; margin-top: -16px;
-  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
-  image-rendering: pixelated;
-}
-.inv__list img {
-  width: 32px; height: 32px; flex: none;
-  object-fit: contain; image-rendering: pixelated;
-}
-
 /* Rap battle (js/act4/rhythm.js). His lines go in a Deltarune box at
    the bottom, left-aligned with a * bullet, never in the middle. */
 .fnf__msg {
@@ -554,79 +522,98 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
   }
 }
 
-/* C menu: ITEMS / EQUIP (W2.2). Keep the frame under .tbox at z 76. */
+/* C menu: ITEMS / EQUIP (js/act4/inventory.js). One block, one scale: the same
+   black panel as the fight's C strip (js/core/kit.js drawStrip): white rim,
+   brimstone inner rim, orange corner studs, stepped red highlight with the
+   soul as the cursor, orange for headings and costs. Font sizes are 16px. z 76, under .tbox (96). */
+@keyframes inv-in { from { opacity: 0; translate: 0 -16px; } to { opacity: 1; translate: 0 0; } }
 .inv {
-  top: 50%; width: min(1152px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
-  transform: translate(-50%, -50%); overflow: auto; padding: 16px;
-  border: 2px solid #fff; box-shadow: inset 0 0 0 2px #000, inset 0 0 0 4px #fff;
-  font: 400 16px/1.25 var(--font);
+  position: fixed; z-index: 76; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(1152px, calc(100vw - 32px)); max-height: calc(100vh - 32px); box-sizing: border-box; overflow: auto;
+  padding: 32px 32px 16px; background-color: #050104; color: #fff; font: 400 16px/1.25 var(--font); outline: none;
+  border: 3px solid #fff;
+  box-shadow: inset 0 0 0 3px #050104, inset 0 0 0 5px #8C1A22, 6px 6px 0 rgba(0, 0, 0, 0.55);
+  background-image: linear-gradient(#FF9E30, #FF9E30), linear-gradient(#FF9E30, #FF9E30), linear-gradient(#FF9E30, #FF9E30), linear-gradient(#FF9E30, #FF9E30);
+  background-size: 4px 4px; background-repeat: no-repeat;
+  background-position: 6px 6px, calc(100% - 6px) 6px, 6px calc(100% - 6px), calc(100% - 6px) calc(100% - 6px);
+  animation: inv-in 0.14s steps(4) both;
 }
-.inv__top { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; border-bottom: 2px solid #fff; }
-.inv__tabs { display: flex; align-items: stretch; gap: 16px; }
-.inv__tab { display: inline-flex; align-items: center; gap: 8px; border: 0; padding: 8px 16px; color: #fff; background: transparent; font: inherit; cursor: pointer; }
-.inv__tab canvas { width: 16px; height: 16px; image-rendering: pixelated; }
-.inv__tab.is-sel { color: #ff0; outline: 2px solid #ff0; outline-offset: -2px; }
-.inv__coins { white-space: nowrap; color: #fff; }
+.inv__top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; border-bottom: 2px solid #3A1016; }
+.inv__tabs { display: flex; align-items: flex-end; gap: 16px; }
+/* the tabs sit on the rule like the strip's title tab */
+.inv__tab {
+  padding: 8px 16px; margin-bottom: -2px; border: 2px solid #3A1016; border-bottom: 0; background: transparent;
+  color: #C0BCC8; font: inherit; cursor: pointer;
+}
+@media (hover: hover) { .inv__tab:hover { color: #ff0; border-color: #8C1A22; } }
+.inv__tab:focus-visible { outline: 2px solid #ff0; outline-offset: 2px; }
+.inv__tab.is-sel { color: #FF9E30; background: #050104; border-color: #fff; }
+.inv__coins { padding-bottom: 8px; white-space: nowrap; color: #FF9E30; }
 .inv__body { display: grid; grid-template-columns: 1fr; gap: 16px; padding: 16px 0; }
-/* EQUIP: categories top-left, the item list in the middle, CHAR and STATS
-   down the right edge. Stats are never in the centre column. */
-.inv.is-equip .inv__body { grid-template-columns: 232px minmax(0, 1fr) 216px; align-items: stretch; }
+/* EQUIP: categories left, the item list in the middle, STATS down the right edge. */
+.inv.is-equip .inv__body { grid-template-columns: 240px minmax(0, 1fr) 224px; align-items: stretch; }
 .inv.is-equip .inv__equipped { grid-column: 1; grid-row: 1; }
 .inv.is-equip .inv__inventory { grid-column: 2; grid-row: 1; }
 .inv.is-equip .inv__stats { grid-column: 3; grid-row: 1; }
-.inv.is-equip .inv__list { max-height: 200px; }
-.inv__body section { min-width: 0; border: 2px solid #fff; padding: 8px; }
-.inv__body h2 { margin: 0 0 8px; color: #fff; font: inherit; }
-.inv__char { text-align: center; }
+.inv.is-equip .inv__list { max-height: 240px; }
+.inv__body section, .inv__preview, .inv__desc { min-width: 0; border: 2px solid #3A1016; background: rgba(255, 255, 255, 0.03); padding: 8px 16px 16px; }
+.inv__body h2, .inv__preview h2 { margin: 0 0 8px; padding-bottom: 8px; border-bottom: 2px solid #3A1016; color: #FF9E30; font: inherit; }
 .inv__slots { display: grid; gap: 8px; }
-.inv__slot { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 4px 8px; min-height: 48px; }
+.inv__slot { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 4px 8px; min-height: 48px; cursor: pointer; }
 /* Category icons: the 48x16 Deltarune strip (sword, arrow, star) shown at 2x. */
 .inv__sym { flex: none; width: 32px; height: 32px; background: url(../img/act4/deltarune/equip-icons.png) 0 0 / 96px 32px no-repeat; image-rendering: pixelated; }
 .inv__sym.sym-ranged { background-position: -32px 0; }
 .inv__sym.sym-spell { background-position: -64px 0; }
-.inv__slot b { font-weight: normal; color: #bbb; }
-.inv__spell { flex: 0 0 100%; padding-left: 40px; color: #ddd; }
-.inv__spell.is-focus { color: #ff0; }
-.inv__slot.is-focus { outline: 2px solid #ff0; }
-.inv__slot.is-focus > b { color: #ff0; }
-.inv__hint { margin: 8px 0 0; color: #aaa; }
+.inv__slot b { font-weight: normal; color: #C0BCC8; }
+.inv__spell { flex: 0 0 100%; padding-left: 40px; color: #fff; }
+/* one selection signal everywhere: the stepped red band, yellow text, a hot edge */
+@media (hover: hover) { .inv__slot:hover, .inv__list li:hover { background: rgba(192, 20, 10, 0.18); } }
+.inv__slot.is-focus, .inv__list li.is-sel {
+  background: linear-gradient(90deg, rgba(192, 20, 10, 0.42) 0 34%, rgba(192, 20, 10, 0.24) 34% 67%, rgba(192, 20, 10, 0.12) 67% 100%);
+  box-shadow: inset 2px 0 0 #FF3A1A; color: #ff0;
+}
+.inv__slot.is-focus > b, .inv__spell.is-focus { color: #ff0; }
+.inv__hint { margin: 8px 0 0; color: #C0BCC8; }
 .inv__statlines { display: grid; gap: 16px; }
 .inv__statlines b { font-weight: normal; }
 .inv__statlines .is-up { color: #5f6; }
 .inv__statlines .is-down { color: #f55; }
-.inv__statlines .is-fx { color: #fa4; }
+.inv__statlines .is-fx { color: #FF9E30; }
 .inv__inventory { grid-column: 1 / -1; }
-.inv__list { max-height: 240px; overflow: auto; }
-.inv__list li { min-height: 40px; padding: 4px 4px 4px 40px; gap: 8px; }
-.inv__list li.is-sel { box-shadow: inset 0 0 0 2px #ff0; }
-.inv__list li.is-equipped span::after { content: '  EQUIPPED'; color: #aaa; }
-.inv__icon { flex: none; width: 32px; height: 32px; image-rendering: pixelated; }
-.inv__desc { min-height: 48px; margin-top: 16px; border: 2px solid #fff; padding: 8px; }
+.inv__list { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow: auto; }
+.inv__list li { position: relative; display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 4px 8px 4px 48px; cursor: pointer; }
+.inv__list li.is-sel::before {
+  content: ''; position: absolute; left: 8px; top: 50%; width: 32px; height: 32px; margin-top: -16px;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%; image-rendering: pixelated;
+}
+.inv__list li.is-equipped span::after { content: '  EQUIPPED'; color: #FF9E30; }
+.inv__icon { flex: none; width: 32px; height: 32px; padding: 4px; box-sizing: content-box; background: rgba(255, 255, 255, 0.06); image-rendering: pixelated; }
+.inv__desc { min-height: 48px; margin-top: 16px; padding: 16px; color: #C0BCC8; }
 /* The bottom fight preview: the combat HUD look, one target, the soul. */
-.inv__preview { margin-top: 16px; border: 2px solid #fff; padding: 8px; }
+.inv__preview { margin-top: 16px; }
 .inv__preview[hidden] { display: none; }
-.inv__preview h2 { margin: 0 0 8px; color: #fff; font: inherit; }
 .inv__stage { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
-.inv__fight { display: block; flex: 0 1 480px; min-width: 0; width: 480px; max-width: 100%; height: auto; aspect-ratio: 4 / 1; border: 2px solid #3a2a55; background: #000; image-rendering: pixelated; }
+.inv__fight { display: block; flex: 0 1 480px; min-width: 0; width: 480px; max-width: 100%; height: auto; aspect-ratio: 4 / 1; border: 2px solid #3A1016; background: #000; image-rendering: pixelated; }
 .inv__fight-text { flex: 1 1 240px; color: #fff; white-space: pre-line; line-height: 2; }
-.inv__fight-text::first-line { color: #ff0; }
+.inv__fight-text::first-line { color: #FF9E30; }
 .inv__body[hidden], .inv__body section[hidden] { display: none; }
 /* Phone: one column, the stats as a row, a shorter list, so the whole menu
    including the description fits the phone screen without a scroll. */
 @media (max-width: 800px) {
-  .inv { top: 0; transform: translateX(-50%); max-height: 100vh; max-height: 100dvh; padding: 8px 8px 24px; }
+  .inv { top: 0; transform: translateX(-50%); max-height: 100vh; max-height: 100dvh; padding: 16px 16px 24px; }
   .inv.is-equip .inv__body { grid-template-columns: 1fr; gap: 8px; padding: 8px 0; }
   .inv.is-equip .inv__body > section { grid-column: 1; grid-row: auto; }
-  .inv.is-equip .inv__list { max-height: 120px; }
+  .inv.is-equip .inv__list { max-height: 144px; }
   .inv.is-equip .inv__slot { min-height: 0; padding: 2px 8px; }
   .inv.is-equip .inv__statlines { grid-auto-flow: column; justify-content: start; gap: 16px; }
-  .inv.is-equip .inv__preview { margin-top: 0; padding: 6px 8px; }
+  .inv.is-equip .inv__preview { margin-top: 0; padding: 8px 16px; }
   .inv.is-equip .inv__preview h2 { margin-bottom: 4px; }
   .inv.is-equip .inv__desc { margin-top: 0; min-height: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
+  .inv, .inv *, .inv *::before, .inv *::after { animation: none !important; transition: none !important; }
 }
+html.rm .inv, html.rm .inv * { animation: none !important; transition: none !important; }
 
 .kernel-play { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .kernel-play canvas { display: block; width: min(100vw, 166.67vh); height: auto; aspect-ratio: 5 / 3; image-rendering: pixelated; }
