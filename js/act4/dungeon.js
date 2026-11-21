@@ -362,7 +362,16 @@
       track();
     },
     onDeath: function () { toSurface(); },
-    tick: function () { track(); }
+    hold: function () { return !!live.boneDoor; },
+    tick: function (dt) {
+      var e = live.boneDoor;
+      if (!e) { track(); return; }
+      e.opening += dt; live.panX = Math.min(1, Math.max(0, (e.opening - 0.6) / 0.6)) * 48;
+      if (e.opening >= 1.2) {
+        e.dead = true; live.boneDoor = null; NEU.dungeon.bossOpen = true; P.close();
+        if (NEU.polt && NEU.polt.open) NEU.polt.open();
+      }
+    }
   });
   def.zones = zones; def.decor = decor; def.cracks = cracks; def.spawners = spawners; def.faction = faction; def.zoneAt = zoneAt;
   /* backward-compat aliases so legacy tests/suites that reference d0..d10 levels resolve to the one map */
@@ -415,8 +424,7 @@
   kd('bossdoor', { touch: function (e, input, melee) {
     if (!melee || e.dead || P.replaying()) return;
     if (NEU.save && NEU.save.has && NEU.save.has('boss_key')) {
-      e.dead = true; NEU.dungeon.bossOpen = true; P.close();
-      if (NEU.polt && NEU.polt.open) NEU.polt.open();
+      e.opening = 0; live.boneDoor = e;
     } else { NEU.dungeon.bossOpen = false; NEU.dungeon.bossLine = '* a bone lock. it wants a key.'; talk([NEU.dungeon.bossLine]); }
   } });
   kd('painting', { touch: function (e, input, melee) {
@@ -482,26 +490,28 @@
      Each station is a sign plus an obstacle that needs exactly one verb: jump, dash, melee twice, charged melee,
      a soul shot across a pit, a spell on a barrier (TP from the crystal), melee to open the chest. The door back
      (tleave) is always open. Death respawns at the last station checkpoint (tcp). Per-open state lives on the level. */
-  var TW = 60, TH = 20, TPIT = [[11, 12], [18, 26], [39, 47]];
+  var TW = 60, TH = 20, TPIT = [[11, 12], [18, 23], [39, 47]];
+  /* D2r supersedes the original station notes: seven listed stations, C opens existing equipment;
+     a six-tile dash corridor has a 32px clearance, so jump-only fails without changing player physics. */
   function tpit(x) { var i; for (i = 0; i < TPIT.length; i++) if (x >= TPIT[i][0] && x <= TPIT[i][1]) return true; return false; }
   function tRows() {
     var g = [], x, y, s;
     for (y = 0; y < TH; y++) {
       s = '';
-      for (x = 0; x < TW; x++) s += (y === 0 || x === TW - 1 || (x === 0 && y !== 15)) ? '#' : y < 16 ? '.' : tpit(x) ? ' ' : '#';
+      for (x = 0; x < TW; x++) s += (y === 0 || x === TW - 1 || (x === 0 && y !== 15) || (y <= 13 && x >= 13 && x <= 27)) ? '#' : y === 15 && x === 9 ? '^' : y < 16 ? '.' : tpit(x) ? ' ' : '#';
       g.push(s);
     }
     return g;
   }
   function kn(def) { return String(NEU.keys && NEU.keys.get ? NEU.keys.get(def) : def).toUpperCase(); }
   var TSIGN = {
-    jump: function () { return '* SPACE jumps the gap.'; },
-    dash: function () { return '* ' + kn('x') + ' in the air dashes the wide gap. it is too wide to jump.'; },
+    jump: function () { return '* ' + kn(' ') + ' jumps the gap.'; },
+    dash: function () { return '* ' + kn('x') + ' dashes the wide gap. the low ceiling blocks a jump.'; },
     crate: function () { return '* ' + kn('z') + ' twice breaks a crate. the wall is two crates high.'; },
     armour: function () { return '* hold ' + kn('z') + ' for a full swing. it breaks armour.'; },
     shot: function () { return '* hold ' + kn('z') + ', then let go: a soul shot. hit the far target.'; },
-    spell: function () { return '* the crystal gives TP. ' + kn('c') + ' opens the strip. down picks SPELL I, ' + kn('z') + ' casts it.'; },
-    chest: function () { return '* ' + kn('z') + ' opens the chest.'; }
+    spell: function () { return '* the crystal gives TP. ' + kn('c') + ' opens the strip. ' + kn('ArrowDown') + ' picks SPELL I, ' + kn('z') + ' casts it.'; },
+    chest: function () { return '* ' + kn('c') + ' opens the chest and equipment. choose EQUIP to practise.'; }
   };
   /* pit widths are measured (tests/fixes561.mjs): jump alone clears 8 tiles at best and never 9; a ground dash
      clears up to 6; a dash in the air clears 9. So the wide gap is 9 wide and the shot pit 9 wide too. */
@@ -546,14 +556,23 @@
   function tTick(dt) {
     var L = P.level0(), h = P.hero(), f = L.kitF;
     /* the pits open to a solid floor below the map: feet past the floor line (y 256) means a fall, so wake at the checkpoint */
+    /* D2r correction: pits are open below the map; the actual fall threshold is y 272. */
     if (h.y > 17 * T) { P.die(); return; }
     if (!L.kit) return;
     f.x = h.x; f.y = h.y - P.hh / 2; f.fx = h.face; f.fy = 0;
     L.kit.hp = h.hp; L.kit.tick(dt);
   }
   function tKey(k, down) {
-    var lk = String(k).toLowerCase(), h = P.hero(), kt = tk();
+    var lk = String(k).toLowerCase(), h = P.hero(), kt = tk(), L = P.level0(), i, e;
     if (!kt) return false;
+    if (down && lk === 'c' && !kt.stripOpen && NEU.inv) {
+      for (i = 0; i < L.entities.length; i++) {
+        e = L.entities[i];
+        if (e.t === 'tchest' && Math.abs(h.x - (e.x + 0.5) * T) <= 22 && Math.abs(h.y - (e.y + 1) * T) < 24) {
+          e.opened = true; L.ts.gate = true; NEU.inv.open(); return true;
+        }
+      }
+    }
     if (down && kt.stripOpen) { kt.hp = h.hp; kt.keydown(k); h.hp = Math.max(h.hp, kt.hp); return true; }
     if (down && lk === 'c') { kt.keydown('c'); return true; }
     if (lk === 'z') { if (down) kt.keydown('z'); else kt.keyup('z'); }
@@ -581,11 +600,7 @@
   kd('tgate', { tick: function (e) { e.dead = !!P.level0().ts.gate; } });
   kd('tcry', { touch: function (e) { var kt = tk(); if (e.used) return; e.used = true; if (kt && !P.replaying()) kt.addTp(0.6); } });
   kd('tchest', { touch: function (e, input, melee) {
-    var L = P.level0();
-    if (!melee || e.opened) return;
-    e.opened = true; L.ts.gate = true;
-    if (!P.replaying() && NEU.save && NEU.save.give && !NEU.save.has('nova')) NEU.save.give('nova');
-    talk(['* a grave nova. the gate ahead is open.']);
+    if (melee && !e.opened) talk(['* press ' + kn('c') + ' to open the chest and equipment.']);
   } });
 
   NEU.dungeon = {

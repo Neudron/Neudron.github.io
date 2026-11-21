@@ -348,8 +348,10 @@
   function step(dt, raw) {
     var input = parseInput(raw), prev = player.prev, mx, my, i, e;
     if (!current || current.exited) return getState();
+    if (NEU.inv && NEU.inv.isOpen()) { keys = {}; player.prev = {}; return getState(); }
     dt = clamp(Number(dt) || STEP, 0, 0.1);
     prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y;
+    if (current.hold && current.hold()) { keys = {}; player.prev = {}; current.tick(dt); if (current) placeCamera(reduced ? -1 : dt); return getState(); }
     /* melee hit-stop: a short sim freeze in game time (unlike juice's real-clock freeze,
        this stays deterministic for fixed-step tests and replays) */
     if (player.hitStop > 0) { prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y; player.hitStop = Math.max(0, player.hitStop - dt); return getState(); }
@@ -522,7 +524,7 @@
     }
     if (current.view === 'terraria') {
       /* Terraria: smooth follow on both axes with a small look-ahead, clamped to the world, rounded at draw */
-      tx = clamp(player.x + player.face * 24 - view.w / 2, 0, Math.max(0, worldW - view.w));
+      tx = clamp(player.x + player.face * 24 + (current.panX || 0) - view.w / 2, 0, Math.max(0, worldW - view.w));
       ty = clamp(player.y - HH - view.h / 2, 0, Math.max(0, worldH - view.h));
       k = dt < 0 ? 1 : 1 - Math.pow(0.85, dt * 60);
       camera.x += (tx - camera.x) * k; camera.y += (ty - camera.y) * k;

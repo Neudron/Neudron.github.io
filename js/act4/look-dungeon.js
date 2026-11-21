@@ -330,10 +330,13 @@
     P.fr(c, gx + [2, 2, 2, 29, 29, 29][k], gy + [12, 22, 32, 12, 22, 32][k], 1, 2, '#B892FF');
     P.glow(c, gx + 16, gy + 24, 28, '#7A52B8', 0.10);
   };
-  kd('bossdoor').draw = function (c, x, y) {
+  kd('bossdoor').draw = function (c, x, y, e) {
     var s = bossSpr(), gx = x - 8, gy = y - 32, has = !!(NEU.save && NEU.save.has && NEU.save.has('boss_key'));
-    c.drawImage(s.cv, gx, gy);
-    P.fr(c, gx + 11, gy + 12, 2, 2, has ? '#FF8AC8' : '#3A2A20'); P.fr(c, gx + 19, gy + 12, 2, 2, has ? '#FF8AC8' : '#3A2A20');
+    var t = e.opening || 0, drop = Math.min(24, Math.max(0, (t - 0.3) / 0.3) * 24), open = Math.min(32, Math.max(0, (t - 0.6) / 0.6) * 32);
+    c.drawImage(s.cv, gx, gy - open);
+    P.fr(c, gx + 11, gy + 12 - open, 2, 2, has ? '#FF8AC8' : '#3A2A20'); P.fr(c, gx + 19, gy + 12 - open, 2, 2, has ? '#FF8AC8' : '#3A2A20');
+    P.fr(c, gx + 3, gy + drop, 2, 20, '#AFA5A0'); P.fr(c, gx + 27, gy + drop, 2, 20, '#AFA5A0');
+    if (t > 0 && t < 0.6) { P.fr(c, gx + 14, gy + 20, t < 0.3 ? 4 : 2, t < 0.3 ? 2 : 4, '#FFD36A'); }
   };
   /* a lift: a dungeon shelf on a chain that runs up out of sight */
   kd('lift').draw = function (c, x, y, e) {
