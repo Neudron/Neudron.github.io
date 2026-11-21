@@ -64,8 +64,9 @@
   function kinds() { return NEU.engineKinds || null; }
 
   /* ── state ────────────────────────────────────────────────────── */
-  var rooms = {}, tilesets = {};
+  var rooms = {}, tilesets = {}, aliases = {};
   var room = null, running = false, last = 0, acc = 0;
+  var currentArea = null;
   var px = 0, py = 0, vx = 0, vy = 0, keys = {}, face = 'down', walked = 0, moving = false;
   var movedFor = 0, settle = 0;
   var camX = 0, camY = 0, kickX = 0, kickY = 0;
@@ -112,6 +113,72 @@
     rooms[id] = def;
     delete layers[id];
     return def;
+  }
+
+  function alias(oldId, newId, spawnMap, areaId) {
+    if (!oldId || !newId || oldId === newId || typeof oldId !== 'string' || typeof newId !== 'string' ||
+        rooms[oldId] || aliases[oldId] ||
+        (spawnMap != null && (typeof spawnMap !== 'object' || Array.isArray(spawnMap))) ||
+        (areaId != null && typeof areaId !== 'string')) return false;
+    var names = Object.keys(spawnMap || {});
+    for (var i = 0; i < names.length; i++) if (typeof spawnMap[names[i]] !== 'string') return false;
+    aliases[oldId] = { id: newId, spawns: spawnMap || {}, area: areaId || null };
+    return true;
+  }
+
+  function areaTarget(id) {
+    var found = null, collision = !!rooms[id], ids = Object.keys(rooms);
+    for (var i = 0; i < ids.length; i++) {
+      var areas = rooms[ids[i]].areas || [];
+      for (var j = 0; j < areas.length; j++) if (areas[j] && areas[j].id === id) {
+        if (collision || found) return false;
+        found = { room: rooms[ids[i]], area: areas[j] };
+      }
+    }
+    return found && found.room.spawns && found.room.spawns[found.area.spawn] ? found : found ? false : null;
+  }
+
+  function resolve(id, spawn) {
+    var seen = {}, mapped = false, area = null, a;
+    while (aliases[id]) {
+      if (seen[id]) return null;
+      seen[id] = true;
+      a = aliases[id];
+      if (Object.prototype.hasOwnProperty.call(a.spawns, spawn)) { spawn = a.spawns[spawn]; mapped = true; }
+      if (!area && a.area) area = a.area;
+      id = a.id;
+    }
+    var directArea = areaTarget(id);
+    if (directArea === false) return null;
+    if (!rooms[id]) {
+      var target = directArea;
+      if (!target || (spawn && spawn !== target.area.spawn)) return null;
+      area = target.area.id;
+      spawn = target.area.spawn;
+      id = target.room.id;
+    }
+    if (!rooms[id]) return null;
+    if (mapped && !(rooms[id].spawns && rooms[id].spawns[spawn])) return null;
+    if (area && !(rooms[id].areas || []).some(function (a) { return a.id === area; })) return null;
+    return { id: id, spawn: spawn, area: area };
+  }
+
+  function areaAt() {
+    var x = Math.floor(px / TILE), y = Math.floor((py - 1) / TILE), areas = room && room.areas || [];
+    for (var i = 0; i < areas.length; i++) {
+      var a = areas[i];
+      if (x >= a.x0 && x <= a.x1 && y >= a.y0 && y <= a.y1) return a;
+    }
+    return null;
+  }
+
+  function checkArea() {
+    var a = areaAt(), id = a && a.id;
+    if (id === currentArea) return;
+    currentArea = id || null;
+    room.__spawn = a ? a.spawn : ((room.spawns || {}).default ? 'default' : room.__spawn);
+    if (NEU.save) NEU.save.capture();
+    if (a && a.onEnter) a.onEnter(API);
   }
 
   /* decor('tree', [x, y, x, y, ...], extra) — a row of one prop or
@@ -532,7 +599,7 @@
 
   /* ── transitions ──────────────────────────────────────────────── */
   function go(id, spawn) {
-    if (!rooms[id]) { say(['there is nothing through there. yet.'], 'narr'); return; }
+    if (!resolve(id, spawn)) { say(['there is nothing through there. yet.'], 'narr'); return; }
     if (fadeDir) return;                    // already moving
     busy = true;
     fadeDir = 1;
@@ -585,14 +652,16 @@
   }
 
   function land(id, spawn) {
+    var target = resolve(id, spawn), selected;
+    if (!target) return false;
     if (room && room.onExit) room.onExit(API);
     clearLater();
-    room = rooms[id];
+    room = rooms[target.id];
     /* A solved puzzle stays solved across a revisit, but the blocks go
        back to their starting cells. */
-    room.__solved = NEU.save ? NEU.save.flagged('solved:' + id) : false;
+    room.__solved = NEU.save ? NEU.save.flagged('solved:' + target.id) : false;
     ents = spawnEnts(room);
-    var s = (room.spawns && room.spawns[spawn]) || (room.spawns && room.spawns.default);
+    var s = (room.spawns && room.spawns[target.spawn]) || (room.spawns && room.spawns.default);
     if (!s) {
       /* An exit naming a spawn the target room does not declare is a
          bug in the room, and it must not be able to pass for level
@@ -600,13 +669,17 @@
       var names = room.spawns ? Object.keys(room.spawns) : [];
       s = names.length ? room.spawns[names[0]] : firstOpenCell();
       if (window.console && console.warn)
-        console.warn('[neu] room "' + id + '" has no spawn "' + spawn +
+        console.warn('[neu] room "' + target.id + '" has no spawn "' + target.spawn +
                      '" — landing at ' + s.x + ',' + s.y);
     }
     px = (s.x + 0.5) * TILE; py = (s.y + 1) * TILE;
     vx = 0; vy = 0; walked = 0; face = s.face || 'down';
     slideD = 0; slideDead = false; promptFor = null; sitting = null;
-    room.__spawn = spawn;
+    room.__spawn = target.spawn;
+    selected = target.area && (room.areas || []).filter(function (a) { return a.id === target.area; })[0];
+    if (!selected) selected = areaAt();
+    currentArea = selected ? selected.id : null;
+    if (selected) room.__spawn = selected.spawn;
     bake();
     camSnap();
     var L = look();
@@ -614,7 +687,9 @@
     /* A room change must not carry the old room's dialogue. */
     if (NEU.talk && NEU.talk.close) NEU.talk.close();
     if (room.onEnter) room.onEnter(API);
+    if (selected && selected.onEnter) selected.onEnter(API);
     if (NEU.save) NEU.save.capture();
+    return true;
   }
 
   /* ── api.later: timers that die with the visit (F4) ──────────────
@@ -714,6 +789,7 @@
     if (!room) return;
 
     if (!busy) { if (!NEU.activeMinigame) move(dt); walkExits(); } else { vx = 0; vy = 0; moving = false; }
+    checkArea();
     camFollow(dt);
     var decay = Math.exp(-14 * dt);
     kickX *= decay; kickY *= decay;
@@ -1094,7 +1170,7 @@
   /* ── open / close ─────────────────────────────────────────────── */
   /* opts.iris: seconds for the iris to open on arrival (default 0.22). */
   function enter(id, spawn, opts) {
-    if (!rooms[id]) return false;
+    if (!resolve(id, spawn)) return false;
     if (NEU.kernel) NEU.kernel.push('engine');
     if (NEU.settings && NEU.settings.warnFlash) NEU.settings.warnFlash();
     wrap.hidden = false;
@@ -1274,19 +1350,28 @@
   });
 
   NEU.engine = {
-    register: register, tileset: tileset, decor: decor, enter: enter, leave: leave, resume: resume, go: go,
+    register: register, alias: alias, tileset: tileset, decor: decor, enter: enter, leave: leave, resume: resume, go: go,
     confirmExit: confirmExit,
-    where: function () { return room ? { room: room.id, spawn: room.__spawn } : null; },
+    where: function () { return room ? { room: currentArea || room.id, spawn: room.__spawn } : null; },
     get running() { return running; },
     get room() { return room ? room.id : null; },
     /* Which zone the player is standing in, by tileset name. music.js
        and engine-look both key off this — one source of truth. */
     zone: function () { return room ? room.tileset : null; },
-    get rooms() { return Object.keys(rooms); },
+    get rooms() {
+      var ids = Object.keys(rooms).concat(Object.keys(aliases)), areas = {};
+      Object.keys(rooms).forEach(function (id) {
+        (rooms[id].areas || []).forEach(function (a) { areas[a.id] = (areas[a.id] || 0) + 1; });
+      });
+      Object.keys(areas).forEach(function (id) {
+        if (areas[id] === 1 && ids.indexOf(id) < 0 && areaTarget(id)) ids.push(id);
+      });
+      return ids;
+    },
     tilesets: function () { return tilesets; },
     api: API,
     /* dev */
-    warp: function (id, spawn) { if (running) { land(id, spawn); } else { enter(id, spawn); } },
+    warp: function (id, spawn) { if (!resolve(id, spawn)) return false; return running ? land(id, spawn) : enter(id, spawn); },
     drawPlayer: drawPlayerCompat,
     TILE: TILE,
     /* live: the scale the view was fitted at (decision 10) */
