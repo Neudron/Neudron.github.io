@@ -1184,6 +1184,11 @@ html.rm .tphud__hp { animation: none !important; }
 /* Elevator (js/act4/elevator.js). Under .tbox (96), over the cart. */
 .elv { position: fixed; inset: 0; z-index: 77; background: #14110e; }
 .elv[hidden] { display: none !important; }
+/* the lower shaft (cel-mode.js) sits over the cabin: same rung, later in the DOM */
+.celm { position: fixed; inset: 0; z-index: 77; background: #0b0a12; display: flex; align-items: center; justify-content: center; }
+.celm[hidden] { display: none !important; }
+.celm canvas { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
+.celm__hud { position: absolute; left: 16px; top: 8px; margin: 0; font: 16px monospace; color: #cfd8e3; }
 .elv canvas { width: 100%; height: 100%; image-rendering: pixelated; }
 .elv__screen {
   position: absolute; left: 50%; top: 32px; transform: translateX(-50%);
