@@ -22,6 +22,7 @@
 
   var A = null;            /* the adapter boss-scal.js hands in with attach() */
   var G = null;            /* per-fight state, see fresh() */
+  var lastHist = [];       /* the last run's attack log, kept for debug.history after reset */
   var cur = null;          /* the running attack: { name, fn, st } */
   var acc = 0, K = 0.35;   /* frame accumulator; arena px per Terraria px */
   var ATK = {};
@@ -2336,40 +2337,40 @@
       var bx_ = G.box;
       var inside = (A.px >= bx_.x + 4 && A.px <= bx_.x + bx_.w - 4 &&
                     A.py >= bx_.y + 4 && A.py <= bx_.y + bx_.h - 4);
-      if (!inside) { A.hit(); A.box = bx_; }
+      if (!inside) { A.hit(); A.box = bx_; if (!G) return; }
     }
     for (i = 0; i < G.bones.length; i++) {
       bo = G.bones[i];
       if (G.fr < bo.at) continue;
-      if (Math.abs(A.px - bo.x) < bo.w + 3.2 && A.py > bo.y0 - 3.2 && A.py < bo.y1 + 3.2) { A.hit(); break; }
+      if (Math.abs(A.px - bo.x) < bo.w + 3.2 && A.py > bo.y0 - 3.2 && A.py < bo.y1 + 3.2) { A.hit(); if (!G) return; break; }
     }
     for (i = 0; i < G.lava.length; i++) {
       r = G.lava[i];
-      if (G.fr >= r.at && h < 8 && A.px > r.x0 && A.px < r.x1) { A.hit(); break; }
+      if (G.fr >= r.at && h < 8 && A.px > r.x0 && A.px < r.x1) { A.hit(); if (!G) return; break; }
     }
-    if (G.ceil && G.fr >= G.ceil.at && h > G.ceil.C - 10.2) A.hit();
+    if (G.ceil && G.fr >= G.ceil.at && h > G.ceil.C - 10.2) { A.hit(); if (!G) return; }
     if (b) {
       var dx = A.px - b.x, dy = A.py - b.y, c = Math.cos(b.a), sn = Math.sin(b.a);
       var along = dx * c + dy * sn, across = Math.abs(dx * sn - dy * c);
-      if (along > 0 && along < b.len && across < 6 * (b.w || 1)) A.hit();
+      if (along > 0 && along < b.len && across < 6 * (b.w || 1)) { A.hit(); if (!G) return; }
     }
     for (i = 0; i < G.bolts.length; i++) {
       bo = G.bolts[i];
       if (G.fr < bo.at) continue;
       for (k = 0; k < bo.segs.length; k++) {
         s = bo.segs[k];
-        if (segDist(A.px, A.py, s.x0, s.y0, s.x1, s.y1) < 7) { A.hit(); break; }
+        if (segDist(A.px, A.py, s.x0, s.y0, s.x1, s.y1) < 7) { A.hit(); if (!G) return; break; }
       }
     }
     for (i = 0; i < G.lasers.length; i++) {
       if (G.fr < G.lasers[i].at) continue;
       s = laserSeg(G.lasers[i]);
-      if (s && segDist(A.px, A.py, s.x0, s.y0, s.x1, s.y1) < 7 && !(A.dashI && A.dashI() > 0)) A.hit();
+      if (s && segDist(A.px, A.py, s.x0, s.y0, s.x1, s.y1) < 7 && !(A.dashI && A.dashI() > 0)) { A.hit(); if (!G) return; }
     }
     for (i = 0; i < G.rend.length; i++) {
       r = G.rend[i];
       if (r.phase === 'rift' &&
-          Math.abs((A.px - r.cx) * Math.sin(r.ang) - (A.py - r.cy) * Math.cos(r.ang)) < 12) A.hit();
+          Math.abs((A.px - r.cx) * Math.sin(r.ang) - (A.py - r.cy) * Math.cos(r.ang)) < 12) { A.hit(); if (!G) return; }
     }
   }
 
@@ -2396,11 +2397,17 @@
     for (i = 0; i < due.length; i++) due[i].fn();
     rendTick();
     hurtCheck();
+    /* a hit can kill the soul inside hurtCheck (A.hit -> startDeath ->
+       reset): the machine is gone, nothing left to launch or finish */
+    if (!G) return;
     if (!cur) {
       if (G.wait-- > 0) return;
       launch();
     }
     var fin = cur.fn(cur.st);
+    /* the attack can end the fight inside its own step (DesperationPhase
+       -> A.win -> reset): cur is null, there is no frame left to count */
+    if (!cur) return;
     cur.st.f++;
     if (fin) finish();
   }
@@ -2417,6 +2424,7 @@
     },
     /* the fight is closed */
     reset: function () {
+      if (G) lastHist = G.hist;
       G = null; cur = null; acc = 0; RNG = Math.random;
       if (NEU.scalSoul) NEU.scalSoul.platforms = null;
     },
@@ -2476,7 +2484,7 @@
     /* the test hooks: every attack the machine started, with its phase and
        frame (debug.history), and the lightning strikes in this phase */
     debug: {
-      get history() { return G ? G.hist : []; },
+      get history() { return G ? G.hist : lastHist; },
       get lightning() { return G ? G.lightPh : 0; },
       /* the live warnings (line, ring), for fixes73: each has its life in frames */
       get warns() { return G && G.fx ? G.fx.warn : []; },

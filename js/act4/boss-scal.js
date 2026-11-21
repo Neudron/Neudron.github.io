@@ -87,7 +87,7 @@
   /* test hook: NEU.scal.invincible(true) makes the soul untouchable */
   var god = false;
   var bossHP = 1, bossMax = 1, invuln = false;
-  var mode = 'intro';        // intro | fight | wall | brothers | dead | won
+  var mode = 'intro';        // intro | fight | wall | brothers | break | dead | won
   var hearts = [], sep = null, bros = [];
   /* scal-worm.js delegation flag: true between open()'s init and
      close()'s reset, so init runs once per fight, not once per frame. */
@@ -516,6 +516,92 @@
     var s = NEU.scalAtk && NEU.scalAtk.stage ? NEU.scalAtk.stage() : '';
     return s ? DESP.indexOf(s) + 1 : 0;
   }
+  /* W14: one aura intensity for the whole fight, so it visibly escalates
+     per phase — the attack level (0-4), the desperation substage on top,
+     and a surge while the 0% break plays. Drawn as glow, storm and
+     vignette; the getter feeds the tests. */
+  function auraK() {
+    var al = NEU.scalAtk && NEU.scalAtk.level ? NEU.scalAtk.level() : 0;
+    var k = Math.max(ph, al) + despLevel();
+    if (mode === 'break') k += 2;
+    return Math.max(0, Math.min(7, k));
+  }
+  /* W14: the enrage states name themselves. ENRAGED covers the 0% break
+     and the gap before the desperation gate lands; DESPERATION is the
+     chain itself. */
+  function enrageLabel() {
+    var l = NEU.scalAtk && NEU.scalAtk.level ? NEU.scalAtk.level() : 0;
+    if (l >= 4) return 'DESPERATION';
+    if (mode === 'break' || (bossHP <= 0 && mode === 'fight')) return 'ENRAGED';
+    return '';
+  }
+  /* W14: the 0% break. breakT < 0 means no cinematic; otherwise it counts
+     seconds into a ~3.4 s sequence — the bar's frame in shards, a string
+     of explosions, her cast poses flickering — that ends back in 'fight'
+     with the gate into desperation still pending. */
+  var breakT = -1, breakBeat = -1, breakLine = false;
+  var BREAK_LEN = 3.4;
+  function startBreak() {
+    breakT = 0; breakBeat = -1; breakLine = false;
+    mode = 'break'; invuln = true;
+    dropBullets(); clearSched();
+    sep = null; hearts = []; bros = []; ringOn = false;
+    if (NEU.scalSeekers) NEU.scalSeekers.clear();
+    if (NEU.juice) { NEU.juice.hit('huge', { colour: '#FF6B4A' });
+                     NEU.juice.burst(bx, by, 40, COL.brim, 300); }
+    sfxPlay('giga-hit'); sfxPlay('maelstrom');
+    phaseFlash();
+  }
+  function breakTick(dt) {
+    breakT += dt;
+    /* a bomblet every beat, ringed round where she stood */
+    var beat = Math.floor(breakT / 0.38);
+    if (beat !== breakBeat) {
+      breakBeat = beat;
+      var a = beat * 2.4;
+      var ex = bx + Math.cos(a) * 60, ey = by + Math.sin(a) * 40;
+      boom(ex, ey);
+      if (NEU.juice) NEU.juice.burst(ex, ey, 8, COL.brimHi, 200);
+      if (NEU.sfx && NEU.sfx.hit) NEU.sfx.hit();
+    }
+    /* she has no idle in the break: the cast poses strobe */
+    scalAnimState = (Math.floor(breakT * 9) % 2) ? 'gigablast' : 'hellblast';
+    if (!breakLine && breakT > BREAK_LEN * 0.55) {
+      breakLine = true;
+      say('* the bar was a lie. she is just getting started.');
+    }
+    if (breakT >= BREAK_LEN) {
+      breakT = -1;
+      mode = 'fight';
+      /* the shield stays up: the transition and the whole desperation are
+         hers to spend, and gateNow sets her HP to 1 on the way in */
+    }
+  }
+  /* the bar's frame in eight shards, flung off its seat, over crack
+     lines across where the fill was. Drawn after dm.hud, outside the
+     shake, same layer as the phase frame. */
+  function drawBreak() {
+    var w = VW, bw = dm.barW ? dm.barW(w) : Math.min(480, w - 200);
+    var bx0 = ((w - bw) / 2) | 0, p = Math.min(1, breakT / BREAK_LEN);
+    var i, x, ww;
+    for (i = 0; i < 8; i++) {
+      x = bx0 - 4 + Math.floor(i * (bw + 8) / 8);
+      ww = Math.ceil((bw + 8) / 8);
+      var dir = (i % 2 ? -1 : 1) * (36 + (i % 3) * 20);
+      ctx.globalAlpha = Math.max(0, 1 - p * 1.15);
+      ctx.fillStyle = i % 2 ? '#5A5468' : '#1A0A0E';
+      ctx.fillRect(x | 0, (32 + dir * p) | 0, ww, 20);
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(0,0,0,' + (0.8 * (1 - p)).toFixed(2) + ')';
+    ctx.lineWidth = 2;
+    for (i = 0; i < 5; i++) {
+      var cx0 = bx0 + (((i * 0.37 + 0.1) % 1) * bw) | 0;
+      ctx.beginPath(); ctx.moveTo(cx0, 34);
+      ctx.lineTo(cx0 + 8 - i * 3, 42); ctx.lineTo(cx0 - 5 + i * 2, 50); ctx.stroke();
+    }
+    ctx.lineWidth = 1;
+  }
   function drawStorm(w, h, lv) {
     /* streaks of brimstone rain outside the arena, falling at a slant */
     var n = 18 + lv * 10, op = ctx.globalCompositeOperation, still = rm();
@@ -818,6 +904,7 @@
     if (mode === 'intro') { if (t > 2.6) startLead(); }
     else if (mode === 'wall') NEU.scalAtk.tick(dt);
     else if (mode === 'brothers') brothersTick(dt);
+    else if (mode === 'break') breakTick(dt);
     else if (mode === 'fight') fightTick(dt);
 
     moveBullets(dt * dm.slow(F));
@@ -1000,16 +1087,23 @@
     { field: '#1E0210', rim: '#E0204A', hi: '#FFA0B4', storm: 2, hud: '#D03048' },
     { field: '#280204', rim: '#FF2A1A', hi: '#FFFFFF', storm: 3, hud: '#FFC46A' }
   ];
-  var ph = 0, phEnded = true;
+  var ph = 0, phEnded = true, phMusic = -2;
   function setPh(n) {
-    n = Math.max(0, Math.min(3, n | 0));
+    var raw = n | 0;
+    n = Math.max(0, Math.min(3, raw));
+    /* W14: the music hears the REAL phase — 4 is the enrage, a track of
+       its own (music.js derives scal.4: +24 bpm, +8 root over scal.3).
+       The palette index stays clamped to the four looks. */
+    if (NEU.music && NEU.music.bossPhase && raw !== phMusic) {
+      phMusic = raw;
+      NEU.music.bossPhase('scal', raw);
+    }
     if (n === ph && !phEnded) return;
     ph = n; phEnded = false;
-    if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('scal', n);
   }
   function endPh() {
     if (phEnded) return;
-    phEnded = true;
+    phEnded = true; phMusic = -1;
     if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('scal', -1);
   }
 
@@ -1404,11 +1498,36 @@
     if (NEU.juice) { NEU.juice.hit('small'); NEU.juice.burst(bx, by, 7, COL.brimHi); }
     bossHP = Math.max(0, bossHP);
     NEU.scalAtk.gate(bossHP / bossMax);
+    /* W14: 0% is not the end — the bar breaks, she explodes back into
+       enrage, and the desperation gate still lands on schedule. Once the
+       chain itself runs (level 4) 0% is just 0%: no second break, or a
+       landed hit would buy an invulnerable bomb-clear every time. */
+    var alvl = NEU.scalAtk && NEU.scalAtk.level ? NEU.scalAtk.level() : 0;
+    if (bossHP <= 0 && mode === 'fight' && breakT < 0 && alvl < 4) startBreak();
     return true;
   }
 
+  /* W14: her lines for the defeat. The shared box wears .tbox--cine, so
+     the shattered arena keeps playing behind it instead of a black card. */
+  var VICTORY_LINES = [
+    '* she does not get up.',
+    '* "...you win. this once."',
+    '* the ash on the altar is still warm.'
+  ];
+  var winStage = 0, winT0 = 0, talkStarted = false;
+  function cineOn() {
+    var tb = document.getElementById('tbox');
+    if (tb) tb.classList.add('tbox--cine');
+  }
+  function cineOff() {
+    var tb = document.getElementById('tbox');
+    if (tb) tb.classList.remove('tbox--cine');
+  }
   function win() {
-    mode = 'won'; running = false; dropBullets(); stripOpen = false;
+    mode = 'won'; running = false; dropBullets(); stripOpen = false; breakT = -1;
+    /* nothing of the fight survives the verdict: no attack timers, no
+       warnings, no desperation stage — same scrub startDeath() runs */
+    if (NEU.scalAtk && NEU.scalAtk.reset) NEU.scalAtk.reset();
     /* the ring cannot outlive her: drop it so nothing ticks or draws
        into the victory lap */
     if (NEU.scalSeekers) NEU.scalSeekers.clear();
@@ -1425,15 +1544,8 @@
     if (NEU.save) NEU.save.flag('scal_shatter', 1);
     function after() {
       if (!active) return;
-      if (msg) {
-        msg.hidden = false;
-        msg.innerHTML = '<b>she sits back down.</b><br>' +
-          '"the small one was me. obviously."<br>' +
-          'she leaves you a handful of ash.<br>' +
-          '<small>esc to leave</small>';
-      }
-      /* 'static smash': stinger, no new audio file. */
-      if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(3);
+      /* beat 1: a breath on the shattered frame, then her dialogue */
+      winStage = 1; winT0 = performance.now(); talkStarted = false;
       requestAnimationFrame(winStep);
     }
     if (NEU.juice && NEU.juice.shatter) {
@@ -1443,7 +1555,7 @@
   }
 
   function startDeath() {
-    running = false; dying = performance.now(); stripOpen = false;
+    running = false; dying = performance.now(); stripOpen = false; breakT = -1;
     /* No state survives the death beat: bullets and hazards gone. */
     dropBullets();
     if (NEU.scalAtk && NEU.scalAtk.reset) NEU.scalAtk.reset();
@@ -1469,7 +1581,9 @@
     requestAnimationFrame(deathStep);
   }
 
-  /* The verdict: red on the void, still — draw is not running here. */
+  /* The verdict, staged: the shattered frame holds, a beat, then her
+     dialogue over the still-running scene (.tbox--cine keeps it
+     readable), then the end card. draw is not running here. */
   function winStep(now) {
     if (!active) return;
     if (!NEU.perf || NEU.perf.paced(now)) {
@@ -1478,6 +1592,28 @@
       ctx.font = BANNER_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillStyle = '#FF1E12';
       ctx.fillText('THE CALAMITY ENDS', (AX + AW / 2) | 0, (AY + AH / 2 - 10) | 0);
+    }
+    if (winStage === 1) {
+      if (!talkStarted) {
+        if (!NEU.talk) { winStage = 2; winT0 = now; }
+        else if (now - winT0 >= 700) {
+          talkStarted = true; cineOn();
+          NEU.talk(VICTORY_LINES, 'scal');
+        }
+      } else if (!NEU.tboxOpen || !NEU.tboxOpen()) {
+        cineOff(); winStage = 2; winT0 = now;
+      }
+    } else if (winStage === 2 && now - winT0 >= 600) {
+      winStage = 3;
+      if (msg) {
+        msg.hidden = false;
+        msg.innerHTML = '<b>she sits back down.</b><br>' +
+          '"the small one was me. obviously."<br>' +
+          'she leaves you a handful of ash.<br>' +
+          '<small>esc to leave</small>';
+      }
+      /* 'static smash': stinger, no new audio file. */
+      if (NEU.sfx && NEU.sfx.stinger) NEU.sfx.stinger(3);
     }
     requestAnimationFrame(winStep);
   }
@@ -1583,16 +1719,16 @@
        code below has no idea it is happening, which is what keeps the
        shake off the simulation. */
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
-    var lv = despLevel();
-    if (lv || PHASE_LOOK[ph].storm) drawStorm(w, h, lv + PHASE_LOOK[ph].storm);
+    var ak = auraK();
+    if (ak) drawStorm(w, h, Math.min(7, ak));
     frame();
-    if (lv) { ctx.fillStyle = 'rgba(120,18,0,' + (0.05 * lv).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH); }
+    if (ak) { ctx.fillStyle = 'rgba(120,18,0,' + Math.min(0.24, 0.03 + ak * 0.025).toFixed(2) + ')'; ctx.fillRect(AX, AY, AW, AH); }
 
     /* her */
     if (mode !== 'won') {
       var bodyKey = mode === 'intro' ? 'scalHood' : 'scal';
       var anim = (mode === 'intro') ? { frame: 0, col: 0 } : getScalAnim();
-      if (lv) drawAura(lv);
+      if (ak) drawAura(ak);
       if (!sprite(bodyKey, bx, by, 2, 0, phase === 2, anim.col, anim.frame)) {
         ctx.fillStyle = '#FF00A0';
         ctx.fillRect((bx - 20) | 0, (by - 26) | 0, 40, 52);
@@ -1762,7 +1898,7 @@
     var rift = NEU.scalAtk.rift ? NEU.scalAtk.rift() : null;
     var off = rift ? splitOffset(rift.t / 60, rm()) : 0;
     if (off > 0) splitView(rift, off);
-    if (lv) drawVignette(w, h, lv);
+    if (ak) drawVignette(w, h, Math.min(6, ak));
     if (NEU.juice) NEU.juice.overlay(ctx, w, h);
 
     var fa = flashAlpha();
@@ -1781,6 +1917,16 @@
     /* the phase's frame round her bar (dm.hud's bar sits at y 36) */
     var hbw = dm.barW ? dm.barW(w) : Math.min(480, w - 200);
     rect(PHASE_LOOK[ph].hud, (((w - hbw) / 2) | 0) - 4, 32, hbw + 8, 20, 2);
+    /* W14: the enrage states name themselves over the bar, and at 0% the
+       bar's own frame breaks into shards (drawn over the empty bar). */
+    var enl = enrageLabel();
+    if (enl) {
+      ctx.font = FONT_UI; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillStyle = enl === 'ENRAGED' ? '#FF2A1A' : '#FFC46A';
+      ctx.fillText(enl, (AX + AW / 2) | 0, 56);
+      ctx.textAlign = 'left';
+    }
+    if (breakT >= 0) drawBreak();
     if (bannerTxt) {
       ctx.font = BANNER_FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       var bnw = (ctx.measureText(bannerTxt).width + 32) | 0, bnx = (AX + AW / 2) | 0;
@@ -2074,6 +2220,15 @@
       } else { close(); }
       return;
     }
+    /* the victory dialogue is modal: Z/X/Enter advance it and nothing
+       else gets through while the box is up */
+    if (NEU.tboxOpen && NEU.tboxOpen()) {
+      if (e.key === 'z' || e.key === 'Z' || e.key === 'x' || e.key === 'X' || e.key === 'Enter') {
+        e.preventDefault();
+        if (NEU.talk && NEU.talk.ff) NEU.talk.ff();
+      }
+      return;
+    }
     if (!running && !dying && !e.repeat && mode !== 'won' &&
         (e.key === 'z' || e.key === 'Z' || e.key === 'Enter')) {
       /* The document-level retry of the bullet minigame used to hear
@@ -2152,7 +2307,7 @@
 
   /* debug hook: drop every special, then run one attack now */
   function clearSpecials() {
-    sep = null; hearts = []; bros = []; ringOn = false; invuln = false;
+    sep = null; hearts = []; bros = []; ringOn = false; invuln = false; breakT = -1;
     if (NEU.scalSeekers) NEU.scalSeekers.clear();
     if (mode !== 'won') mode = 'fight';
   }
@@ -2207,7 +2362,7 @@
       skipFrac = NEU.cheat.startFrac;
       bossHP = bossMax * skipFrac; NEU.cheat.startFrac = 0;
     }
-    hearts = []; sep = null; bros = []; invuln = true; dying = 0;
+    hearts = []; sep = null; bros = []; invuln = true; dying = 0; breakT = -1;
     ringOn = false;
     /* Hand the Sepulcher module its canvas + arena once per fight;
        close() clears the flag so a reopened fight re-inits fresh. The
@@ -2240,7 +2395,9 @@
     if (NEU.kernel) NEU.kernel.push('scal');
   }
   function close() {
-    active = false; running = false; dying = 0; stripOpen = false;
+    active = false; running = false; dying = 0; stripOpen = false; breakT = -1;
+    cineOff();
+    if (NEU.talk && NEU.talk.close) NEU.talk.close();
     if (NEU.kernel && NEU.kernel.current() === 'scal') NEU.kernel.pop();
     F.pops = []; endPh();
     var kh = document.querySelector('#bh .bh__keys');
@@ -2366,6 +2523,11 @@
                 get invuln() { return invuln; },
                 setInvuln: function (v) { invuln = !!v; },
                 get ph() { return ph; },
+                /* W14 test hooks: the escalating aura, the enrage
+                   label, and her current quip line */
+                get aura() { return auraK(); },
+                get enrage() { return enrageLabel(); },
+                get line() { return line; },
                 win: function () { win(); },
                 get phaseLook() { return PHASE_LOOK; },
                 get broCol() { return BRO_COL; },
