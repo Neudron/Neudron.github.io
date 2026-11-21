@@ -681,55 +681,70 @@
     for (var x = 6; x < W; x += 10) { P(x, 117, 3, 10, '#2A2A30'); P(x, 117, 1, 10, '#3A3A42'); }
     P(0, 127, W, 3, '#2E2E36');
   }
-  function paintHall(P, variant) {
-    var W = 384, i;
+  /* W18: the halls are no longer all 24 tiles wide. Everything that was
+     pinned to 384 px is now a fraction of W, so a narrow room composes
+     itself instead of cropping. Under ~260 px the corridor drops to a
+     single window and skips the two decorative doors — a squeeze, not
+     a hallway. */
+  function paintHall(P, variant, W) {
+    var i, sx = W / 384, two = W > 260, cx = Math.round(W * 0.52);
     homeWall(P, W, variant, false);
-    homeWindow(P, 64, variant - 1);
-    homeWindow(P, 288, variant - 1);
-    homeDoor(P, 128); homeDoor(P, 240);
-    sconce(P, 104); sconce(P, 168); sconce(P, 228);
+    if (two) {
+      homeWindow(P, Math.round(64 * sx), variant - 1);
+      homeWindow(P, Math.round(288 * sx), variant - 1);
+      homeDoor(P, Math.round(128 * sx)); homeDoor(P, Math.round(240 * sx));
+    } else {
+      homeWindow(P, Math.round(W / 2) - 16, variant - 1);
+    }
     /* the odd one out on the wall, per room */
     if (variant === 1) {
       /* an empty frame on its nail: brighter paper where a picture was */
-      P(188, -12, 24, 20, '#2E2E36'); P(186, -14, 28, 2, '#55505A'); P(186, 6, 28, 2, '#55505A');
-      P(186, -14, 2, 22, '#55505A'); P(212, -14, 2, 22, '#55505A');
-      P(188, -12, 24, 18, HOME.paper2);
-      P(199, -20, 2, 2, '#8A8478'); P(193, -18, 7, 1, '#3A3A42'); P(201, -18, 7, 1, '#3A3A42');
+      P(cx - 14, -12, 28, 2, '#2E2E36'); P(cx - 16, -14, 2, 22, '#55505A'); P(cx + 14, -14, 2, 22, '#55505A');
+      P(cx - 14, 6, 28, 2, '#55505A');
+      P(cx - 12, -12, 24, 18, HOME.paper2);
+      P(cx - 1, -20, 2, 2, '#8A8478'); P(cx - 7, -18, 7, 1, '#3A3A42'); P(cx + 1, -18, 7, 1, '#3A3A42');
       /* shelf with a few books */
-      P(26, -2, 26, 2, '#3A3A42'); P(28, -10, 3, 8, '#4A4A54'); P(31, -9, 2, 7, '#3A3A46'); P(34, -11, 3, 9, '#525260'); P(40, -6, 8, 4, '#2E2E36');
+      var shx = Math.round(26 * sx);
+      P(shx, -2, 26, 2, '#3A3A42'); P(shx + 2, -10, 3, 8, '#4A4A54'); P(shx + 5, -9, 2, 7, '#3A3A46'); P(shx + 8, -11, 3, 9, '#525260'); P(shx + 14, -6, 8, 4, '#2E2E36');
     } else if (variant === 2) {
       /* the same shelf, one book fewer, and a clock-shaped pale patch */
-      P(26, -2, 26, 2, '#3A3A42'); P(28, -10, 3, 8, '#4A4A54'); P(34, -11, 3, 9, '#525260'); P(40, -6, 8, 4, '#2E2E36');
-      P(196, -14, 8, 8, HOME.paper2);
+      var shx2 = Math.round(26 * sx);
+      P(shx2, -2, 26, 2, '#3A3A42'); P(shx2 + 2, -10, 3, 8, '#4A4A54'); P(shx2 + 8, -11, 3, 9, '#525260'); P(shx2 + 14, -6, 8, 4, '#2E2E36');
+      P(two ? cx - 4 : 46, -14, 8, 8, HOME.paper2);
     } else {
       /* the door you do not have a key for: heavier, darker, a cold line of light under it */
-      P(186, -12, 28, 44, '#0A0A0C'); P(188, -10, 24, 42, '#1A1A1E');
-      for (i = 0; i < 24; i += 4) P(188 + i, -10, 1, 42, '#141418');
-      P(196, 8, 8, 8, '#2A2A30'); P(199, 10, 2, 3, '#07070A'); P(199, 13, 1, 2, '#07070A');
-      P(188, 31, 24, 1, '#8A9AC0');
-      P.a(0.12); P(186, 32, 28, 5, '#8A9AC0'); P(190, 37, 20, 3, '#8A9AC0'); P.a(1);
+      P(cx - 14, -12, 28, 44, '#0A0A0C'); P(cx - 12, -10, 24, 42, '#1A1A1E');
+      for (i = 0; i < 24; i += 4) P(cx - 12 + i, -10, 1, 42, '#141418');
+      P(cx - 4, 8, 8, 8, '#2A2A30'); P(cx - 1, 10, 2, 3, '#07070A'); P(cx - 1, 13, 1, 2, '#07070A');
+      P(cx - 12, 31, 24, 1, '#8A9AC0');
+      P.a(0.12); P(cx - 14, 32, 28, 5, '#8A9AC0'); P(cx - 10, 37, 20, 3, '#8A9AC0'); P.a(1);
       /* no shelf: just the screw holes where one was */
       P(30, -2, 1, 1, '#141418'); P(48, -2, 1, 1, '#141418');
     }
     homeSides(P, W);
     homeFloor(P, W, 32, 112, variant * 7);
     /* the runner along the corridor */
-    P(40, 66, 304, 28, '#2A2A2E'); P(42, 68, 300, 24, '#323236');
-    P(42, 70, 300, 1, '#3E3E44'); P(42, 89, 300, 1, '#3E3E44');
-    for (i = 46; i < 340; i += 8) { P(i, 78, 3, 3, '#2A2A2E'); }
-    for (i = 40; i < 344; i += 2) { P(i, 65, 1, 1, '#3A3A40'); P(i, 94, 1, 1, '#3A3A40'); }
+    var rx = Math.round(40 * sx), rw = W - 2 * rx;
+    P(rx, 66, rw, 28, '#2A2A2E'); P(rx + 2, 68, rw - 4, 24, '#323236');
+    P(rx + 2, 70, rw - 4, 1, '#3E3E44'); P(rx + 2, 89, rw - 4, 1, '#3E3E44');
+    for (i = rx + 6; i < rx + rw - 4; i += 8) { P(i, 78, 3, 3, '#2A2A2E'); }
+    for (i = rx; i < rx + rw; i += 2) { P(i, 65, 1, 1, '#3A3A40'); P(i, 94, 1, 1, '#3A3A40'); }
     /* moon on the boards */
-    shaft(P, 64, 32, 96, 32, HOME.moon, variant === 3 ? 0.12 : 0.09);
-    shaft(P, 288, 32, 96, 32, HOME.moon, 0.09);
+    if (two) {
+      shaft(P, Math.round(64 * sx), 32, 96, 32, HOME.moon, variant === 3 ? 0.12 : 0.09);
+      shaft(P, Math.round(288 * sx), 32, 96, 32, HOME.moon, 0.09);
+    } else {
+      shaft(P, Math.round(W / 2) - 16, 32, 96, 32, HOME.moon, 0.09);
+    }
     banister(P, W);
   }
-  function paintE4(P) {
-    var W = 384, i;
+  function paintE4(P, W) {
+    var i, m = Math.round(W * 0.2), cw = W - 2 * m;
     homeWall(P, W, 1, true);
     /* frames on the wall, gold, each holding a little of the room's light */
-    var F = [112, 176, 240];
+    var F = [0.32, 0.49, 0.66];
     for (i = 0; i < F.length; i++) {
-      var x = F[i];
+      var x = Math.round(F[i] * W) - 12;
       P(x - 1, -13, 26, 22, '#3A2A10'); P(x, -12, 24, 20, '#C8A04A'); P(x, -12, 24, 1, '#F2D27A');
       P(x + 2, -10, 20, 16, i === 1 ? '#3A2E24' : '#2A2620');
       if (i === 0) { fillEll(P, x + 12, -2, 5, 5, '#5A4630'); P(x + 10, -4, 1, 1, '#14100A'); P(x + 13, -4, 1, 1, '#14100A'); }
@@ -739,30 +754,79 @@
     homeSides(P, W);
     homeFloor(P, W, 32, 112, 4);
     /* the carpet: the one warm thing */
-    P(78, 46, 228, 52, '#2A140E');
-    P(80, 48, 224, 48, '#6A2A20'); P(80, 48, 224, 2, '#8A3A2A'); P(80, 94, 224, 2, '#4A1A14');
-    P(84, 52, 216, 40, '#7A3426'); P(86, 54, 212, 36, '#6A2A20');
-    for (i = 0; i < 216; i += 12) { P(88 + i, 56, 4, 4, '#C8904A'); P(90 + i, 82, 4, 4, '#C8904A'); }
-    for (i = 100; i < 290; i += 28) {
+    P(m, 46, cw, 52, '#2A140E');
+    P(m + 2, 48, cw - 4, 48, '#6A2A20'); P(m + 2, 48, cw - 4, 2, '#8A3A2A'); P(m + 2, 94, cw - 4, 2, '#4A1A14');
+    P(m + 6, 52, cw - 12, 40, '#7A3426'); P(m + 8, 54, cw - 16, 36, '#6A2A20');
+    for (i = 0; i < cw - 16; i += 12) { P(m + 10 + i, 56, 4, 4, '#C8904A'); P(m + 12 + i, 82, 4, 4, '#C8904A'); }
+    for (i = m + 22; i < m + cw - 18; i += 28) {
       P(i, 71, 8, 2, '#A8603A'); P(i + 2, 69, 4, 6, '#A8603A'); P(i + 3, 67, 2, 10, '#A8603A');
       P(i + 3, 71, 2, 2, '#E8B868');
     }
-    P(86, 60, 212, 1, '#8A3A2A'); P(86, 83, 212, 1, '#8A3A2A');
-    for (i = 80; i < 304; i += 3) { P(i, 45, 1, 2, '#C8904A'); P(i, 97, 1, 2, '#C8904A'); }
+    P(m + 8, 60, cw - 16, 1, '#8A3A2A'); P(m + 8, 83, cw - 16, 1, '#8A3A2A');
+    for (i = m + 2; i < m + cw - 2; i += 3) { P(i, 45, 1, 2, '#C8904A'); P(i, 97, 1, 2, '#C8904A'); }
     /* golden light from nowhere in particular: shafts falling through the wall */
-    for (i = 0; i < 4; i++) shaft(P, 70 + i * 72, 18, 108, 30, '#FFC86A', 0.12);
-    pool(P, 312, 78, 40, 22, '#FFD890', 0.05);
+    var FX = [0.18, 0.37, 0.56, 0.745];
+    for (i = 0; i < 4; i++) shaft(P, Math.round(FX[i] * W), 18, 108, 30, '#FFC86A', 0.12);
+    pool(P, W - 72, 78, 40, 22, '#FFD890', 0.05);
     banister(P, W);
+  }
+
+  /* W18 side rooms off the halls. Same wallpaper language, but they are
+     ROOMS, not the landing: no banister — a plain wall across the near
+     side — and each gets one composition. variant 1 is the nook you
+     outgrew (rug, height marks, a still mobile, blocks); variants 2
+     and 3 are the locked larder and cellar (shelf, jars, crates). */
+  function paintNook(P, w, variant) {
+    var W = w * 16, i, nook = variant === 1;
+    homeWall(P, W, variant, false);
+    homeWindow(P, Math.round(W / 2) - 16, variant - 1);
+    homeFloor(P, W, 32, 112, variant * 11 + 5);
+    homeSides(P, W);
+    if (nook) {
+      /* the rug you grew out of */
+      var rx = Math.round(W * 0.22), rw = W - 2 * rx;
+      P(rx, 68, rw, 30, '#241C14'); P(rx + 2, 70, rw - 4, 26, '#3A2A1C');
+      P(rx + 2, 70, rw - 4, 1, '#4A3828'); P(rx + 2, 94, rw - 4, 1, '#1E1810');
+      for (i = rx + 6; i < rx + rw - 6; i += 10) P(i, 80, 4, 4, '#2E2218');
+      /* height marks on the paper, and the odd one that is not a hand */
+      P(30, -16, 1, 32, '#2E2E36');
+      for (i = 0; i < 6; i++) P(32, -14 + i * 5, 8 - (i % 2), 1, '#3A3A42');
+      P(38, -9, 1, 1, '#8A8478');
+      /* a mobile, long still */
+      var mx = Math.round(W / 2);
+      P(mx - 1, -24, 2, 12, '#3A3A42');
+      P(mx - 6, -13, 5, 1, '#4A4A54'); P(mx + 1, -13, 5, 1, '#4A4A54');
+      P(mx - 3, -12, 2, 2, '#8A90A8'); P(mx + 1, -12, 2, 2, '#8A90A8');
+      P(mx - 1, -10, 2, 3, '#C8C0B0');
+      /* the loose board the player can find: a pale edge in the boards */
+      P(45, 85, 24, 4, '#1E1A16'); P(45, 85, 24, 1, '#332C22'); P(46, 88, 22, 1, '#141210');
+      /* blocks on the floor */
+      P(W - 42, 92, 10, 8, '#0A0A0C'); P(W - 41, 91, 8, 7, '#4A5A6A'); P(W - 39, 90, 4, 2, '#6A7A8A');
+      P(W - 28, 96, 8, 4, '#0A0A0C'); P(W - 27, 95, 6, 3, '#5A4A6A');
+    } else {
+      /* larder / cellar: a shelf of jars and a few crates */
+      P(20, -2, 34, 2, '#3A3A42'); P(22, -12, 4, 10, '#4A4A54'); P(28, -10, 5, 8, '#3A3A46'); P(34, -14, 4, 12, '#525260'); P(40, -9, 6, 7, '#2E2E36');
+      P(24, -8, 3, 6, '#3A4A5A'); P(30, -7, 3, 5, '#5A4A3A');
+      P(30, 86, 18, 14, '#0A0A0C'); P(31, 87, 16, 12, '#2E2A24'); P(31, 87, 16, 1, '#3E3A30');
+      P(52, 92, 14, 10, '#0A0A0C'); P(53, 93, 12, 8, '#26221C'); P(53, 93, 12, 1, '#343028');
+      P(38, 100, 10, 6, '#0A0A0C'); P(39, 101, 8, 4, '#2E2A24');
+    }
+    /* the near side is a plain wall here, not the stairwell banister */
+    P(0, 112, W, 20, '#0C0C0E');
+    P(0, 112, W, 4, '#26262E'); P(0, 116, W, 1, '#141418'); P(0, 127, W, 3, '#22222A');
   }
 
   var ROOMS = {
     d1_street: { w: 26, h: 13, paint: paintD1 },
     d2_alley: { w: 20, h: 10, paint: paintD2 },
     d3_square: { w: 25, h: 14, paint: paintD3 },
-    e1_hall: { w: 24, h: 8, paint: function (P) { paintHall(P, 1); } },
-    e2_hall: { w: 24, h: 8, paint: function (P) { paintHall(P, 2); } },
-    e3_hall: { w: 24, h: 8, paint: function (P) { paintHall(P, 3); } },
-    e4_corridor: { w: 24, h: 8, paint: paintE4 }
+    e1_hall: { w: 20, h: 8, paint: function (P) { paintHall(P, 1, 320); } },
+    e2_hall: { w: 14, h: 8, paint: function (P) { paintHall(P, 2, 224); } },
+    e3_hall: { w: 24, h: 8, paint: function (P) { paintHall(P, 3, 384); } },
+    e4_corridor: { w: 16, h: 8, paint: function (P) { paintE4(P, 256); } },
+    e7_nook: { w: 12, h: 8, paint: function (P) { paintNook(P, 12, 1); } },
+    e8_larder: { w: 10, h: 8, paint: function (P) { paintNook(P, 10, 2); } },
+    e9_cellar: { w: 10, h: 8, paint: function (P) { paintNook(P, 10, 3); } }
   };
   function roomArt(id) {
     var r = ROOMS[id];
@@ -1236,6 +1300,14 @@
       P(-1, -16, 1, 7, '#2A3A2E'); P(-5, -20, 4, 6, '#2A3A2E'); P(1, -22, 4, 8, '#2A3A2E'); P(-3, -24, 3, 6, '#34463A');
       P(-4, -19, 2, 1, '#3E5244'); P(2, -21, 2, 1, '#3E5244');
     } },
+    musicbox: { w: 14, h: 12, ax: 7, ay: 10, paint: function (P) {
+      P.a(0.4); fillEll(P, 0, -1, 5, 1, '#000000'); P.a(1);
+      /* a little box on feet, a key strip, and the winding key up top */
+      P(-6, -9, 12, 9, '#0A0A0C'); P(-5, -8, 10, 7, '#3A2E22'); P(-5, -8, 10, 1, '#4A3A2A');
+      P(-4, -6, 8, 1, '#1A1410');
+      P(-2, -10, 4, 2, '#C8A04A'); P(-1, -11, 2, 1, '#E8D0A0');
+      P(0, -7, 1, 3, '#8A7048');
+    }, light: function () { return { r: 24, col: '#E8D0A0', glow: 0.12 }; } },
     sconce: { w: 1, h: 1, ax: 0, ay: 0, paint: function () {},
               light: function (e, d) {
                 if (e.flick && !still()) {
