@@ -641,7 +641,7 @@
   /* ── camera ───────────────────────────────────────────────────── */
   function chooseScale() {
     var s = Math.floor(Math.min(innerWidth / (20 * TILE), innerHeight / (12 * TILE)));
-    return Math.max(2, Math.min(6, s || 2));
+    return Math.max(2, Math.min(12, s || 2));
   }
   /* How much of the bottom of the screen the touch pad covers. */
   function measurePad() {
@@ -875,8 +875,7 @@
 
   function draw(now) {
     var w = innerWidth, h = innerHeight;
-    ctx.fillStyle = '#050507'; ctx.fillRect(0, 0, w, h);
-    if (!room) return;
+    if (!room) { ctx.fillStyle = '#050507'; ctx.fillRect(0, 0, w, h); return; }
     var L = look(), K = kinds();
     var shook = NEU.juice ? NEU.juice.begin(ctx, w, h) : false;
     var v = view();
@@ -889,6 +888,11 @@
     function sy(wy) { return Math.round(wy * S) - oy; }
 
     var layer = layers[room.id];
+    if (!L || !L.surround || !L.surround(ctx, room.tileset, -ox, -oy,
+      (layer ? layer.width : (room.grid[0] || '').length * TILE) * S,
+      (layer ? layer.height : room.grid.length * TILE) * S, w, h, S)) {
+      ctx.fillStyle = '#050507'; ctx.fillRect(0, 0, w, h);
+    }
     if (layer && L) {
       /* PERF: the floor pass below paints over the whole room, so when a
          floor does, this layer and its tiles would be painted under it
@@ -1027,7 +1031,8 @@
     if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
     if (e.key === 'z' || e.key === 'Z' || e.key === 'Enter' || e.key === 'x' || e.key === 'X') {
       e.preventDefault();
-      NEU.talk.ff();
+      if (e.key === 'x' || e.key === 'X') NEU.talk.holdStart ? NEU.talk.holdStart() : NEU.talk.ff();
+      else NEU.talk.ff();
     }
   });
   addEventListener('keydown', function (e) {
@@ -1055,18 +1060,17 @@
       return;
     }
     if (e.key === 'x' || e.key === 'X') {
-      /* X fast-forwards a textbox (whole line, then the next one) and
-         does nothing else. Escape is what closes it. */
+      /* X hold timing lives with the shared dialogue box. */
       if (NEU.tboxOpen && NEU.tboxOpen() && NEU.talk) {
         e.preventDefault();
-        if (NEU.talk.ff) NEU.talk.ff(); else { var tbx = document.getElementById('tbox'); if (tbx) tbx.click(); }
+        if (NEU.talk.holdStart) NEU.talk.holdStart(); else if (NEU.talk.ff) NEU.talk.ff();
       }
       return;
     }
     if (e.key === 'z' || e.key === 'Z') {
       e.preventDefault();
-      /* Z advances an open textbox through the same path a click takes. */
-      if (NEU.tboxOpen && NEU.tboxOpen()) { var tb = document.getElementById('tbox'); if (tb) tb.click(); return; }
+      /* Z reveals the current line before it advances dialogue. */
+      if (NEU.tboxOpen && NEU.tboxOpen()) { if (NEU.talk && NEU.talk.ff) NEU.talk.ff(); return; }
       if (busy) return;
       /* Interact first, push second. A block you are standing next to
          is almost never what you meant when there is an npc in reach. */
