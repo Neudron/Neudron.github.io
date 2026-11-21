@@ -41,7 +41,19 @@
     if (active.name === 'fall') {
       var t = active.t, oldY = -Math.round(t * h), shaftY = Math.round((1 - t) * h), newY = Math.round((2.5 - 2.5 * t) * h);
       ctx.save(); ctx.imageSmoothingEnabled = false; ctx.fillStyle = active.wall; ctx.fillRect(0, 0, w, h);
-      for (var y = 0; y < h * 1.5; y += 16 * scale) { ctx.fillStyle = (y / (16 * scale) | 0) % 2 ? active.wall : '#201B28'; ctx.fillRect(0, shaftY + y, w, 8 * scale); }
+      /* brick courses, warm at the bottom: the hall below lights the shaft */
+      for (var y = 0; y < h * 1.5; y += 16 * scale) {
+        var row = (y / (16 * scale) | 0) % 2, deep = y / (h * 1.5);
+        ctx.fillStyle = deep > 0.7 ? (row ? '#2E1E18' : '#3A2518')
+                                   : (row ? active.wall : '#201B28');
+        ctx.fillRect(0, shaftY + y, w, 8 * scale);
+      }
+      for (var k = 0; k < 4; k++) {
+        ctx.globalAlpha = 0.04 * (4 - k);
+        ctx.fillStyle = '#FF8A3A';
+        ctx.fillRect(0, shaftY + h * 1.5 - (k + 1) * 16 * scale, w, 16 * scale);
+      }
+      ctx.globalAlpha = 1;
       if (active.canvas) ctx.drawImage(active.canvas, 0, oldY, w, h);
       if (active.incoming) ctx.drawImage(active.incoming, 0, newY, w, h);
       ctx.restore(); return;

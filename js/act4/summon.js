@@ -58,6 +58,12 @@
   var EYE_T = 5100, EYE_LEN = 900;
   var RISE_T = 6400, RISE_LEN = 1800;
   var TALK_T = 8600, FLASH_LEN = 450, FADE_LEN = 700;
+  /* the verified beats above do not move. What is new: the last frame of
+     the summon is handed to a `mode` bridge, and over 500 ms the circle
+     collapses into the box the fight will occupy. */
+  var MODE_MS = 500, SHRINK_MS = 500, FIGHT_Z = 0.45;
+  var FIGHT_BOX = { x: Math.round(CX - RX * FIGHT_Z), y: Math.round(CY - RY * FIGHT_Z),
+                    w: Math.round(2 * RX * FIGHT_Z), h: Math.round(2 * RY * FIGHT_Z) };
   var LINES = ['"you came all the way down here."',
                '"sit down. this will take a while."',
                '"do not die. i want the whole fight."'];
@@ -66,8 +72,9 @@
   var near = 0;            /* 0..1, how close the player is to the altar */
   var run = null;          /* the summoning in progress */
   var dbg = { starts: 0, rings: 0, ringOrder: [], erupted: 0, dark: 0, eye: 0, rise: 0,
-              shakes: 0, flashes: 0, fades: 0 };
+              shakes: 0, flashes: 0, fades: 0, shrink: 0, bridges: 0 };
   var origin = { x: 0, y: 0, S: 3 };   /* world (0,0) on screen, from the last floor draw */
+  var lastShot = null;                 /* the mode bridge's outgoing frame */
 
   function L() { return NEU.engineLook; }
   function save() { return NEU.save; }
@@ -275,6 +282,17 @@
                ['110', '010', '011', '010', '110'], ['111', '001', '010', '100', '111'],
                ['010', '111', '010', '101', '101'], ['100', '110', '111', '011', '001']];
   function circleState() { return dead() ? 'cracked' : run ? 'lit' : 'dormant'; }
+  /* the shrink is a visual scale about the circle's centre: 1 at rest,
+     FIGHT_Z when the circle has collapsed into the fight box */
+  function circleScale() {
+    var k = 1 - (dbg.shrink || 0);
+    return FIGHT_Z + (1 - FIGHT_Z) * k;   /* lands on FIGHT_Z exactly */
+  }
+  function circleBox() {
+    var z = circleScale();
+    return { x: Math.round(CX - RX * z), y: Math.round(CY - RY * z),
+             w: Math.round(2 * RX * z), h: Math.round(2 * RY * z) };
+  }
 
   /* The circle's box in world px: the outer ring is RX/RY wide, the
      scorch RX+6/RY+4, and the cracked state's break runs from CX-64
@@ -395,6 +413,11 @@
   function drawCircle(g, e, d) {
     var S = d.S, o = orig(e, d), ox = o.x, oy = o.y, now = d.now, i;
     origin.x = ox; origin.y = oy; origin.S = S;
+    var z = circleScale(), scaled = z < 0.999;
+    if (scaled) {
+      g.save(); g.translate(ox + CX * S, oy + CY * S);
+      g.scale(z, z); g.translate(-(ox + CX * S), -(oy + CY * S));
+    }
     var st = circleState(), lit = st === 'lit' ? dbg.rings : 0;
     var cols = circleColours(st, lit, now);
     var bm = slow ? null : circleBitmap(st, cols, cols.key);
@@ -418,6 +441,7 @@
       for (i = 0; i < dbg.rings; i++) drawShock(g, ox, oy, S, t - RING_T[i], 480, SHOCK_COL);
       drawShock(g, ox, oy, S, t - ERUPT_T, 640, SHOCK_HOT);
     }
+    if (scaled) g.restore();
   }
   /* the original immediate-mode painter: the fallback with no canvas, and
      the reference the baked bitmap is checked against */
@@ -1494,6 +1518,7 @@
     dbg.starts++;
     dbg.rings = 0; dbg.ringOrder = []; dbg.erupted = 0; dbg.dark = 0; dbg.eye = 0; dbg.rise = 0;
     dbg.flashes = 0; dbg.fades = 0; dbg.shakes = 0;
+    dbg.shrink = 0; dbg.bridges = 0; lastShot = null;
     run = { c: c, t: 0, talked: false, flashAt: 0, fade: false, stop: null };
     api = c;
     near = 1;
@@ -1535,7 +1560,21 @@
       if (noFlash()) { run.fade = true; dbg.fades++; }
       else { dbg.flashes++; sfx('stinger', 3); shake(0.8); }
     }
-    if (run.flashAt && t >= run.flashAt + (run.fade ? FADE_LEN : FLASH_LEN)) { launch(); return; }
+    if (run.flashAt) {
+      var tail = run.fade ? FADE_LEN : FLASH_LEN;
+      /* reduced motion lands in the fight box at once, with no bridge */
+      dbg.shrink = still() ? 1 : clamp((t - (run.flashAt + tail)) / SHRINK_MS);
+      if (!run.bridging && !still() && t >= run.flashAt + tail) {
+        run.bridging = 1;
+        var T = NEU.engineTrans;
+        if (T && T.start) {
+          lastShot = cv;
+          run.modeActive = !!T.start('mode', cv, 'down', false, null, { ms: MODE_MS });
+          if (run.modeActive) dbg.bridges++;
+        }
+      }
+      if (t >= run.flashAt + tail + (still() ? 0 : SHRINK_MS)) { launch(); return; }
+    }
     c.later(tick, 16);
   }
 
@@ -1543,9 +1582,12 @@
      NEU.scal.open() takes the screen (rooms-a.js enterArena). */
   function launch() {
     if (!run) return;
-    var c = run.c;
+    var c = run.c, bridged = run.modeActive;
     if (run.stop) run.stop();
     run = null;
+    /* the bridge is a hand-off, not a stuck transition: once the fight has
+       the screen the mode record is cut, reduced motion or a skip included */
+    if (bridged && NEU.engineTrans && NEU.engineTrans.cut) NEU.engineTrans.cut();
     if (save()) save().flag('scal_summon_seen', 1);
     NEU.duckHold = false;
     overlayOff();
@@ -1588,6 +1630,14 @@
     aftermath: dead,
     prox: prox,
     centre: { x: CX, y: CY },
+    /* the verified beats are read-only here so a suite can pin their
+       numbers; the two new 500 ms windows sit AFTER the flash */
+    timeline: { rings: RING_T.slice(), erupt: ERUPT_T, dark: DARK_T, eye: EYE_T,
+                rise: RISE_T, talk: TALK_T, flash: FLASH_LEN, mode: MODE_MS, shrink: SHRINK_MS },
+    circleBox: circleBox,
+    fightBox: function () { return { x: FIGHT_BOX.x, y: FIGHT_BOX.y,
+                                     w: FIGHT_BOX.w, h: FIGHT_BOX.h }; },
+    bridge: function () { return { mode: 'fight', box: circleBox(), shot: lastShot }; },
     get active() { return !!run; },
     get near() { return near; },
     debug: dbg,

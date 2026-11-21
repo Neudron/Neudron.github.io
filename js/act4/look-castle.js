@@ -506,6 +506,21 @@
         }
         /* the crack the mushroom grows out of */
         R2(19 * T + 2, 10 * T + 12, 8, 1, '#0C0A12'); R2(19 * T + 9, 10 * T + 13, 5, 1, '#0C0A12'); R2(19 * T + 4, 10 * T + 13, 3, 1, '#26342E');
+        /* the trapdoor seal in the north ash: a round stone-and-iron
+           disc 44 px across, ash worked into its grooves, four bars.
+           Painted from the castle palette until IMG-04 arrives. */
+        var tx = 11 * T + 8, ty = 3 * T + 8;
+        ringPaint(R2, tx, ty, 22, 22, '#6A6470');
+        ringPaint(R2, tx, ty, 19, 19, '#2E2838');
+        ringPaint(R2, tx, ty, 15, 15, '#4A4450');
+        for (var q = 0; q < 4; q++) {
+          var qx = tx + (q < 2 ? -1 : 1) * 13, qy = ty + (q % 2 ? -1 : 1) * 13;
+          R2(qx - 2, qy - 2, 4, 4, '#1A1620'); R2(qx - 1, qy - 1, 2, 2, '#8A8278');
+        }
+        for (var ai = 0; ai < 18; ai++) {
+          var aa = ai / 18 * Math.PI * 2;
+          R2(Math.round(tx + Math.cos(aa) * 20), Math.round(ty + Math.sin(aa) * 20), 1, 1, '#9A9488');
+        }
       } });
     }
   };
@@ -587,7 +602,60 @@
       W(g, o, S, tx - 10, ty - 1, 20, 3, '#9FB8D8');
       g.globalAlpha = 1;
     },
+    b6_dark: function (g, o, S, d, c) {
+      /* Painted eyes live at the six pocket mouths. They are ink on the
+         wall, so they only read inside the carried torch radius; two of
+         them stay shut until the torch has been carried past them. */
+      var room = roomOf(d), eyes = room && room.eyes;
+      if (!eyes || !eyes.length) return;
+      var solved = flagged('solved:b6_dark');
+      var lt = room.light && d.api ? room.light(d.api) : null;
+      if (!lt && !solved) return;
+      var px = lt ? (lt.x + 0.5) * T : 0, py = lt ? (lt.y + 0.5) * T : 0;
+      var rad = solved ? 100000 : ((room.dark && room.dark(d.api)) || 72) * 0.7 + 12;
+      for (var i = 0; i < eyes.length; i++) {
+        var e = eyes[i];
+        if (e.shut && !solved && (!lt || lt.x <= e.x)) continue;
+        var ex = e.x * T + 8, ey = e.y * T + 8;
+        if (!solved && (Math.abs(ex - px) > rad || Math.abs(ey - py) > rad)) continue;
+        var ox = e.dir === 'west' ? -2 : e.dir === 'east' ? 2 : 0;
+        var oy = e.dir === 'north' ? -2 : e.dir === 'south' ? 2 : 0;
+        W(g, o, S, ex - 4, ey - 2, 9, 5, '#7A6A4A');
+        W(g, o, S, ex - 3, ey - 1, 7, 3, '#E8DCC8');
+        W(g, o, S, ex - 1 + ox, ey - 1 + oy, 3, 3, '#1A1420');
+        if (!still()) W(g, o, S, ex + ox, ey - 1 + oy, 1, 1, '#FFFFFF');
+      }
+    },
     b7_altar: function (g, o, S, d, c) {
+      var room = roomOf(d), st = room && room.trapState ? room.trapState() : null;
+      var tx = 11 * T + 8, ty = 3 * T + 8, k;
+      if (st) {
+        /* four locking bars, drawn retracting over 900-1300 ms */
+        for (k = 0; k < 4; k++) {
+          var bx = tx + (k < 2 ? -1 : 1) * (10 - st.bars * 4);
+          var by = ty + (k % 2 ? -1 : 1) * 13;
+          if (st.bars < 1) W(g, o, S, bx - 1, by - 1, 3, 3, '#3A3440');
+        }
+        /* the orange seam flickers at 0.5 Hz while the seal is shut */
+        var flick = still() ? 0.5 : 0.5 + 0.5 * Math.sin(d.now / 1000 * Math.PI);
+        if (!st.halves) W(g, o, S, tx - 1, ty - 18, 2, 36, flick > 0.6 ? '#FF8A3A' : '#8A2A10');
+        /* the two halves slide 14 px apart in four steps: black, orange light */
+        if (st.halves > 0) {
+          var off = st.halves * 3.5;
+          W(g, o, S, tx - 18 - off, ty - 9, 16, 18, '#08060C');
+          W(g, o, S, tx + 2 + off, ty - 9, 16, 18, '#08060C');
+          W(g, o, S, tx - 4 - off, ty - 8, 3, 16, flick > 0.5 ? '#FF8A3A' : '#8A2A10');
+          W(g, o, S, tx + 1 + off, ty - 8, 3, 16, flick > 0.5 ? '#FFB347' : '#8A2A10');
+        }
+        /* twelve embers rise 200-1200, then dust with the halves 1300-2300 */
+        var rise = st.embers > 0 ? st.embers : st.dust;
+        if (st.kick && !still()) W(g, o, S, tx - 20, ty - 11, 40, 1, '#FFB347');
+        if (rise > 0) for (k = 0; k < 12; k++) {
+          var ex = tx + ((hash(k, 1, 71) * 40) | 0) - 20;
+          var ey = ty + 12 - ((rise * (18 + ((hash(k, 2, 72) * 14) | 0))) | 0);
+          W(g, o, S, ex, ey, 1, 1, k & 1 ? '#FF8A3A' : '#E8C47A');
+        }
+      }
       /* once the ashes are in, the circle smoulders */
       if (!flagged('firedoor') || still()) return;
       var cx = 11 * T + 8, cy = 7 * T + 2, now = d.now;
@@ -1179,7 +1247,9 @@
   skins.cresset = {
     width: 0,
     draw: function (g, e, d) {
-      var lit = d.api && d.api.solved && d.api.solved(roomOf(d).id);
+      /* A seated torch burns even in a wrong socket; the room solves only
+         when the one socket every open eye can see holds it. */
+      var lit = !!e.seated || !!(e.correct && d.api && d.api.solved && d.api.solved(roomOf(d).id));
       blit(g, sprite('cresset', 26, 36, 13, 33, function (R, gg) {
         shadowOval(R, gg, 0, 0, 9, 2, 0.5);
         R(-6, -4, 12, 4, '#2A2232'); R(-6, -4, 12, 1, '#4A4058');
