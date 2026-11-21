@@ -171,6 +171,20 @@
   }
   installSkins();
 
+  /* Use the same stepped canopy palette outside each forest room. */
+  if (L() && L().surroundTiles) {
+    [1, 0.8, 0.7, 0.6].forEach(function (level) {
+      var cv = mkCanvas(64, 64), g = cv.getContext && cv.getContext('2d');
+      if (!g) return;
+      var shade = function (c) { return L().shade(c, level); };
+      g.fillStyle = shade('#091214'); g.fillRect(0, 0, 64, 64);
+      var R = function (x, y, w, h, c) { g.fillStyle = shade(c); g.fillRect(x, y, w, h); };
+      canopy(R, g, 14, 13, 17, 11, 3, ['#102020', '#18302D', '#24433B', '#53766A']);
+      canopy(R, g, 48, 48, 18, 12, 7, ['#102020', '#18302D', '#24433B', '#53766A']);
+      L().surroundTiles['woods:' + level] = cv;
+    });
+  }
+
   /* ── the shade: a room's static darkness, baked ─────────────────────
      A pre-lit dim layer, the cheap cousin of the engine's dark rooms: the
      room is filled with night at `alpha`, and every light that never moves
