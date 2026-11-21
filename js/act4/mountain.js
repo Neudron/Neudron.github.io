@@ -152,8 +152,6 @@
     var rows = blank(48), ents, spawn;
     if (n === 0) {
       fill(rows, 0, 8, 12, '#');
-      fill(rows, 9, 20, 13, '^');
-      fill(rows, 9, 20, 14, '#');
       fill(rows, 21, 47, 12, '#');
       spawn = { x: 2, y: 11 };
       ents = [{ t: 'refill', x: 16, y: 10 }, { t: 'exit', x: 42, y: 11 }];
