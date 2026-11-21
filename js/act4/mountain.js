@@ -18,7 +18,7 @@
 
   /* recordings re-cut for the Celeste core (B1): edge-triggered jump/dash, so a held key is one press */
   var REC = {
-    m0: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, 'dash right']],
+    m0: [[28, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [120, 'right']],
     m1: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
     m2: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right']],
     m3: [[4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
@@ -152,14 +152,11 @@
     var rows = blank(48), ents, spawn;
     if (n === 0) {
       fill(rows, 0, 8, 12, '#');
-      fill(rows, 9, 12, 13, '^');
-      fill(rows, 9, 12, 14, '#');
-      fill(rows, 13, 26, 12, '#');
-      fill(rows, 27, 30, 13, '^');
-      fill(rows, 27, 30, 14, '#');
-      fill(rows, 31, 47, 12, '#');
+      fill(rows, 9, 20, 13, '^');
+      fill(rows, 9, 20, 14, '#');
+      fill(rows, 21, 47, 12, '#');
       spawn = { x: 2, y: 11 };
-      ents = [{ t: 'refill', x: 18, y: 11 }, { t: 'exit', x: 42, y: 11 }];
+      ents = [{ t: 'refill', x: 16, y: 10 }, { t: 'exit', x: 42, y: 11 }];
     } else if (n === 1) {
       fill(rows, 0, 15, 14, '#');
       fill(rows, 16, 18, 15, '^');
