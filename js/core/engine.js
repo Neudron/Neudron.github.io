@@ -47,7 +47,13 @@
   var reduced = false;
   try { reduced = (window.NEU && window.NEU.motion) ? window.NEU.motion.reduced() : matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
   /* NEU.motion (motion.js) is the one source; it can change live. */
-  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) { reduced = r; });
+  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) {
+    reduced = r;
+    if (r) {
+      camLeadX = camLeadY = 0; camZoomState = null; cv.style.transform = '';
+      if (camPan) { camX = camPan.x; camY = camPan.y; camFocusX = camX + view().w / 2; camFocusY = camY + view().uh / 2; camPan = null; camClamp(); }
+    }
+  });
 
   var TILE = 16;              // world units per cell
   var SPEED = 96;             // world units/sec — top speed, unchanged from v1
@@ -57,7 +63,7 @@
   var PLAYER_W = 10, PLAYER_H = 8;   // the FEET box. smaller than the sprite.
   var REACH = 22;
   var STEP = 1 / 60;
-  var LOOKAHEAD = 12;         // u the camera leads in the facing direction
+  var LOOKAHEAD = 20;         // u the camera leads along velocity
   var INTERACT_COOLDOWN = 500; // ms
 
   function look() { return NEU.engineLook || null; }
@@ -68,7 +74,8 @@
   var room = null, running = false, last = 0, acc = 0;
   var px = 0, py = 0, vx = 0, vy = 0, keys = {}, face = 'down', walked = 0, moving = false;
   var movedFor = 0, settle = 0;
-  var camX = 0, camY = 0, kickX = 0, kickY = 0;
+  var camX = 0, camY = 0, camFocusX = 0, camFocusY = 0, camLeadX = 0, camLeadY = 0;
+  var camHold = false, camPan = null, camZoomState = null, kickX = 0, kickY = 0;
   var S = 3, padH = 0, padPoll = 0;
   var fade = 0, fadeDir = 0, fadeThen = null;
   /* Seconds the iris takes. A door is quick (0.22); arriving from a
@@ -667,15 +674,60 @@
     if (room.h * TILE < v.uh) camY = (room.h * TILE - v.uh) / 2;
   }
   function camTarget() {
-    var v = view(), f = DIRV[face] || [0, 0];
-    var lead = reduced ? 0 : LOOKAHEAD;
-    return { x: px + f[0] * lead - v.w / 2, y: py - 6 + f[1] * lead - v.uh / 2 };
+    var v = view();
+    return { x: camFocusX + camLeadX - v.w / 2, y: camFocusY + camLeadY - v.uh / 2 };
   }
-  function camSnap() { var t = camTarget(); camX = t.x; camY = t.y; camClamp(); }
+  function camReset() {
+    camHold = false; camPan = null; camZoomState = null; camLeadX = camLeadY = 0;
+    cv.style.transform = ''; cv.style.transformOrigin = '';
+  }
+  function camSnap() { camReset(); camFocusX = px; camFocusY = py - 6; var t = camTarget(); camX = t.x; camY = t.y; camClamp(); }
   function camFollow(dt) {
+    if (camPan) {
+      camPan.t += dt;
+      var p = camPan.ms ? Math.min(1, camPan.t / camPan.ms) : 1;
+      p = 1 - Math.pow(1 - p, 3);
+      camX = camPan.sx + (camPan.x - camPan.sx) * p; camY = camPan.sy + (camPan.y - camPan.sy) * p;
+      if (p >= 1) { camFocusX = camPan.x + view().w / 2; camFocusY = camPan.y + view().uh / 2; camPan = null; }
+      camClamp(); return;
+    }
+    if (camHold) return;
+    var dx = px - camFocusX, dy = (py - 6) - camFocusY;
+    if (Math.abs(dx) > 12) camFocusX += dx - (dx < 0 ? -12 : 12);
+    if (Math.abs(dy) > 8) camFocusY += dy - (dy < 0 ? -8 : 8);
+    var speed = Math.sqrt(vx * vx + vy * vy), lx = reduced || !speed ? 0 : vx / speed * LOOKAHEAD;
+    var ly = reduced || !speed ? 0 : vy / speed * LOOKAHEAD, lk = 1 - Math.exp(-4 * dt);
+    camLeadX += (lx - camLeadX) * lk; camLeadY += (ly - camLeadY) * lk;
     var t = camTarget(), k = 1 - Math.exp(-10 * dt);
     camX += (t.x - camX) * k; camY += (t.y - camY) * k;
     camClamp();
+  }
+  function camTo(x, y, ms) {
+    var v = view(), tx = x - v.w / 2, ty = y - v.uh / 2;
+    camHold = true;
+    if (reduced || !ms) { camX = tx; camY = ty; camFocusX = x; camFocusY = y; camPan = null; camClamp(); return; }
+    camPan = { sx: camX, sy: camY, x: tx, y: ty, t: 0, ms: ms / 1000 };
+  }
+  function camZoom(k, ms) {
+    if (reduced) { cv.style.transform = ''; camZoomState = null; return; }
+    var from = parseFloat((cv.style.transform.match(/scale\(([^)]+)\)/) || [0, 1])[1]) || 1;
+    camZoomOrigin();
+    if (!ms) { cv.style.transform = k === 1 ? '' : 'scale(' + k + ')'; camZoomState = null; return; }
+    camZoomState = { from: from, to: k, t: 0, ms: ms / 1000 };
+  }
+  function camZoomOrigin() {
+    cv.style.transformOrigin = (Math.round(camFocusX * S) - Math.round(camX * S)) + 'px ' +
+      (Math.round(camFocusY * S) - Math.round(camY * S)) + 'px';
+  }
+  function camZoomStep(dt) {
+    if (camZoomState) {
+      camZoomState.t += dt;
+      var p = Math.min(1, camZoomState.t / camZoomState.ms), eased = 1 - Math.pow(1 - p, 3);
+      var z = camZoomState.from + (camZoomState.to - camZoomState.from) * eased;
+      cv.style.transform = Math.abs(z - 1) < 0.001 ? '' : 'scale(' + z + ')';
+      if (p >= 1) camZoomState = null;
+    }
+    if (cv.style.transform) camZoomOrigin();
   }
   /* A small directional camera impulse (B3): a push, a solved room.
      Part of shake, so it obeys the same switches. */
@@ -715,6 +767,7 @@
 
     if (!busy) { if (!NEU.activeMinigame) move(dt); walkExits(); } else { vx = 0; vy = 0; moving = false; }
     camFollow(dt);
+    camZoomStep(dt);
     var decay = Math.exp(-14 * dt);
     kickX *= decay; kickY *= decay;
     if (settle > 0) settle -= dt;
@@ -1027,7 +1080,8 @@
     if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
     if (e.key === 'z' || e.key === 'Z' || e.key === 'Enter' || e.key === 'x' || e.key === 'X') {
       e.preventDefault();
-      NEU.talk.ff();
+      if (e.key === 'x' || e.key === 'X') NEU.talk.holdStart ? NEU.talk.holdStart() : NEU.talk.ff();
+      else NEU.talk.ff();
     }
   });
   addEventListener('keydown', function (e) {
@@ -1055,18 +1109,17 @@
       return;
     }
     if (e.key === 'x' || e.key === 'X') {
-      /* X fast-forwards a textbox (whole line, then the next one) and
-         does nothing else. Escape is what closes it. */
+      /* X hold timing lives with the shared dialogue box. */
       if (NEU.tboxOpen && NEU.tboxOpen() && NEU.talk) {
         e.preventDefault();
-        if (NEU.talk.ff) NEU.talk.ff(); else { var tbx = document.getElementById('tbox'); if (tbx) tbx.click(); }
+        if (NEU.talk.holdStart) NEU.talk.holdStart(); else if (NEU.talk.ff) NEU.talk.ff();
       }
       return;
     }
     if (e.key === 'z' || e.key === 'Z') {
       e.preventDefault();
-      /* Z advances an open textbox through the same path a click takes. */
-      if (NEU.tboxOpen && NEU.tboxOpen()) { var tb = document.getElementById('tbox'); if (tb) tb.click(); return; }
+      /* Z reveals the current line before it advances dialogue. */
+      if (NEU.tboxOpen && NEU.tboxOpen()) { if (NEU.talk && NEU.talk.ff) NEU.talk.ff(); return; }
       if (busy) return;
       /* Interact first, push second. A block you are standing next to
          is almost never what you meant when there is an npc in reach. */
@@ -1195,6 +1248,7 @@
 
   function leave() {
     running = false;
+    camReset();
     if (NEU.kernel && NEU.kernel.current() === 'engine') NEU.kernel.pop();
     clearLater();
     wrap.hidden = true;
@@ -1220,6 +1274,12 @@
   }
 
   var API = {
+    cam: {
+      to: function (x, y, ms) { camTo(x, y, ms); },
+      hold: function () { camHold = true; camPan = null; },
+      release: function () { camHold = false; camPan = null; },
+      zoom: camZoom
+    },
     say: say, flag: flag,
     flagged: function (k) { return NEU.save ? NEU.save.flagged(k) : false; },
     give: function (i) { if (NEU.save) NEU.save.give(i); },
@@ -1294,7 +1354,7 @@
     REACH: REACH, PLAYER_H: PLAYER_H, PLAYER_W: PLAYER_W, SPEED: SPEED,
     /* read-only internals for tests and the dev console */
     get debug() {
-      return { scale: S, cam: { x: camX, y: camY }, vel: { x: vx, y: vy }, padH: padH,
+      return { scale: S, cam: { x: camX, y: camY }, focus: { x: camFocusX, y: camFocusY }, camLead: { x: camLeadX, y: camLeadY }, vel: { x: vx, y: vy }, padH: padH,
                baked: !!(room && layers[room.id]), fade: fade, iris: fadeSpan, prompt: promptFor,
                lights: (room && look()) ? lightsFor(0, camX, camY, view()).list.length : 0,
                cine: cine, seat: sitting ? { x: sitting.x, y: sitting.y } : null,

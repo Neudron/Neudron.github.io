@@ -31,7 +31,6 @@
 
   var sans   = document.getElementById('sans');
   var btn    = document.getElementById('sansBtn');
-  var secret = document.getElementById('sansSecret');
   var pop    = document.getElementById('sansPop');
   var sword  = document.getElementById('sword');
   var tbox   = document.getElementById('tbox');
@@ -626,6 +625,7 @@
      — the dog handing over the hammer is narration first and him
      second, and forcing that into one voice loses the beat. */
   var queue = [], queueV = [], typing = null, curV = 'sans', curLine = '';
+  var typePos = 0, xHoldTimer = null, xHeld = false;
   var curIdx = 0, curTotal = 0, watch = null;
   var tface = document.getElementById('tboxFace');
   var tfaceImg = document.getElementById('tboxFaceImg');
@@ -675,7 +675,30 @@
      player who walks away still gets through the scene. Z/Enter/X skip
      or advance well before it fires. */
   var TALK_IDLE = 6000;
+  function routedTalkKey(e) {
+    var key = e.key || '';
+    if (NEU.keys && NEU.keys.route) {
+      var r = NEU.keys.route(key, null);
+      /* keys.js already canonicalized trusted remaps; keep that canonical X even though route marks the moved physical key swallowed. */
+      if (r.swallow && key.toLowerCase() !== 'x') return '';
+      key = r.swallow ? 'x' : (r.to || key);
+    }
+    return key.length === 1 ? key.toLowerCase() : key;
+  }
+  function typeLine(line, v) {
+    clearInterval(typing);
+    typing = setInterval(function () {
+      ttxt.textContent = line.slice(0, ++typePos);
+      if (typePos % 2 === 0) blip(v);
+      if (typePos >= line.length) {
+        clearInterval(typing); typing = null;
+        if (tmore) tmore.hidden = false;
+        next.hold = setTimeout(next, xHeld ? 120 : TALK_IDLE);
+      }
+    }, xHeld ? 8 : 42);
+  }
   function say(lines, who) {
+    clearTimeout(xHoldTimer); xHoldTimer = null; xHeld = false; xDown = false;
     queue = lines.slice();
     queueV = lines.map(function (_, i) {
       return Array.isArray(who) ? (who[i] || 'narr') : (who || 'sans');
@@ -693,7 +716,7 @@
       if (watch) watch(-1, -1);
       return;
     }
-    var line = queue.shift().replace(/^\* /, ''), i = 0;
+    var line = queue.shift().replace(/^\* /, '');
     srSay(line);
     curV = queueV.shift() || 'sans';
     curIdx++;
@@ -711,20 +734,12 @@
     if (reduced) {                       // no typing, just the line
       ttxt.textContent = line;
       if (tmore) tmore.hidden = false;
-      next.hold = setTimeout(next, TALK_IDLE);
+      next.hold = setTimeout(next, xHeld ? 120 : TALK_IDLE);
       return;
     }
-    var v = curV;
     curLine = line;
-    typing = setInterval(function () {
-      ttxt.textContent = line.slice(0, ++i);
-      if (i % 2 === 0) blip(v);
-      if (i >= line.length) {
-        clearInterval(typing);
-        if (tmore) tmore.hidden = false;
-        next.hold = setTimeout(next, TALK_IDLE);
-      }
-    }, 42);
+    typePos = 0;
+    typeLine(line, curV);
   }
 
   /* The dialogue box is the only one on the site and every new scene
@@ -736,6 +751,7 @@
      entry so a door does not carry the last room's half-typed line. */
   NEU.talk.close = function () {
     clearInterval(typing); clearTimeout(next.hold);
+    clearTimeout(xHoldTimer); xHoldTimer = null; xHeld = false; xDown = false;
     queue = [];
     if (tbox) tbox.hidden = true;
     srSay(''); setFace();
@@ -749,11 +765,59 @@
       clearInterval(typing); typing = null;
       ttxt.textContent = curLine;
       if (tmore) tmore.hidden = false;
-      clearTimeout(next.hold); next.hold = setTimeout(next, TALK_IDLE);
+      clearTimeout(next.hold); next.hold = setTimeout(next, xHeld ? 120 : TALK_IDLE);
       return;
     }
     next();
   };
+  NEU.talk.holdStart = function () {
+    if (xHoldTimer !== null || xHeld || tbox.hidden) return;
+    xHoldTimer = setTimeout(function () {
+      xHoldTimer = null;
+      xHeld = true;
+      if (typing) typeLine(curLine, curV);
+      else { clearTimeout(next.hold); next.hold = setTimeout(next, 120); }
+    }, 350);
+  };
+  NEU.talk.holdEnd = function () {
+    if (xHoldTimer !== null) {
+      clearTimeout(xHoldTimer); xHoldTimer = null;
+      NEU.talk.ff();
+      return;
+    }
+    if (!xHeld) return;
+    xHeld = false;
+    clearTimeout(next.hold);
+    if (typing) typeLine(curLine, curV);
+    else if (!tbox.hidden) next.hold = setTimeout(next, TALK_IDLE);
+  };
+  function cancelXHold() {
+    clearTimeout(xHoldTimer); xHoldTimer = null; xDown = false;
+    if (!xHeld) return;
+    xHeld = false;
+    clearTimeout(next.hold);
+    if (typing) typeLine(curLine, curV);
+    else if (!tbox.hidden) next.hold = setTimeout(next, TALK_IDLE);
+  }
+  var xDown = false;
+  addEventListener('keydown', function (e) {
+    var key = routedTalkKey(e);
+    if (key !== 'x' || !NEU.tboxOpen || !NEU.tboxOpen() || NEU.activeMinigame) return;
+    var active = document.activeElement;
+    if (active && (/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName) || active.isContentEditable)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (e.repeat) return;
+    xDown = true;
+    NEU.talk.holdStart();
+  }, true);
+  addEventListener('keyup', function (e) {
+    if (!xDown || routedTalkKey(e) !== 'x') return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    xDown = false;
+    NEU.talk.holdEnd();
+  }, true);
+  addEventListener('blur', cancelXHold);
+  document.addEventListener('visibilitychange', function () { if (document.hidden) cancelXHold(); });
   /* Dark door: engine.js skips dialogue only with no minigame up, and dark.js
      eats Z (interact) while the box is open. Capture phase takes the key first. */
   addEventListener('keydown', function (e) {
@@ -775,6 +839,7 @@
      longer there is just litter. */
   function shutUp() {
     clearInterval(typing); clearTimeout(next.hold);
+    clearTimeout(xHoldTimer); xHoldTimer = null; xHeld = false; xDown = false;
     queue = []; queueV = []; ttxt.textContent = ''; tbox.hidden = true;
     srSay(''); setFace();
     if (watch) watch(-1, -1);
@@ -1062,6 +1127,7 @@
     if (asleep) { maybeSwitch(); tvState(); return; }
     clearTimeout(hideT);
     sans.hidden = false;
+    if (NEU.stars && NEU.stars.layoutSecret) NEU.stars.layoutSecret();
     requestAnimationFrame(function () { sans.classList.add('is-in'); });
     if (state === 'away') state = 'here';
     if (NEU.quest) NEU.quest.mark('sans');
@@ -1084,9 +1150,7 @@
   }
 
   /* ── click sans ─────────────────────────────────────────────────*/
-  /* The star no longer sits beside him. It is one star of the sky: stars.js
-     picks it and calls this when a click lands on it. Same reward as before. */
-  if (secret) secret.hidden = true;
+  /* stars.js places the hidden sky star by his sleeve and calls this on click. */
   if (NEU.stars) NEU.stars.onSecret = function () {
     if (NEU.save && NEU.save.flagged && NEU.save.flagged('act1:star')) {
       say(['the tiny star is still there. it does not need anything.']);
@@ -1895,8 +1959,8 @@
     flyHome();
   });
 
-  /* Clicking the box advances it, the way it should. */
-  tbox.addEventListener('click', next);
+  /* Clicking the box reveals this line before advancing to the next. */
+  tbox.addEventListener('click', function () { NEU.talk.ff(); });
 
   /* ── dog food, and what it buys ─────────────────────────────────
      Survive twenty seconds in the room and you come out holding
@@ -1943,7 +2007,7 @@
       "that's toby. he isn't mine. he isn't anyone's, really.",
       "he says thanks. he also says you're doing this the hard way.",
       "type 69420 while you're dodging. clears the whole run.",
-      "flip the cosmolight off and back on if you want another go.",
+      "flip the cosmolight off and back on if you need the room lit again.",
       "door stays open, by the way. corner of your eye, bottom left."
     ]);
   }
@@ -1962,7 +2026,8 @@
       if (dogOut) {
         dogOut = false;
         dogEl.classList.remove('is-in');
-        setTimeout(function () { dogEl.hidden = true; }, 520);
+        dogEl.classList.add('is-leave');
+        setTimeout(function () { dogEl.hidden = true; dogEl.classList.remove('is-leave'); }, 520);
       }
     }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   }
@@ -2266,7 +2331,7 @@
        has nothing left to do. A scroll now would move a settled page. */
     cancelLater();
     asleep = true; wantSleep = false;
-    if (dogEl)   { dogEl.classList.remove('is-in'); setTimeout(function () { dogEl.hidden = true; }, 520); }
+    if (dogEl)   { dogEl.classList.remove('is-in'); dogEl.classList.add('is-leave'); setTimeout(function () { dogEl.hidden = true; dogEl.classList.remove('is-leave'); }, 520); }
     /* The dog is leaving the page with him, so the flag has to follow
        the DOM — otherwise a slept-through visit keeps telling
        grantDogFood and summonDog that the dog is still out, and the
