@@ -19,7 +19,7 @@
   /* recordings re-cut for the Celeste core (B1): edge-triggered jump/dash, so a held key is one press */
   var REC = {
     m0: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, 'dash right']],
-    m1: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
+    m1: [[48, 'right'], [4, 'jump right'], [6, 'right'], [4, 'dash right'], [20, 'right'], [4, 'dash right'], [60, 'right']],
     m2: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right']],
     m3: [[4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
     m4: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [4, 'right']],
@@ -162,11 +162,9 @@
       ents = [{ t: 'refill', x: 18, y: 11 }, { t: 'exit', x: 42, y: 11 }];
     } else if (n === 1) {
       fill(rows, 0, 15, 14, '#');
-      fill(rows, 16, 18, 15, '^');
-      fill(rows, 16, 18, 16, '#');
-      fill(rows, 17, 42, 12, '#');
+      fill(rows, 28, 47, 14, '#');
       spawn = { x: 3, y: 13 };
-      ents = [{ t: 'spring', x: 15, y: 13 }, { t: 'exit', x: 36, y: 11 }];
+      ents = [{ t: 'spring', x: 22, y: 11 }, { t: 'exit', x: 36, y: 13 }];
     } else if (n === 2) {
       fill(rows, 0, 24, 14, '#');
       fill(rows, 25, 28, 15, '^');
@@ -223,7 +221,7 @@
   }
 
   var LANTERN = [[22, 11], [8, 13], [20, 13], [24, 13], [24, 13], [20, 12], [6, 10], [22, 11]];
-  var BANNER = [[5, 11], [28, 11], [33, 13], [5, 13], [9, 13], [28, 12], [13, 10], [33, 11]];
+  var BANNER = [[5, 11], [33, 13], [33, 13], [5, 13], [9, 13], [28, 12], [13, 10], [33, 11]];
   var n;
   for (n = 0; n <= 7; n++) build(n);
 
