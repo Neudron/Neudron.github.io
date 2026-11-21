@@ -47,7 +47,13 @@
   var reduced = false;
   try { reduced = (window.NEU && window.NEU.motion) ? window.NEU.motion.reduced() : matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
   /* NEU.motion (motion.js) is the one source; it can change live. */
-  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) { reduced = r; });
+  if (window.NEU && window.NEU.motion) window.NEU.motion.on(function (r) {
+    reduced = r;
+    if (r) {
+      camLeadX = camLeadY = 0; camZoomState = null; cv.style.transform = '';
+      if (camPan) { camX = camPan.x; camY = camPan.y; camFocusX = camX + view().w / 2; camFocusY = camY + view().uh / 2; camPan = null; camClamp(); }
+    }
+  });
 
   var TILE = 16;              // world units per cell
   var SPEED = 96;             // world units/sec — top speed, unchanged from v1
@@ -57,18 +63,20 @@
   var PLAYER_W = 10, PLAYER_H = 8;   // the FEET box. smaller than the sprite.
   var REACH = 22;
   var STEP = 1 / 60;
-  var LOOKAHEAD = 12;         // u the camera leads in the facing direction
+  var LOOKAHEAD = 20;         // u the camera leads along velocity
   var INTERACT_COOLDOWN = 500; // ms
 
   function look() { return NEU.engineLook || null; }
   function kinds() { return NEU.engineKinds || null; }
 
   /* ── state ────────────────────────────────────────────────────── */
-  var rooms = {}, tilesets = {};
+  var rooms = {}, tilesets = {}, aliases = {};
   var room = null, running = false, last = 0, acc = 0;
-  var px = 0, py = 0, vx = 0, vy = 0, keys = {}, face = 'down', walked = 0, moving = false;
+  var currentArea = null;
+  var px = 0, py = 0, prevPX = 0, prevPY = 0, prevCamX = 0, prevCamY = 0, vx = 0, vy = 0, keys = {}, face = 'down', walked = 0, moving = false;
   var movedFor = 0, settle = 0;
-  var camX = 0, camY = 0, kickX = 0, kickY = 0;
+  var camX = 0, camY = 0, camFocusX = 0, camFocusY = 0, camLeadX = 0, camLeadY = 0;
+  var camHold = false, camPan = null, camZoomState = null, kickX = 0, kickY = 0;
   var S = 3, padH = 0, padPoll = 0;
   var fade = 0, fadeDir = 0, fadeThen = null;
   /* Seconds the iris takes. A door is quick (0.22); arriving from a
@@ -112,6 +120,72 @@
     rooms[id] = def;
     delete layers[id];
     return def;
+  }
+
+  function alias(oldId, newId, spawnMap, areaId) {
+    if (!oldId || !newId || oldId === newId || typeof oldId !== 'string' || typeof newId !== 'string' ||
+        rooms[oldId] || aliases[oldId] ||
+        (spawnMap != null && (typeof spawnMap !== 'object' || Array.isArray(spawnMap))) ||
+        (areaId != null && typeof areaId !== 'string')) return false;
+    var names = Object.keys(spawnMap || {});
+    for (var i = 0; i < names.length; i++) if (typeof spawnMap[names[i]] !== 'string') return false;
+    aliases[oldId] = { id: newId, spawns: spawnMap || {}, area: areaId || null };
+    return true;
+  }
+
+  function areaTarget(id) {
+    var found = null, collision = !!rooms[id], ids = Object.keys(rooms);
+    for (var i = 0; i < ids.length; i++) {
+      var areas = rooms[ids[i]].areas || [];
+      for (var j = 0; j < areas.length; j++) if (areas[j] && areas[j].id === id) {
+        if (collision || found) return false;
+        found = { room: rooms[ids[i]], area: areas[j] };
+      }
+    }
+    return found && found.room.spawns && found.room.spawns[found.area.spawn] ? found : found ? false : null;
+  }
+
+  function resolve(id, spawn) {
+    var seen = {}, mapped = false, area = null, a;
+    while (aliases[id]) {
+      if (seen[id]) return null;
+      seen[id] = true;
+      a = aliases[id];
+      if (Object.prototype.hasOwnProperty.call(a.spawns, spawn)) { spawn = a.spawns[spawn]; mapped = true; }
+      if (!area && a.area) area = a.area;
+      id = a.id;
+    }
+    var directArea = areaTarget(id);
+    if (directArea === false) return null;
+    if (!rooms[id]) {
+      var target = directArea;
+      if (!target || (spawn && spawn !== target.area.spawn)) return null;
+      area = target.area.id;
+      spawn = target.area.spawn;
+      id = target.room.id;
+    }
+    if (!rooms[id]) return null;
+    if (mapped && !(rooms[id].spawns && rooms[id].spawns[spawn])) return null;
+    if (area && !(rooms[id].areas || []).some(function (a) { return a.id === area; })) return null;
+    return { id: id, spawn: spawn, area: area };
+  }
+
+  function areaAt() {
+    var x = Math.floor(px / TILE), y = Math.floor((py - 1) / TILE), areas = room && room.areas || [];
+    for (var i = 0; i < areas.length; i++) {
+      var a = areas[i];
+      if (x >= a.x0 && x <= a.x1 && y >= a.y0 && y <= a.y1) return a;
+    }
+    return null;
+  }
+
+  function checkArea() {
+    var a = areaAt(), id = a && a.id;
+    if (id === currentArea) return;
+    currentArea = id || null;
+    room.__spawn = a ? a.spawn : ((room.spawns || {}).default ? 'default' : room.__spawn);
+    if (NEU.save) NEU.save.capture();
+    if (a && a.onEnter) { a.onEnter(API); prevPX = px; prevPY = py; prevCamX = camX; prevCamY = camY; }
   }
 
   /* decor('tree', [x, y, x, y, ...], extra) — a row of one prop or
@@ -532,7 +606,7 @@
 
   /* ── transitions ──────────────────────────────────────────────── */
   function go(id, spawn) {
-    if (!rooms[id]) { say(['there is nothing through there. yet.'], 'narr'); return; }
+    if (!resolve(id, spawn)) { say(['there is nothing through there. yet.'], 'narr'); return; }
     if (fadeDir) return;                    // already moving
     busy = true;
     fadeDir = 1;
@@ -585,14 +659,16 @@
   }
 
   function land(id, spawn) {
+    var target = resolve(id, spawn), selected;
+    if (!target) return false;
     if (room && room.onExit) room.onExit(API);
     clearLater();
-    room = rooms[id];
+    room = rooms[target.id];
     /* A solved puzzle stays solved across a revisit, but the blocks go
        back to their starting cells. */
-    room.__solved = NEU.save ? NEU.save.flagged('solved:' + id) : false;
+    room.__solved = NEU.save ? NEU.save.flagged('solved:' + target.id) : false;
     ents = spawnEnts(room);
-    var s = (room.spawns && room.spawns[spawn]) || (room.spawns && room.spawns.default);
+    var s = (room.spawns && room.spawns[target.spawn]) || (room.spawns && room.spawns.default);
     if (!s) {
       /* An exit naming a spawn the target room does not declare is a
          bug in the room, and it must not be able to pass for level
@@ -600,13 +676,17 @@
       var names = room.spawns ? Object.keys(room.spawns) : [];
       s = names.length ? room.spawns[names[0]] : firstOpenCell();
       if (window.console && console.warn)
-        console.warn('[neu] room "' + id + '" has no spawn "' + spawn +
+        console.warn('[neu] room "' + target.id + '" has no spawn "' + target.spawn +
                      '" — landing at ' + s.x + ',' + s.y);
     }
-    px = (s.x + 0.5) * TILE; py = (s.y + 1) * TILE;
+    px = (s.x + 0.5) * TILE; py = (s.y + 1) * TILE; prevPX = px; prevPY = py;
     vx = 0; vy = 0; walked = 0; face = s.face || 'down';
     slideD = 0; slideDead = false; promptFor = null; sitting = null;
-    room.__spawn = spawn;
+    room.__spawn = target.spawn;
+    selected = target.area && (room.areas || []).filter(function (a) { return a.id === target.area; })[0];
+    if (!selected) selected = areaAt();
+    currentArea = selected ? selected.id : null;
+    if (selected) room.__spawn = selected.spawn;
     bake();
     camSnap();
     var L = look();
@@ -614,7 +694,10 @@
     /* A room change must not carry the old room's dialogue. */
     if (NEU.talk && NEU.talk.close) NEU.talk.close();
     if (room.onEnter) room.onEnter(API);
+    if (selected && selected.onEnter) selected.onEnter(API);
+    prevPX = px; prevPY = py; prevCamX = camX; prevCamY = camY;
     if (NEU.save) NEU.save.capture();
+    return true;
   }
 
   /* ── api.later: timers that die with the visit (F4) ──────────────
@@ -667,15 +750,60 @@
     if (room.h * TILE < v.uh) camY = (room.h * TILE - v.uh) / 2;
   }
   function camTarget() {
-    var v = view(), f = DIRV[face] || [0, 0];
-    var lead = reduced ? 0 : LOOKAHEAD;
-    return { x: px + f[0] * lead - v.w / 2, y: py - 6 + f[1] * lead - v.uh / 2 };
+    var v = view();
+    return { x: camFocusX + camLeadX - v.w / 2, y: camFocusY + camLeadY - v.uh / 2 };
   }
-  function camSnap() { var t = camTarget(); camX = t.x; camY = t.y; camClamp(); }
+  function camReset() {
+    camHold = false; camPan = null; camZoomState = null; camLeadX = camLeadY = 0;
+    cv.style.transform = ''; cv.style.transformOrigin = '';
+  }
+  function camSnap() { camReset(); camFocusX = px; camFocusY = py - 6; var t = camTarget(); camX = t.x; camY = t.y; camClamp(); prevCamX = camX; prevCamY = camY; }
   function camFollow(dt) {
+    if (camPan) {
+      camPan.t += dt;
+      var p = camPan.ms ? Math.min(1, camPan.t / camPan.ms) : 1;
+      p = 1 - Math.pow(1 - p, 3);
+      camX = camPan.sx + (camPan.x - camPan.sx) * p; camY = camPan.sy + (camPan.y - camPan.sy) * p;
+      if (p >= 1) { camFocusX = camPan.x + view().w / 2; camFocusY = camPan.y + view().uh / 2; camPan = null; }
+      camClamp(); return;
+    }
+    if (camHold) return;
+    var dx = px - camFocusX, dy = (py - 6) - camFocusY;
+    if (Math.abs(dx) > 12) camFocusX += dx - (dx < 0 ? -12 : 12);
+    if (Math.abs(dy) > 8) camFocusY += dy - (dy < 0 ? -8 : 8);
+    var speed = Math.sqrt(vx * vx + vy * vy), lx = reduced || !speed ? 0 : vx / speed * LOOKAHEAD;
+    var ly = reduced || !speed ? 0 : vy / speed * LOOKAHEAD, lk = 1 - Math.exp(-4 * dt);
+    camLeadX += (lx - camLeadX) * lk; camLeadY += (ly - camLeadY) * lk;
     var t = camTarget(), k = 1 - Math.exp(-10 * dt);
     camX += (t.x - camX) * k; camY += (t.y - camY) * k;
     camClamp();
+  }
+  function camTo(x, y, ms) {
+    var v = view(), tx = x - v.w / 2, ty = y - v.uh / 2;
+    camHold = true;
+    if (reduced || !ms) { camX = tx; camY = ty; camFocusX = x; camFocusY = y; camPan = null; camClamp(); prevCamX = camX; prevCamY = camY; return; }
+    camPan = { sx: camX, sy: camY, x: tx, y: ty, t: 0, ms: ms / 1000 };
+  }
+  function camZoom(k, ms) {
+    if (reduced) { cv.style.transform = ''; camZoomState = null; return; }
+    var from = parseFloat((cv.style.transform.match(/scale\(([^)]+)\)/) || [0, 1])[1]) || 1;
+    camZoomOrigin();
+    if (!ms) { cv.style.transform = k === 1 ? '' : 'scale(' + k + ')'; camZoomState = null; return; }
+    camZoomState = { from: from, to: k, t: 0, ms: ms / 1000 };
+  }
+  function camZoomOrigin() {
+    cv.style.transformOrigin = (Math.round(camFocusX * S) - Math.round(camX * S)) + 'px ' +
+      (Math.round(camFocusY * S) - Math.round(camY * S)) + 'px';
+  }
+  function camZoomStep(dt) {
+    if (camZoomState) {
+      camZoomState.t += dt;
+      var p = Math.min(1, camZoomState.t / camZoomState.ms), eased = 1 - Math.pow(1 - p, 3);
+      var z = camZoomState.from + (camZoomState.to - camZoomState.from) * eased;
+      cv.style.transform = Math.abs(z - 1) < 0.001 ? '' : 'scale(' + z + ')';
+      if (p >= 1) camZoomState = null;
+    }
+    if (cv.style.transform) camZoomOrigin();
   }
   /* A small directional camera impulse (B3): a push, a solved room.
      Part of shake, so it obeys the same switches. */
@@ -693,7 +821,7 @@
     ctx.imageSmoothingEnabled = false;
     S = chooseScale();
     padH = measurePad();
-    if (room) camClamp();
+    if (room) { camClamp(); prevCamX = camX; prevCamY = camY; }
   }
   /* A window drag fires resize dozens of times a frame; lay out once per frame. */
   var layoutQueued = false;
@@ -712,9 +840,12 @@
     }
     if ((padPoll -= dt) <= 0) { padPoll = 0.5; var ph = measurePad(); if (ph !== padH) padH = ph; }
     if (!room) return;
+    prevPX = px; prevPY = py; prevCamX = camX; prevCamY = camY;
 
     if (!busy) { if (!NEU.activeMinigame) move(dt); walkExits(); } else { vx = 0; vy = 0; moving = false; }
+    checkArea();
     camFollow(dt);
+    camZoomStep(dt);
     var decay = Math.exp(-14 * dt);
     kickX *= decay; kickY *= decay;
     if (settle > 0) settle -= dt;
@@ -811,7 +942,7 @@
   }
 
   /* ── draw ─────────────────────────────────────────────────────── */
-  function lightsFor(now, camSX, camSY, v) {
+  function lightsFor(now, camSX, camSY, v, playerX, playerY) {
     var L = look(), K = kinds(), out = [];
     var z = L.zone(room.tileset);
     var darkAmt = typeof room.dark === 'function' ? room.dark(API) : room.dark;
@@ -825,9 +956,9 @@
       ambient = 0.03;
       var lt = room.light ? room.light(API) : null;
       if (lt) out.push({ x: lt.x, y: lt.y - 6, r: darkAmt * 0.7, col: z.warm, glow: 0.18, a: 1 });
-      else out.push({ x: px, y: py - 6, r: 20, a: 0.8 });
+      else out.push({ x: playerX, y: playerY - 6, r: 20, a: 0.8 });
     } else if (ambient < 0.8) {
-      out.push({ x: px, y: py - 6, r: 34, a: 0.5 });
+      out.push({ x: playerX, y: playerY - 6, r: 34, a: 0.5 });
     }
     /* entity lights */
     for (var i = 0; i < ents.length; i++) {
@@ -883,7 +1014,9 @@
     /* Pixel-snap the camera once; every world→screen conversion below
        rounds against the same origin, so sprites never shimmer against
        the floor. */
-    var ox = Math.round((camX + kickX) * S), oy = Math.round((camY + kickY) * S);
+    var alpha = reduced ? 1 : acc / STEP, drawPX = prevPX + (px - prevPX) * alpha, drawPY = prevPY + (py - prevPY) * alpha;
+    var drawCamX = prevCamX + (camX - prevCamX) * alpha, drawCamY = prevCamY + (camY - prevCamY) * alpha;
+    var ox = Math.round((drawCamX + kickX) * S), oy = Math.round((drawCamY + kickY) * S);
     var camSX = ox / S, camSY = oy / S;
     function sx(wx) { return Math.round(wx * S) - ox; }
     function sy(wy) { return Math.round(wy * S) - oy; }
@@ -936,13 +1069,13 @@
       if (k && (k.floor || k.hidden)) continue;
       drawn.push({ e: e, k: k, y: (e.y + 1) * TILE });
     }
-    drawn.push({ e: null, y: py });
+    drawn.push({ e: null, y: drawPY });
     drawn.sort(function (a, b) { return a.y - b.y; });
     /* shadows under all of it, then the things themselves */
     if (L) {
       for (i = 0; i < drawn.length; i++) {
         var it = drawn[i];
-        if (!it.e) { L.shadow(ctx, sx(px), sy(py), 9, S, 0.42); continue; }
+        if (!it.e) { L.shadow(ctx, sx(drawPX), sy(drawPY), 9, S, 0.42); continue; }
         var ww = it.k && it.k.width ? it.k.width(it.e, S) : 9;
         if (ww > 0) { var pe = entAt(it.e); L.shadow(ctx, sx(pe.x), sy(pe.y), Math.min(14, ww * 0.8), S, 0.32); }
       }
@@ -950,7 +1083,7 @@
     for (i = 0; i < drawn.length; i++) {
       var dr = drawn[i];
       if (!dr.e) {
-        if (L) L.drawPlayer(ctx, sx(px), sy(py) - (sitting ? 11 * S : 0), face, walked, moving, S, now,
+        if (L) L.drawPlayer(ctx, sx(drawPX), sy(drawPY) - (sitting ? 11 * S : 0), face, walked, moving, S, now,
           { settle: settle > 0, act: playerAct && playerAct.name, actP: playerAct ? 1 - playerAct.t / playerAct.max : 0, sit: sitting });
         continue;
       }
@@ -970,7 +1103,7 @@
 
     if (L) {
       L.weatherDraw(ctx, camSX, camSY, S, w, h);
-      var lt = lightsFor(now, camSX, camSY, v);
+      var lt = lightsFor(now, camSX, camSY, v, drawPX, drawPY);
       L.drawLight(ctx, w, h, lt.ambient, lt.night, lt.list, camSX, camSY, S);
     }
 
@@ -991,7 +1124,7 @@
                      NEU.juice.overlay(ctx, w, h); }
 
     if (fade > 0) {
-      if (L && !reduced) L.drawIris(ctx, w, h, sx(px), sy(py - 8), fade);
+      if (L && !reduced) L.drawIris(ctx, w, h, sx(drawPX), sy(drawPY - 8), fade);
       else { ctx.fillStyle = 'rgba(5,5,7,' + fade.toFixed(3) + ')'; ctx.fillRect(0, 0, w, h); }
     }
   }
@@ -1094,7 +1227,7 @@
   /* ── open / close ─────────────────────────────────────────────── */
   /* opts.iris: seconds for the iris to open on arrival (default 0.22). */
   function enter(id, spawn, opts) {
-    if (!rooms[id]) return false;
+    if (!resolve(id, spawn)) return false;
     if (NEU.kernel) NEU.kernel.push('engine');
     if (NEU.settings && NEU.settings.warnFlash) NEU.settings.warnFlash();
     wrap.hidden = false;
@@ -1195,6 +1328,7 @@
 
   function leave() {
     running = false;
+    camReset();
     if (NEU.kernel && NEU.kernel.current() === 'engine') NEU.kernel.pop();
     clearLater();
     wrap.hidden = true;
@@ -1213,13 +1347,19 @@
     wrap.hidden = false;
     document.body.classList.add('is-playing');
     if (NEU.quest) NEU.quest.lock(true);
-    keys = {}; busy = false; acc = 0; sitting = null;
+    keys = {}; busy = false; acc = 0; sitting = null; prevPX = px; prevPY = py; prevCamX = camX; prevCamY = camY;
     running = true; last = performance.now();
     requestAnimationFrame(step);
     return true;
   }
 
   var API = {
+    cam: {
+      to: function (x, y, ms) { camTo(x, y, ms); },
+      hold: function () { camHold = true; camPan = null; },
+      release: function () { camHold = false; camPan = null; },
+      zoom: camZoom
+    },
     say: say, flag: flag,
     flagged: function (k) { return NEU.save ? NEU.save.flagged(k) : false; },
     give: function (i) { if (NEU.save) NEU.save.give(i); },
@@ -1274,19 +1414,28 @@
   });
 
   NEU.engine = {
-    register: register, tileset: tileset, decor: decor, enter: enter, leave: leave, resume: resume, go: go,
+    register: register, alias: alias, tileset: tileset, decor: decor, enter: enter, leave: leave, resume: resume, go: go,
     confirmExit: confirmExit,
-    where: function () { return room ? { room: room.id, spawn: room.__spawn } : null; },
+    where: function () { return room ? { room: currentArea || room.id, spawn: room.__spawn } : null; },
     get running() { return running; },
     get room() { return room ? room.id : null; },
     /* Which zone the player is standing in, by tileset name. music.js
        and engine-look both key off this — one source of truth. */
     zone: function () { return room ? room.tileset : null; },
-    get rooms() { return Object.keys(rooms); },
+    get rooms() {
+      var ids = Object.keys(rooms).concat(Object.keys(aliases)), areas = {};
+      Object.keys(rooms).forEach(function (id) {
+        (rooms[id].areas || []).forEach(function (a) { areas[a.id] = (areas[a.id] || 0) + 1; });
+      });
+      Object.keys(areas).forEach(function (id) {
+        if (areas[id] === 1 && ids.indexOf(id) < 0 && areaTarget(id)) ids.push(id);
+      });
+      return ids;
+    },
     tilesets: function () { return tilesets; },
     api: API,
     /* dev */
-    warp: function (id, spawn) { if (running) { land(id, spawn); } else { enter(id, spawn); } },
+    warp: function (id, spawn) { if (!resolve(id, spawn)) return false; return running ? land(id, spawn) : enter(id, spawn); },
     drawPlayer: drawPlayerCompat,
     TILE: TILE,
     /* live: the scale the view was fitted at (decision 10) */
@@ -1294,7 +1443,7 @@
     REACH: REACH, PLAYER_H: PLAYER_H, PLAYER_W: PLAYER_W, SPEED: SPEED,
     /* read-only internals for tests and the dev console */
     get debug() {
-      return { scale: S, cam: { x: camX, y: camY }, vel: { x: vx, y: vy }, padH: padH,
+      return { scale: S, cam: { x: camX, y: camY }, focus: { x: camFocusX, y: camFocusY }, camLead: { x: camLeadX, y: camLeadY }, vel: { x: vx, y: vy }, padH: padH,
                baked: !!(room && layers[room.id]), fade: fade, iris: fadeSpan, prompt: promptFor,
                lights: (room && look()) ? lightsFor(0, camX, camY, view()).list.length : 0,
                cine: cine, seat: sitting ? { x: sitting.x, y: sitting.y } : null,

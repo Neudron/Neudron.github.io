@@ -15,7 +15,7 @@
   var levels = {}, kinds = {}, current = null, live = false, paused = false, replaying = false;
   var canvas = document.getElementById('platCanvas'), overlay = document.getElementById('plat');
   var ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
-  var keys = {}, accumulator = 0, simClock = 0, camera = { x: 0, y: 0 }, baked = null, afterimages = [], bakeCache = {};
+  var keys = {}, accumulator = 0, simClock = 0, camera = { x: 0, y: 0 }, prevX = 0, prevY = 0, prevCamX = 0, prevCamY = 0, baked = null, afterimages = [], bakeCache = {};
   var reduced = redNow(), view = { w: 640, h: 360, scale: 1 }, area = { x0: 0, y0: 0, x1: 640, y1: 360 };
   var painters = [], padB = {}, sprCache = {}, lastDraw = 0, chunks = {}, chunkOrder = [], CHUNK = 32, LRU = 12;
   function redNow() {
@@ -350,7 +350,8 @@
     dt = clamp(Number(dt) || STEP, 0, 0.1);
     /* melee hit-stop: a short sim freeze in game time (unlike juice's real-clock freeze,
        this stays deterministic for fixed-step tests and replays) */
-    if (player.hitStop > 0) { player.hitStop = Math.max(0, player.hitStop - dt); return getState(); }
+    if (player.hitStop > 0) { prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y; player.hitStop = Math.max(0, player.hitStop - dt); return getState(); }
+    prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y;
     simClock += dt;
     player.prev = input;
     if (player.wipe > 0) player.wipe = Math.max(0, player.wipe - dt);
@@ -400,6 +401,7 @@
     player.squash = Math.max(0, player.squash - dt); player.stretch = Math.max(0, player.stretch - dt);
     if (player.onGround && Math.abs(player.vx) > 8) player.walked += Math.abs(player.vx) * dt;
     for (i = afterimages.length - 1; i >= 0; i--) { afterimages[i].t -= dt; if (afterimages[i].t <= 0) afterimages.splice(i, 1); }
+    placeCamera(reduced ? -1 : dt);
     return getState();
   }
   function getState() { return { x: player.x, y: player.y, vx: player.vx, vy: player.vy, face: player.face, st: player.st,
@@ -432,6 +434,7 @@
     simClock = 0;
     if (current.onRespawn) current.onRespawn();
     if (current.cameraMode === 'mountain') placeCamera(-1);
+    prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y;
   }
   function bake() {
     if (!current || !document.createElement) return;
@@ -580,8 +583,9 @@
     ox = Math.round((w - view.w * view.scale) / 2); oy = Math.round((h - view.h * view.scale) / 2);
     area.x0 = Math.floor(-ox / view.scale) - 1; area.y0 = Math.floor(-oy / view.scale) - 1;
     area.x1 = Math.ceil((w - ox) / view.scale) + 1; area.y1 = Math.ceil((h - oy) / view.scale) + 1;
-    placeCamera(reduced ? -1 : dtf);
-    cx = Math.round(camera.x); cy = Math.round(camera.y);
+    cx = Math.round(prevCamX + (camera.x - prevCamX) * (reduced ? 1 : accumulator / STEP)); cy = Math.round(prevCamY + (camera.y - prevCamY) * (reduced ? 1 : accumulator / STEP));
+    var drawX = reduced ? player.x : prevX + (player.x - prevX) * (accumulator / STEP);
+    var drawY = reduced ? player.y : prevY + (player.y - prevY) * (accumulator / STEP);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (!api.backdrop) { ctx.fillStyle = '#0b0a12'; ctx.fillRect(0, 0, w, h); }
     ctx.setTransform(view.scale, 0, 0, view.scale, ox, oy); ctx.imageSmoothingEnabled = false;
@@ -606,17 +610,17 @@
     if (player.dead <= 0) {
       if (player.onGround) {
         ctx.globalAlpha = 0.4; ctx.fillStyle = '#000000';
-        ctx.fillRect((player.x - cx - 10) | 0, (player.y - cy) | 0, 20, 1);
-        ctx.fillRect((player.x - cx - 7) | 0, (player.y - cy + 1) | 0, 14, 1);
+        ctx.fillRect((drawX - cx - 10) | 0, (drawY - cy) | 0, 20, 1);
+        ctx.fillRect((drawX - cx - 7) | 0, (drawY - cy + 1) | 0, 14, 1);
         ctx.globalAlpha = 1;
       }
       if (player.inv > 0) ctx.globalAlpha = reduced ? 0.6 : ((((now / 170) | 0) & 1) ? 0.35 : 1); /* 340 ms period: under the 3 Hz flash cap */
-      drawHero(ctx, player.x - cx, player.y - cy, player.face, player.onGround);
+      drawHero(ctx, drawX - cx, drawY - cy, player.face, player.onGround);
       ctx.globalAlpha = 1;
-    } else deathRing(ctx, player.x - cx, player.y - cy - HH / 2, 1 - player.dead / (current.quickRespawn ? 0.18 : DEATH));
+    } else deathRing(ctx, drawX - cx, drawY - cy - HH / 2, 1 - player.dead / (current.quickRespawn ? 0.18 : DEATH));
     if (player.dead <= 0 && player.swing > 0)
-      meleeArc(ctx, player.x - cx, player.y - cy, player.face, player.swingDown, player.swingPow === 2, 1 - player.swing / C.swing);
-    if (player.dead <= 0 && player.charging) chargeArc(ctx, player.x - cx, player.y - cy, player.face, player.chargeK);
+      meleeArc(ctx, drawX - cx, drawY - cy, player.face, player.swingDown, player.swingPow === 2, 1 - player.swing / C.swing);
+    if (player.dead <= 0 && player.charging) chargeArc(ctx, drawX - cx, drawY - cy, player.face, player.chargeK);
     if (J && J.drawParts) { ctx.save(); ctx.translate(-cx, -cy); J.drawParts(ctx, dtf || 0.016); ctx.restore(); }
     if (api.foreground) api.foreground(ctx, cx, cy, L, now, area);
     if (J && J.end) J.end(ctx, shook);
@@ -871,6 +875,7 @@
     sizeView(Math.round((window.innerWidth || 640) * (window.devicePixelRatio || 1)), Math.round((window.innerHeight || 360) * (window.devicePixelRatio || 1)));
     placeCamera(-1);
     if (current.onOpen) current.onOpen(opts);
+    prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y;
     draw();
     NEU.activeMinigame = 'plat';
     if (NEU.kernel && NEU.kernel.current() !== 'plat') NEU.kernel.push('plat'); return true;
@@ -1020,7 +1025,7 @@
     restartRoom: function () { if (!current) return false; respawn(); return true; },
     solid: function (tx, ty) { return !!current && solidCell(cell(tx, ty)); }, cell: function (tx, ty) { return current ? cell(tx, ty) : '#'; },
     chunkCount: function () { return chunkOrder.length; }, replaying: function () { return replaying; },
-    snap: function () { if (current) placeCamera(-1); }, fallOf: fallOf, dropChunks: function () { chunks = {}; chunkOrder = []; }, ent: function (t, c, x, y, e, now) { if (ENT[t]) ENT[t](c, x, y, e, now || 0); },
+    snap: function () { if (current) { placeCamera(-1); prevCamX = camera.x; prevCamY = camera.y; } }, fallOf: fallOf, dropChunks: function () { chunks = {}; chunkOrder = []; }, ent: function (t, c, x, y, e, now) { if (ENT[t]) ENT[t](c, x, y, e, now || 0); },
     levelId: function () { return current ? current.id : ''; },
     get levels() { return levels; }, _kinds: kinds,
     cam: function () { return { x: camera.x, y: camera.y }; } };
