@@ -8,7 +8,8 @@
     "verify": "node scripts/verify-dist.mjs",
     "bench": "node bench/renderers.mjs",
     "dev": "node scripts/dev.mjs",
-    "test:mountain": "node tests/mountain-foundations.mjs"
+    "test:mountain": "node tests/mountain-foundations.mjs",
+    "test:dungeon": "node tests/dungeon-sprites.mjs"
   },
   "devDependencies": {
     "acorn": "8.19.0",

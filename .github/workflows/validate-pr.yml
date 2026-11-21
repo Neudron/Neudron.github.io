@@ -27,6 +27,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Game syntax compatibility
         run: npm run check
+      - name: Dungeon sprite regressions
+        run: npm run test:dungeon
       - name: Produce deployable bundle (without deploying)
         run: npm run build
       - name: Verify artifact boundaries and surface

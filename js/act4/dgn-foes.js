@@ -104,7 +104,12 @@
   /* foe shot sprites (img/act4/vfx, CC0/AI sources — see .opencode/plans/vfx-assets.md).
      A missing file just falls back to the old glow+rect, same as before. */
   var FXS = { bullet: 'dgFxBullet', pellet: 'dgFxPellet', soul: 'dgFxSoul', flame: 'dgFxFlame', ghost: 'dgFxGhost', bolt: 'dgFxBolt' };
-  function fxIm(k) { var sh = k && NEU.dgSheets && NEU.dgSheets[k]; return sh ? NEU.sheetReady(sh) : null; }
+  function fxIm(k) {
+    var sh = k && NEU.dgSheets && NEU.dgSheets[k];
+    if (!sh) return null;
+    /* Draw the alpha-cleaned dungeon sprites for projectiles too. */
+    return NEU.dungeonLook && NEU.dungeonLook.sheet ? NEU.dungeonLook.sheet(k) : NEU.sheetReady(sh);
+  }
   function fxShot(c, s, k) {
     var im = fxIm(k), sh = im && NEU.dgSheets[k], w, h;
     if (!im) return false;
@@ -114,7 +119,7 @@
     return true;
   }
 
-  /* ── AI families ───────────────────────────────────────────────────── */
+    /* ── AI families ───────────────────────────────────────────────────── */
   function fighter(f, dt) {
     var d = f.d, dx = hx() - f.x, stuck, v;
     if (f.st === 1) { f.t -= dt; f.vx *= 0.8; if (f.t <= 0) { throwHammer(f); f.st = 0; f.cd = 3; } body(f, dt); return; }
@@ -365,13 +370,20 @@
     for (i = 0; i < foes.length; i++) { f = foes[i]; f.dx = ip(f.ox, f.x, a); f.dy = ip(f.oy, f.y, a); }
     for (i = 0; i < shots.length; i++) { s = shots[i]; s.dx = ip(s.ox, s.x, a); s.dy = ip(s.oy, s.y, a); }
   }
-  function frameOf(f, sh) {
-    var n = sh.frames, d = f.d, t = P.reduced() ? 0 : (P.time() * 1000 / 160) | 0, a;   /* the sim clock: it stops with hit-stop and pause */
-    if (d.ai === 'fighter' || d.ai === 'warlock') return !f.ground ? 1 % n : Math.abs(f.vx) > 8 ? 2 + ((f.walked / 8) | 0) % Math.max(1, n - 2) : 0;
-    if (d.ai === 'ranged') { if (f.warn || f.t >= 0 && Math.abs(f.vx) < 8) { a = Math.atan2((f.aim ? f.aim.y : f.y) - f.y, Math.abs((f.aim ? f.aim.x : f.x) - f.x) || 1); return Math.max(0, Math.min(4, Math.round(2 + a / 0.6))); } return 5 + ((f.walked / 8) | 0) % (n - 5); }
-    if (d.ai === 'caster') return f.t < 0.5 ? (f.t < 0.15 ? 2 : 1) : 0;
-    if (d.ai === 'skull') return n > 3 ? (f.glow > 0 ? 3 + t % 3 : t % 3) : f.st ? 2 : 0;
-    return t % n;
+  /* Every pick stays inside the sheet (short sheets never index past their last frame); `now` (ms) overrides the sim clock for tests. */
+  function frameOf(f, sh, now) {
+    var n = Math.max(1, sh.frames | 0), d = f.d, a, idx,
+      t = now !== undefined ? (now / 160) | 0 : P.reduced() ? 0 : (P.time() * 1000 / 160) | 0,   /* the sim clock: it stops with hit-stop and pause */
+      walk = ((f.walked || 0) / 8) | 0, moving = Math.abs(f.vx || 0) > 8;
+    if (d.ai === 'fighter' || d.ai === 'warlock') idx = !f.ground ? 1 : moving ? 2 + walk % Math.max(1, n - 2) : 0;
+    else if (d.ai === 'ranged') {
+      if (f.warn || f.t >= 0 && !moving) { a = Math.atan2((f.aim ? f.aim.y : f.y) - f.y, Math.abs((f.aim ? f.aim.x : f.x) - f.x) || 1); idx = Math.round(2 + a / 0.6); }
+      else idx = moving ? 5 + walk % Math.max(1, n - 5) : 0;
+    }
+    else if (d.ai === 'caster') idx = f.t < 0.5 ? (f.t < 0.15 ? 2 : 1) : 0;
+    else if (d.ai === 'skull') idx = n > 3 ? (f.glow > 0 ? 3 + t % 3 : t % 3) : f.st ? 2 : 0;
+    else idx = t % n;
+    return Math.max(0, Math.min(n - 1, idx));
   }
   function draw(c, cx, cy) {
     var i, f, sh, k, L = NEU.dungeonLook, x, y, fl, still = P.reduced(), d, g;
