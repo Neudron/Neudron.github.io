@@ -21,7 +21,7 @@
     m0: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, 'dash right']],
     m1: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
     m2: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right']],
-    m3: [[4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
+    m3: [[40, 'right'], [4, 'jump right'], [22, 'right'], [4, 'jump right'], [18, 'right'], [4, 'jump right'], [90, 'right']],
     m4: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [4, 'right']],
     m5: [[4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right']],
     m6: [[4, 'dash up right'], [12, 'right']],
@@ -177,12 +177,12 @@
       ents = [{ t: 'zip', x: 16, y: 13, targetX: 16, targetY: 8 }, { t: 'exit', x: 42, y: 13 }];
     } else if (n === 3) {
       fill(rows, 0, 10, 14, '#');
-      fill(rows, 14, 30, 14, '#');
-      fill(rows, 11, 13, 15, '^');
-      fill(rows, 11, 13, 16, '#');
+      fill(rows, 23, 47, 14, '#');
+      fill(rows, 11, 22, 15, '^');
+      fill(rows, 11, 22, 16, '#');
       spawn = { x: 2, y: 13 };
       ents = [
-        { t: 'crumble', x: 11, y: 14 }, { t: 'crumble', x: 12, y: 14 }, { t: 'crumble', x: 13, y: 14 },
+        { t: 'crumble', x: 14, y: 14 }, { t: 'crumble', x: 19, y: 14 },
         { t: 'exit', x: 26, y: 13 }
       ];
     } else if (n === 4) {
