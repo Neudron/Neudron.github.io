@@ -369,7 +369,7 @@
   if (NEU.roomArt && NEU.roomArt.skins) {
     NEU.roomArt.skins.hood = { width: 0, draw: hoodDraw };
   }
-  E.register('a1_clearing', {
+  var A1 = {
     tileset: 'woods',
     tiles: [
       '########################',
@@ -399,7 +399,7 @@
               'somebody has lit a path. that was thoughtful of them.',
               'it only goes one way.']);
     }
-  });
+  };
 
   /* ══ A2 — the long walk ══════════════════════════════════════════
      The first mushroom. You cannot take it and the game says why in
@@ -422,7 +422,7 @@
      turn costs no aiming. The mushroom sits in a mossy hollow on the
      south bank under a patch of moonlight, so it is seen from the top
      path across the water long before you can reach it. */
-  E.register('a2_path', {
+  var A2 = {
     tileset: 'woods',
     tiles: [
       '##########################',
@@ -442,7 +442,7 @@
     spawns: { west: { x: 1, y: 3, face: 'right' }, east: { x: 24, y: 7, face: 'left' } },
     entities: woodsLook(11).concat([
       { t: 'npc', x: 8, y: 6, colour: '#C4705F', mush: 'mush1', sheet: 'mushroom',
-        run: function (c) { NEU.chop && NEU.chop(c, 'mush1'); } },
+        run: function (c) { NEU.chop && NEU.chop({ room: { id: 'a2_path' }, ents: c.ents, say: c.say }, 'mush1'); } },
       { t: 'npc', x: 18, y: 2, colour: '#4A4560', skin: 'barktree', look: 'tree',
         lines: ['the trees here have no bark on the north side.',
                 'there is no north here.'] },
@@ -457,7 +457,7 @@
       P('stump', 12, 2, { solid: true }), P('shrooms', 10, 6), P('shrooms', 17, 6, { seed: 2 }),
       P('ferns', 5, 6), P('ferns', 20, 6), P('ferns', 8, 2), P('bush', 24, 2), P('ferns', 14, 8)
     ])
-  });
+  };
 
   /* ══ A3 — the fork ═══════════════════════════════════════════════
      Left is the castle. Right is the altar room you cannot open yet,
@@ -473,7 +473,7 @@
      track under fallen leaves, past the oldest tree in the wood, to an
      overgrown arch in the east edge (b7). Read at a glance: lit means
      expected, moss means "not swept in a long time". */
-  E.register('a3_fork', {
+  var A3 = {
     tileset: 'woods',
     tiles: [
       '########################',
@@ -522,7 +522,75 @@
       say(c, ['the path splits.',
               'one way is lit and looks expected of you.']);
     }
+  };
+
+  function mergeWoods() {
+    var rows = [], source = [
+      { room: A1, x: 0, y: 0, x0: 0, x1: 22 },
+      { room: A2, x: 22, y: 4, x0: 1, x1: 24 },
+      { room: A3, x: 46, y: 4, x0: 1, x1: 23 }
+    ];
+    var y, i, j, grid, start, end;
+    for (y = 0; y < 16; y++) rows[y] = Array(70 + 1).join('#');
+    for (i = 0; i < source.length; i++) {
+      grid = source[i].room.tiles.split('\n');
+      for (j = 0; j < grid.length; j++) {
+        y = source[i].y + j;
+        if (y >= rows.length) continue;
+        start = source[i].x + source[i].x0;
+        end = start + source[i].x1 - source[i].x0 + 1;
+        rows[y] = rows[y].substring(0, start) + grid[j].substring(source[i].x0, source[i].x1 + 1) + rows[y].substring(end);
+      }
+    }
+    return rows.join('\n');
+  }
+  function mergeWoodsEntities(room, id, dx, dy) {
+    var entities = room.entities || [], out = [], i, e, copy;
+    for (i = 0; i < entities.length; i++) {
+      e = entities[i];
+      if (e.t === 'woodsfloor' || e.t === 'woodsfx' ||
+          (e.t === 'exit' && (e.to === 'a1_clearing' || e.to === 'a2_path' || e.to === 'a3_fork'))) continue;
+      copy = {};
+      for (var k in e) copy[k] = e[k];
+      copy.origin = { room: id, x: e.x, y: e.y };
+      copy.x += dx; copy.y += dy;
+      out.push(copy);
+    }
+    return out;
+  }
+  function mergeBeams(room, dx, dy) {
+    return room.beams.map(function (b) { return [b[0] + dx, b[1] + dy, b[2], b[3]]; });
+  }
+  function mergeMist(room, dy) {
+    return room.mist.map(function (y) { return dy + y; });
+  }
+  E.register('a_woods', {
+    tileset: 'woods', tiles: mergeWoods(),
+    beams: mergeBeams(A1, 0, 0).concat(mergeBeams(A2, 22, 4), mergeBeams(A3, 46, 4)),
+    mist: mergeMist(A1, 0).concat(mergeMist(A2, 4), mergeMist(A3, 4)),
+    spawns: {
+      a1_default: { x: 10, y: 7, face: 'right' }, a1_north: { x: 10, y: 3, face: 'down' }, a1_east: { x: 22, y: 7, face: 'left' },
+      a2_west: { x: 23, y: 7, face: 'right' }, a2_east: { x: 46, y: 11, face: 'left' },
+      a3_west: { x: 47, y: 11, face: 'right' }, castle: { x: 56, y: 6, face: 'down' }, altar: { x: 68, y: 11, face: 'left' }
+    },
+    areas: [
+      { id: 'a1_clearing', x0: 0, y0: 0, x1: 22, y1: 12, spawn: 'a1_default', onEnter: A1.onEnter },
+      { id: 'a2_path', x0: 23, y0: 4, x1: 46, y1: 14, spawn: 'a2_west' },
+      { id: 'a3_fork', x0: 47, y0: 4, x1: 69, y1: 15, spawn: 'a3_west', onEnter: A3.onEnter }
+    ],
+    get entities() {
+      var out = woodsLook(16)
+        .concat(mergeWoodsEntities(A1, 'a1_clearing', 0, 0), mergeWoodsEntities(A2, 'a2_path', 22, 4), mergeWoodsEntities(A3, 'a3_fork', 46, 4));
+      out.push(P('oak', 21, 7, { big: 1 }), P('oak', 24, 7, { big: 1 }), P('oak', 45, 11, { big: 1 }), P('oak', 48, 11, { big: 1 }));
+      if (NEU.save && (NEU.save.has('mush1') || NEU.save.flagged('gone:a2_path:mush1'))) {
+        return out.filter(function (e) { return e.mush !== 'mush1'; });
+      }
+      return out;
+    }
   });
+  E.alias('a1_clearing', 'a_woods', { default: 'a1_default', north: 'a1_north', east: 'a1_east' }, 'a1_clearing');
+  E.alias('a2_path', 'a_woods', { west: 'a2_west', east: 'a2_east' }, 'a2_path');
+  E.alias('a3_fork', 'a_woods', { west: 'a3_west', castle: 'castle', altar: 'altar' }, 'a3_fork');
 
   /* ── the castle's look ─────────────────────────────────────────────
      Same contract as the woods: one `castlefloor` (js/act4/look-castle.js

@@ -1,4 +1,4 @@
-/* look-woods.js — what the woods (a1, a2, a3) look like, and the shared
+/* look-woods.js — what the merged woods room and the shared
    kit the castle's look (look-castle.js) is built on.
    ───────────────────────────────────────────────────────────────────
    The rooms stay DATA in rooms-a.js. This file only draws them, the
@@ -461,6 +461,24 @@
           for (var i = 0; i < 6; i++) R2(x * T + ((hash(x, y, 300 + i) * 14) | 0), y * T + ((hash(x, y, 310 + i) * 14) | 0), 2, 1, i & 1 ? C.leaf : '#6A4A2A');
         }
       } });
+    }
+  };
+  function paintPart(R, g, room, c, id, x, y, w, h) {
+    var rows = [], yy, part = { anim: [], water: [] };
+    for (yy = 0; yy < h; yy++) rows.push(room.grid[y + yy].substring(x, x + w));
+    PAINT[id](function (px, py, pw, ph, col) { R(x * T + px, y * T + py, pw, ph, col); }, g,
+      { id: id, grid: rows, w: w, h: h }, part);
+    if (part.water) for (yy = 0; yy < part.water.length; yy += 2) c.water.push(part.water[yy] + x, part.water[yy + 1] + y);
+  }
+  PAINT.a_woods = function (R, g, room, c) {
+    c.water = [];
+    paintPart(R, g, room, c, 'a1_clearing', 0, 0, 23, 13);
+    paintPart(R, g, room, c, 'a2_path', 23, 4, 24, 11);
+    paintPart(R, g, room, c, 'a3_fork', 47, 4, 23, 12);
+    /* Fill the cut edges with canopy while the seam trees shade the path. */
+    for (var i = 0; i < 4; i++) {
+      canopy(R, g, (22 + i) * T + 8, 7 * T, 18, 9, 410 + i, OAK);
+      canopy(R, g, (46 + i) * T + 8, 11 * T, 18, 9, 450 + i, OAK);
     }
   };
 
