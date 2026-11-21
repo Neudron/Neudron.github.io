@@ -268,7 +268,7 @@
       /* Taken stays taken even after the item is spent somewhere else.
          v1 read "taken" off the inventory alone, so a pickup came back
          the moment its item went into an altar. */
-      if (NEU.save && sys.room()) NEU.save.flag('p:' + sys.room().id + ':' + e.x + ',' + e.y, 1);
+      if (NEU.save && sys.room()) NEU.save.flag(sys.key('p', e), 1);
       sys.say(e.lines || ['you take it.'], e.who || 'narr');
       sfx('snap');
       /* SMALL. A pickup must register without competing with a boss
