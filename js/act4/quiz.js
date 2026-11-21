@@ -473,6 +473,12 @@
   function open() {
     if (open_) return;
     open_ = true;
+    /* Frames load on first open, not at init, so a player who never
+       opens the quiz does not fetch the intro. Once per page. */
+    if (!introPre) {
+      introPre = true;
+      if (NEU.seqReady && introSheet()) for (var fi = 0; fi < INTRO_N; fi++) NEU.seqReady(introSheet(), fi);
+    }
     if (NEU.diff) NEU.diff.begin();   /* latch the tier for this show's question clocks */
     /* Where to put the player back when they leave. Only captured once
        per visit, so a replay cannot overwrite it with a button inside. */
@@ -514,11 +520,66 @@
     /* the set warms up like an old television, then he is on */
     if (!fast && !reduced) { wrap.classList.remove('is-on'); void wrap.offsetWidth; wrap.classList.add('is-on'); }
     pose('cheer', 'static');
+    /* No options exist yet: focus rests on the overlay itself. */
+    if (wrap.focus) { wrap.setAttribute('tabindex', '-1'); wrap.focus(); }
+    playIntro();
+  }
+
+  /* ── the cold open ──────────────────────────────────────────────
+     Deltarune Ch3 "TV Time" intro (fanIntro, 158 frames, 320x240) plays once
+     per open, before Tenna's first line. It draws on the question canvas at
+     the stage's 2/3 scale, on the show's own later() clock, so close() and
+     begin() stop it with everything else. Skipped under reduced motion, in
+     dev fast mode. A frame not yet loaded is held; the intro ends if frame 0
+     stays missing for 0.6 s, or after twice its nominal length. Skip keys
+     are the quiz's confirm and cancel keys; they never answer a question
+     (see the keydown handler). */
+  var INTRO_FPS = 30, INTRO_N = 158;
+  var INTRO_SKIP = { z: 1, Z: 1, x: 1, X: 1, Enter: 1, ' ': 1 };
+  var introOn = false, introF = 0;
+  function introSheet() { return NEU.sheets && NEU.sheets.fanIntro; }
+  var introPre = false, introTicks = 0;
+  function introTick() {
+    if (!introOn) return;
+    /* counted in show ticks, not wall time, so it follows the later() clock */
+    if (++introTicks > 2 * INTRO_N) return endIntro();
+    if (introF >= INTRO_N) return endIntro();
+    /* frame not in yet: hold it; frame 0 gets at most 0.6 s before we give up */
+    if (!NEU.seqReady(introSheet(), introF)) {
+      if (introF === 0 && introTicks > INTRO_FPS * 0.6) return endIntro();
+      return later(introTick, 1000 / INTRO_FPS);
+    }
+    if (!introDraw(introF)) return endIntro();
+    introF++;
+    later(introTick, 1000 / INTRO_FPS);
+  }
+  function introDraw(f) {
+    if (!cx || !NEU.sheetDraw) return false;
+    cx.setTransform(1, 0, 0, 1, 0, 0);
+    cx.imageSmoothingEnabled = false;
+    cx.fillStyle = '#000';
+    cx.fillRect(0, 0, cv.width, cv.height);
+    return NEU.sheetDraw(cx, 'fanIntro', cv.width / 2, cv.height / 2, { frame: f, scale: 2 / 3 });
+  }
+  function playIntro() {
+    if (fast || reduced || !introSheet() || !cv) return afterIntro();
+    introOn = true; introF = 0; introTicks = 0;
+    cv.hidden = false;
+    introTick();
+  }
+  /* Natural end or skip. stopTimers() drops the pending frame tick. */
+  function endIntro() {
+    if (!introOn) return;
+    introOn = false;
+    stopTimers();
+    if (cx) { cx.setTransform(1, 0, 0, 1, 0, 0); cx.clearRect(0, 0, cv.width, cv.height); }
+    cv.hidden = true;
+    afterIntro();
+  }
+  function afterIntro() {
     later(function () { pose('cheer', 'grin'); host(TENNA.intro[0]); }, 450);
     later(function () { pose('point', 'wink'); host(TENNA.intro[1]); }, 1900);
     later(function () { pose('shrug', 'smug'); host(TENNA.intro[2]); }, 3300);
-    /* No options exist yet: focus rests on the overlay itself. */
-    if (wrap.focus) { wrap.setAttribute('tabindex', '-1'); wrap.focus(); }
     later(ask, 4700);
   }
 
@@ -531,6 +592,8 @@
     if (NEU.kernel && NEU.kernel.current() === 'quiz') NEU.kernel.pop();
     run++;
     ended = false; leaving = false; state = 'idle';
+    introOn = false;
+    if (cv) cv.hidden = true;
     stopTimers();
     stopPhase();
     clearFx();
@@ -1129,6 +1192,7 @@
       return;
     }
     if (e.key === 'Escape') { e.preventDefault(); leave(); return; }
+    if (introOn) { if (INTRO_SKIP[e.key]) { e.preventDefault(); endIntro(); } return; }
     if (phase || i >= deal.length) return;
     if (optionKey(e)) { e.preventDefault(); return; }
     var k = 'abcd'.indexOf(String(e.key).toLowerCase());
