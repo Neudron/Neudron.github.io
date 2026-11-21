@@ -334,7 +334,7 @@
   record('mtest_medium', climbRecording(4, 40), 337);
   record('mtest_hard', climbRecording(8, 40), 430);
 
-  NEU.mountain.prototypes = ['mtest_easy', 'mtest_medium', 'mtest_hard', 'mtest_springs', 'mtest_start', 'mtest_flags'];
+  NEU.mountain.prototypes = ['mtest_easy', 'mtest_medium', 'mtest_hard', 'mtest_springs', 'mtest_start', 'mtest_flags', 'mtest_reference'];
   NEU.mountain.openPrototype = function (difficulty) {
     var id = 'mtest_' + difficulty;
     return NEU.mountain.prototypes.indexOf(id) >= 0 && P.open(id);
@@ -461,6 +461,58 @@
     camera: { focusY: 0.61 } });
   claim('mtest_flags');
   record('mtest_flags', [[280, 'right']], 187);
+
+  /* Advanced room. Original geometry on the 16 px grid, distinct from the
+     story route. Three required aerial commitments with contrasting dashes:
+     up-right over a spike pit, two up-dashes split by an airborne refill, and
+     an up-left reversal under a ceiling. A plain jump tops out at 3.5 tiles on
+     this kernel, so every raised landing is a hard height gate; careless
+     running dies in the floor spikes. Development-only registration, isolated
+     save flags, no story or physics authority. */
+  prototype('mtest_reference', 112, 34, { x: 3, y: 29 }, [
+    { from: 50, to: 66, y: 5, tile: '#' },
+    { from: 36, to: 46, y: 8, tile: '=' },
+    { from: 67, to: 67, y: 8, tile: '#' },
+    { from: 43, to: 55, y: 13, tile: '=' },
+    { from: 56, to: 66, y: 13, tile: '^' },
+    { from: 47, to: 48, y: 14, tile: '#' },
+    { from: 47, to: 48, y: 15, tile: '#' },
+    { from: 47, to: 48, y: 16, tile: '#' },
+    { from: 47, to: 48, y: 17, tile: '#' },
+    { from: 47, to: 48, y: 18, tile: '#' },
+    { from: 47, to: 48, y: 19, tile: '#' },
+    { from: 47, to: 48, y: 20, tile: '#' },
+    { from: 47, to: 48, y: 21, tile: '#' },
+    { from: 47, to: 48, y: 22, tile: '#' },
+    { from: 47, to: 48, y: 23, tile: '#' },
+    { from: 47, to: 48, y: 24, tile: '#' },
+    { from: 29, to: 46, y: 25, tile: '=' },
+    { from: 47, to: 48, y: 25, tile: '#' },
+    { from: 47, to: 48, y: 26, tile: '#' },
+    { from: 47, to: 48, y: 27, tile: '#' },
+    { from: 47, to: 48, y: 28, tile: '#' },
+    { from: 47, to: 48, y: 29, tile: '#' },
+    { from: 0, to: 16, y: 30, tile: '#' },
+    { from: 17, to: 111, y: 30, tile: '^' }
+  ], [
+    { t: 'checkpoint', x: 4, y: 29, id: 'foot', alt: 1000 },
+    { t: 'spring', x: 42, y: 24 },
+    { t: 'refill', x: 42, y: 18 },
+    { t: 'checkpoint', x: 50, y: 12, id: 'summit', alt: 1800 },
+    { t: 'coin', x: 46, y: 12, id: 'mtn_coin:mtest_reference' },
+    { t: 'refill', x: 44, y: 7 },
+    { t: 'exit', x: 42, y: 7 }
+  ], { stage: 'ridge', altitude: 1000,
+    mechanics: ['up-right dash', 'spring', 'airborne refill', 'up-dash chain', 'left reversal'],
+    reference: 'Original room; abstract constraints from Strawberry Jam Advanced corpus (scripted input + encoded entities only)',
+    camera: { focusY: 0.55 } });
+  claim('mtest_reference');
+  /* Real-controller replay: 356 frames, 0 deaths, exit touched. Mid checkpoint
+     earned at x=50; the airborne refill at x=42,y=18 is consumed before the
+     second up-dash. Timing windows are multi-frame, never single-frame. */
+  record('mtest_reference', [[80, 'right'], [16, 'right jump'], [6, 'right'], [9, 'up right dash'],
+    [19, 'right'], [70, 'right'], [2, 'right jump'], [9, 'up dash'], [8, 'up'], [9, 'up dash'],
+    [40, ''], [40, 'right'], [16, 'jump'], [4, ''], [9, 'up left dash'], [60, 'left']], 356);
 
   /* Heaven is gold and cloud. Evil is crimson and ash. Four screens each. */
   var EX = 160, INK = '#12081E';
