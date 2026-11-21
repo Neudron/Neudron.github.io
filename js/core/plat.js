@@ -33,8 +33,12 @@
       maxFall: C.maxFall, dashTime: 0, dashCd: 0, refillCd: 0, dashAttack: 0, dashX: 0, dashY: 0, duck: false,
       wallSlide: C.slideTime, slideDir: 0, wallBoost: 0, boostDir: 0, forceX: 0, forceDir: 0, climbNoMove: 0, lastClimb: 0,
       swing: 0, pogo: false, squash: 0, stretch: 0, walked: 0, hp: 0, inv: 0, hopWait: 0,
-      meleeHold: 0, charging: false, chargeK: 0, swingPow: 1, swingDown: false, hitStop: 0, hurtFlash: 0 };
+      meleeHold: 0, charging: false, chargeK: 0, swingPow: 1, swingDown: false, hitStop: 0, hurtFlash: 0, tech: {} };
   }
+  /* per-life tech counters (super, hyper, wallbounce, ...): read by room tests through P.hero().tech */
+  function tk(k) { player.tech[k] = (player.tech[k] || 0) + 1; }
+  /* room tests ban a tech to prove a room needs it: a banned super/hyper is a plain jump, a banned wallbounce a plain wall jump */
+  var banned = {};
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function sign(v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
   function approach(v, target, delta) { return v < target ? Math.min(target, v + delta) : Math.max(target, v - delta); }
@@ -173,7 +177,7 @@
     for (tx = tx0; tx <= tx1; tx++) if (cell(tx, ty) === '^' || cell(tx, Math.floor(player.y / TILE)) === '^') { bounce(); return true; }
     return false;
   }
-  function bounce() { player.vy = C.pogo; player.varJump = 0; player.pogo = true; player.st = 0; refill(); player.swing = 0; }
+  function bounce() { tk('pogo'); player.vy = C.pogo; player.varJump = 0; player.pogo = true; player.st = 0; refill(); player.swing = 0; }
   function touchEntities(input, melee) {
     var i, e, ex, ey, dx, dy, kind;
     for (i = 0; i < current.entities.length; i++) {
@@ -190,18 +194,20 @@
     player.stretch = 0.12; player.st = 0;
   }
   function wallJump(dir, mx) {
-    jump(0); if (mx) { player.forceDir = dir; player.forceX = C.wallForce; }
+    tk('walljump'); jump(0); if (mx) { player.forceDir = dir; player.forceX = C.wallForce; }
     player.vx = C.wallH * dir; player.face = dir;
   }
   function climbJump(mx) {
     if (!player.onGround) player.stamina -= C.climbJump;
-    jump(mx); if (!mx) { player.boostDir = -player.face; player.wallBoost = C.boostTime; }
+    tk('climbjump'); jump(mx); if (!mx) { player.boostDir = -player.face; player.wallBoost = C.boostTime; }
   }
   function superWallJump(dir) {
-    jump(0); player.vx = C.superWallH * dir; player.vy = C.superWallV; player.varJump = C.superWallVar; player.varSpeed = player.vy; player.face = dir;
+    if (banned.wallbounce) { wallJump(dir, 0); return; }
+    tk('wallbounce'); jump(0); player.vx = C.superWallH * dir; player.vy = C.superWallV; player.varJump = C.superWallVar; player.varSpeed = player.vy; player.face = dir;
   }
   function superJump() {
-    jump(0); player.vx = C.superH * player.face;
+    if (banned[player.duck ? 'hyper' : 'super']) { player.duck = false; jump(0); return; }
+    tk(player.duck ? 'hyper' : 'super'); jump(0); player.vx = C.superH * player.face;
     if (player.duck) { player.vx *= C.duckX; player.vy *= C.duckY; player.varSpeed = player.vy; }
     player.duck = false;
   }
@@ -222,7 +228,7 @@
   function startDash(mx, my) {
     var dx = mx, dy = my, len, sx;
     if (!dx && !dy) dx = player.face;
-    player.dashBuf = 0; player.dashes--; player.dashCd = C.dashCd; player.refillCd = C.refillCd; player.dashAttack = C.dashAttack;
+    tk('dash'); player.dashBuf = 0; player.dashes--; player.dashCd = C.dashCd; player.refillCd = C.refillCd; player.dashAttack = C.dashAttack;
     player.inv = Math.max(player.inv, C.dashI); /* dash i-frames: 250 ms, the 150 ms dash plus a 100 ms tail */
     len = Math.sqrt(dx * dx + dy * dy); player.dashX = dx / len; player.dashY = dy / len;
     sx = player.dashX * C.dash;
@@ -348,7 +354,7 @@
     var x0 = Math.floor((player.x + player.vx * STEP - HW) / TILE), x1 = Math.floor((player.x + player.vx * STEP + HW) / TILE);
     var y0 = Math.floor((player.y + player.vy * STEP - HH) / TILE), y1 = Math.floor((player.y + player.vy * STEP - 1) / TILE), tx, ty, broke = false;
     for (ty = y0; ty <= y1; ty++) for (tx = x0; tx <= x1; tx++)
-      if (cell(tx, ty) === 'x') { if (!current.broken) current.broken = {}; current.broken[tx + ',' + ty] = true; broke = true; dropChunk(tx, ty); }
+      if (cell(tx, ty) === 'x') { if (!current.broken) current.broken = {}; current.broken[tx + ',' + ty] = true; broke = true; tk('break'); dropChunk(tx, ty); }
     if (broke && !current.chunked) { delete bakeCache[current.id]; bake(); }
   }
   function step(dt, raw) {
@@ -1064,13 +1070,13 @@
       for (j = 0; j < pair[0]; j++) { state = step(STEP, pair[1]); frames++; if (state.dead && !wasDead) deaths++; wasDead = state.dead; if (current.exited) break; }
       if (current.exited) break;
     }
-    var reached = !!current.exited, end = getState();
+    var reached = !!current.exited, end = getState(), tech = player.tech;
     replaying = false;
     live = oldLive; current = oldLevel; player = oldPlayer; paused = oldPaused;
     accumulator = oldAccumulator; simClock = oldClock; afterimages = oldImages; baked = oldBaked; levelSlide = oldSlide;
     if (oldStack && NEU.kernel) { NEU.kernel.stack.length = 0; for (i = 0; i < oldStack.length; i++) NEU.kernel.stack.push(oldStack[i]); }
     NEU.activeMinigame = oldMini;
-    if (overlay) overlay.hidden = !live; return { reached: reached, deaths: deaths, frames: frames, end: end };
+    if (overlay) overlay.hidden = !live; return { reached: reached, deaths: deaths, frames: frames, end: end, tech: tech };
   }
   function getStateSafe() { return live ? getState() : null; }
   function routed(e) {
@@ -1101,13 +1107,13 @@
   window.addEventListener('keyup', onKey);
   function feetOn(e) { return player.onGround && Math.abs(player.y - e.y * TILE) < 0.5 && player.x + HW > e.x * TILE && player.x - HW < e.x * TILE + TILE; }
   function climbing(e) { return player.st === 1 && Math.floor((player.x + player.face * (HW + 1)) / TILE) === Math.floor(e.x) && player.y - HH < e.y * TILE + TILE && player.y > e.y * TILE; }
-  kinds.refill = { touch: function (e) { if (!(e.t0 > 0)) { refill(); e.t0 = 2.5; } }, tick: function (e, dt) { if (e.t0 > 0) { e.t0 -= dt; if (e.t0 <= 0) e.t0 = 0; } } };
+  kinds.refill = { touch: function (e) { if (!(e.t0 > 0)) { tk('refill'); refill(); e.t0 = 2.5; } }, tick: function (e, dt) { if (e.t0 > 0) { e.t0 -= dt; if (e.t0 <= 0) e.t0 = 0; } } };
   kinds.spring = { touch: function (e) {
     if (player.vy >= 0 && player.y >= (e.y + 1) * TILE - 12 && Math.abs(player.x - (e.x + 0.5) * TILE) < HW + 8) {
-      player.vy = C.spring; player.varJump = C.springVar; player.varSpeed = player.vy; player.st = 0; player.dashAttack = 0; refill(); e.flash = 0.25;
+      tk('spring'); player.vy = C.spring; player.varJump = C.springVar; player.varSpeed = player.vy; player.st = 0; player.dashAttack = 0; refill(); e.flash = 0.25;
     } }, tick: function (e, dt) { if (e.flash > 0) e.flash = Math.max(0, e.flash - dt); } };
   /* a zip block carries whoever stands on it */
-  kinds.zip = { touch: function (e) { if (!e.go) { e.go = true; e.returning = false; e.wait = 0.2; e.sx = e.x; e.sy = e.y; } }, tick: function (e, dt) {
+  kinds.zip = { touch: function (e) { if (!e.go) { tk('zip'); e.go = true; e.returning = false; e.wait = 0.2; e.sx = e.x; e.sy = e.y; } }, tick: function (e, dt) {
     var tx, ty, ox = e.x, oy = e.y, ride = feetOn(e);
     if (!e.go) return;
     if (e.wait > 0) { e.wait -= dt; return; }
@@ -1150,7 +1156,7 @@
   kinds.crumble = { tick: function (e, dt) {
     var on;
     if (e.bounce > 0) e.bounce = Math.max(0, e.bounce - dt);
-    if (!e.cs) { on = feetOn(e); if (on || climbing(e)) { e.cs = 1; e.ct = on ? 0.6 : 1; e.top = on; } return; }
+    if (!e.cs) { on = feetOn(e); if (on || climbing(e)) { tk('crumble'); e.cs = 1; e.ct = on ? 0.6 : 1; e.top = on; } return; }
     if (e.cs === 1) {
       e.ct -= dt;
       if (e.ct <= 0 || (e.top && e.ct < 0.4 && !feetOn(e))) { e.cs = 2; e.ct = 2; e.dead = true; }
@@ -1216,6 +1222,7 @@
     chunkCount: function () { return chunkOrder.length; }, replaying: function () { return replaying; },
     snap: function () { if (current) placeCamera(-1); }, fallOf: fallOf, dropChunks: function () { chunks = {}; chunkOrder = []; }, ent: function (t, c, x, y, e, now) { if (ENT[t]) ENT[t](c, x, y, e, now || 0); },
     levelId: function () { return current ? current.id : ''; },
+    ban: function (set) { banned = set || {}; },
     get levels() { return levels; }, _kinds: kinds,
     cam: function () { return { x: camera.x, y: camera.y }; },
     /* the render alpha camera, hero and (dgn-foes) bodies share: prev step to this step */

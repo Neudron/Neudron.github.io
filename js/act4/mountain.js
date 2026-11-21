@@ -1,32 +1,11 @@
-/* mountain.js — eight original screens on the plat kernel (W5.4).
-   PLAY-1 M1 movement envelope, measured on this kernel (tests/fixes9957.mjs): tiles, TILE=16, 60 Hz.
-   metric   measured  SAFE    HARD
-   jumpH      3.5625   2.494   3.384
-   runD       8.1146   5.680   7.709
-   dashD      4.5000   3.150   4.275
-   jdashD     9.6056   6.724   9.125
-   wallH      3.5625   2.494   3.384
-   climbH    15.0000  10.500  14.250
-   springH    2.2396   1.568   2.128
-   SAFE = 0.7 x measured maximum. HARD = 0.95 x measured maximum. Required-path gaps use SAFE or less; HARD only on an optional refill ledge. */
+/* mountain.js — the Ascent: 26 original rooms on the plat kernel, five lobbies from a
+   small tutorial to Grandmaster, plus the research prototypes and the two descents. */
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
   var P = NEU.plat;
   if (!P || !P.level) return;
-  var W = 128, H = 18, SHIFT = 80, LEADS = [426, 427, 426, 426, 426, 427, 427, 427], currentId = '';
-
-  /* recordings re-cut for the Celeste core (B1): edge-triggered jump/dash, so a held key is one press */
-  var REC = {
-    m0: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, 'dash right']],
-    m1: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
-    m2: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right']],
-    m3: [[4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
-    m4: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [4, 'right']],
-    m5: [[4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right']],
-    m6: [[4, 'dash up right'], [12, 'right']],
-    m7: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'right down melee'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right']]
-  };
+  var W = 128, H = 18, currentId = '';
 
   function blank(w, h) {
     var rows = [], y, x, s, width = w || W, height = h || H;
@@ -65,7 +44,7 @@
   function makeExit(n) {
     return function () {
       if (NEU.save && NEU.save.flag) NEU.save.flag('mtn_' + n, 1);
-      if (n >= 7) { summit(); return; }
+      if (n >= ROOMS.length - 1) { summit(); return; }
       puff();
       if (P.slideOpen) P.slideOpen('m' + (n + 1));   /* D4: 400 ms snapshot slide between m levels */
       else P.open('m' + (n + 1));
@@ -78,7 +57,7 @@
       if (NEU.save && NEU.save.flag) NEU.save.flag('mtn_cp:' + id + ':' + e.id, 1);
     };
   }
-  function add(id, rows, spawn, ents, n, rec, chapter, baseAlt) {
+  function add(id, rows, spawn, ents, n, rec, chapter, baseAlt, wind) {
     var def = P.level(id, {
       tiles: rows.join('\n'),
       spawn: spawn,
@@ -87,55 +66,13 @@
       openBottom: true,   /* M2: pits are bottomless, so a mechanic over a pit is a real gate */
       chapter: chapter || 'pine',
       altitude: baseAlt || 1000,
+      wind: wind,
       onCheckpoint: cpHook(id),
       onExit: makeExit(n)
     });
-    def.recording = rec || REC[id];
+    def.recording = rec;
     NEU.mountain.recordings[id] = def.recording;
     return def;
-  }
-
-  /* Three-screen Pine course: two original teaching screens before the
-     authored obstacle strip. The old route starts at x=SHIFT with the hero
-     stopped at the same tile, so every committed recording still applies. */
-  function ascent(n, oldRows, oldEnts, oldSpawn) {
-    var prefix = blank(SHIFT), rows = [], floor = oldSpawn.y + 1, i, e, spawn;
-    var base = 1000 + n * 180, oldRec = REC['m' + n];
-    fill(prefix, 0, SHIFT - 1, floor, '#');
-    /* screen 1 — teach: a safe ledge, a dash crystal and a spring you can ignore */
-    fill(prefix, 12, 20, floor - 4, '=');
-    fill(prefix, 22, 32, floor - 5, '=');
-    /* screen 2 — test: a crumble bridge with a static shelf on either side */
-    fill(prefix, 34, 42, floor - 5, '=');
-    fill(prefix, 46, 54, floor - 5, '=');
-    /* screen 3 — twist: a tuft marks the climb to the optional berry */
-    fill(prefix, 56, 62, floor - 7, '=');
-    fill(prefix, 64, 72, floor - 4, '=');
-    for (i = 0; i < 5; i++) fill(prefix, 6 + (i % 2) * 8, 44, floor - 2 - i * 2, '=');
-    fill(prefix, 50, 66, floor - 9, '=');
-    put(prefix, 58, floor - 1, '`');
-    put(prefix, 10, floor - 1, 'l');
-    put(prefix, 40, floor - 1, 'f');
-    for (i = 0; i < oldRows.length; i++) rows.push(prefix[i] + oldRows[i]);
-    var ents = [
-      cp(4, floor - 1, 'foot', base + 40),
-      cp(44, floor - 1, 'ridge', base + 160),
-      cp(76, floor - 1, 'lip', base + 280),
-      { t: 'refill', x: 16, y: floor - 5 },
-      { t: 'spring', x: 26, y: floor - 6 },
-      { t: 'crumble', x: 36, y: floor - 6 },
-      { t: 'crumble', x: 37, y: floor - 6 },
-      { t: 'crumble', x: 38, y: floor - 6 },
-      { t: 'coin', x: 59, y: floor - 8, id: 'mtn_coin:m' + n }
-    ];
-    for (i = 0; i < oldEnts.length; i++) {
-      e = oldEnts[i];
-      ents.push({ t: e.t, x: e.x + SHIFT, y: e.y, id: e.id, targetX: e.targetX, targetY: e.targetY });
-    }
-    spawn = { x: oldSpawn.x, y: oldSpawn.y };
-    var rec = [[LEADS[n], 'right'], [8, '']].concat(oldRec);
-    REC['m' + n] = rec;
-    add('m' + n, rows, spawn, ents, n, rec, 'pine', base);
   }
 
   NEU.mountain = {
@@ -148,84 +85,238 @@
     here: function () { return NEU.mountain.active && P.levelId ? P.levelId() : currentId; }
   };
 
-  function build(n) {
-    var rows = blank(48), ents, spawn;
-    if (n === 0) {
-      fill(rows, 0, 8, 12, '#');
-      fill(rows, 9, 12, 13, '^');
-      fill(rows, 9, 12, 14, '#');
-      fill(rows, 13, 26, 12, '#');
-      fill(rows, 27, 30, 13, '^');
-      fill(rows, 27, 30, 14, '#');
-      fill(rows, 31, 47, 12, '#');
-      spawn = { x: 2, y: 11 };
-      ents = [{ t: 'refill', x: 18, y: 11 }, { t: 'exit', x: 42, y: 11 }];
-    } else if (n === 1) {
-      fill(rows, 0, 15, 14, '#');
-      fill(rows, 16, 18, 15, '^');
-      fill(rows, 16, 18, 16, '#');
-      fill(rows, 17, 42, 12, '#');
-      spawn = { x: 3, y: 13 };
-      ents = [{ t: 'spring', x: 15, y: 13 }, { t: 'exit', x: 36, y: 11 }];
-    } else if (n === 2) {
-      fill(rows, 0, 24, 14, '#');
-      fill(rows, 25, 28, 15, '^');
-      fill(rows, 25, 28, 16, '#');
-      fill(rows, 29, 47, 14, '#');
-      fill(rows, 16, 16, 9, 'v');
-      spawn = { x: 2, y: 13 };
-      ents = [{ t: 'zip', x: 16, y: 13, targetX: 16, targetY: 8 }, { t: 'exit', x: 42, y: 13 }];
-    } else if (n === 3) {
-      fill(rows, 0, 10, 14, '#');
-      fill(rows, 14, 30, 14, '#');
-      fill(rows, 11, 13, 15, '^');
-      fill(rows, 11, 13, 16, '#');
-      spawn = { x: 2, y: 13 };
-      ents = [
-        { t: 'crumble', x: 11, y: 14 }, { t: 'crumble', x: 12, y: 14 }, { t: 'crumble', x: 13, y: 14 },
-        { t: 'exit', x: 26, y: 13 }
-      ];
-    } else if (n === 4) {
-      fill(rows, 0, 47, 14, '#');
-      fill(rows, 18, 18, 12, 'x');
-      fill(rows, 18, 18, 13, 'x');
-      spawn = { x: 2, y: 13 };
-      ents = [{ t: 'exit', x: 40, y: 13 }];
-    } else if (n === 5) {
-      fill(rows, 0, 10, 14, '#');
-      fill(rows, 11, 14, 15, '^');
-      fill(rows, 11, 30, 13, '#');
-      spawn = { x: 4, y: 13 };
-      ents = [{ t: 'pogo', x: 8, y: 13 }, { t: 'exit', x: 24, y: 12 }];
-    } else if (n === 6) {
-      fill(rows, 0, 10, 16, '#');
-      fill(rows, 11, 20, 16, '^');
-      fill(rows, 0, 20, 17, '#');
-      fill(rows, 2, 14, 11, '=');
-      spawn = { x: 6, y: 15 };
-      ents = [{ t: 'refill', x: 8, y: 10 }, { t: 'exit', x: 12, y: 10 }];
-    } else {
-      fill(rows, 0, 15, 14, '#');
-      fill(rows, 16, 18, 15, '^');
-      fill(rows, 16, 18, 16, '#');
-      fill(rows, 17, 26, 12, '#');
-      fill(rows, 27, 30, 13, '^');
-      fill(rows, 27, 30, 14, '#');
-      fill(rows, 31, 46, 12, '#');
-      spawn = { x: 3, y: 13 };
-      ents = [{ t: 'spring', x: 15, y: 13 }, { t: 'exit', x: 42, y: 11 }];
-    }
-    /* one lit lantern per screen: the focal point the eye finds first, standing on the floor it lights */
-    put(rows, LANTERN[n][0], LANTERN[n][1], "l");
-    /* and one trail banner on the same floor, well away from the lantern: the second prop the eye finds */
-    put(rows, BANNER[n][0], BANNER[n][1], "f");
-    ascent(n, rows, ents, spawn);
-  }
+  /* ═══ THE ASCENT ═══════════════════════════════════════════════════
+     26 rooms in five lobbies, Beginner to Grandmaster (owner brief 2026-11-21,
+     modelled on the Strawberry Jam Collab lobby ladder). m0 is a small tutorial;
+     every technique is taught in a safe room before a later room tests it.
+     A room is data, edited only between its ROOM / END markers:
+       rows  top to bottom. '#' rock, '=' jump-through, '^' 'v' spikes, 'x' dash-breakable,
+             '`' tuft, 'l' lantern, 'f' banner. Rooms are openBottom: a column with
+             no floor is a bottomless pit.
+       tier  tutorial | teach | test | gauntlet | reference (difficulty bands in tests/fixes9990.mjs)
+       teach techniques this room introduces; mech: techniques/entities its route must use
+       rec   the intended deathless route; ref: difficulty reference (tier and mechanic
+             vocabulary only, every layout is original).
+     Measured envelope on this kernel (tiles): jump tap 1.5 up / 4 across, held jump
+     3.6 / 7.6, jump+dash 11.2 across, super 16.5 across, hyper 17.2 across 1.6 up,
+     dash up 5.6, held jump + dash up 9.1, wallbounce 3.6-6.6 (8.3 from the air),
+     climb ~19.9 on full stamina. */
+  var ROOMS = [];
+  function flat(w) { var rows = blank(w), x; for (x = 0; x < w; x++) { put(rows, x, 15, '#'); put(rows, x, 16, '#'); put(rows, x, 17, '#'); } return rows; }
+  /* ROOM m0 */
+  ROOMS.push({ id: 'm0', chapter: 'pine', tier: 'tutorial', teach: ['jump','climb','dash'], mech: ['dash'],
+    ref: '',
+    /* tutorial: a held jump onto the step, a climb up the wall, a jump + dash over the gap. Nothing here kills; a missed dash drops to the catch floor and the wall climbs back up. */
+    spawn: { x: 2, y: 14 },
+    rows: [
+      '................................................',
+      '................................................',
+      '................................................',
+      '................................................',
+      '................................................',
+      '.........................................f......',
+      '........................######.........#########',
+      '........................######.........#########',
+      '........................######..................',
+      '........................######..................',
+      '........................######..................',
+      '........................######..................',
+      '........................######..................',
+      '............######......######..................',
+      '.....l......######..`...######..................',
+      '##############################..................',
+      '##############################..................',
+      '################################################'
+    ],
+    ents: [
+      {t: 'checkpoint',x: 3,y: 14,id: 'start'},
+      {t: 'checkpoint',x: 27,y: 5,id: 'wall'},
+      {t: 'exit',x: 45,y: 5}
+    ],
+    rec: [[36,'right'],[16,'jump right'],[40,'right'],[220,'grab up right'],[20,'right'],[14,'jump right'],[3,'dash right'],[50,'right']] });
+  /* END m0 */
+  /* ROOM m1 */
+  ROOMS.push({ id: 'm1', chapter: 'pine', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m1 */
+  /* ROOM m2 */
+  ROOMS.push({ id: 'm2', chapter: 'pine', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m2 */
+  /* ROOM m3 */
+  ROOMS.push({ id: 'm3', chapter: 'pine', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m3 */
+  /* ROOM m4 */
+  ROOMS.push({ id: 'm4', chapter: 'pine', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m4 */
+  /* ROOM m5 */
+  ROOMS.push({ id: 'm5', chapter: 'pine', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m5 */
+  /* ROOM m6 */
+  ROOMS.push({ id: 'm6', chapter: 'ridge', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m6 */
+  /* ROOM m7 */
+  ROOMS.push({ id: 'm7', chapter: 'ridge', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m7 */
+  /* ROOM m8 */
+  ROOMS.push({ id: 'm8', chapter: 'ridge', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m8 */
+  /* ROOM m9 */
+  ROOMS.push({ id: 'm9', chapter: 'ridge', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m9 */
+  /* ROOM m10 */
+  ROOMS.push({ id: 'm10', chapter: 'ridge', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m10 */
+  /* ROOM m11 */
+  ROOMS.push({ id: 'm11', chapter: 'crag', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m11 */
+  /* ROOM m12 */
+  ROOMS.push({ id: 'm12', chapter: 'crag', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m12 */
+  /* ROOM m13 */
+  ROOMS.push({ id: 'm13', chapter: 'crag', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m13 */
+  /* ROOM m14 */
+  ROOMS.push({ id: 'm14', chapter: 'crag', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m14 */
+  /* ROOM m15 */
+  ROOMS.push({ id: 'm15', chapter: 'crag', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m15 */
+  /* ROOM m16 */
+  ROOMS.push({ id: 'm16', chapter: 'storm', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m16 */
+  /* ROOM m17 */
+  ROOMS.push({ id: 'm17', chapter: 'storm', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m17 */
+  /* ROOM m18 */
+  ROOMS.push({ id: 'm18', chapter: 'storm', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m18 */
+  /* ROOM m19 */
+  ROOMS.push({ id: 'm19', chapter: 'storm', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m19 */
+  /* ROOM m20 */
+  ROOMS.push({ id: 'm20', chapter: 'storm', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m20 */
+  /* ROOM m21 */
+  ROOMS.push({ id: 'm21', chapter: 'summit', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m21 */
+  /* ROOM m22 */
+  ROOMS.push({ id: 'm22', chapter: 'summit', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m22 */
+  /* ROOM m23 */
+  ROOMS.push({ id: 'm23', chapter: 'summit', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m23 */
+  /* ROOM m24 */
+  ROOMS.push({ id: 'm24', chapter: 'summit', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m24 */
+  /* ROOM m25 */
+  ROOMS.push({ id: 'm25', chapter: 'summit', tier: 'todo', teach: [], mech: [], ref: '',
+    spawn: { x: 2, y: 14 },
+    rows: flat(32),
+    ents: [{ t: 'checkpoint', x: 3, y: 14, id: 'start' }, { t: 'exit', x: 28, y: 14 }],
+    rec: [[200, 'right']] });
+  /* END m25 */
 
-  var LANTERN = [[22, 11], [8, 13], [20, 13], [24, 13], [24, 13], [20, 12], [6, 10], [22, 11]];
-  var BANNER = [[5, 11], [28, 11], [33, 13], [5, 13], [9, 13], [28, 12], [13, 10], [33, 11]];
   var n;
-  for (n = 0; n <= 7; n++) build(n);
+  for (n = 0; n < ROOMS.length; n++) {
+    ROOMS[n].def = add(ROOMS[n].id, ROOMS[n].rows, ROOMS[n].spawn, ROOMS[n].ents, n, ROOMS[n].rec, ROOMS[n].chapter, 1000 + n * 150, ROOMS[n].wind);
+    ROOMS[n].def.tier = ROOMS[n].tier; ROOMS[n].def.teach = ROOMS[n].teach; ROOMS[n].def.mech = ROOMS[n].mech; ROOMS[n].def.ref = ROOMS[n].ref;
+  }
+  NEU.mountain.rooms = ROOMS;
 
   /*
    * Research-gated precision-platforming PROTOTYPES. Deliberately separate
@@ -794,6 +885,10 @@
      owns playback, so no second audio authority is created here. */
   var SECTIONS = {
     pine: { id: 'mtn_pine', name: 'PINE STEPS', bpm: 88, root: 50, sky: '#B8CCD6', ink: '#E6EEF2' },
+    ridge: { id: 'mtn_ridge', name: 'WIND RIDGE', bpm: 96, root: 52, sky: '#C8D8E0', ink: '#F0F6FA' },
+    crag: { id: 'mtn_crag', name: 'IRON CRAG', bpm: 110, root: 47, sky: '#A8B4C4', ink: '#E8ECF4' },
+    storm: { id: 'mtn_storm', name: 'STORM WALL', bpm: 124, root: 45, sky: '#8C9AB0', ink: '#DCE4F0' },
+    summit: { id: 'mtn_summit_theme', name: 'GRAND SUMMIT', bpm: 132, root: 50, sky: '#E8EEF8', ink: '#FFFFFF' },
     sun: { id: 'mtn_sun', name: 'SUNLIT SHELF', bpm: 102, root: 57, sky: '#F8E7A8', ink: '#FFF6DE' },
     ember: { id: 'mtn_ember', name: 'EMBER PASS', bpm: 138, root: 45, sky: '#3A1018', ink: '#FFD070' }
   };
@@ -809,6 +904,7 @@
     }
   }
   function chapterOf(id) {
+    if (P.levels[id] && /^m\d+$/.test(id)) return P.levels[id].chapter || 'pine';
     if (/^m(\d|test_)/.test(id)) return 'pine';
     return id && id.charAt(0) === 'h' ? 'sun' : 'ember';
   }
@@ -821,9 +917,11 @@
     return { got: got, total: n };
   }
   function mapDots(c, x, y, L, s) {
-    var ids = L.chapter === 'pine' ? ['m0', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'] : ['h0', 'h1', 'h2', 'h3', 'v0', 'v1', 'v2', 'v3'], i, on;
+    var asc = /^m\d+$/.test(L.id), ids = [], i, on;
+    if (asc) { for (i = 0; i < ROOMS.length; i++) if (ROOMS[i].chapter === L.chapter) ids.push(ROOMS[i].id); }
+    else ids = ['h0', 'h1', 'h2', 'h3', 'v0', 'v1', 'v2', 'v3'];
     for (i = 0; i < ids.length; i++) {
-      if (L.chapter !== 'pine' && ids[i].charAt(0) !== L.id.charAt(0)) continue;
+      if (!asc && ids[i].charAt(0) !== L.id.charAt(0)) continue;
       on = NEU.save && NEU.save.flagged && NEU.save.flagged('mtn_' + ids[i]);
       c.fillStyle = 'rgba(255,255,255,0.22)'; c.fillRect(x + i * 12 - 1, y - 1, 10, 10);
       c.fillStyle = on ? s.ink : 'rgba(255,255,255,0.45)';
@@ -850,7 +948,7 @@
 
   var origOpen = P.open, origReplay = P.replay;
   P.open = function (id, opts) {
-    var ascent = !!P.levels[id] && (/^m[0-7]$/.test(id) || /^mtest_(easy|medium|hard|springs|start|flags)$/.test(id));
+    var ascent = !!P.levels[id] && (/^m\d+$/.test(id) || /^mtest_(easy|medium|hard|springs|start|flags)$/.test(id));
     var drop = !!P.levels[id] && /^[hv][0-3]$/.test(id);
     var ok;
     NEU.mountain.mood = drop ? (id.charAt(0) === 'v' ? 'evil' : 'heaven') : '';
