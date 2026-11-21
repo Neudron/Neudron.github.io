@@ -25,7 +25,7 @@
     m4: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [4, 'right']],
     m5: [[4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right']],
     m6: [[4, 'dash up right'], [12, 'right']],
-    m7: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'right down melee'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right']]
+    m7: [[12, 'right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [6, 'right'], [4, 'dash right'], [8, 'right'], [120, 'right']]
   };
 
   function blank(w, h) {
@@ -205,15 +205,10 @@
       spawn = { x: 6, y: 15 };
       ents = [{ t: 'refill', x: 8, y: 10 }, { t: 'exit', x: 12, y: 10 }];
     } else {
-      fill(rows, 0, 15, 14, '#');
-      fill(rows, 16, 18, 15, '^');
-      fill(rows, 16, 18, 16, '#');
-      fill(rows, 17, 26, 12, '#');
-      fill(rows, 27, 30, 13, '^');
-      fill(rows, 27, 30, 14, '#');
-      fill(rows, 31, 46, 12, '#');
+      fill(rows, 0, 9, 14, '#');
+      fill(rows, 24, 47, 14, '#');
       spawn = { x: 3, y: 13 };
-      ents = [{ t: 'spring', x: 15, y: 13 }, { t: 'exit', x: 42, y: 11 }];
+      ents = [{ t: 'spring', x: 14, y: 11 }, { t: 'spring', x: 21, y: 11 }, { t: 'exit', x: 42, y: 13 }];
     }
     /* one lit lantern per screen: the focal point the eye finds first, standing on the floor it lights */
     put(rows, LANTERN[n][0], LANTERN[n][1], "l");
@@ -222,8 +217,8 @@
     ascent(n, rows, ents, spawn);
   }
 
-  var LANTERN = [[22, 11], [8, 13], [20, 13], [24, 13], [24, 13], [20, 12], [6, 10], [22, 11]];
-  var BANNER = [[5, 11], [28, 11], [33, 13], [5, 13], [9, 13], [28, 12], [13, 10], [33, 11]];
+  var LANTERN = [[22, 11], [8, 13], [20, 13], [24, 13], [24, 13], [20, 12], [6, 10], [28, 13]];
+  var BANNER = [[5, 11], [28, 11], [33, 13], [5, 13], [9, 13], [28, 12], [13, 10], [36, 13]];
   var n;
   for (n = 0; n <= 7; n++) build(n);
 
