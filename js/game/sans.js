@@ -31,7 +31,6 @@
 
   var sans   = document.getElementById('sans');
   var btn    = document.getElementById('sansBtn');
-  var secret = document.getElementById('sansSecret');
   var pop    = document.getElementById('sansPop');
   var sword  = document.getElementById('sword');
   var tbox   = document.getElementById('tbox');
@@ -1062,6 +1061,7 @@
     if (asleep) { maybeSwitch(); tvState(); return; }
     clearTimeout(hideT);
     sans.hidden = false;
+    if (NEU.stars && NEU.stars.layoutSecret) NEU.stars.layoutSecret();
     requestAnimationFrame(function () { sans.classList.add('is-in'); });
     if (state === 'away') state = 'here';
     if (NEU.quest) NEU.quest.mark('sans');
@@ -1084,9 +1084,7 @@
   }
 
   /* ── click sans ─────────────────────────────────────────────────*/
-  /* The star no longer sits beside him. It is one star of the sky: stars.js
-     picks it and calls this when a click lands on it. Same reward as before. */
-  if (secret) secret.hidden = true;
+  /* stars.js places the hidden sky star by his sleeve and calls this on click. */
   if (NEU.stars) NEU.stars.onSecret = function () {
     if (NEU.save && NEU.save.flagged && NEU.save.flagged('act1:star')) {
       say(['the tiny star is still there. it does not need anything.']);
@@ -1943,7 +1941,7 @@
       "that's toby. he isn't mine. he isn't anyone's, really.",
       "he says thanks. he also says you're doing this the hard way.",
       "type 69420 while you're dodging. clears the whole run.",
-      "flip the cosmolight off and back on if you want another go.",
+      "flip the cosmolight off and back on if you need the room lit again.",
       "door stays open, by the way. corner of your eye, bottom left."
     ]);
   }
@@ -1962,7 +1960,8 @@
       if (dogOut) {
         dogOut = false;
         dogEl.classList.remove('is-in');
-        setTimeout(function () { dogEl.hidden = true; }, 520);
+        dogEl.classList.add('is-leave');
+        setTimeout(function () { dogEl.hidden = true; dogEl.classList.remove('is-leave'); }, 520);
       }
     }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   }
@@ -2266,7 +2265,7 @@
        has nothing left to do. A scroll now would move a settled page. */
     cancelLater();
     asleep = true; wantSleep = false;
-    if (dogEl)   { dogEl.classList.remove('is-in'); setTimeout(function () { dogEl.hidden = true; }, 520); }
+    if (dogEl)   { dogEl.classList.remove('is-in'); dogEl.classList.add('is-leave'); setTimeout(function () { dogEl.hidden = true; dogEl.classList.remove('is-leave'); }, 520); }
     /* The dog is leaving the page with him, so the flag has to follow
        the DOM — otherwise a slept-through visit keeps telling
        grantDogFood and summonDog that the dog is still out, and the

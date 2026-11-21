@@ -645,14 +645,6 @@ html.is-lite .glass { display: none; }
 }
 .sans__btn:hover img { transform: translateY(-4px); }
 .sans__btn:focus-visible { outline: 2px solid var(--edge); outline-offset: 5px; }
-.sans__secret {
-  position: absolute; left: -28px; top: 2px; width: 40px; height: 40px;
-  padding: 0; color: var(--accent); background: transparent; border: 0;
-  font: 20px/1 var(--font-quest); cursor: pointer;
-}
-.sans__secret:hover { color: var(--edge); }
-.sans__secret:focus-visible { outline: 2px solid var(--edge); outline-offset: 1px; }
-
 /* the totem, popping over his head — same keyframes as the cat, just
    scaled by --pk. small, as asked. */
 .pop {
@@ -1043,7 +1035,7 @@ body.is-playing { overflow: hidden; }
 /* ── asleep ───────────────────────────────────────────────────────*/
 .sleep {
   position: absolute;
-  right: clamp(72px, 11vw, 150px);
+  right: calc(clamp(12px, 2vw, 30px) + 120px);
   bottom: clamp(20px, 5vh, 60px);
   z-index: 40;
   width: 250px; height: 140px;
