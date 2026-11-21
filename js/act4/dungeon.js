@@ -521,7 +521,14 @@
         depth = NEU.save && NEU.save.flag ? NEU.save.flag('dgn_depth') : undefined;
         if (depth === undefined || depth === null || z.n > depth) flag('dgn_depth', z.n);
         if (z.n === 3 || z.n === 6 || z.n === 9) flag('dgn_lift_' + z.n, 1);
-        if (z.n === 10) { NEU.dungeon.bossOpen = false; NEU.dungeon.bossLine = ''; }
+        if (z.n === 10) {
+          NEU.dungeon.bossOpen = false; NEU.dungeon.bossLine = '';
+          /* BUG-0032b: the descent pays once at the bottom, through the one coin authority. */
+          if (!P.replaying() && NEU.save && NEU.save.addCoins && NEU.save.flagged && !NEU.save.flagged('dgn_descent_paid')) {
+            NEU.save.addCoins(25);
+            flag('dgn_descent_paid', 1);
+          }
+        }
         if (z.n === 5) NEU.dungeon.mageSign = '';
       }
     }
