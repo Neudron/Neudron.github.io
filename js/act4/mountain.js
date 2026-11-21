@@ -20,7 +20,7 @@
   var REC = {
     m0: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, 'dash right']],
     m1: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [4, ''], [4, 'jump right'], [4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
-    m2: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right']],
+    m2: [[97, 'right'], [232, ''], [60, 'right']],
     m3: [[4, 'dash right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [12, 'right']],
     m4: [[4, 'dash right'], [4, 'right'], [4, 'jump right'], [8, 'right'], [4, 'jump right'], [4, 'right'], [4, 'dash right'], [12, 'right'], [4, 'dash right'], [4, 'right'], [4, 'jump right'], [16, 'right'], [4, 'dash right'], [4, 'right']],
     m5: [[4, 'dash right'], [4, 'jump right'], [12, 'right'], [4, 'dash right'], [8, 'right'], [4, 'dash right'], [4, 'right']],
@@ -168,13 +168,13 @@
       spawn = { x: 3, y: 13 };
       ents = [{ t: 'spring', x: 15, y: 13 }, { t: 'exit', x: 36, y: 11 }];
     } else if (n === 2) {
-      fill(rows, 0, 24, 14, '#');
-      fill(rows, 25, 28, 15, '^');
-      fill(rows, 25, 28, 16, '#');
-      fill(rows, 29, 47, 14, '#');
-      fill(rows, 16, 16, 9, 'v');
+      fill(rows, 0, 19, 14, '#');
+      fill(rows, 20, 31, 15, '^');
+      fill(rows, 20, 31, 16, '#');
+      fill(rows, 32, 47, 14, '#');
       spawn = { x: 2, y: 13 };
-      ents = [{ t: 'zip', x: 16, y: 13, targetX: 16, targetY: 8 }, { t: 'exit', x: 42, y: 13 }];
+      /* ascent() does not shift targetX, so the zip target is written in absolute tiles */
+      ents = [{ t: 'zip', x: 20, y: 14, targetX: SHIFT + 31, targetY: 14 }, { t: 'exit', x: 42, y: 13 }];
     } else if (n === 3) {
       fill(rows, 0, 10, 14, '#');
       fill(rows, 14, 30, 14, '#');
@@ -222,7 +222,7 @@
     ascent(n, rows, ents, spawn);
   }
 
-  var LANTERN = [[22, 11], [8, 13], [20, 13], [24, 13], [24, 13], [20, 12], [6, 10], [22, 11]];
+  var LANTERN = [[22, 11], [8, 13], [6, 13], [24, 13], [24, 13], [20, 12], [6, 10], [22, 11]];
   var BANNER = [[5, 11], [28, 11], [33, 13], [5, 13], [9, 13], [28, 12], [13, 10], [33, 11]];
   var n;
   for (n = 0; n <= 7; n++) build(n);
