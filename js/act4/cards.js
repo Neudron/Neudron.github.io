@@ -14,7 +14,10 @@
   var SPEC = [['ATTACK', 6], ['HEAL', 4], ['DEFEND', 3], ['PARRY', 3]];
   /* PLAN 9.4: no shuffle. Both orders are written data, guarded by the
      solver in fixes522 (a reacting line wins, all-in ATTACK loses) and
-     fixes587 (never-ATTACK also loses). */
+     fixes587 (never-ATTACK also loses). Cards are drawn with pop(), so the
+     opening four are this deck's tail: DEFEND, ATTACK, HEAL, DEFEND. That
+     lets a reacting player brace the telegraphed first attack without
+     handing the race to a player who never swings (fixes587). */
   var PLAYER_DECK = ['ATTACK', 'PARRY', 'ATTACK', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'ATTACK',
     'HEAL', 'ATTACK', 'HEAL', 'PARRY', 'DEFEND', 'HEAL', 'ATTACK', 'DEFEND'];
   var MAGE_DECK = ['ATTACK', 'ATTACK', 'HEAL', 'PARRY', 'HEAL', 'HEAL', 'DEFEND', 'ATTACK',
@@ -62,19 +65,34 @@
       sel: 0, over: false, result: null, awarded: false,
       clock: 0, flies: [], slide: null, grain: [], grainAt: -1000,
       disp: { you: 15, mage: 15 }, fx: [], intent: null,
-      legacy: false,
+      pops: [], flash: null, legacy: false,
       exiting: false, exitT: 0, returned: false, endT: 0
     };
   }
 
   function hurt(p, dmg) {
-    var use;
+    var use, before = p.hp;
     if (p.block > 0) {
       use = p.block > dmg ? dmg : p.block;
       p.block -= use;
       dmg -= use;
     }
     p.hp -= dmg;
+    return before - p.hp;
+  }
+
+  /* Feedback only: a rising number over the struck/Healed plate and a short
+     plaque flash. Reduced motion drops both — juice owns the shake. */
+  function fxHit(target, amount, heal) {
+    var calm;
+    if (reduced() || !(amount > 0)) return;
+    state.pops.push({ x: target === 'you' ? 544 : 48, y: 50,
+      text: (heal ? '+' : '-') + amount, t: 0, dur: 650, heal: !!heal });
+    if (state.pops.length > 6) state.pops.shift();
+    if (heal) return;
+    calm = (NEU.motion && NEU.motion.calmFlash && NEU.motion.calmFlash()) ||
+      (NEU.juice && NEU.juice.noFlash);
+    if (!calm) state.flash = { x: target === 'you' ? 528 : 32, y: 10, t: 0, dur: 120 };
   }
 
   function drawUp(who) {
@@ -88,12 +106,8 @@
     }
   }
 
-  function attackDamage(who) {
-    return who === 'you' ? Math.min(3 + state.you.streak, 5) : 3;
-  }
-
-  /* Fixed priority over public state: each rule fires only when its card is
-     in hand, then the next rule gets its turn. */
+  /* Fixed priority, pure over public state. Each rule only fires when its
+     card is actually in hand; the next rule then gets its turn. */
   function mageIndex() {
     var h = state.mage.hand, i, through, dmg;
     dmg = attackDamage('mage');
@@ -140,23 +154,30 @@
     }
   }
 
+  function attackDamage(who) {
+    return who === 'you' ? Math.min(3 + state.you.streak, 5) : 3;
+  }
+
   function act(who, idx) {
-    var p, id, enemy, dmg, tier, reflected;
+    var p, id, enemy, dmg, tier, reflected, dealt;
     if (!state || state.over) return false;
     p = state[who];
     if (idx < 0 || idx >= p.hand.length) return false;
     id = p.hand.splice(idx, 1)[0];
     enemy = state[who === 'you' ? 'mage' : 'you'];
     reflected = false;
+    dealt = 0;
     if (id !== 'ATTACK' && enemy.parry) enemy.parry = false;
     if (id === 'ATTACK') {
       dmg = attackDamage(who);
-      if (enemy.parry) { enemy.parry = false; reflected = true; hurt(p, dmg); }
-      else hurt(enemy, dmg);
+      if (enemy.parry) { enemy.parry = false; reflected = true; dealt = hurt(p, dmg); fxHit(who, dealt); }
+      else { dealt = hurt(enemy, dmg); fxHit(who === 'you' ? 'mage' : 'you', dealt); }
       if (who === 'you') state.you.streak = Math.min(state.you.streak + 1, 3);
     } else if (id === 'HEAL') {
+      var before = p.hp;
       p.hp = p.hp + 3;
       if (p.hp > 15) p.hp = 15;
+      fxHit(who, p.hp - before, true);
       if (who === 'you') state.you.streak = 0;
     } else if (id === 'DEFEND') {
       p.block = 3;
@@ -168,8 +189,9 @@
     }
     state.discard.push(id);
     if (who === 'you' && !reduced()) state.slide = { id: id, t: 0, dur: 280 };
-    /* small for quiet cards, medium for a normal ATTACK, large only for a
-       killing blow or a parry that actually turns a blow back. */
+    /* Juice tiers: small for the quiet cards, medium for a normal ATTACK,
+       and large ONLY for the two beats that end or turn a fight — a parry
+       that lands (the blow is reflected) or a killing blow (a plate hits 0). */
     tier = 'small';
     if (id === 'ATTACK') {
       tier = 'medium';
@@ -338,6 +360,14 @@
     if (state.slide) {
       state.slide.t += dt;
       if (state.slide.t >= state.slide.dur) state.slide = null;
+    }
+    for (i = state.pops.length - 1; i >= 0; i--) {
+      state.pops[i].t += dt;
+      if (state.pops[i].t >= state.pops[i].dur) state.pops.splice(i, 1);
+    }
+    if (state.flash) {
+      state.flash.t += dt;
+      if (state.flash.t >= state.flash.dur) state.flash = null;
     }
     for (i = state.fx.length - 1; i >= 0; i--) {
       state.fx[i].t += dt;
@@ -699,7 +729,17 @@
   }
 
   function drawEnd() {
-    var e = state.endT | 0, i, x, y;
+    var e = reduced() ? 0 : state.endT | 0, i, x, y, win;
+    win = state.result === 'win';
+    /* one readable board on either result; the win keeps its little parade */
+    ctx.globalAlpha = 0.78;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(120, 186, 400, 148);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = win ? '#C8A040' : '#6A3A4A';
+    ctx.fillRect(120, 186, 400, 4);
+    text(win ? 'YOU WIN' : 'THE LAMP GOES OUT', 160, 210, 32, win ? '#FFE080' : '#C8B898');
+    text(win ? 'WIN' : 'LOSE', 288, 258, 32, win ? '#FFE080' : '#D07070');
     if (state.result === 'win') {
       /* hat tips, cards scatter, and the key + spell slide across */
       for (i = 0; i < 4; i++) {
@@ -708,18 +748,13 @@
         drawFace(state.mageDeck.length ? state.mageDeck[i % state.mageDeck.length] : 'ATTACK', x, y, false);
       }
       x = Math.min(320, 120 + e);
-      ctx.fillStyle = '#C8A040'; ctx.fillRect(x, 250, 22, 8);
-      ctx.fillStyle = '#B892FF'; ctx.fillRect(x + 28, 250, 14, 8);
-      text('YOU WIN', 250, 210, 32, '#FFE080');
-    } else if (state.result === 'lose') {
-      ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.85, e / 700) + ')';
-      ctx.fillRect(0, 0, 640, 480);
-      text('THE LAMP GOES OUT', 180, 220, 32, '#C8B898');
+      ctx.fillStyle = '#C8A040'; ctx.fillRect(x, 300, 22, 8);
+      ctx.fillStyle = '#B892FF'; ctx.fillRect(x + 28, 300, 14, 8);
     }
   }
 
   function draw() {
-    var w, h, sway, cx, i, n, pos, f, t, x, y, shook, a, sel, k;
+    var w, h, sway, cx, i, n, pos, f, t, x, y, shook, a, sel, k, pp, ft;
     if (!ctx || !state) return;
     w = canvas.width || 640;
     h = canvas.height || 480;
@@ -822,6 +857,22 @@
       ctx.fillStyle = '#C8C0B4';
       for (i = 0; i < state.grain.length; i++) ctx.fillRect(state.grain[i].x, state.grain[i].y, 1, 1);
     }
+    if (!reduced()) {
+      if (state.flash) {
+        ft = state.flash.t / state.flash.dur;
+        ctx.globalAlpha = (1 - ft > 0 ? 1 - ft : 0) * 0.6;
+        ctx.fillStyle = '#FFE8E8';
+        ctx.fillRect(state.flash.x - 6, state.flash.y - 6, 108, 78);
+        ctx.globalAlpha = 1;
+      }
+      for (i = 0; i < state.pops.length; i++) {
+        pp = state.pops[i];
+        ft = pp.t / pp.dur;
+        ctx.globalAlpha = 1 - ft > 0 ? 1 - ft : 0;
+        text(pp.text, pp.x, pp.y - 30 - Math.round(ft * 26), 16, pp.heal ? '#4AB880' : '#FF6B6B');
+        ctx.globalAlpha = 1;
+      }
+    }
     if (NEU.juice && NEU.juice.end) NEU.juice.end(ctx, shook);
     if (NEU.juice && NEU.juice.overlay) NEU.juice.overlay(ctx, w, h);
     if (NEU.juice && NEU.juice.drawParts) NEU.juice.drawParts(ctx, 0.016);
@@ -853,10 +904,12 @@
     /* Tab is not a duel action. Swallow it so quest.js cannot open the
        objectives panel over a live hand of cards. */
     if (e.key === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (losePending) return;
     r = (NEU.keys && NEU.keys.route) ? NEU.keys.route(e.key, {}) : { to: e.key, swallow: false };
     if (r.swallow) return;
     k = r.to;
     if (k === 'Escape') {
+      if (losePending) return;
       close();
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -873,26 +926,34 @@
     if (k === 'z' || k === 'Z') {
       e.preventDefault();
       e.stopImmediatePropagation();
+      if (losePending) return;
       if (state.over) { close(); return; }
       play(state.sel);
     }
   }
 
+  /* Tap selects; a second tap on the same card plays it. Mouse and touch
+     share the click path; the canvas may be letterboxed by object-fit. */
   function onClick(e) {
-    var r, x, y, i, px;
+    var r, s, ox, oy, x, y, i, px;
     if (!active || !state) return;
     if (NEU.kernel && NEU.kernel.current && NEU.kernel.current() !== 'cards') return;
+    if (losePending) return;
     if (state.over) { close(); e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (!canvas || !canvas.getBoundingClientRect) return;
     r = canvas.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    x = (e.clientX - r.left) * (canvas.width / r.width);
-    y = (e.clientY - r.top) * (canvas.height / r.height);
+    s = Math.min(r.width / canvas.width, r.height / canvas.height);
+    ox = (r.width - canvas.width * s) / 2;
+    oy = (r.height - canvas.height * s) / 2;
+    x = (e.clientX - r.left - ox) / s;
+    y = (e.clientY - r.top - oy) / s;
     if (y < 344 || y > 464) return;
     for (i = 0; i < state.you.hand.length; i++) {
       px = 196 + i * 86;
       if (x >= px && x <= px + CW) {
         if (state.sel !== i) { state.sel = i; draw(); }
+        else play(i);
         e.preventDefault();
         e.stopImmediatePropagation();
         return;
@@ -912,8 +973,11 @@
     RULES: RULES,
     rule: function (id) { return RULES[id]; },
     decks: function () { return { you: PLAYER_DECK.slice(), mage: MAGE_DECK.slice() }; },
+    RULES: RULES,
+    rule: function (id) { return RULES[id] || ''; },
     intent: function () { return state ? state.intent : null; },
     mageIndex: function () { return mageIndex(); },
+    think: function () { beginTurn(); return state ? state.intent : null; },
     shelf: function () {
       if (!state) return [];
       return [state.deck[state.deck.length - 1], state.deck[state.deck.length - 2]]
