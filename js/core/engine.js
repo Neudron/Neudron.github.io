@@ -89,7 +89,6 @@
   var playerAct = null;                // { name, t, max } — a held player pose (the recall drink)
   var sitting = null;                  // { ent, x, y } — seated on a seat entity until a move key
   var cine = false;                    // a scripted walk owns the stick (api.drive)
-  var paceV = 0, paceA = 0;            // api.pace: the scripted walk's top speed and acceleration (0 = the usual)
   var ents = [];                       // live copy of room.entities
   var images = {};
   var layers = {};                     // baked static layer per room id
@@ -1045,9 +1044,8 @@
 
     if (ix || iy) {
       var len = Math.sqrt(ix * ix + iy * iy);
-      var top = cine && paceV ? paceV : SPEED, acc = cine && paceA ? paceA : ACCEL;   /* a scripted walk may set its own pace */
-      vx = approach(vx, ix / len * top, acc * dt);
-      vy = approach(vy, iy / len * top, acc * dt);
+      vx = approach(vx, ix / len * SPEED, ACCEL * dt);
+      vy = approach(vy, iy / len * SPEED, ACCEL * dt);
       face = Math.abs(ix) > Math.abs(iy) ? (ix > 0 ? 'right' : 'left') : (iy > 0 ? 'down' : 'up');
       if (!ix) vx = approach(vx, 0, FRICTION * dt);
       if (!iy) vy = approach(vy, 0, FRICTION * dt);
@@ -1610,10 +1608,7 @@
       return true;
     },
     /* Scripted input for cinematics: real keys die, drive() walks. */
-    cine: function (on) { cine = !!on; keys = {}; if (!on) paceV = paceA = 0; },
-    pace: function (v, a) { paceV = Number(v) || 0; paceA = Number(a) || 0; },
-    /* a stumble: the same squash a stop gives, held a little longer */
-    stumble: function () { settle = 0.12; },
+    cine: function (on) { cine = !!on; keys = {}; },
     drive: function (ix, iy) {
       if (!cine) return;
       keys.left = ix < 0; keys.right = ix > 0; keys.up = iy < 0; keys.down = iy > 0;

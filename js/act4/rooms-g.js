@@ -432,91 +432,35 @@
   }
   function talkOpen() { return !!(NEU.tboxOpen && NEU.tboxOpen()); }
 
-  /* The walk is planned, not hand-waypointed: a 4-neighbour BFS over the room grid, solid tiles and
-     solid props blocking. Goals: the cell above the bulkhead hatch in h2, the water inlet in h1. */
-  var WATER = { x: 15, y: 9, w: 3, h: 1 };
-  var GOALS = {
-    h2_machine: function (x, y) { return x === 15 && y === 17; },
-    h1_storm: function (x, y) { return x >= WATER.x && x < WATER.x + WATER.w && y === WATER.y; }
-  };
-  function plan(c, sx, sy) {
-    var r = c.room, g = r.grid, goal = GOALS[r.id], ts = NEU.engine.tilesets()[r.tileset], solidCh = ts ? ts.solid : '#';
-    if (!g || !goal) return null;
-    var es = c.ents(), prev = {}, q = [[sx, sy]], i, k, d, cur, nx, ny, path;
-    function solid(x, y) {
-      var row = g[y], j;
-      if (!row || x < 0 || x >= row.length || solidCh.indexOf(row.charAt(x)) >= 0) return true;
-      for (j = 0; j < es.length; j++) if (!es[j].dead && es[j].solid && es[j].x === x && es[j].y === y) return true;
-      return false;
-    }
-    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    prev[sx + ',' + sy] = true;
-    for (i = 0; i < q.length; i++) {
-      cur = q[i];
-      if (goal(cur[0], cur[1])) {
-        path = [];
-        for (k = cur[0] + ',' + cur[1]; prev[k] !== true; k = prev[k].k) path.unshift(prev[k].c);
-        return path;
-      }
-      for (d = 0; d < 4; d++) {
-        nx = cur[0] + D[d][0]; ny = cur[1] + D[d][1]; k = nx + ',' + ny;
-        if (prev[k] || solid(nx, ny)) continue;
-        prev[k] = { k: cur[0] + ',' + cur[1], c: [nx, ny] }; q.push([nx, ny]);
-      }
-    }
-    return null;
-  }
-  NEU.tripWalk = { plan: plan };
+  /* h1 waypoints: under the hatch column, then east into the inlet */
+  var H1_WP = [[168, 72], [168, 160], [232, 160], [264, 160]];
   /* shared by the walk and a player wading in themselves: the flag,
      not the cutscene, is the truth (a reload lands here too) */
   function cineOn(c, phase) {
     if (CINE) return;
-    CINE = { c: c, phase: phase, room: null, lx: -1, ly: -1, moved: 0, replans: 0, until: 0, t0: 0 };
+    CINE = { c: c, phase: phase, wp: 0, n: 0 };
     document.body.classList.add('is-trip');
     letterbox(true);
     if (c.cine) c.cine(true);
-    if (c.pace) c.pace(60, 150);   /* 60 px/s, up from rest in 0.4 s */
     if (talkOpen()) NEU.talk.close();
   }
-  /* One decision per frame (requestAnimationFrame, so it stays in step with the engine).
-     Each room plans its own cell path once and walks it axis by axis; two stumbles on the
-     way; stuck for 1.5 s re-plans once, then hands control back (never a teleport). */
   function cineTick() {
     if (!CINE || CINE.phase !== 'walk') return;
-    var c = CINE.c, room = NEU.engine.room, p = c.player, t, dx, dy, now = performance.now();
-    if (!CINE.t0) CINE.t0 = now;
-    if (now - CINE.t0 > 24000) { cineRelease(); return; }            /* watchdog */
-    if (room !== CINE.room) { CINE.room = room; CINE.path = null; CINE.i = 0; CINE.moved = now; CINE.replans = 0; CINE.until = 0; }
-    if (room !== 'h2_machine' && room !== 'h1_storm') {
+    var c = CINE.c, room = NEU.engine.room, p = c.player;
+    if (++CINE.n > 300) { cineRelease(); return; }                 /* watchdog */
+    if (room === 'h2_machine') {
+      c.drive((p.x - 248) / 8 | 0, CINE.n & 1);   /* tap: exits arm off-touch */
+    } else if (room === 'h1_storm') {
+      var w = H1_WP[CINE.wp];
+      if (!w) { c.drive(0, 0); water(c); return; }
+      var dx = w[0] - p.x, dy = w[1] - p.y;
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) { CINE.wp++; cineTick(); return; }
+      c.drive(dx / 10 | 0, dy / 10 | 0);
+    } else {
       c.drive(0, 0);
       if (NEU.save && NEU.save.flagged('water_portal')) return;   /* water() owns the tail */
-      requestAnimationFrame(cineTick); return;
     }
-    if (now < CINE.until) { c.drive(0, 0); requestAnimationFrame(cineTick); return; }
-    if (!CINE.path) {
-      CINE.path = plan(c, Math.floor(p.x / 16), Math.floor((p.y - 1) / 16)) || [];
-      CINE.i = 0; CINE.beats = [Math.floor(CINE.path.length / 3), Math.floor(CINE.path.length * 2 / 3)];
-    }
-    t = CINE.path[CINE.i];
-    if (!t) {
-      c.drive(0, room === 'h2_machine' ? 1 : 0);                    /* h2: on into the hatch; h1: the water */
-      if (room === 'h1_storm') { water(c); return; }
-    } else {
-      dx = t[0] * 16 + 8 - p.x; dy = t[1] * 16 + 12 - p.y;
-      if (Math.abs(dx) <= 2 && Math.abs(dy) <= 2) {
-        CINE.i++;
-        if (CINE.i === CINE.beats[0] || CINE.i === CINE.beats[1]) { CINE.until = now + 120; if (c.stumble) c.stumble(); }  /* "they are not fine" */
-      } else if (Math.abs(dx) > Math.abs(dy)) c.drive(dx > 0 ? 1 : -1, 0);
-      else c.drive(0, dy > 0 ? 1 : -1);
-    }
-    if (Math.abs(p.x - CINE.lx) + Math.abs(p.y - CINE.ly) >= 0.2 || now < CINE.until) CINE.moved = now;
-    CINE.lx = p.x; CINE.ly = p.y;
-    if (now - CINE.moved > 1500) {
-      CINE.moved = now;
-      if (CINE.replans++ < 1) CINE.path = null;
-      else { cineRelease(); return; }
-    }
-    requestAnimationFrame(cineTick);
+    setTimeout(cineTick, 80);
   }
   /* Control comes back only once the pot room has landed and settled. */
   function cineRelease() {
@@ -554,11 +498,7 @@
     if (NEU.sfx && NEU.sfx.snap) NEU.sfx.snap();
     setTimeout(function () {
       WSEQ.phase = 'splash';
-      if (NEU.juice && NEU.juice.hit) NEU.juice.hit('large', { colour: '#9FE0FF' });
-      if (NEU.juice && NEU.juice.burst) {
-        var dbg = NEU.engine.debug, q = c.player;
-        NEU.juice.burst(Math.round((q.x - dbg.cam.x) * NEU.engine.SCALE), Math.round((q.y - dbg.cam.y) * NEU.engine.SCALE), 12, '#9FE0FF', 90);
-      }
+      if (NEU.juice && NEU.juice.burst) NEU.juice.burst(320, 336, 12, '#9FE0FF', 90);
       WSEQ.phase = 'rings';
       setTimeout(function () {
         WSEQ.phase = 'sink';
