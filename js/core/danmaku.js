@@ -463,10 +463,6 @@
     glow(ctx, x, y, r, '#FFFFFF', F.flashT / 0.1);
   }
 
-  function bar(ctx, x, y, w, h, r, track, fill) {
-    ctx.fillStyle = track; ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = fill; ctx.fillRect(x, y, Math.round(w * Math.max(0, Math.min(1, r))), h);
-  }
   /* K1 thin frame (2px rim, black inside) from the stage kit; a test
      page without stage.js just skips it */
   function fr(ctx, x, y, w, h, rim) {
@@ -486,11 +482,12 @@
            pmax, phase, tp?, rage?, rageOn?, frame? } */
   /* TP, Deltarune's meter: a vertical framed gauge left of the arena,
      ten cells filling bottom-up, gold at MAX. tp is 0..1. */
-  function tpMeter(ctx, tp, AX, AY, AH) {
+  function tpMeter(ctx, tp, AX, AY, AH, bot) {
     var f = Math.max(0, Math.min(1, tp)), max = f >= 1, slim = AX < 92;
     var w = slim ? 12 : 24, h = Math.min(320, AH) | 0;
     var x = slim ? Math.max(6, (AX - 18) | 0) : Math.max(40, (AX - 52) | 0);
-    var y = (AY + ((AH - h) >> 1)) | 0;
+    /* bottom on the strip's bottom: gauge + strip read as one L */
+    var y = (bot - h) | 0;
     fr(ctx, x, y, w, h, '#FFFFFF');
     fr(ctx, x + 2, y + 2, w - 4, h - 4, '#8C2F4A');
     /* 10 cells, 2px black gaps, inside the 4px rims */
@@ -523,9 +520,30 @@
 
   /* one width for every boss bar: clears the esc button with a gap
      down to 390 px. Takes the viewport width (number) or an object o.w. */
+  var BAR_Y = 50;   /* boss bar top: its plate starts 16px under the screen top */
   function barW(o) {
     var w = typeof o === 'number' ? o : (o && o.w) || 0;
     return Math.min(480, w - 200) | 0;
+  }
+
+  /* 10 cells, 2px gaps, 4px tall; a cell fills left to right */
+  function cells(ctx, x, y, w, r, track, fill) {
+    var cw = ((w - 18) / 10) | 0, n = Math.max(0, Math.min(1, r)) * 10, i, part;
+    for (i = 0; i < 10; i++) {
+      ctx.fillStyle = track; ctx.fillRect(x + i * (cw + 2), y, cw, 4);
+      part = Math.round(cw * Math.max(0, Math.min(1, n - i)));
+      if (part > 0) { ctx.fillStyle = fill; ctx.fillRect(x + i * (cw + 2), y, part, 4); }
+    }
+  }
+  /* the top of the canvas wrapper's DOM key row (.bh__keys), or h - 2
+     when it is not laid out (coarse pointer, other wrappers). Only
+     display counts: scal's talk-time visibility toggle must not make
+     the strip jump. */
+  function keysTop(ctx, h) {
+    var c = ctx.canvas, k = c && (c.__keys !== undefined ? c.__keys :
+      (c.__keys = (c.parentNode && c.parentNode.querySelector('.bh__keys')) || null));
+    if (!k || !k.offsetHeight) return h - 2;
+    return Math.min(h - 2, k.getBoundingClientRect().top | 0);
   }
 
   function hud(ctx, F, o) {
@@ -534,7 +552,7 @@
     var d = Math.max(0, F.clock - F.hudAt); F.hudAt = F.clock;
     if (r > F.chip) F.chip = r;
     else if (F.clock - F.hitAt > 0.4) F.chip = Math.max(r, F.chip - d * 0.6);
-    var bw = barW(o.w), bx = ((o.w - bw) / 2) | 0, by = 36, i;
+    var bw = barW(o.w), bx = ((o.w - bw) / 2) | 0, by = BAR_Y, i;
     /* boss bar: 2px white rim, 2px inner rim (o.frame), 16px well */
     ctx.fillStyle = '#FFFFFF'; ctx.fillRect(bx - 4, by - 4, bw + 8, 24);
     ctx.fillStyle = o.frame || '#B892FF'; ctx.fillRect(bx - 2, by - 2, bw + 4, 20);
@@ -553,17 +571,17 @@
     var still = !!(NEU.settings && NEU.settings.reduced);
     var glx = (o.glitch && !still) ? ((Math.floor(F.clock * 2) & 1) ? 2 : -2) : 0;
     var pct = Math.ceil(r * 100) + '%';
-    var nw = Math.min(bw - 80, Math.ceil((ctx.measureText(o.name).width + 32) / 8) * 8) | 0;
-    var cw = Math.ceil((ctx.measureText(pct).width + 32) / 8) * 8;
-    tab(ctx, bx - 4, by - 4, nw); tab(ctx, bx + bw + 4 - cw, by - 4, cw);
+    /* name and % share one plate: name left, % right, 16px apart */
+    var pw = Math.min(bw + 8, Math.ceil((ctx.measureText(o.name + pct).width + 48) / 8) * 8) | 0;
+    tab(ctx, bx - 4, by - 4, pw);
     ctx.fillStyle = '#EDE7DE';
-    ctx.textAlign = 'left'; ctx.fillText(o.name, bx + 12 + glx, by - 26);
-    ctx.textAlign = 'right'; ctx.fillText(pct, bx + bw - 12, by - 26);
+    ctx.textAlign = 'left'; ctx.fillText(o.name, bx + 12 + glx, by - 26, pw - 48 - ctx.measureText(pct).width);
+    ctx.textAlign = 'right'; ctx.fillText(pct, bx - 4 + pw - 16, by - 26);
 
     /* the party strip: one band, the arena's width, under the arena */
     var AW = o.AW || (o.AX !== undefined ? o.w - 2 * o.AX : Math.min(760, o.w - 48));
     AW = Math.max(240, Math.min(o.w - 16, AW)) | 0;
-    var sx = ((o.w - AW) / 2) | 0, sy = Math.min(o.AY + o.AH + 8, o.h - 56 - 8) | 0;
+    var sx = ((o.w - AW) / 2) | 0, sy = Math.min(o.AY + o.AH + 8, keysTop(ctx, o.h) - 6 - 56) | 0;
     var yw = Math.min(256, AW - 120) | 0;
     fr(ctx, sx, sy, AW, 56, '#FFFFFF');
     ctx.fillStyle = COL_SOUL; ctx.fillRect(sx, sy, AW, 4);
@@ -577,7 +595,7 @@
     var rgOn = o.rageOn !== undefined ? o.rageOn : F.rageT > 0;
     var dk = F.dashCd > 0 ? 1 - F.dashCd / (F.dashCdMax || DASH_CD) : 1;
     var ar = F.adrenT > 0 ? F.adrenT / ADREN_ON : F.adren;
-    var lx = sx + yw + 8, bx2 = lx + 56, bw2 = sx + AW - 10 - bx2;
+    var lx = sx + yw + 8, bx2 = lx + 56, bw2 = Math.min(128, sx + AW - 10 - bx2);
     var SUB = [
       ['RAGE', COL_RAGE, rgOn ? 1 : rg, '#3A0E0E', rgOn ? '#FFC46A' : COL_RAGE],
       ['DASH', dk >= 1 ? '#B8E6FF' : '#6A6480', dk, '#1A2230', dk >= 1 ? '#B8E6FF' : '#5A7A90'],
@@ -587,9 +605,9 @@
     for (i = 0; i < 3; i++) {
       var ry = sy + 6 + i * 16;
       ctx.fillStyle = SUB[i][1]; ctx.fillText(SUB[i][0], lx, ry);
-      bar(ctx, bx2, ry + 6, bw2, 4, SUB[i][2] || 0, SUB[i][3], SUB[i][4]);
+      cells(ctx, bx2, ry + 6, bw2, SUB[i][2] || 0, SUB[i][3], SUB[i][4]);
     }
-    if (o.tp !== undefined) tpMeter(ctx, o.tp, o.AX, o.AY, o.AH);
+    if (o.tp !== undefined) tpMeter(ctx, o.tp, o.AX, o.AY, o.AH, sy + 56);
     /* the screen-reader line: HP and phase, written only on a change */
     var s = 'HP ' + Math.max(0, o.php) + '/' + o.pmax + ', ' + o.name + ' phase ' + o.phase;
     if (s !== F.live) {
@@ -604,7 +622,7 @@
     fight: fight, move: move, dash: dash, tap: tap, key: key, keyName: keyName,
     tick: tick, hurt: hurt, mul: mul, slow: slow, pop: pop, bossHit: bossHit,
     adrenaline: adrenaline, rage: rage, soulMode: soulMode,
-    glow: glow, drawFX: drawFX, drawFlash: drawFlash, hud: hud, barW: barW,
+    glow: glow, drawFX: drawFX, drawFlash: drawFlash, hud: hud, barW: barW, BAR_Y: BAR_Y,
     DASH_CD: DASH_CD, ADREN_ON: ADREN_ON,
     TAP: 0,      /* double-tap window, s; 0 = off: X is the only dash */
     soul: {

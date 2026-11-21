@@ -1213,13 +1213,14 @@ body.is-blackout::before {
   background: #000;
   transform-origin: 50% 50%;
 }
+.quiz__tv { padding-bottom: 56px; }
 @media (pointer: coarse) { .quiz__tv { padding-bottom: 200px; } }
 
 /* Deltarune's 640x480 split: a 2:1 stage over the dialog box, laid out in
    percentages of the 640x320 picture (x / 6.4, y / 3.2). */
 .quiz__stage {
   position: relative; z-index: 1;
-  width: min(100vw, calc((100vh - 260px) * 1.7778));
+  width: min(100vw, calc((100vh - 340px) * 1.7778));
   background: #000;
 }
 .quiz__main { display: contents; }
@@ -1301,8 +1302,8 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
   image-rendering: pixelated;
 }
 @media (min-width: 700px) {
-  .quiz__box { padding: 24px 24px 24px 184px; min-height: 160px; }
-  .quiz__face { left: 24px; top: 24px; width: 144px; height: 112px; }
+  .quiz__box { padding: 16px 24px 16px 176px; min-height: 160px; }
+  .quiz__face { left: 8px; top: 32px; width: 144px; height: 112px; clip-path: inset(0 8px); }
 }
 .quiz__host {
   display: grid; grid-template-columns: 24px 1fr;
@@ -1337,8 +1338,7 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 /* a big screen gets Deltarune's own scale: 2x text, 2x soul */
 @media (min-width: 1100px) and (min-height: 760px) {
   .quiz__stage { width: min(100vw, calc((100vh - 400px) * 1.8)); }
-  .quiz__host, .quiz__q, .quiz__o { font-size: 32px; }
-  .quiz__host { grid-template-columns: 48px 1fr; }
+  .quiz__q, .quiz__o { font-size: 32px; }
   .quiz__o { padding-left: 48px; }
   .quiz__o.is-sel::before, .quiz__o:hover::before, .quiz__o.is-right::before { width: 32px; height: 32px; margin-top: -16px; }
 }
@@ -1388,7 +1388,7 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 /* two spotlights, only while the finale is on. Real elements that
    quiz.js un-hides, so the hidden attribute (which every engine
    honours) is what keeps them off the rest of the show. Two flat
-   steps (K4), hung from the backdrop's inner lamps at 15% / 85%. */
+   steps (K4), hung at 24% / 76%, inside the set. */
 .quiz__beam, .quiz__beam::before {
   position: absolute; top: 12%; z-index: 0; width: 40%; height: 80%;
   background: rgba(237, 231, 222, .08);
@@ -1397,10 +1397,10 @@ i[data-s=tvStatic] { background-image: url(../img/act4/deltarune/tvtime/face-sta
 }
 .quiz__beam { animation: quizSweepL 3s steps(6) infinite alternate; }
 .quiz__beam::before { content: ''; top: 0; left: 0; width: 100%; height: 100%; clip-path: polygon(48% 0, 52% 0, 75% 100%, 25% 100%); }
-.quiz__beam--l { left: -5%; }
-.quiz__beam--r { left: 65%; animation-name: quizSweepR; }
-@keyframes quizSweepL { from { transform: rotate(-24deg); } to { transform: rotate(12deg); } }
-@keyframes quizSweepR { from { transform: rotate(24deg); } to { transform: rotate(-12deg); } }
+.quiz__beam--l { left: 4%; }
+.quiz__beam--r { left: 56%; animation-name: quizSweepR; }
+@keyframes quizSweepL { from { transform: rotate(-12deg); } to { transform: none; } }
+@keyframes quizSweepR { from { transform: rotate(12deg); } to { transform: none; } }
 /* confetti, over the picture */
 .quiz__fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; transition: opacity .25s; }
 

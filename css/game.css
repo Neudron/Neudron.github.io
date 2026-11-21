@@ -27,9 +27,10 @@
   border: 2px solid #fff; border-bottom: 0;
   box-shadow: inset 0 4px 0 var(--show-gold);
 }
-/* K3: pleats on a 32px tile + gold-lo hem; valance with scallops + trim */
+/* K3: uneven 64px pleat (16 lo / 24 mid / 8 hi / 16 mid) so a wide
+   gutter reads as cloth, not a barcode; gold-lo hem; valance + trim */
 .stage-curtain {
-  background: #8C2F4A url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='8'%3E%3Crect width='8' height='8' fill='%235A1E2E'/%3E%3Crect x='8' width='8' height='8' fill='%238C2F4A'/%3E%3Crect x='16' width='8' height='8' fill='%23C2405F'/%3E%3Crect x='24' width='8' height='8' fill='%238C2F4A'/%3E%3C/svg%3E") repeat;
+  background: #8C2F4A url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='8'%3E%3Crect width='16' height='8' fill='%235A1E2E'/%3E%3Crect x='40' width='8' height='8' fill='%23C2405F'/%3E%3C/svg%3E") repeat;
   box-shadow: inset 0 -8px 0 var(--show-gold-lo);
   image-rendering: pixelated;
 }
@@ -252,3 +253,22 @@ html.rm .quiz.is-right .quiz__set::before { animation: none; }
 .quiz__top .plate:empty { visibility: hidden; }
 /* a minigame owns the whole picture: no crowd or board over its canvas */
 .quiz.is-mini .quiz__set::before, .quiz.is-mini .quiz__set::after, .quiz.is-mini .quiz__board { display: none; }
+/* jamb: 16px black then 4px gold-lo between the curtains and the set */
+.quiz__stage { box-shadow: -16px 0 0 #000, 16px 0 0 #000, -20px 0 0 var(--show-gold-lo), 20px 0 0 var(--show-gold-lo); }
+/* the host's portrait well, as .tbox__face; the 72x56 head sits on its floor */
+.quiz__box::before {
+  content: ''; position: absolute; left: 16px; top: 16px; width: 72px; height: 72px;
+  background: var(--ink); box-shadow: inset 0 0 0 2px var(--crypt);
+}
+.quiz__face { top: 32px; }
+@media (min-width: 700px) {
+  /* 2x head is 144 wide: centred in the 128 well (style.css), 8px of empty margin cut off each side */
+  .quiz__box::before { width: 128px; height: 128px; }
+  .quiz__host { font-size: 32px; line-height: 1.25; grid-template-columns: 32px 1fr; }
+}
+/* esc on the stage: a square K10 cell, not the site's lilac chip */
+.quiz .bh__quit { border: 2px solid var(--show-gold-lo); border-radius: 0; background: #000; color: #fff; box-shadow: inset 0 0 0 2px #000; }
+.quiz .bh__quit:hover, .quiz .bh__quit:focus-visible { background: var(--show-gold); color: #000; outline: none; }
+/* the finale drops the question rows and the hint strip, so the set
+   takes back the height the tally needs */
+.quiz.is-finale .quiz__stage { width: min(100vw, calc((100vh - 260px) * 1.7778)); }

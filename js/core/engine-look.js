@@ -964,12 +964,12 @@
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(L, T, Rr - L, B - T); ctx.clip('evenodd');
     ctx.drawImage(St.bake('ow' + w + 'x' + h + 's' + s, w, h, function (g) {
-      var m = w >> 1;
-      St.curtain(g, 0, 0, m, h, 'l', s);
-      St.curtain(g, m, 0, w - m, h, 'r', s);
+      var cw = Math.min(w >> 1, 96 * s);   /* panels hug the outer edge; the rest stays void */
+      St.curtain(g, 0, 0, cw, h, 'l', s);
+      St.curtain(g, w - cw, 0, cw, h, 'r', s);
       St.valance(g, 0, 0, w, s);
     }), 0, 0);
-    St.bulbs(ctx, 0, 5 * s, w, now, s);
+    St.bulbs(ctx, 0, 5 * s, w - 80, now, s);   /* stops short of esc */
     /* the crowd stays off phones: the pad owns the foot of the screen */
     var cs = Math.min(s, Math.floor((h - B) / 44));   /* the whole crowd fits the band, or none */
     if (!pad && cs >= 1) St.crowd(ctx, 0, h - 40 * cs, w, now, 7, cs);

@@ -1,4 +1,4 @@
-/* stage.js: canvas stage kit (spec K1-K11). Art px * scale s (required, integer); static when reduced. */
+/* stage.js: canvas stage kit (K1-K11). Art px * integer scale s; static when reduced. */
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
@@ -41,10 +41,10 @@
   }
   /* K3 */
   function curtain(c, x, y, w, h, side, s) {
-    var P = [C.curtainLo, C.blood, C.curtainHi, C.blood], cw = 4 * s, i, a;
-    for (i = 0; i * cw < w; i++) {
-      a = side === 'r' ? x + w - (i + 1) * cw : x + i * cw;
-      R(c, P[i % 4], Math.max(a, x), y, Math.min(a + cw, x + w) - Math.max(a, x), h - 4 * s);
+    var P = [C.curtainLo, C.blood, C.curtainHi, C.blood], W = [8, 12, 4, 8], i = 0, o = 0, a, b, d;
+    for (; o < w; o += d, i++) {
+      d = W[i % 4] * s; a = side === 'r' ? x + w - o - d : x + o; b = Math.max(a, x);
+      R(c, P[i % 4], b, y, Math.min(a + d, x + w) - b, h - 4 * s);
     }
     R(c, C.goldLo, x, y + h - 4 * s, w, 4 * s);
   }
@@ -110,25 +110,25 @@
       R(g, C.curtainLo, 0, H + 4 * s, w, 2 * s);
     }), x, y);
   }
-  /* K7 */
+  /* K7: all rims, then all fills */
   function crowd(c, x, y, w, t, seed, s) {
     var z = calm(), r = rng(seed), fr = z ? 0 : ((t / 500) | 0) % 2,
         base = y + 40 * s - (!z && t >= bobAt && t - bobAt < 250 ? 2 * s : 0),
-        px = x - 8 * s, O = [[-s, 0], [s, 0], [0, -s], [0, s], [0, 0]], j, q, o;
+        px = x - 8 * s, O = [[-s, 0], [s, 0], [0, -s], [0, s], [0, 0]], rs = [], j, q, o;
     while (px < x + w) {
-      var sh = 18 + ((r() * 7) | 0), hd = 10 + ((r() * 5) | 0), top = base - (20 + ((r() * 7) | 0)) * s,
-          arm = r() < 1 / 3, stk = r() < 1 / 5, k = r() < 0.5,
+      var sh = 18 + ((r() * 7) | 0), hd = 10 + ((r() * 5) | 0),
+          top = base - (18 + ((r() * 7) | 0) + ((r() * 5) | 0)) * s,
+          arm = r() < 1 / 3, k = r() < 0.5,
           hx = px + ((sh - hd) >> 1) * s, hy = top - (hd + 2) * s,
-          ax = px + (k ? 1 : sh - 4) * s, ay = hy - 6 * s - ((fr ^ k) ? 2 * s : 0);
-      var rs = [[px + 2 * s, top, (sh - 4) * s, s], [px, top + s, sh * s, base - top],
-        [hx + s, hy, (hd - 2) * s, s], [hx, hy + s, hd * s, (hd - 1) * s],
-        [hx + 2 * s, hy + hd * s, (hd - 4) * s, 2 * s]];
-      if (arm || stk) rs.push([ax, ay + 4 * s, 3 * s, top - ay - 3 * s], [ax - s, ay, 5 * s, 5 * s]);
-      for (j = 0; j < 5; j++) for (q = 0; q < rs.length; q++) {
-        o = rs[q]; R(c, j < 4 ? C.bone : '#000', o[0] + O[j][0], o[1] + O[j][1], o[2], o[3]);
-      }
-      if (stk) { R(c, '#000', ax + s, ay - 6 * s, s, 6 * s); R(c, C.lilac, ax + s, ay - 8 * s, 2 * s, 2 * s); }
-      px += (sh - 4 + r() * 6) * s | 0;
+          ax = k ? px - 2 * s : px + (sh - 2) * s, ay = hy - 6 * s - (fr ^ k ? 2 * s : 0);
+      rs.push([px + s, top, (sh - 2) * s, s], [px, top + s, sh * s, base - top + s],
+        [hx + 2 * s, hy, (hd - 4) * s, s], [hx + s, hy + s, (hd - 2) * s, s],
+        [hx, hy + 2 * s, hd * s, hd * s]);
+      if (arm) rs.push([ax, ay + 4 * s, 3 * s, top - ay - s], [k ? ax - s : ax, ay, 4 * s, 5 * s]);
+      px += (sh - 4 + r() * 4) * s | 0;
+    }
+    for (j = 0; j < 5; j++) for (q = 0; q < rs.length; q++) {
+      o = rs[q]; R(c, j < 4 ? C.bone : '#000', o[0] + O[j][0], o[1] + O[j][1], o[2], o[3]);
     }
   }
   function bob(t) { bobAt = t == null ? Date.now() : t; }
