@@ -192,21 +192,63 @@
       setTimeout(function () { el.style.pointerEvents = 'none'; }, d);
     }, d);
   };
+  /* The stage's own curtain, shared with the rhythm fight's exit. Red cloth
+     drops over the outgoing room and lifts on the incoming stage; the reverse
+     plays on the way out. z 96, below the dialogue box at 96/96 — it never
+     covers a textbox that is still closing. */
+  var stageCurtain = null;
+  function curtainFx() {
+    if (!stageCurtain) {
+      stageCurtain = document.createElement('div');
+      stageCurtain.id = 'stageCurtain';
+      stageCurtain.setAttribute('aria-hidden', 'true');
+      stageCurtain.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:96;pointer-events:none;overflow:hidden;' +
+        'transform:translateY(-100%);transition:transform 500ms linear;' +
+        'background:repeating-linear-gradient(90deg,#5A1024 0 24px,#7A1830 24px 48px);' +
+        'box-shadow:inset 0 -24px 0 #3A0A18;';
+      document.body.appendChild(stageCurtain);
+    }
+    return stageCurtain;
+  }
+  function curtainStill() {
+    return !!(NEU.motion && NEU.motion.reduced ? NEU.motion.reduced() :
+      window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ||
+      !!(NEU.settings && NEU.settings.reduced);
+  }
+  NEU.stageCurtain = {
+    el: curtainFx,
+    still: curtainStill,
+    /* drop the cloth, run mid() behind it, then lift it again */
+    through: function (mid, ms, cb) {
+      var el = curtainFx(), d = curtainStill() ? 0 : (ms || 500);
+      el.style.transitionDuration = d + 'ms';
+      el.style.transform = 'translateY(0)';
+      el.style.pointerEvents = 'auto';
+      setTimeout(function () {
+        mid();
+        el.style.transform = 'translateY(-100%)';
+        setTimeout(function () {
+          el.style.pointerEvents = 'none';
+          if (cb) cb();
+        }, d);
+      }, d);
+    }
+  };
   function toCombat(c, start) {
-    cutFx();
-    var reduced = !!(NEU.motion && NEU.motion.reduced ? NEU.motion.reduced() : window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    curtainFx();
+    var reduced = curtainStill();
     var shut = reduced ? 0 : 500, hold = reduced ? 0 : 450, lift = reduced ? 0 : 600;
     function waitShut() {
       if (NEU.tboxOpen && NEU.tboxOpen()) { setTimeout(waitShut, 120); return; }
-      cutEl.style.transitionDuration = shut + 'ms';
-      cutEl.style.pointerEvents = 'auto';
-      cutEl.style.opacity = '1';
+      stageCurtain.style.transitionDuration = shut + 'ms';
+      stageCurtain.style.pointerEvents = 'auto';
+      stageCurtain.style.transform = 'translateY(0)';
       setTimeout(function () {
         c.leave();
         start();
-        cutEl.style.transitionDuration = lift + 'ms';
-        cutEl.style.opacity = '0';
-        setTimeout(function () { cutEl.style.pointerEvents = 'none'; }, lift);
+        stageCurtain.style.transitionDuration = lift + 'ms';
+        stageCurtain.style.transform = 'translateY(-100%)';
+        setTimeout(function () { stageCurtain.style.pointerEvents = 'none'; }, lift);
       }, shut + hold);
     }
     setTimeout(waitShut, 120);

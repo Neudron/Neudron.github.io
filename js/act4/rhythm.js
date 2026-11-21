@@ -75,6 +75,15 @@
   var MAX_MISS = 5;                  /* five notes in a row missed and the fight is lost */
   var SEC = [0, 26, 52, 78];
   var BREAK_AT = [14, 40, 66, 92];   /* four soul sections, four attack patterns */
+  var WIND_UP = 0.3;                 /* s: the merchant's tell before each throw wave */
+  /* The way back is a downbeat too: the box opens and the arrows return on
+     the next bar line of the section's tempo, never mid-bar. */
+  var RETURN_AT = [];
+  function barOf(s) { return 4 * 60 / BPM[Math.min(s, BPM.length - 1)]; }
+  for (var ri = 0; ri < BREAK_AT.length; ri++) {
+    var rend = BREAK_AT[ri] + DODGE + EASE_OUT;
+    RETURN_AT[ri] = SEC[ri] + Math.ceil((rend - SEC[ri]) / barOf(ri)) * barOf(ri);
+  }
   var PAT_GAP = [0.55, 1.0, 1.4, 1.5];   /* seconds between hazard spawns, per pattern */
   var PAT_NAME = ['COIN VOLLEY', 'LOBS', 'RING', 'THE WALL'];
   var PAT_COL = ['#E04A6B', '#4AC2E0', '#C24AE0', '#FFD34E'];
@@ -105,7 +114,8 @@
             blockLane: -1, blockUntil: 0,
             soulx: 0, souly: 0, hazards: [], pattern: 0, spawnN: 0, paused: false, introT: 0,
             drainFrom: 1, drainTo: 1, drainT: 0,
-            mercHit: 9, glare: false, soulA: 1, brkI: -1 };
+            mercHit: 9, glare: false, soulA: 1, brkI: -1,
+            wind: 0, windN: 0, boxA: 0 };
   var pops = [], splashes = [];
   var raf = 0, soulF = null, hazBreak = -1, lastBrk = 0, loopSrc = null;
   var introOn = false, boomed = false, crowdCache = null;
@@ -135,8 +145,8 @@
       b = BREAK_AT[i];
       if (sp >= b - EASE_IN && sp < b) { u = (sp - (b - EASE_IN)) / EASE_IN; return { i: i, name: 'in', u: u }; }
       if (sp >= b && sp < b + DODGE) return { i: i, name: 'dodge', u: 1 };
-      if (sp >= b + DODGE && sp < b + DODGE + EASE_OUT) {
-        u = (sp - (b + DODGE)) / EASE_OUT; return { i: i, name: 'out', u: u };
+      if (sp >= b + DODGE && sp < RETURN_AT[i]) {
+        u = (sp - (b + DODGE)) / (RETURN_AT[i] - (b + DODGE)); return { i: i, name: 'out', u: u };
       }
     }
     return null;
@@ -165,7 +175,7 @@
     var total = Math.floor(span / bl + 1e-6);
     var rel = BREAK_AT[s] - SEC[s];
     var d0 = (rel - EASE_IN - 0.3) / bl;      /* last beat still hittable before the ease-in */
-    var d1 = (rel + DODGE + EASE_OUT + 0.3) / bl;  /* first beat after the arrows return */
+    var d1 = (RETURN_AT[s] - SEC[s] + 0.3) / bl;  /* first beat after the bar-line return */
     var grid = s === 0 ? 1 : 0.5;
     var gapLim = Math.max(grid, Math.floor((MAX_GAP - 0.5) / bl / grid) * grid);
     var sameLim = Math.ceil(0.3 / bl / grid) * grid;
@@ -210,6 +220,12 @@
         notes.push({ t: t, end: t + (n[2] || 0) * bl, lane: n[1], mine: true, hit: false, done: false });
       }
     }
+    /* The box opens on a downbeat and a chart note lands exactly on it: the
+       dodge-to-chart hand-off is on the bar line, never mid-bar. */
+    for (s = 0; s < SECTIONS; s++) {
+      t = RETURN_AT[s];
+      notes.push({ t: t, end: t, lane: (s + 2) % 4, mine: true, hit: false, done: false });
+    }
     for (i = 0; i < ITEMS.length; i++) {
       notes.push({ t: ITEMS[i][0], end: ITEMS[i][0], lane: ITEMS[i][1], mine: true,
         hit: false, done: false, kind: ITEMS[i][2] });
@@ -231,7 +247,7 @@
     for (var i = 0; i < notes.length; i++) if (notes[i].mine && !notes[i].done) ts.push(notes[i].t);
     ts.sort(function (a, b) { return a - b; });
     var wins = [];
-    for (var j = 0; j < BREAK_AT.length; j++) wins.push([BREAK_AT[j] - EASE_IN, BREAK_AT[j] + DODGE + EASE_OUT]);
+    for (var j = 0; j < BREAK_AT.length; j++) wins.push([BREAK_AT[j] - EASE_IN, RETURN_AT[j]]);
     /* gaps are measured on the player's notes: split each pair at the break
        windows and take the longest free segment, not the window-subtracted
        total (which would merge two gaps into one) */
@@ -255,7 +271,7 @@
     return { maxGap: max, count: ts.length, over: over, limit: MAX_GAP };
   }
   function resetFeel() {
-    S.section = 0; S.mode = 'chart'; S.arrowA = 1;
+    S.section = 0; S.mode = 'chart'; S.arrowA = 1; S.boxA = 0; S.wind = 0; S.windN = 0;
     S.sway = 0; S.swayUntil = 0;
     S.blockLane = -1; S.blockUntil = 0; S.soulx = 0; S.souly = 0; S.hazards = [];
     soulF = null; hazBreak = -1; lastBrk = 0;
@@ -576,9 +592,15 @@
   }
   /* the dodge's spawns: each pattern drops its next wave once its gap has passed */
   function spawnHazards(i, tb, g) {
-    if (hazBreak !== i) { hazBreak = i; S.pattern = i; S.spawnN = 0; S.hazards = []; }
-    while (S.spawnN * PAT_GAP[i] <= tb) {
-      S.hazards = S.hazards.concat(spawnAt(i, S.spawnN, g, soulF));
+    if (hazBreak !== i) { hazBreak = i; S.pattern = i; S.spawnN = 0; S.hazards = []; S.wind = 0; S.windN = 0; }
+    var n = S.spawnN, wt = WIND_UP + n * PAT_GAP[i];
+    if (tb >= wt - WIND_UP && tb < wt) {
+      /* he leans back and raises a hand before every wave — the tell is the
+         same length as the arrows' fold, so the player can read it */
+      S.wind = Math.max(0, Math.min(1, (tb - (wt - WIND_UP)) / WIND_UP));
+    } else if (tb >= wt) {
+      S.wind = 0; S.windN++;
+      S.hazards = S.hazards.concat(spawnAt(i, n, g, soulF));
       S.spawnN++;
     }
   }
@@ -593,17 +615,17 @@
     if (!soulF) soulF = { x: g.cx, y: g.strumY, dashI: 0 };
     if (bp.name === 'dodge') spawnHazards(bp.i, sp - BREAK_AT[bp.i], g);
     if (bp.name === 'in') {
-      S.arrowA = 1 - u;
+      S.arrowA = 1 - u; S.boxA = u;
       soulF.x = g.cx + (cx - g.cx) * u;
       soulF.y = g.strumY + (cy - g.strumY) * u - (still() ? 0 : Math.sin(u * Math.PI) * 34);
       S.soulA = u;
     } else if (bp.name === 'out') {
-      S.arrowA = u; S.hazards = [];
+      S.arrowA = u; S.boxA = 1 - u; S.hazards = [];
       soulF.x = cx + (g.cx - cx) * u;
       soulF.y = cy + (g.strumY - cy) * u;
       S.soulA = 1 - u;
     } else {
-      S.arrowA = 0; S.soulA = 1;
+      S.arrowA = 0; S.boxA = 1; S.soulA = 1;
       var mk = {
         left: !!keys[LANES[0]], down: !!keys[LANES[1]],
         up: !!keys[LANES[2]], right: !!keys[LANES[3]], focus: !!keys.focus
@@ -1043,6 +1065,7 @@
       var x = who[side], y = g.stage + 8 + bob + ((sing && pose === 1 && !still()) ? cs : 0);
       if (won && !side) y += 3 * cs;      /* beaten: he slumps */
       if (!side) { x += flinch * cs; y -= hop; }
+      if (!side && S.wind > 0) { x -= Math.round(2 * S.wind * cs); y -= Math.round(4 * S.wind * cs); }
       /* the figure is 9 cells wide and 13 tall, feet at y */
       var x0 = Math.round(x - 4.5 * cs), y0 = y - 13 * cs, shY = y0 + (side ? 7 : 8) * cs;
       if (side) L.drawPlayer(ctx, x, y, 'left', 0, false, cs, performance.now());
@@ -1385,6 +1408,24 @@
     }
   }
 
+  /* The arrows fold up (a vertical squash) while four border segments slide
+     in from off-screen to the soul arena. One progress value, u, drives both:
+     the same 0.6s ease the fight already used for the crossfade. */
+  function arrowFold(u) { return 1 - Math.max(0, Math.min(1, u)); }
+  function boxSegments(u, g) {
+    g = g || geom();
+    u = Math.max(0, Math.min(1, u));
+    var w = Math.max(32, g.w - 128), h = Math.max(32, g.h - 128);
+    var top = -40 + (64 + 40) * u, bot = (g.h + 40) + (g.h - 68 - g.h - 40) * u;
+    var left = -40 + (64 + 40) * u, right = (g.w + 40) + (g.w - 68 - g.w - 40) * u;
+    return [
+      { x: 64, y: Math.round(top), w: w, h: 4, outside: u < 0.999 },
+      { x: 64, y: Math.round(bot), w: w, h: 4, outside: u < 0.999 },
+      { x: Math.round(left), y: 64, w: 4, h: h, outside: u < 0.999 },
+      { x: Math.round(right), y: 64, w: 4, h: h, outside: u < 0.999 }
+    ];
+  }
+
   function draw(sp) {
     var g = geom(), t = now(), s = g.s, half = (N * s) >> 1;
     var SD = [{ x: g.hisX, y: g.hisY, s: g.hs, p: g.pitchH }, { x: g.mineX, y: g.strumY, s: s, p: g.pitch }];
@@ -1417,7 +1458,12 @@
       for (var l = 0; l < 4; l++) {
         var f = (t - confirmAt[side][l] < 0.15 || held[side][l]) ? 2 : (side && keys[LANES[l]]) ? 1 : 0;
         if (side && l === S.blockLane && sp < S.blockUntil) f = 1;
+        ctx.save();
+        ctx.translate(0, sd.y);
+        ctx.scale(1, Math.max(0.02, arrowFold(S.arrowA)));
+        ctx.translate(0, -sd.y);
         arrow(f, l, sd.x + l * sd.p, sd.y, sd.s);
+        ctx.restore();
       }
     }
     ctx.globalAlpha = 1;
@@ -1496,13 +1542,12 @@
           ctx.globalAlpha = 1;
         }
       }
-      if (S.brk === 'dodge') {
+      if (S.boxA > 0.001) {
         var ba = still() ? 0.35 : 0.3 + 0.15 * Math.sin(sp * 5);
-        ctx.globalAlpha = ba; ctx.fillStyle = PAT_COL[S.pattern];
-        ctx.fillRect(64, 64, Math.max(32, g.w - 128), 4);
-        ctx.fillRect(64, g.h - 68, Math.max(32, g.w - 128), 4);
-        ctx.fillRect(64, 64, 4, Math.max(32, g.h - 128));
-        ctx.fillRect(g.w - 68, 64, 4, Math.max(32, g.h - 128));
+        var segs = boxSegments(S.boxA, g);
+        ctx.globalAlpha = ba;
+        ctx.fillStyle = PAT_COL[S.brkI >= 0 ? S.brkI : 0];
+        for (var si = 0; si < 4; si++) ctx.fillRect(segs[si].x, segs[si].y, segs[si].w, segs[si].h);
         ctx.globalAlpha = 1;
       }
       /* the soul materialises: a shrinking ring while it fades/rises in,
@@ -1633,14 +1678,14 @@
     if (NEU.save && api.key) NEU.save.flag(api.key('gone', axe), 1);
   }
 
-  /* A win leaves through the black cut: black in, rooms swap behind it, the
-     stall hand-over opens on the black, black out. */
+  /* A win leaves through the stage curtain: it drops over the stage, the
+     stall hand-over opens behind it, and it lifts onto the room. */
   var closing = false;
   function close() {
     if (closing) return;
-    if (!won || !NEU.cut) { leave(); return; }
+    if (!won || !NEU.stageCurtain) { leave(); return; }
     closing = true; running = false;
-    NEU.cut(function () { closing = false; leave(); }, 240);
+    NEU.stageCurtain.through(function () { closing = false; leave(); }, 240);
   }
   function leave() {
     running = false;
@@ -1676,5 +1721,7 @@
                  charts: CHARTS, bpm: BPM, WINDOW: WINDOW_MS / 1000,
                  sections: SECTIONS, length: SONG, soulHit: soulHit,
                  stats: chartStats, MAX_GAP: MAX_GAP,
-                 soul: function () { return soulF; } };
+                 soul: function () { return soulF; }, WIND_UP: WIND_UP, returnAt: RETURN_AT, barOf: barOf, sec: SEC,
+                  boxSegments: boxSegments, arrowFold: arrowFold,
+                  hazards: { wave: spawnHazards, wind: function () { return { t: S.wind, n: S.windN }; } } };
 })();
