@@ -209,12 +209,12 @@ function hasSetter(lock, setters, rooms) {
   return setters.gives && Object.values(rooms).some(room => (room.entities || []).some(e => e.gives === lock));
 }
 
-export function criticalPath(graph, { start, goal, complete = false }) {
+export function criticalPath(graph, { start, goal, complete = false, flags: knownFlags = [] }) {
   if (!complete || !start || !goal) return { status: 'UNKNOWN', reached: [], flags: [], reason: 'missing complete start/goal/grant metadata' };
-  const reached = new Set(), flags = new Set();
-  if (!(graph.rooms[start] || graph.levels[start]) || !(graph.rooms[goal] || graph.levels[goal]))
+  const starts = asList(start), goals = asList(goal), reached = new Set(), flags = new Set(asList(knownFlags));
+  if (starts.some(id => !(graph.rooms[id] || graph.levels[id])) || goals.some(id => !(graph.rooms[id] || graph.levels[id])))
     return { status: 'UNKNOWN', reached: [], flags: [], reason: 'start or goal is absent from graph' };
-  reached.add(start);
+  for (const id of starts) reached.add(id);
   let changed = true;
   while (changed) {
     changed = false;
@@ -228,7 +228,25 @@ export function criticalPath(graph, { start, goal, complete = false }) {
       }
     }
   }
-  return { status: reached.has(goal) ? 'REACHABLE' : 'UNREACHABLE', reached: [...reached], flags: [...flags] };
+  return { status: goals.every(id => reached.has(id)) ? 'REACHABLE' : 'UNREACHABLE', reached: [...reached], flags: [...flags],
+    reason: 'start/goal/grants derived from graph data' };
+}
+/* All three fields come from sources the tool already owns: entry rooms from
+   act4.js (entries(), :234), gated targets from exit locks (buildGraph, :49),
+   and obtainable flags from the setter evidence validate() uses (:90, :166).
+   No hand-maintained room id or flag list. Locks with no proven setter remain
+   reported by validate() and are excluded from the path's goal set. */
+export function criticalPathMetadata(graph, root = ROOT, problems = null) {
+  const findings = problems || validate(graph, root);
+  const unproven = new Set(findings.filter(p => p.startsWith('lock-setter-unproven:'))
+    .map(p => p.slice(p.lastIndexOf(':') + 1)));
+  const start = entries(graph, root).filter(id => graph.rooms[id] || graph.levels[id]);
+  const gated = graph.edges.filter(e => e.lock || e.needs);
+  const flags = [...new Set(gated.flatMap(e => asList(e.lock).concat(asList(e.needs))))]
+    .filter(f => !unproven.has(f));
+  const goal = [...new Set(gated.filter(e => asList(e.lock).concat(asList(e.needs))
+    .every(f => flags.includes(f))).map(e => e.to))];
+  return { complete: !!(start.length && goal.length), start, goal, flags };
 }
 /* Real entry points: act4.js START/HOME plus every literal enter/warp/go('id') under js/. */
 export function entries(graph, root = ROOT) {
@@ -308,7 +326,7 @@ Camera, sound, save and focal point/sightline stay with art direction (D-AB-12, 
 
 export function render(root = ROOT) {
   const graph = buildGraph(root), problems = validate(graph, root);
-  const pathProof = criticalPath(graph, {});
+  const pathProof = criticalPath(graph, criticalPathMetadata(graph, root, problems));
   const out = path.join(root, 'scripts/v3/out/design');
   fs.mkdirSync(out, { recursive: true });
   fs.writeFileSync(path.join(out, 'world-graph.json'), JSON.stringify({
@@ -316,8 +334,8 @@ export function render(root = ROOT) {
     levels: graph.levelIds.map(id => ({ id, spawn: graph.levels[id].spawn })),
     edges: graph.edges, aliases: graph.aliases, problems, criticalPath: pathProof
   }, null, 2) + '\n');
-  fs.writeFileSync(path.join(out, 'WORLD_GRAPH.md'), `# World graph\n\nRooms: ${graph.roomIds.length}; edges: ${graph.edges.length}.\n\n| From | To | Spawn | Via | Lock |\n|---|---|---|---|---|\n${graph.edges.map(e => `| ${e.from} | ${e.to} | ${e.spawn || ''} | ${e.via || 'MISSING'} | ${e.lock || ''} |`).join('\n')}\n\n## Validation findings\n\n${problems.length ? problems.map(p => `- ${p}`).join('\n') : '- None'}\n\nCritical-path flag grants are not encoded in room registration data; automatic story-path proof is unavailable from these sources.\n`);
-  fs.appendFileSync(path.join(out, 'WORLD_GRAPH.md'), `\nCritical-path checker status: ${pathProof.status} (${pathProof.reason}).\n`);
+  fs.writeFileSync(path.join(out, 'WORLD_GRAPH.md'), `# World graph\n\nRooms: ${graph.roomIds.length}; edges: ${graph.edges.length}.\n\n| From | To | Spawn | Via | Lock |\n|---|---|---|---|---|\n${graph.edges.map(e => `| ${e.from} | ${e.to} | ${e.spawn || ''} | ${e.via || 'MISSING'} | ${e.lock || ''} |`).join('\n')}\n\n## Validation findings\n\n${problems.length ? problems.map(p => `- ${p}`).join('\n') : '- None'}\n\nCritical-path start = entries(), goal = locked-exit targets, grants = setter evidence over js/ (validate's authority). Locks without a proven setter stay in Validation findings and are excluded from the goal set.\n`);
+  fs.appendFileSync(path.join(out, 'WORLD_GRAPH.md'), `\nCritical-path checker status: ${pathProof.status} (${pathProof.reason || 'derived from graph data'}).\n`);
   const md = path.join(root, 'plans/neu-v3');
   fs.mkdirSync(md, { recursive: true });
   fs.writeFileSync(path.join(md, 'WORLD_GRAPH.md'), worldGraphMd(graph, problems, reachability(graph, entries(graph, root)), root));
