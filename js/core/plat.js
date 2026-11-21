@@ -53,7 +53,10 @@
     levels[id] = def; return def;
   }
   function cell(x, y) {
-    if (!current || y < 0 || y >= current.h || x < 0 || x >= current.w) return '#';
+    if (!current || y < 0 || x < 0 || x >= current.w) return '#';
+    /* openBottom levels have no floor under the map: a pit is a real drop, and
+       the fall-out check in update() kills. Others keep a solid floor. */
+    if (y >= current.h) return current.openBottom ? '.' : '#';
     if (current.broken && current.broken[x + ',' + y]) return '.';
     return (current.grid[y] || '')[x] || '.';
   }

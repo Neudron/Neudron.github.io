@@ -84,6 +84,7 @@
       spawn: spawn,
       entities: ents,
       tileset: 'mountain',
+      openBottom: true,   /* M2: pits are bottomless, so a mechanic over a pit is a real gate */
       chapter: chapter || 'pine',
       altitude: baseAlt || 1000,
       onCheckpoint: cpHook(id),
