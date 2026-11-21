@@ -303,6 +303,10 @@
       draw: stampGlow,
       end: endGlow
     },
-    stats: stats
+    stats: stats,
+    /* WotG-kit vocabulary (P-WO-P2): aliases of the primitives above, not a
+       second implementation. This module is stateless — attach/loud pass the
+       argument through; there is no adapter or loud flag to own here. */
+    attach: pal, flareImg: glowStamp, kick: shake, cue: titleCard, loud: pal
   };
 })();
