@@ -199,7 +199,7 @@
       settled = true;
       dog.hidden = false;
       dog.classList.remove('is-leave');
-      dog.classList.add('is-in');
+      requestAnimationFrame(function () { dog.classList.add('is-in'); });
       setTimeout(function () {
         dog.classList.remove('is-in');
         dog.classList.add('is-leave');

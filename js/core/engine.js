@@ -1027,7 +1027,8 @@
     if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
     if (e.key === 'z' || e.key === 'Z' || e.key === 'Enter' || e.key === 'x' || e.key === 'X') {
       e.preventDefault();
-      NEU.talk.ff();
+      if (e.key === 'x' || e.key === 'X') NEU.talk.holdStart ? NEU.talk.holdStart() : NEU.talk.ff();
+      else NEU.talk.ff();
     }
   });
   addEventListener('keydown', function (e) {
@@ -1055,18 +1056,17 @@
       return;
     }
     if (e.key === 'x' || e.key === 'X') {
-      /* X fast-forwards a textbox (whole line, then the next one) and
-         does nothing else. Escape is what closes it. */
+      /* X hold timing lives with the shared dialogue box. */
       if (NEU.tboxOpen && NEU.tboxOpen() && NEU.talk) {
         e.preventDefault();
-        if (NEU.talk.ff) NEU.talk.ff(); else { var tbx = document.getElementById('tbox'); if (tbx) tbx.click(); }
+        if (NEU.talk.holdStart) NEU.talk.holdStart(); else if (NEU.talk.ff) NEU.talk.ff();
       }
       return;
     }
     if (e.key === 'z' || e.key === 'Z') {
       e.preventDefault();
-      /* Z advances an open textbox through the same path a click takes. */
-      if (NEU.tboxOpen && NEU.tboxOpen()) { var tb = document.getElementById('tbox'); if (tb) tb.click(); return; }
+      /* Z reveals the current line before it advances dialogue. */
+      if (NEU.tboxOpen && NEU.tboxOpen()) { if (NEU.talk && NEU.talk.ff) NEU.talk.ff(); return; }
       if (busy) return;
       /* Interact first, push second. A block you are standing next to
          is almost never what you meant when there is an npc in reach. */
