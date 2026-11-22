@@ -44,7 +44,6 @@
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&family=Cormorant+Garamond:ital,wght@1,300&family=VT323&family=Comic+Neue:wght@400;700&display=swap"></noscript>
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/game.css">
-<link rel="stylesheet" href="css/switch2.css">
 
 <!-- Without JS the boot overlay would sit there forever and every
      revealed element would stay at opacity 0. Hide the one, show
@@ -349,45 +348,33 @@
   <ul class="quest__l" id="questList"></ul>
 </aside>
 
-
-<!-- NEU OS — keyboard-first console HOME layout with Switch 2 proportions. -->
-<div class="deck" id="deck" hidden aria-label="neu console home" role="dialog" aria-modal="true">
+<!-- ═══ what's on the television ═══════════════════════════════════
+     A handheld's home screen, on the big screen. Built as elements
+     rather than a canvas because it is an interface, not a game: the
+     text has to be selectable, readable and reflowable. -->
+<div class="deck" id="deck" hidden aria-label="neu deck">
   <div class="deck__bar">
-    <div class="deck__profiles" aria-label="player profile">
-      <span class="deck__avatar" aria-hidden="true">n</span>
-      <span class="deck__profile-label">neu</span>
-    </div>
+    <span class="deck__brand"><span class="glyph__copy">neu deck</span><span data-glyph-slot="deck"></span></span>
     <span class="deck__stat">
+      <span class="deck__wifi" aria-hidden="true">&#9679;&#9679;&#9679;</span>
       <span id="deckClock">--:--</span>
-      <span class="deck__wifi" aria-label="wireless connected" role="img">◔</span>
       <span class="deck__batt" aria-hidden="true"><i id="deckBattFill"></i></span>
       <span id="deckBattTxt">100%</span>
     </span>
   </div>
-  <main class="deck__body">
-    <div class="deck__selected" aria-live="polite">
-      <h2 class="deck__t" id="deckTitle"></h2>
+
+  <div class="deck__body">
+    <h2 class="deck__h"><span class="glyph__copy">library</span><span data-glyph-slot="list"></span></h2>
+    <ul class="deck__shelf" id="deckShelf" role="listbox" aria-label="games"></ul>
+    <div class="deck__sel">
+      <h3 class="deck__t" id="deckTitle"></h3>
       <p class="deck__m" id="deckMeta"></p>
-    </div>
-    <ul class="deck__shelf" id="deckShelf" role="listbox" aria-label="console games"></ul>
-    <p class="deck__err" id="deckErr" hidden role="alert"></p>
-    <nav class="deck__dock" id="deckDock" aria-label="console shortcuts">
-      <button type="button" class="deck__dock-btn deck__dock-btn--home" data-deck-action="home" data-label="Home" aria-label="Story menu"><span aria-hidden="true">⌂</span></button>
-      <button type="button" class="deck__dock-btn deck__dock-btn--save" data-deck-action="save" data-label="Save" aria-label="Save files"><span aria-hidden="true">▣</span></button>
-      <button type="button" class="deck__dock-btn deck__dock-btn--progress" data-deck-action="progress" data-label="Progress" aria-label="View progress"><span aria-hidden="true">▤</span></button>
-      <button type="button" class="deck__dock-btn deck__dock-btn--difficulty" data-deck-action="difficulty" data-label="Difficulty" aria-label="Choose difficulty"><span aria-hidden="true">◇</span></button>
-      <button type="button" class="deck__dock-btn deck__dock-btn--settings" data-deck-action="settings" data-label="Settings" aria-label="Open settings"><span aria-hidden="true">⚙</span></button>
-      <button type="button" class="deck__dock-btn deck__dock-btn--power" data-deck-action="power" data-label="Return" aria-label="Close console"><span aria-hidden="true">⏻</span></button>
-    </nav>
-  </main>
-  <div class="deck__foot">
-    <span class="deck__foot-mark">neu · console</span>
-    <div class="deck__foot-hints">
-      <span>＋ options</span>
-      <button type="button" class="deck__play" id="deckPlay">Ⓐ OK</button>
-      <span>Ⓑ back</span>
+      <button class="deck__play" id="deckPlay"><span class="glyph__copy">&#9656; play</span><span data-glyph-slot="open"></span></button>
+      <p class="deck__err" id="deckErr" hidden role="alert"></p>
     </div>
   </div>
+
+  <p class="bh__keys">&larr; &rarr;<span class="glyph__copy"> to browse</span> &nbsp;&middot;&nbsp; <kbd class="glyph__key" data-k="z">z</kbd><span class="glyph__copy"> to play</span> &nbsp;&middot;&nbsp; <span class="glyph__copy">esc to put it down</span><kbd class="glyph__shape glyph__key" aria-hidden="true">Esc</kbd></p>
 </div>
 
 <!-- swipes down on every pet -->

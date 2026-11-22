@@ -150,14 +150,13 @@ async function main() {
   const sceneName = path.basename(entry);
 
   /* css keeps its own directory so ../fonts and ../img still resolve */
-  for (const [src, out] of [['css/style.css', 'style'], ['css/game.css', 'game'], ['css/switch2.css', 'home']]) {
+  for (const [src, out] of [['css/style.css', 'style'], ['css/game.css', 'game']]) {
     const css = (await transform(await read(src), { loader: 'css', minify: true })).code;
     assertNoGeneratedOriginal(src, css);
     await writeAsset('css', out + '.' + hash(css) + '.css', css);
   }
   const styleName = (await fs.readdir(path.join(DIST, 'css'))).find((f) => f.startsWith('style.'));
   const gameCssName = (await fs.readdir(path.join(DIST, 'css'))).find((f) => f.startsWith('game.'));
-  const switchCssName = (await fs.readdir(path.join(DIST, 'css'))).find((f) => f.startsWith('home.'));
 
   for (const f of FILES) if (await exists(path.join(ROOT, f))) await fs.cp(path.join(ROOT, f), path.join(DIST, f));
   await fs.writeFile(path.join(DIST, '.nojekyll'), '');
@@ -188,8 +187,7 @@ async function main() {
   const imEnd = html.indexOf('</script>', imTag) + '</script>'.length;
   html = html.slice(0, imStart) + html.slice(imEnd);
   html = html.replace('href="css/style.css"', 'href="css/' + styleName + '"')
-             .replace('href="css/game.css"', 'href="css/' + gameCssName + '"')
-             .replace('href="css/switch2.css"', 'href="css/' + switchCssName + '"');
+             .replace('href="css/game.css"', 'href="css/' + gameCssName + '"');
   const classicStart = html.indexOf('<script src="js/core/motion.js"></script>');
   const classicEndTag = '<script src="js/core/dev.js"></script>';
   const classicEnd = html.indexOf(classicEndTag);

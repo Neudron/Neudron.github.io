@@ -182,9 +182,6 @@
   ];
 
   var sel = 0, open_ = false, tiles = [];
-  var zone = 'games', dockIndex = 0;
-  var dock = document.getElementById('deckDock');
-  var dockButtons = dock ? Array.prototype.slice.call(dock.querySelectorAll('[data-deck-action]')) : [];
 
   /* The red soul is the cursor, Deltarune-style. ONE element that pick()
      moves into the selected tile, so there can never be two. */
@@ -254,10 +251,7 @@
   function pick(i) {
     sel = (i + GAMES.length) % GAMES.length;
     var g = GAMES[sel];
-    zone = 'games';
-    wrap.classList.remove('is-dock');
-    dockButtons.forEach(function (b) { b.classList.remove('is-on'); b.setAttribute('aria-pressed', 'false'); });
-    tiles.forEach(function (t, n) { t.classList.toggle('is-on', n === sel); t.setAttribute('aria-selected', String(n === sel)); });
+    tiles.forEach(function (t, n) { t.classList.toggle('is-on', n === sel); });
     if (tiles[sel]) tiles[sel].appendChild(soul);
     if (elTitle) elTitle.textContent = g.title;
     /* A personal best is the only reason to reopen an endless game, so
@@ -265,7 +259,7 @@
     var best = (g.run && NEU.save) ? NEU.save.best(g.id) : 0;
     if (elMeta) elMeta.textContent = g.meta + (best ? '  ·  best ' + fmtBest(g.id, best) : '');
     if (elErr)   elErr.hidden = true;
-    if (elPlay) elPlay.textContent = g.run ? 'Ⓐ Start' : 'Ⓐ Details';
+    if (elPlay)  elPlay.textContent = g.run ? '▸ play' : '▸ play';
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
 
     /* Keep the selection on screen without yanking the whole page —
@@ -300,41 +294,6 @@
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
   }
 
-
-  /* Down moves from the horizontal games shelf to the system dock.
-     Every dock icon is a real action; there are no decorative dead ends. */
-  function pickDock(i) {
-    if (!dockButtons.length) return;
-    zone = 'dock';
-    dockIndex = (i + dockButtons.length) % dockButtons.length;
-    wrap.classList.add('is-dock');
-    dockButtons.forEach(function (b, n) {
-      b.classList.toggle('is-on', n === dockIndex);
-      b.setAttribute('aria-pressed', String(n === dockIndex));
-    });
-    if (elErr) elErr.hidden = true;
-    if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
-  }
-
-  function runDock(action) {
-    if (action === 'power') { close(); return; }
-    if (action === 'settings') {
-      if (NEU.settings && NEU.settings.open) NEU.settings.open();
-      return;
-    }
-    if (!NEU.menu) return;
-    if (action === 'home') NEU.menu.open('root');
-    if (action === 'save') NEU.menu.open('save');
-    if (action === 'progress') NEU.menu.open('progress');
-    if (action === 'difficulty') NEU.menu.open('difficultyChange');
-  }
-  dockButtons.forEach(function (b, n) {
-    b.addEventListener('click', function () {
-      pickDock(n);
-      runDock(b.getAttribute('data-deck-action'));
-    });
-  });
-
   /* ── the status bar ─────────────────────────────────────────────
      Real clock, and the battery is the console's ACTUAL charge — the
      number you filled up in the room. A fake 100% here would quietly
@@ -365,7 +324,6 @@
     document.body.classList.add('is-playing');
     if (NEU.quest) { NEU.quest.lock(true); NEU.quest.mark('deck'); }
     build();
-    zone = 'games';
     pick(0);
     status();
     clearInterval(tick);
@@ -385,44 +343,30 @@
     if (NEU.quest) NEU.quest.lock(false);
   }
 
-
   addEventListener('keydown', function (e) {
     if (!open_) return;
+    /* Settings (or a menu opened on top) owns the keyboard while up. */
     if ((NEU.settings && NEU.settings.open_) ||
         (NEU.menu && NEU.menu.active) || (NEU.dummy && NEU.dummy.active)) return;
-
-    var key = e.key;
-    if (key === 'Escape' || key === 'x' || key === 'X' || key === 'Backspace') {
-      e.preventDefault();
-      if (zone === 'dock') { pick(sel); return; }
-      close(); return;
-    }
-    if (key === 'ArrowDown' && zone === 'games') {
-      e.preventDefault(); pickDock(0); return;
-    }
-    if (key === 'ArrowUp' && zone === 'dock') {
-      e.preventDefault(); pick(sel); return;
-    }
-    if (key === 'ArrowLeft' || key === 'ArrowRight') {
-      e.preventDefault();
-      var delta = key === 'ArrowRight' ? 1 : -1;
-      if (zone === 'dock') pickDock(dockIndex + delta);
-      else pick(sel + delta);
+    if (e.key === 'Escape')     { e.preventDefault(); close(); return; }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); pick(sel - 1); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); pick(sel + 1); return; }
+    if (e.key === 'Tab') {
+      var focusables = [elPlay].filter(function (el) { return el && !el.hidden; });
+      if (focusables.length) {
+        var idx = focusables.indexOf(document.activeElement);
+        if (e.shiftKey) {
+          if (idx <= 0) { e.preventDefault(); focusables[focusables.length - 1].focus(); }
+        } else {
+          if (idx === -1 || idx >= focusables.length - 1) { e.preventDefault(); focusables[0].focus(); }
+        }
+      } else {
+        e.preventDefault();
+      }
       return;
     }
-    if (key === 'ArrowDown' || key === 'ArrowUp') {
-      e.preventDefault(); return;
-    }
-    if (key === 'Tab') {
-      e.preventDefault();
-      if (zone === 'games') pickDock(0);
-      else pickDock(dockIndex + (e.shiftKey ? -1 : 1));
-      return;
-    }
-    if (key === 'Enter' || key === 'z' || key === 'Z' || key === ' ') {
-      e.preventDefault();
-      if (zone === 'dock') runDock(dockButtons[dockIndex].getAttribute('data-deck-action'));
-      else launch();
+    if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z' || e.key === ' ') {
+      e.preventDefault(); launch();
     }
   });
 
