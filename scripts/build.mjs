@@ -150,14 +150,14 @@ async function main() {
   const sceneName = path.basename(entry);
 
   /* css keeps its own directory so ../fonts and ../img still resolve */
-  for (const [src, out] of [['css/style.css', 'style'], ['css/game.css', 'game'], ['css/switch2.css', 'switch2']]) {
+  for (const [src, out] of [['css/style.css', 'style'], ['css/game.css', 'game'], ['css/switch2.css', 'home']]) {
     const css = (await transform(await read(src), { loader: 'css', minify: true })).code;
     assertNoGeneratedOriginal(src, css);
     await writeAsset('css', out + '.' + hash(css) + '.css', css);
   }
   const styleName = (await fs.readdir(path.join(DIST, 'css'))).find((f) => f.startsWith('style.'));
   const gameCssName = (await fs.readdir(path.join(DIST, 'css'))).find((f) => f.startsWith('game.'));
-  const switchCssName = (await fs.readdir(path.join(DIST, 'css'))).find((f) => f.startsWith('switch2.'));
+  const switchCssName = (await fs.readdir(path.join(DIST, 'css'))).find((f) => f.startsWith('home.'));
 
   for (const f of FILES) if (await exists(path.join(ROOT, f))) await fs.cp(path.join(ROOT, f), path.join(DIST, f));
   await fs.writeFile(path.join(DIST, '.nojekyll'), '');
