@@ -210,6 +210,7 @@
 
   function continueGame() {
     close();
+    if (NEU.deck && NEU.deck.running) NEU.deck.close();
     if (NEU.act4 && NEU.act4.open) NEU.act4.open();
   }
 
@@ -292,6 +293,7 @@
     if (NEU.save && NEU.save.newGame) NEU.save.newGame();
     if (NEU.diff && NEU.diff.set) NEU.diff.set(id);
     close();
+    if (NEU.deck && NEU.deck.running) NEU.deck.close();
     if (NEU.act4 && NEU.act4.open) NEU.act4.open();
   }
 
