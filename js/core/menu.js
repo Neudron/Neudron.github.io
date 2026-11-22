@@ -156,28 +156,61 @@
   }
 
   /* ── screens ──────────────────────────────────────────────────── */
+
+  function appCard(label, subtitle, art, mod, fn) {
+    var b = button('', 'menu__app menu__app--' + mod, fn);
+    b.textContent = '';
+    var cover = el('span', 'menu__app-art');
+    cover.setAttribute('aria-hidden', 'true');
+    cover.appendChild(el('span', 'menu__app-mark', art));
+    var cap = el('span', 'menu__app-name', label);
+    var small = el('span', 'menu__app-sub', subtitle);
+    b.appendChild(cover);
+    b.appendChild(cap);
+    b.appendChild(small);
+    return b;
+  }
+
   function root() {
     clear();
     var save = NEU.save && NEU.save.load ? NEU.save.load() : null;
-    heading(paused ? 'MENU' : (save ? 'the woods are still there.' : 'something is hidden down here.'));
-    if (paused) box._body.appendChild(button('Resume', 'menu__primary', close));
-    box._body.appendChild(button('Play', 'menu__primary', function () {
-      if (NEU.save && NEU.save.load && NEU.save.load()) continueGame();
-      else setScreen('difficulty');
-    }));
-    box._body.appendChild(button('Config', '', function () {
+    heading(paused ? 'paused' : 'the woods');
+    box._body.appendChild(el('p', 'menu__lead',
+      paused ? 'Your journey is waiting.' : 'Select a title to continue.'));
+    var row = el('div', 'menu__apps');
+    row.appendChild(appCard(paused ? 'Resume' : (save ? 'Continue' : 'Start'),
+      save ? 'the story continues' : 'begin the story', '✦', 'story',
+      function () { if (paused) close(); else if (save) continueGame(); else setScreen('difficulty'); }));
+    row.appendChild(appCard('New journey', 'start from the beginning', '◇', 'new',
+      function () {
+        if (!save) { setScreen('difficulty'); return; }
+        ask('start a new journey?', 'Your current browser progress will be replaced. Saved slots are kept.',
+          'start', function () { setScreen('difficulty'); }, function () { setScreen('root'); });
+      }));
+    row.appendChild(appCard('Console', 'explore the game library', '▦', 'console',
+      function () { close(); if (NEU.deck && NEU.deck.open) NEU.deck.open(); }));
+    box._body.appendChild(row);
+    var dock = el('nav', 'menu__dock');
+    dock.setAttribute('aria-label', 'story system menu');
+    dock.appendChild(button('▣ Save files', 'menu__system', function () { setScreen('save'); }));
+    dock.appendChild(button('◇ Difficulty', 'menu__system', function () { setScreen('difficultyChange'); }));
+    dock.appendChild(button('⚙ Settings', 'menu__system', function () {
       if (NEU.settings && NEU.settings.open) NEU.settings.open();
     }));
-    box._body.appendChild(button('Save', '', function () { setScreen('save'); }));
-    if (paused) box._body.appendChild(button('Exit', 'menu__danger', function () {
-      NEU.engine.confirmExit('the game', function () { close(); NEU.engine.leave(); },
-        'leave the game? your save is kept.');
+    if (paused) dock.appendChild(button('⏻ Exit', 'menu__system menu__danger', function () {
+      if (NEU.engine && NEU.engine.confirmExit) {
+        NEU.engine.confirmExit('the game', function () { close(); NEU.engine.leave(); },
+          'leave the game? your save is kept.');
+      }
     }));
+    dock.appendChild(button('× Close', 'menu__system', close));
+    box._body.appendChild(dock);
     note('');
   }
 
   function continueGame() {
     close();
+    if (NEU.deck && NEU.deck.running) NEU.deck.close();
     if (NEU.act4 && NEU.act4.open) NEU.act4.open();
   }
 
@@ -222,36 +255,67 @@
     note('');
   }
 
-  function difficulty() {
+
+  function difficulty() { renderDifficulty(false); }
+  function difficultyChange() { renderDifficulty(true); }
+
+  function renderDifficulty(changeOnly) {
     clear();
-    heading('pick how hard it pushes back.');
+    heading(changeOnly ? 'difficulty' : 'choose your difficulty');
+    box._body.appendChild(el('p', 'menu__lead',
+      changeOnly ? 'Changes apply when you enter or retry a fight.' :
+        'Pick how hard the world pushes back. Your story begins after choosing.'));
+    var listBox = el('div', 'menu__tiers');
+    listBox.setAttribute('role', 'listbox');
+    listBox.setAttribute('aria-label', 'difficulty');
     var ids = NEU.diff && NEU.diff.list ? NEU.diff.list() : [];
     for (var i = 0; i < ids.length; i++) {
       (function (id, n) {
         var b = el('button', 'menu__tier');
         b.type = 'button';
         b.setAttribute('role', 'option');
+        b.setAttribute('aria-selected', String(changeOnly && NEU.diff && NEU.diff.id() === id));
+        b.appendChild(el('span', 'menu__tier-number', String(n + 1).padStart(2, '0')));
         b.appendChild(el('b', 'menu__tier-name', NEU.diff.name ? NEU.diff.name(n) : id));
-        var desc = el('span', 'menu__tier-fx', FX[id] || FALLBACK_FX);
-        if (NEU.glyph) {
-          desc.classList.add('glyph__copy');
-          b.appendChild(NEU.glyph.meter(n + 1));
-        }
-        b.appendChild(desc);
-        b.addEventListener('click', function () { chooseTier(id); });
-        box._body.appendChild(b);
+        b.appendChild(el('span', 'menu__tier-bars', '▰'.repeat(n + 1)));
+        b.appendChild(el('span', 'menu__tier-fx', FX[id] || FALLBACK_FX));
+        b.addEventListener('click', function () { chooseTier(id, changeOnly); });
+        listBox.appendChild(b);
       })(ids[i], i);
     }
-    var back = button('Back', 'menu__back', function () { setScreen('root'); });
-    box._body.appendChild(back);
-    note('you can change this later in the file.');
+    box._body.appendChild(listBox);
+    box._body.appendChild(button('← Back', 'menu__back', function () { setScreen('root'); }));
+    note(changeOnly ? 'Your current save will not be erased.' :
+      'The selected difficulty will be stored with your journey.');
   }
 
-  function chooseTier(id) {
-    if (NEU.diff && NEU.diff.set) NEU.diff.set(id);
+  function startWithTier(id) {
     if (NEU.save && NEU.save.newGame) NEU.save.newGame();
+    if (NEU.diff && NEU.diff.set) NEU.diff.set(id);
     close();
+    if (NEU.deck && NEU.deck.running) NEU.deck.close();
     if (NEU.act4 && NEU.act4.open) NEU.act4.open();
+  }
+
+  function chooseTier(id, changeOnly) {
+    var ids = NEU.diff && NEU.diff.list ? NEU.diff.list() : [];
+    var tierIndex = ids.indexOf(id);
+    var finish = function () {
+      if (changeOnly) {
+        if (NEU.diff && NEU.diff.set) NEU.diff.set(id);
+        setScreen('root');
+        note('difficulty changed. applies at the next fight or retry.');
+      } else startWithTier(id);
+    };
+    if (tierIndex >= 5 && (!changeOnly || (NEU.diff && NEU.diff.id() !== id))) {
+      ask(NEU.diff && NEU.diff.name ? NEU.diff.name(tierIndex) + '?' : 'advanced difficulty?',
+        tierIndex === 6 ? 'The fastest patterns. No healing. Continue?' :
+          'Extreme speed, fewer chances to recover. Continue?',
+        'Confirm', finish,
+        function () { setScreen(changeOnly ? 'difficultyChange' : 'difficulty'); });
+      return;
+    }
+    finish();
   }
 
   function fmtTime(sec) {
@@ -322,7 +386,6 @@
       ask('erase this progress and start over?',
         'your save in this browser will be replaced.', 'start over',
         function () {
-          if (NEU.save && NEU.save.newGame) NEU.save.newGame();
           setScreen('difficulty');
         }, function () { setScreen('save'); });
     }));
@@ -381,12 +444,14 @@
   }
 
   var SCREENS = {
-    root: root, difficulty: difficulty, progress: progress, save: saveScreen,
+    root: root, difficulty: difficulty, difficultyChange: difficultyChange,
+    progress: progress, save: saveScreen,
     confirm: confirmScreen, export: exportScreen, import: importScreen
   };
 
   function setScreen(name) {
     screen = SCREENS[name] ? name : 'root';
+    box.setAttribute('data-screen', screen);
     if (SCREENS[screen]) SCREENS[screen]();
     box.setAttribute('aria-label', 'main menu \u2014 ' + screen);
     focusAt(0);
