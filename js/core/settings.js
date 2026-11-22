@@ -722,10 +722,6 @@
     });
   }
 
-
-
-  }
-
   /* The panel's focusables. Disabled ones are skipped: a trap that wraps
      to one eats Tabs silently. A radiogroup is ONE tab stop (its picked
      option has tabIndex 0); arrows move inside it.
