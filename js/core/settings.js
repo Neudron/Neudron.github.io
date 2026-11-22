@@ -248,36 +248,7 @@
     return r;
   }
 
-  /* The one-line tier description belongs to menu.js, which owns the
-     tier picker. settings.js loads first, so read it only when the panel
-     is drawn or the slider moves — by then the menu has been built. */
-  function diffFx(v) {
-    var id = NEU.diff && NEU.diff.list ? NEU.diff.list()[v] : null;
-    if (id && NEU.menu && NEU.menu.effect) return NEU.menu.effect(id);
-    return NEU.diff && NEU.diff.name ? NEU.diff.name(v) :
-      'changes how hard the fights press you.';
-  }
 
-  function paintDiff(v) {
-    var rg = document.getElementById('settDiff');
-    var fx = document.getElementById('settDiffFx');
-    if (rg && v !== undefined) {
-      rg.value = String(v);
-      rg.setAttribute('aria-valuetext', NEU.diff && NEU.diff.name ? NEU.diff.name(v) : String(v));
-    }
-    var tier = v === undefined ? (NEU.diff ? NEU.diff.index() : 2) : v;
-    if (fx) {
-      fx.textContent = diffFx(tier);
-      if (NEU.glyph) {
-        var copy = document.createElement('span');
-        copy.className = 'glyph__copy';
-        copy.textContent = fx.textContent;
-        fx.textContent = '';
-        fx.appendChild(NEU.glyph.meter(tier + 1));
-        fx.appendChild(copy);
-      }
-    }
-  }
 
   /* Three choices, one of them picked: a radiogroup of buttons, arrow
      keys move the pick (WAI-ARIA radio pattern). A switch cannot say
@@ -532,54 +503,8 @@
     /* 1. Config pane */
     var pConfig = panes.config;
 
-    /* Seven tiers, the same list diff.js owns. NEU.diff.set writes the
-       opt_diff flag immediately; fights sample it on entry and retry.
-       First in the pane: at 720p the rest scrolls, this one does not. */
-    var diffRow = slider('settDiff', 'difficulty',
-        'how hard the fights press you. takes effect on the next fight.',
-        function () { return NEU.diff ? NEU.diff.index() : 2; },
-        function (v) {
-          if (v >= 5 && NEU.diff && v !== NEU.diff.index()) { askTier(v); return; }
-          hideAsk();
-          if (NEU.diff && NEU.diff.list) NEU.diff.set(NEU.diff.list()[v]);
-          paintDiff(v);
-        }, null,
-        { min: 0, max: 6, step: 1,
-          text: function (v) { return NEU.diff && NEU.diff.name ? NEU.diff.name(v) : String(v); } });
-    var fx = document.createElement('small');
-    fx.className = 'sett__fx';
-    fx.id = 'settDiffFx';
-    fx.setAttribute('aria-live', 'polite');
-    diffRow.querySelector('.sett__lbl').appendChild(fx);
-    diffRow.id = 'settDiffRow';
-    pConfig.appendChild(diffRow);
+    /* Difficulty belongs exclusively to the story/console menu. */
 
-    /* The two top tiers cost something real, so the slider asks first and
-       writes nothing until yes. */
-    var ask = document.createElement('div');
-    ask.id = 'settDiffConfirm';
-    ask.setAttribute('role', 'group');
-    ask.setAttribute('aria-live', 'polite');
-    ask.hidden = true;
-    var askMsg = document.createElement('span');
-    var askYes = document.createElement('button');
-    askYes.type = 'button'; askYes.id = 'settDiffYes'; askYes.className = 'sett__opt'; askYes.textContent = 'yes';
-    var askNo = document.createElement('button');
-    askNo.type = 'button'; askNo.id = 'settDiffNo'; askNo.className = 'sett__opt'; askNo.textContent = 'no';
-    ask.appendChild(askMsg); ask.appendChild(askYes); ask.appendChild(askNo);
-    var askTier_ = 0;
-    function hideAsk() { ask.hidden = true; }
-    function askTier(v) {
-      askTier_ = v;
-      askMsg.textContent = v === 5 ? 'ultrakill: half your HP, faster everything. sure?' :
-                                     'final breath: 1 HP. no heals. sure?';
-      ask.hidden = false;
-    }
-    askYes.addEventListener('click', function () {
-      NEU.diff.set(NEU.diff.list()[askTier_]); hideAsk(); paintDiff(askTier_);
-    });
-    askNo.addEventListener('click', function () { hideAsk(); paintDiff(NEU.diff.index()); });
-    pConfig.appendChild(ask);
 
     pConfig.appendChild(seg('settMotion', 'motion',
         'calm keeps things still unless you move them. the game works either way.',
@@ -711,7 +636,7 @@
       panes[pane].appendChild(b);
     }
     function flags(o) { if (NEU.save) for (var k in o) if (o.hasOwnProperty(k)) NEU.save.flag(k, o[k]); }
-    tabReset('config', function () { if (NEU.diff) NEU.diff.set('medium'); });
+    tabReset('config', function () {});
     tabReset('sound', function () {
       mute(false);
       if (NEU.music) NEU.music.setVolume(55); else flags({ opt_music: 55 });
@@ -795,15 +720,10 @@
       var g = document.getElementById(id);
       if (g && g._paint) g._paint();
     });
-    paintDiff();
-    var dr = document.getElementById('settDiffRow');
-    if (dr) {
-      var seen = !!(NEU.save && (NEU.save.flagged('opt_seenTitle') || NEU.save.flagged('a1_seen')));
-      dr.hidden = !seen;
-      dr.style.display = seen ? '' : 'none';   /* .sett__row sets display, which beats [hidden] */
-      var cf = document.getElementById('settDiffConfirm');
-      if (!seen && cf) cf.hidden = true;
-    }
+  }
+
+
+
   }
 
   /* The panel's focusables. Disabled ones are skipped: a trap that wraps
