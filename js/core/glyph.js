@@ -58,6 +58,29 @@
     });
     return svg;
   }
+  /* The `*` strips type themselves out like Deltarune's textbox. The full
+     text is in the DOM at once (screen readers and tests read it whole);
+     only the eye sees it arrive, through a stepped clip the CSS owns
+     (.dr-type). A soft blip every other letter; calm motion shows the
+     line at once and stays quiet. */
+  function type(el, text) {
+    if (!el) return;
+    clearInterval(el._typeT);
+    el.textContent = '';
+    if (!text) return;
+    var s = document.createElement('span');
+    s.className = 'dr-type';
+    s.textContent = text;
+    s.style.setProperty('--n', text.length);
+    el.appendChild(s);
+    if (NEU.motion && NEU.motion.reduced()) return;
+    var i = 0;
+    el._typeT = setInterval(function () {
+      i += 2;
+      if (NEU.sfx && NEU.sfx.ui && /\S/.test(text.charAt(i))) NEU.sfx.ui('hover');
+      if (i >= text.length) clearInterval(el._typeT);
+    }, 56);
+  }
   function put(el, name, text) {
     el.textContent = '';
     var copy = document.createElement('span');
@@ -88,7 +111,7 @@
   }
   function markup(name) { return icon(name).outerHTML; }
   NEU.glyph = { compact: compact, icon: icon, put: put, draw: draw,
-                key: key, meter: meter, markup: markup, quest: quest };
+                key: key, meter: meter, markup: markup, quest: quest, type: type };
   function hydrate() {
     var slots = document.querySelectorAll('[data-glyph-slot]');
     for (var i = 0; i < slots.length; i++)

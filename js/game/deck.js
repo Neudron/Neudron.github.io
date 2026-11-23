@@ -43,6 +43,9 @@
   var elMeta  = document.getElementById('deckMeta');
   var elErr   = document.getElementById('deckErr');
   var elPlay  = document.getElementById('deckPlay');
+  var elCover = document.getElementById('deckCover');
+  var elDesc  = document.getElementById('deckDesc');
+  var bgEl    = document.getElementById('deckBg');
   var elClock = document.getElementById('deckClock');
   var elBatt  = document.getElementById('deckBattTxt');
   var elFill  = document.getElementById('deckBattFill');
@@ -131,27 +134,13 @@
      `run` present means it launches. `err` present means it doesn't,
      and says why. `ink`/`hi` are the cover's two line colours. */
   var GAMES = [
-    /* Launched from here they run ENDLESS. The story versions still
-       run bounded when reached through the chain — same modules, a
-       flag. A console library whose games stop after twenty seconds
-       is not a library, and there would be no reason to come back. */
-    { id: 'twenty', title: 'thirty seconds',
-      meta: 'survival · endless',
-      a: '#B892FF', b: '#2A1E44', ink: '#F0E6FF', hi: '#FF6B8A',
-      run: function () { return NEU.bullet && NEU.bullet.open({ endless: true }); } },
-
-    { id: 'dark', title: 'the dark',
-      meta: 'walking sim · endless',
-      a: '#4A4560', b: '#0B0B10', ink: '#8F88A8', hi: '#FFD08A',
-      run: function () { return NEU.dark && NEU.dark.open({ endless: true }); } },
-
-    /* The big one. Every tile is drawn now, so the shelf no longer
-       marks the real game by being the only one with a picture on it.
-       It is marked by being the only WARM one — the crimson gradient
-       and the brimstone star against six cooler boxes. Same job, done
-       with colour instead of with everything else being unfinished. */
-    { id: 'woods', title: 'the woods',
+    /* The story comes first. A console home screen puts the thing the
+       player is actually playing at the front of the shelf; grouping the
+       older games with the broken ones made the library read as a list
+       of chapters, which is not what any of these entries are. */
+    { id: 'woods', title: 'the woods', group: 'story',
       meta: 'adventure · unfinished business',
+      desc: 'the story so far. it picks up where you left it.',
       a: '#C2405F', b: '#1A0A12', ink: '#FF6B4A', hi: '#FFD08A',
       /* The story game opens through its own Play/Config/Save menu;
          the endless titles launch straight into their scene. */
@@ -160,26 +149,61 @@
         return NEU.act4 && NEU.act4.open();
       } },
 
-    { id: 'skele', title: 'skeleton simulator',
+    /* Launched from here the earlier games run ENDLESS. The story
+       versions still run bounded when reached through the chain — same
+       modules, a flag. They live under PREVIOUSLY, not under chapters. */
+    { id: 'twenty', title: 'thirty seconds', group: 'previous',
+      meta: 'the earlier survival game · endless',
+      desc: 'dodge for thirty seconds. then keep going.',
+      a: '#B892FF', b: '#2A1E44', ink: '#F0E6FF', hi: '#FF6B8A',
+      run: function () { return NEU.bullet && NEU.bullet.open({ endless: true }); } },
+
+    { id: 'dark', title: 'the dark', group: 'previous',
+      meta: 'the earlier walking game · endless',
+      desc: 'walk into the dark and see how far it goes.',
+      a: '#4A4560', b: '#0B0B10', ink: '#8F88A8', hi: '#FFD08A',
+      run: function () { return NEU.dark && NEU.dark.open({ endless: true }); } },
+
+    /* EXTRAS, not chapters: these are the console's own joke tiles,
+       unavailable or already running. They belong in a bonus shelf. */
+    { id: 'skele', title: 'skeleton simulator', group: 'extras',
       meta: '0.2 hrs on record · 340 GB',
+      desc: 'rattle around as a skeleton. bones not included.',
       a: '#EDE7DE', b: '#3A3A46', ink: '#2A2A33', hi: '#7A6ACF',
       err: 'the update server is asleep. try again later.' },
 
-    { id: 'wax', title: 'wax tycoon',
+    { id: 'wax', title: 'wax tycoon', group: 'extras',
       meta: 'never played · 12 MB',
+      desc: 'build a candle empire, one drip at a time.',
       a: '#E4C46A', b: '#4A3A14', ink: '#3A2C0C', hi: '#FFF3C4',
       err: 'still setting. the wax has not cooled.' },
 
-    { id: 'dog2', title: 'dog 2',
+    { id: 'dog2', title: 'dog 2', group: 'extras',
       meta: 'never played · 1.1 GB',
+      desc: 'the sequel to dog.',
       a: '#7BE38A', b: '#153A1E', ink: '#0E2A15', hi: '#FFF0F4',
       err: 'not for this device. not for any device yet.' },
 
-    { id: 'neu', title: 'neu.ac',
+    { id: 'neu', title: 'neu.ac', group: 'extras',
       meta: '1 hr on record · running',
+      desc: 'this website, as a game. you are in it.',
       a: '#C2405F', b: '#3A121E', ink: '#FFE3EA', hi: '#4FC3F7',
       err: 'already running.' }
   ];
+
+  /* Section headers are meaning, not a new screen: the first two tiles
+     are earlier standalone games relaunched as endless modes, not chapter 1
+     and chapter 2 of the woods. Generated content keeps the shelf's seven
+     direct options intact, so keyboard indices and tests stay unchanged. */
+  var GROUP_LABEL = {
+    story: 'the story',
+    previous: 'previously',
+    extras: 'extras'
+  };
+  var GROUP_NOTE = {
+    previous: 'the earlier games · endless',
+    extras: 'not available on this deck'
+  };
 
   var sel = 0, open_ = false, tiles = [];
 
@@ -201,16 +225,25 @@
     if (!shelf) return;
     shelf.innerHTML = '';
     tiles = [];
+    var lastGroup = null;
     GAMES.forEach(function (g, i) {
       var li = document.createElement('li');
       li.className = 'deck__tile' + (g.err ? ' is-dead' : '');
       li.setAttribute('role', 'option');
       li.tabIndex = -1;
+      li.setAttribute('aria-label', g.title + ', ' + GROUP_LABEL[g.group] + ', ' + g.meta);
+      if (g.group !== lastGroup) {
+        li.classList.add('group-start');
+        li.setAttribute('data-group-label', GROUP_LABEL[g.group]);
+        if (GROUP_NOTE[g.group]) li.setAttribute('data-group-note', GROUP_NOTE[g.group]);
+        lastGroup = g.group;
+      }
 
       var art = document.createElement('span');
       art.className = 'deck__art';
-      art.style.background =
-        'linear-gradient(150deg,' + g.a + ' 0%,' + g.b + ' 78%)';
+      /* flat box colour with a 4px rim in the light one: pixel art, no ramps */
+      art.style.background = g.b;
+      art.style.boxShadow = 'inset 0 0 0 4px ' + g.a;
 
       /* Presence in SIGILS is the switch — there is no separate flag to
          forget to set. Inline svg, so it inherits the tile's scaling
@@ -243,6 +276,7 @@
       li.addEventListener('click', function () {
         if (sel === i) { launch(); } else { pick(i); }
       });
+      li.addEventListener('mouseenter', function () { if (open_ && sel !== i) pick(i); });
       shelf.appendChild(li);
       tiles.push(li);
     });
@@ -254,23 +288,39 @@
     tiles.forEach(function (t, n) { t.classList.toggle('is-on', n === sel); });
     if (tiles[sel]) tiles[sel].appendChild(soul);
     if (elTitle) elTitle.textContent = g.title;
+    /* the detail panel's cover is a copy of the row's own art */
+    if (elCover && tiles[sel]) { elCover.innerHTML = ''; elCover.appendChild(tiles[sel].firstChild.cloneNode(true)); }
+    if (elDesc) { if (NEU.glyph && NEU.glyph.type) NEU.glyph.type(elDesc, g.desc || ''); else elDesc.textContent = g.desc || ''; }
     /* A personal best is the only reason to reopen an endless game, so
-       it goes on the meta line the moment one exists. */
+       it goes in the list the moment one exists. */
     var best = (g.run && NEU.save) ? NEU.save.best(g.id) : 0;
-    if (elMeta) elMeta.textContent = g.meta + (best ? '  ·  best ' + fmtBest(g.id, best) : '');
+    if (elMeta) {
+      var rows = [GROUP_LABEL[g.group]].concat(g.meta.split(' · '));
+      if (best) rows.push('best ' + fmtBest(g.id, best));
+      /* the story reads its own file: one owner (save.js), shown, not copied */
+      var file = g.id === 'woods' && NEU.save && NEU.save.load ? NEU.save.load() : null;
+      if (file) {
+        if (NEU.diff && NEU.diff.name) rows.push('tier ' + NEU.diff.name().toLowerCase());
+        if (NEU.save.playtime) rows.push((NEU.save.playtime() / 3600).toFixed(1) + ' hrs on record');
+      }
+      rows.push(!g.run ? 'not available' : file ? 'continue' : 'ready');
+      elMeta.innerHTML = '';
+      rows.forEach(function (t) { var li = document.createElement('li'); li.textContent = t; elMeta.appendChild(li); });
+    }
     if (elErr)   elErr.hidden = true;
     if (elPlay)  elPlay.textContent = g.run ? '▸ play' : '▸ play';
     if (NEU.sfx && NEU.sfx.tick) NEU.sfx.tick();
 
     /* Keep the selection on screen without yanking the whole page —
        scrollIntoView with block:'nearest' would still scroll the
-       document behind the overlay in some browsers. */
+       document behind the overlay in some browsers. 48px of slack keeps
+       a group's header in view with its first row. */
     var t = tiles[sel];
     if (t && shelf) {
-      var l = t.offsetLeft, r = l + t.offsetWidth;
-      if (l < shelf.scrollLeft) shelf.scrollLeft = l - 24;
-      else if (r > shelf.scrollLeft + shelf.clientWidth)
-        shelf.scrollLeft = r - shelf.clientWidth + 24;
+      var top = t.offsetTop - shelf.offsetTop, bot = top + t.offsetHeight;
+      if (top - 48 < shelf.scrollTop) shelf.scrollTop = Math.max(0, top - 48);
+      else if (bot > shelf.scrollTop + shelf.clientHeight)
+        shelf.scrollTop = bot - shelf.clientHeight + 8;
     }
   }
 
@@ -290,7 +340,7 @@
       if (!reduced) elErr.classList.add('is-shake');
     }
     /* the cover itself refuses: art shakes (not the li, whose transform is the lift) */
-    if (NEU.juice && tiles[sel]) NEU.juice.shakeEl(tiles[sel].firstChild, 'small');
+    if (NEU.juice && elCover && elCover.firstChild) NEU.juice.shakeEl(elCover.firstChild, 'small');
     if (NEU.sfx && NEU.sfx.locked) NEU.sfx.locked();
   }
 
@@ -310,6 +360,28 @@
     if (elFill) elFill.style.width = Math.max(4, pct) + '%';
   }
 
+  /* ── the backdrop ───────────────────────────────────────────────
+     Deltarune's battle grid (the fanBg sequence in sheets.js, the one
+     rhythm.js already ships) on a 320x240 canvas CSS scales up pixelated.
+     ~30 fps while the deck is open, frame 0 held still under calm
+     motion. A frame that has not loaded yet keeps the last one up. */
+  var bgCtx = null;
+  try { bgCtx = bgEl && bgEl.getContext ? bgEl.getContext('2d') : null; } catch (e) { bgCtx = null; }
+  var bgRaf = 0, bgT0 = 0, bgLast = -1;
+  function bgFrame(now) {
+    bgRaf = 0;
+    if (!open_ || !bgCtx || !NEU.sheets || !NEU.seqReady) return;
+    if (!bgT0) bgT0 = now;
+    var sh = NEU.sheets.fanBg, fr = reduced ? 0 : (((now - bgT0) / 33) | 0) % 100;
+    if (sh && fr !== bgLast && NEU.seqReady(sh, fr)) {
+      bgCtx.fillStyle = '#000'; bgCtx.fillRect(0, 0, 320, 240);
+      NEU.sheetDraw(bgCtx, 'fanBg', 160, 120, { frame: fr });
+      bgLast = fr;
+    }
+    if (sh) NEU.seqReady(sh, (fr + 1) % 100);   /* warm the next file */
+    if (!reduced || bgLast !== 0) bgRaf = requestAnimationFrame(bgFrame);
+  }
+
   /* ── open / close ───────────────────────────────────────────────*/
   function open() {
     if (open_) return;
@@ -326,6 +398,8 @@
     build();
     pick(0);
     status();
+    bgT0 = 0; bgLast = -1;
+    if (!bgRaf && bgCtx) bgRaf = requestAnimationFrame(bgFrame);
     clearInterval(tick);
     tick = setInterval(status, 10000);
     requestAnimationFrame(function () { wrap.classList.add('is-in'); });
@@ -336,6 +410,8 @@
     open_ = false;
     if (NEU.kernel && NEU.kernel.current() === 'deck') NEU.kernel.pop();
     clearInterval(tick);
+    if (bgRaf) cancelAnimationFrame(bgRaf);
+    bgRaf = 0;
     wrap.classList.remove('is-in');
     wrap.hidden = true;
     if (NEU.activeMinigame === 'deck') NEU.activeMinigame = null;
@@ -349,8 +425,8 @@
     if ((NEU.settings && NEU.settings.open_) ||
         (NEU.menu && NEU.menu.active) || (NEU.dummy && NEU.dummy.active)) return;
     if (e.key === 'Escape')     { e.preventDefault(); close(); return; }
-    if (e.key === 'ArrowLeft')  { e.preventDefault(); pick(sel - 1); return; }
-    if (e.key === 'ArrowRight') { e.preventDefault(); pick(sel + 1); return; }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')    { e.preventDefault(); pick(sel - 1); return; }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); pick(sel + 1); return; }
     if (e.key === 'Tab') {
       var focusables = [elPlay].filter(function (el) { return el && !el.hidden; });
       if (focusables.length) {

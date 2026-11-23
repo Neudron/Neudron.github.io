@@ -403,7 +403,7 @@
     goEl.type = 'button';
     goEl.className = 'craft__go';
     goEl.textContent = 'CRAFT';
-    goEl.style.cssText = 'font:400 16px/1 var(--font-display, monospace);min-width:144px;padding:16px 24px;color:#170D1F;background:#7BE38A;border:3px solid #E9FFE9;cursor:pointer;box-shadow:inset -4px -4px 0 #2F7A3C,inset 4px 4px 0 #C9FFD2';
+    /* the look lives in css/game.css (the DR kit's bar), not inline */
     goEl.addEventListener('click', commit);
     /* result slot and button travel as one block, so the row stays three
        things wide (recipe, grid, result) and stacks cleanly on a phone */

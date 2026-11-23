@@ -544,7 +544,7 @@
      One delegated listener per gesture, not one per button. A hover
      plays once per element until the pointer or focus moves to another
      one. Only the menu controls in UI_SEL make a sound. */
-  var UI_SEL = '.sett button, .shop__row, #confirmExit button, .quiz__o';
+  var UI_SEL = '.sett button, .shop__row, #confirmExit button, .quiz__o, .menu__act, .menu__tier';
   var lastUi = null;
   function uiEl(e) {
     var t = e.target;

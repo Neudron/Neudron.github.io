@@ -148,14 +148,14 @@
     }
     /* last damage number, in the same gold as the stall */
     if (last) {
-      c.font = '32px monospace';
+      c.font = "32px 'Pixelify Sans', monospace";
       c.fillStyle = '#FFD866';
       c.textAlign = 'center';
       c.fillText(String(last), 230, 28);
       c.textAlign = 'left';
     }
     dm = 'practice dummy';
-    c.font = '16px monospace';
+    c.font = "16px 'Pixelify Sans', monospace";
     c.fillStyle = '#B9B4C4';
     c.fillText(dm, 8, 20);
   }

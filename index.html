@@ -353,6 +353,7 @@
      rather than a canvas because it is an interface, not a game: the
      text has to be selectable, readable and reflowable. -->
 <div class="deck" id="deck" hidden aria-label="neu deck">
+  <canvas class="deck__bg" id="deckBg" width="320" height="240" aria-hidden="true"></canvas>
   <div class="deck__bar">
     <span class="deck__brand"><span class="glyph__copy">neu deck</span><span data-glyph-slot="deck"></span></span>
     <span class="deck__stat">
@@ -364,17 +365,21 @@
   </div>
 
   <div class="deck__body">
-    <h2 class="deck__h"><span class="glyph__copy">library</span><span data-glyph-slot="list"></span></h2>
-    <ul class="deck__shelf" id="deckShelf" role="listbox" aria-label="games"></ul>
-    <div class="deck__sel">
-      <h3 class="deck__t" id="deckTitle"></h3>
-      <p class="deck__m" id="deckMeta"></p>
-      <button class="deck__play" id="deckPlay"><span class="glyph__copy">&#9656; play</span><span data-glyph-slot="open"></span></button>
-      <p class="deck__err" id="deckErr" hidden role="alert"></p>
+    <div class="deck__win">
+      <h2 class="deck__h"><span class="glyph__copy">library</span><span data-glyph-slot="list"></span></h2>
+      <ul class="deck__shelf" id="deckShelf" role="listbox" aria-label="games"></ul>
+      <div class="deck__sel">
+        <span class="deck__cover" id="deckCover" aria-hidden="true"></span>
+        <h3 class="deck__t" id="deckTitle"></h3>
+        <ul class="deck__m" id="deckMeta"></ul>
+        <button class="deck__play" id="deckPlay"><span class="glyph__copy">&#9656; play</span><span data-glyph-slot="open"></span></button>
+        <p class="deck__err" id="deckErr" hidden role="alert"></p>
+      </div>
     </div>
+    <p class="deck__desc" id="deckDesc" aria-hidden="true"></p>
   </div>
 
-  <p class="bh__keys">&larr; &rarr;<span class="glyph__copy"> to browse</span> &nbsp;&middot;&nbsp; <kbd class="glyph__key" data-k="z">z</kbd><span class="glyph__copy"> to play</span> &nbsp;&middot;&nbsp; <span class="glyph__copy">esc to put it down</span><kbd class="glyph__shape glyph__key" aria-hidden="true">Esc</kbd></p>
+  <p class="bh__keys"><kbd aria-hidden="true">&uarr;&darr;</kbd><span class="glyph__copy">browse</span><kbd class="glyph__key" data-k="z">z</kbd><span class="glyph__copy">play</span><kbd aria-hidden="true">Esc</kbd><span class="glyph__copy">put it down</span></p>
 </div>
 
 <!-- swipes down on every pet -->

@@ -927,12 +927,6 @@
                'i am what the fire leaves, what the bowl wants,',
                'and what her door is paid with. press the right stone.'];
         } },
-      /* A hint the player asked for by walking up to it. Signs only
-         repeat what the room already showed them; the castle's rooms
-         tell you the rules once and expect you to walk them again. */
-      { t: 'sign', x: 3, y: 5, skin: 'lectern',
-        lines: ['a wall of three loose stones, each with a word.',
-                'the bowl wants what the fire leaves.'] },
       { t: 'plate', x: 6, y: 3, skin: 'stoneplate' },
       { t: 'plate', x: 14, y: 3, skin: 'stoneplate' },
       { t: 'block', x: 6, y: 9, push: true, skin: 'stoneblock' },
@@ -949,10 +943,7 @@
       Q('candles', 10, 10, { solid: true }), Q('rubble', 18, 4),
       Q('glow', 10, 4, { r: 72, col: '#D8C8FF', g: 0.08 }),
       inspect('banner', 3, 3, ['a banner of a bowl and a flame.',
-                                'it has been mended so often the bowl is now mostly flame.']),
-      inspect('bookshelf', 17, 3, ['a shelf of riddle books, all shut.',
-                                    'the spines read "Ask", "Answer", and "Do Not Say It Out Loud".',
-                                    'the last one has a padlock on it.'])
+                                'it has been mended so often the bowl is now mostly flame.'])
     ]).concat(columns([2, 3, 18, 3, 2, 8, 18, 8])),
     onEnter: function (c) {
       b2picked = c.flagged('b2_ash') || c.flagged('solved:b2_blocks') ? 'ash' : '';
@@ -1193,9 +1184,6 @@
       Q('rubble', 2, 10),
       inspect('banner', 10, 2, ['a hunter\'s banner, stiff with frost.',
                                  'the animal on it has been reversed by the cold. it looks worried.']),
-      inspect('bookshelf', 2, 9, ['a shelf of ledgers, frozen shut.',
-                                   'every title is "On The Subject Of Not Falling Through Ice".',
-                                   'there is no volume two.']),
       inspect('statue', 17, 4, ['a frozen knight, caught mid-salute.',
                                  'the ice has kept him perfectly, which is more than can be said for the salute.']),
       inspect('plaque', 16, 2, ['a brass plaque, iced over.',

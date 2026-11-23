@@ -33,8 +33,6 @@
     entities: [
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_02', spawn: 'from_wex_savanna_01_east', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_06', spawn: 'from_wex_savanna_01_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: acacia / mask: ferns'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: cross / topology: loop'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -64,8 +62,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_savanna_01', spawn: 'from_wex_savanna_02_west', style: 'arch' },
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_03', spawn: 'from_wex_savanna_02_east', style: 'ridge' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_07', spawn: 'from_wex_savanna_02_south', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: termite / mask: rubble'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: climb / topology: switchback'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -95,8 +91,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_savanna_02', spawn: 'from_wex_savanna_03_west', style: 'ridge' },
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_04', spawn: 'from_wex_savanna_03_east', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_08', spawn: 'from_wex_savanna_03_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: ridge / mask: grass'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: loop / topology: overlook'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -126,8 +120,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_savanna_03', spawn: 'from_wex_savanna_04_west', style: 'arch' },
       { t: 'exit', x: 14, y: 5, to: 'wex_split_baobab', spawn: 'from_wex_savanna_04_east', style: 'ridge' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_09', spawn: 'from_wex_savanna_04_south', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: grass / mask: pipes'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: descend / topology: split'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -155,8 +147,6 @@
     entities: [
       { t: 'exit', x: 0, y: 5, to: 'wex_savanna_04', spawn: 'from_wex_split_baobab_west', style: 'ridge' },
       { t: 'exit', x: 7, y: 10, to: 'wex_dry_well', spawn: 'from_wex_split_baobab_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: split_baobab / mask: clear'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: skirt / topology: overlook'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a baobab split into two trunks with a path between'] }
     ]
   });
@@ -186,8 +176,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_07', spawn: 'from_wex_savanna_06_east', style: 'ridge' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_01', spawn: 'from_wex_savanna_06_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_11', spawn: 'from_wex_savanna_06_south', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: termite / mask: pipes'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: loop / topology: split'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -219,8 +207,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_08', spawn: 'from_wex_savanna_07_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_02', spawn: 'from_wex_savanna_07_north', style: 'ridge' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_12', spawn: 'from_wex_savanna_07_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: ridge / mask: clear'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: descend / topology: courtyard'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -252,8 +238,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_09', spawn: 'from_wex_savanna_08_east', style: 'ridge' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_03', spawn: 'from_wex_savanna_08_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_13', spawn: 'from_wex_savanna_08_south', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: grass / mask: ferns'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: skirt / topology: loop'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -285,8 +269,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_dry_well', spawn: 'from_wex_savanna_09_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_04', spawn: 'from_wex_savanna_09_north', style: 'ridge' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_14', spawn: 'from_wex_savanna_09_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: baobab / mask: rubble'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: cross / topology: switchback'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -316,8 +298,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_savanna_09', spawn: 'from_wex_dry_well_west', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_split_baobab', spawn: 'from_wex_dry_well_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_termite_cathedral', spawn: 'from_wex_dry_well_south', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: dry_well / mask: grass'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: climb / topology: loop'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a dry well with three paths worn into its rim'] }
     ]
   });
@@ -347,8 +327,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_12', spawn: 'from_wex_savanna_11_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_06', spawn: 'from_wex_savanna_11_north', style: 'ridge' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_16', spawn: 'from_wex_savanna_11_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: ridge / mask: rubble'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: skirt / topology: switchback'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -380,8 +358,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_13', spawn: 'from_wex_savanna_12_east', style: 'ridge' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_07', spawn: 'from_wex_savanna_12_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_17', spawn: 'from_wex_savanna_12_south', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: grass / mask: grass'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: cross / topology: overlook'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -413,8 +389,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_14', spawn: 'from_wex_savanna_13_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_08', spawn: 'from_wex_savanna_13_north', style: 'ridge' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_18', spawn: 'from_wex_savanna_13_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: baobab / mask: pipes'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: climb / topology: split'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -446,8 +420,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_termite_cathedral', spawn: 'from_wex_savanna_14_east', style: 'ridge' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_09', spawn: 'from_wex_savanna_14_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_19', spawn: 'from_wex_savanna_14_south', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: acacia / mask: clear'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: loop / topology: courtyard'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -477,8 +449,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_savanna_14', spawn: 'from_wex_termite_cathedral_west', style: 'ridge' },
       { t: 'exit', x: 7, y: 0, to: 'wex_dry_well', spawn: 'from_wex_termite_cathedral_north', style: 'ridge' },
       { t: 'exit', x: 7, y: 10, to: 'wex_mirror_ridge', spawn: 'from_wex_termite_cathedral_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: termite_cathedral / mask: ferns'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: descend / topology: split'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a termite mound shaped like a cathedral'] }
     ]
   });
@@ -508,8 +478,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_17', spawn: 'from_wex_savanna_16_east', style: 'ridge' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_11', spawn: 'from_wex_savanna_16_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_21', spawn: 'from_wex_savanna_16_south', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: grass / mask: clear'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: climb / topology: courtyard'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -541,8 +509,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_18', spawn: 'from_wex_savanna_17_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_12', spawn: 'from_wex_savanna_17_north', style: 'ridge' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_22', spawn: 'from_wex_savanna_17_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: baobab / mask: ferns'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: loop / topology: loop'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -574,8 +540,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_19', spawn: 'from_wex_savanna_18_east', style: 'ridge' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_13', spawn: 'from_wex_savanna_18_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_23', spawn: 'from_wex_savanna_18_south', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: acacia / mask: rubble'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: descend / topology: switchback'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -607,8 +571,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_mirror_ridge', spawn: 'from_wex_savanna_19_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_14', spawn: 'from_wex_savanna_19_north', style: 'ridge' },
       { t: 'exit', x: 7, y: 10, to: 'wex_savanna_24', spawn: 'from_wex_savanna_19_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: termite / mask: grass'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: skirt / topology: overlook'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -638,8 +600,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_savanna_19', spawn: 'from_wex_mirror_ridge_west', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_termite_cathedral', spawn: 'from_wex_mirror_ridge_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_braid_fork', spawn: 'from_wex_mirror_ridge_south', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: mirror_ridge / mask: pipes'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: cross / topology: switchback'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a laterite ridge that echoes your steps late'] }
     ]
   });
@@ -667,8 +627,6 @@
     entities: [
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_22', spawn: 'from_wex_savanna_21_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_16', spawn: 'from_wex_savanna_21_north', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: baobab / mask: grass'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: descend / topology: overlook'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -698,8 +656,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_savanna_21', spawn: 'from_wex_savanna_22_west', style: 'arch' },
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_23', spawn: 'from_wex_savanna_22_east', style: 'ridge' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_17', spawn: 'from_wex_savanna_22_north', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: acacia / mask: pipes'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: skirt / topology: split'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -729,8 +685,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_savanna_22', spawn: 'from_wex_savanna_23_west', style: 'ridge' },
       { t: 'exit', x: 14, y: 5, to: 'wex_savanna_24', spawn: 'from_wex_savanna_23_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_18', spawn: 'from_wex_savanna_23_north', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: termite / mask: clear'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: cross / topology: courtyard'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -760,8 +714,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_savanna_23', spawn: 'from_wex_savanna_24_west', style: 'arch' },
       { t: 'exit', x: 14, y: 5, to: 'wex_braid_fork', spawn: 'from_wex_savanna_24_east', style: 'ridge' },
       { t: 'exit', x: 7, y: 0, to: 'wex_savanna_19', spawn: 'from_wex_savanna_24_north', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: ridge / mask: ferns'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: climb / topology: loop'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -789,8 +741,6 @@
     entities: [
       { t: 'exit', x: 0, y: 5, to: 'wex_savanna_24', spawn: 'from_wex_braid_fork_west', style: 'ridge' },
       { t: 'exit', x: 7, y: 0, to: 'wex_mirror_ridge', spawn: 'from_wex_braid_fork_north', style: 'ridge' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: braid_fork / mask: rubble'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: loop / topology: courtyard'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a fork of trails that braids and unbraids'] }
     ]
   });

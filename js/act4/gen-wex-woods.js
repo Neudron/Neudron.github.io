@@ -33,8 +33,6 @@
     entities: [
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_02', spawn: 'from_wex_woods_01_east', style: 'tunnel' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_06', spawn: 'from_wex_woods_01_south', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: canopy / mask: ferns'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: cross / topology: loop'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -64,8 +62,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_woods_01', spawn: 'from_wex_woods_02_west', style: 'tunnel' },
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_03', spawn: 'from_wex_woods_02_east', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_07', spawn: 'from_wex_woods_02_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: stump / mask: rubble'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: climb / topology: switchback'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -95,8 +91,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_woods_02', spawn: 'from_wex_woods_03_west', style: 'arch' },
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_04', spawn: 'from_wex_woods_03_east', style: 'tunnel' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_08', spawn: 'from_wex_woods_03_south', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: arch / mask: grass'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: loop / topology: overlook'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -126,8 +120,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_woods_03', spawn: 'from_wex_woods_04_west', style: 'tunnel' },
       { t: 'exit', x: 14, y: 5, to: 'wex_hollow_trunk', spawn: 'from_wex_woods_04_east', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_09', spawn: 'from_wex_woods_04_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: spire / mask: pipes'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: descend / topology: split'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -155,8 +147,6 @@
     entities: [
       { t: 'exit', x: 0, y: 5, to: 'wex_woods_04', spawn: 'from_wex_hollow_trunk_west', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_moonwell', spawn: 'from_wex_hollow_trunk_south', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: hollow_trunk / mask: clear'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: skirt / topology: overlook'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a hollow trunk wide enough to walk through'] }
     ]
   });
@@ -186,8 +176,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_07', spawn: 'from_wex_woods_06_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_01', spawn: 'from_wex_woods_06_north', style: 'tunnel' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_11', spawn: 'from_wex_woods_06_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: stump / mask: pipes'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: loop / topology: split'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -219,8 +207,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_08', spawn: 'from_wex_woods_07_east', style: 'tunnel' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_02', spawn: 'from_wex_woods_07_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_12', spawn: 'from_wex_woods_07_south', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: arch / mask: clear'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: descend / topology: courtyard'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -252,8 +238,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_09', spawn: 'from_wex_woods_08_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_03', spawn: 'from_wex_woods_08_north', style: 'tunnel' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_13', spawn: 'from_wex_woods_08_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: spire / mask: ferns'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: skirt / topology: loop'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -285,8 +269,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_moonwell', spawn: 'from_wex_woods_09_east', style: 'tunnel' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_04', spawn: 'from_wex_woods_09_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_14', spawn: 'from_wex_woods_09_south', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: thicket / mask: rubble'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: cross / topology: switchback'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -316,8 +298,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_woods_09', spawn: 'from_wex_moonwell_west', style: 'tunnel' },
       { t: 'exit', x: 7, y: 0, to: 'wex_hollow_trunk', spawn: 'from_wex_moonwell_north', style: 'tunnel' },
       { t: 'exit', x: 7, y: 10, to: 'wex_root_cause', spawn: 'from_wex_moonwell_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: moonwell / mask: grass'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: climb / topology: loop'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a dry well reflecting a moon that is not overhead'] }
     ]
   });
@@ -347,8 +327,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_12', spawn: 'from_wex_woods_11_east', style: 'tunnel' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_06', spawn: 'from_wex_woods_11_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_16', spawn: 'from_wex_woods_11_south', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: arch / mask: rubble'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: skirt / topology: switchback'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -380,8 +358,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_13', spawn: 'from_wex_woods_12_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_07', spawn: 'from_wex_woods_12_north', style: 'tunnel' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_17', spawn: 'from_wex_woods_12_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: spire / mask: grass'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: cross / topology: overlook'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -413,8 +389,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_14', spawn: 'from_wex_woods_13_east', style: 'tunnel' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_08', spawn: 'from_wex_woods_13_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_18', spawn: 'from_wex_woods_13_south', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: thicket / mask: pipes'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: climb / topology: split'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -446,8 +420,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_root_cause', spawn: 'from_wex_woods_14_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_09', spawn: 'from_wex_woods_14_north', style: 'tunnel' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_19', spawn: 'from_wex_woods_14_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: canopy / mask: clear'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: loop / topology: courtyard'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -477,8 +449,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_woods_14', spawn: 'from_wex_root_cause_west', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_moonwell', spawn: 'from_wex_root_cause_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_watchtower', spawn: 'from_wex_root_cause_south', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: root_cause / mask: ferns'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: descend / topology: split'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['two roots grown around a door that was never built'] }
     ]
   });
@@ -508,8 +478,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_17', spawn: 'from_wex_woods_16_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_11', spawn: 'from_wex_woods_16_north', style: 'tunnel' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_21', spawn: 'from_wex_woods_16_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: spire / mask: clear'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: climb / topology: courtyard'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -541,8 +509,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_18', spawn: 'from_wex_woods_17_east', style: 'tunnel' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_12', spawn: 'from_wex_woods_17_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_22', spawn: 'from_wex_woods_17_south', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: thicket / mask: ferns'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: loop / topology: loop'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -574,8 +540,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_19', spawn: 'from_wex_woods_18_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_13', spawn: 'from_wex_woods_18_north', style: 'tunnel' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_23', spawn: 'from_wex_woods_18_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: canopy / mask: rubble'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: descend / topology: switchback'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -607,8 +571,6 @@
       { t: 'exit', x: 14, y: 5, to: 'wex_watchtower', spawn: 'from_wex_woods_19_east', style: 'tunnel' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_14', spawn: 'from_wex_woods_19_north', style: 'arch' },
       { t: 'exit', x: 7, y: 10, to: 'wex_woods_24', spawn: 'from_wex_woods_19_south', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: stump / mask: grass'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: skirt / topology: overlook'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -638,8 +600,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_woods_19', spawn: 'from_wex_watchtower_west', style: 'tunnel' },
       { t: 'exit', x: 7, y: 0, to: 'wex_root_cause', spawn: 'from_wex_watchtower_north', style: 'tunnel' },
       { t: 'exit', x: 7, y: 10, to: 'wex_glass_clearing', spawn: 'from_wex_watchtower_south', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: watchtower / mask: pipes'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: cross / topology: switchback'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a watchtower with no ladder and one lit window'] }
     ]
   });
@@ -667,8 +627,6 @@
     entities: [
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_22', spawn: 'from_wex_woods_21_east', style: 'tunnel' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_16', spawn: 'from_wex_woods_21_north', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: thicket / mask: grass'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: descend / topology: overlook'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -698,8 +656,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_woods_21', spawn: 'from_wex_woods_22_west', style: 'tunnel' },
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_23', spawn: 'from_wex_woods_22_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_17', spawn: 'from_wex_woods_22_north', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: canopy / mask: pipes'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: skirt / topology: split'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -729,8 +685,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_woods_22', spawn: 'from_wex_woods_23_west', style: 'arch' },
       { t: 'exit', x: 14, y: 5, to: 'wex_woods_24', spawn: 'from_wex_woods_23_east', style: 'tunnel' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_18', spawn: 'from_wex_woods_23_north', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: stump / mask: clear'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: cross / topology: courtyard'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -760,8 +714,6 @@
       { t: 'exit', x: 0, y: 5, to: 'wex_woods_23', spawn: 'from_wex_woods_24_west', style: 'tunnel' },
       { t: 'exit', x: 14, y: 5, to: 'wex_glass_clearing', spawn: 'from_wex_woods_24_east', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_woods_19', spawn: 'from_wex_woods_24_north', style: 'tunnel' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: arch / mask: ferns'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: climb / topology: loop'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a room made for walking through, not staying in.'] }
     ]
   });
@@ -789,8 +741,6 @@
     entities: [
       { t: 'exit', x: 0, y: 5, to: 'wex_woods_24', spawn: 'from_wex_glass_clearing_west', style: 'arch' },
       { t: 'exit', x: 7, y: 0, to: 'wex_watchtower', spawn: 'from_wex_glass_clearing_north', style: 'arch' },
-      { t: 'sign', x: 3, y: 5, lines: ['silhouette: glass_clearing / mask: rubble'] },
-      { t: 'sign', x: 11, y: 5, lines: ['beat: loop / topology: courtyard'] },
       { t: 'npc', x: 7, y: 3, colour: '#7E3E78', look: 'wex', lines: ['a clearing floored in old glass'] }
     ]
   });

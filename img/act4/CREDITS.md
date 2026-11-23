@@ -74,6 +74,7 @@ claimed for any row below; none is APPROVED. See `plans/neu-v3/ASSET_MANIFEST.md
 | Calamity Mod (Supreme Calamitas, Polterghast, projectiles, 5 dungeon NPCs) | `img/act4/calamity/` | Calamity Team / Azafure, LLC. Proprietary, all rights reserved. | none claimed |
 | Undertale sprites (Act I–III and props) | `img/act123/`, `img/act4/undertale/` | Toby Fox. | none claimed |
 | Deltarune atlases (TV Time, equipment icons, zone tiles) | `img/act4/deltarune/`, `img/act4/tiles/` | Toby Fox. | none claimed |
+| Deltarune UI panel-kit crops (dark-world dialog box 9-slice, C-menu icons, star) | `img/act4/deltarune/ui/dwbox.png`, `menu-icons.png`, `star.png` | Toby Fox. Cropped 2026-11-23 from the Spriters Resource sheets `fan/deltarune/hud.png` (asset 110733) and `battle-menu.png` (asset 110943), which themselves stay unshipped. Drawn by the deck, main menu, difficulty picker and settings (`css/game.css` DR panel kit). Ships under the owner's 2026-11-21 fan-use decision; NOT CLEARED. | none claimed |
 | Super Pixel Effects Gigapack (free tier) + BDragon free-tier effects | `img/act4/vfx/` | Will Tice / unTied Games; BDragon. Bundle-with-attribution terms only; no rightsholder clearance. | none claimed |
 | TownNPC witch portrait crop | `img/act4/witch-face.png` | Toby Fox (Deltarune atlas crop). | none claimed |
 | Root franchise assets | `img/Sans_sprite.webp`, `img/totem.webp`, `img/annoying-dog.gif`, `img/cat.gif` | Toby Fox / Undertale. | none claimed |

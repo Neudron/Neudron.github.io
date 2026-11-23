@@ -5,55 +5,352 @@
    settings (94), and the shop rows inside .shop (76)/.mage (76).
    Font sizes stay on the 16px grid. Semantic tokens only. */
 
+/* ── DR panel kit ────────────────────────────────────────────────
+   One look for the deck, the main menu, the difficulty picker and
+   settings: Deltarune's dark-world box (img/act4/deltarune/ui/dwbox.png,
+   a 12px 9-slice drawn at 2x), stepped pixel bars, the red soul as the
+   cursor and yellow for the line it is on. Deltarune's own palette;
+   no blur, no smooth gradients, no rounded corners. */
+:root {
+  --dr-rim: #FFFFFF; --dr-sel: #FFFF00; --dr-off: #808080; --dr-gold: #FFC90E;
+  --dr-void: #240024; --dr-line: #4A3A5E; --dr-hint: #9DA2C4; --dr-bad: #FF5050;
+  --dr-bar-off: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='21' height='20' viewBox='0 0 21 20' shape-rendering='crispEdges'%3E%3Crect x='9' y='0' width='3' height='1' fill='%234A3A5E'/%3E%3Crect x='8' y='1' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='9' y='1' width='3' height='1' fill='%23000000'/%3E%3Crect x='12' y='1' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='7' y='2' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='8' y='2' width='5' height='1' fill='%23000000'/%3E%3Crect x='13' y='2' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='6' y='3' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='7' y='3' width='7' height='1' fill='%23000000'/%3E%3Crect x='14' y='3' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='6' y='4' width='9' height='1' fill='%23000000'/%3E%3Crect x='15' y='4' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='5' y='5' width='11' height='1' fill='%23000000'/%3E%3Crect x='16' y='5' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='4' y='6' width='13' height='1' fill='%23000000'/%3E%3Crect x='17' y='6' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='2' y='7' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='3' y='7' width='15' height='1' fill='%23000000'/%3E%3Crect x='18' y='7' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='1' y='8' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='2' y='8' width='17' height='1' fill='%23000000'/%3E%3Crect x='19' y='8' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='0' y='9' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='1' y='9' width='19' height='1' fill='%23000000'/%3E%3Crect x='20' y='9' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='0' y='10' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='1' y='10' width='19' height='1' fill='%23000000'/%3E%3Crect x='20' y='10' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='1' y='11' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='2' y='11' width='17' height='1' fill='%23000000'/%3E%3Crect x='19' y='11' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='2' y='12' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='3' y='12' width='15' height='1' fill='%23000000'/%3E%3Crect x='18' y='12' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='3' y='13' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='4' y='13' width='13' height='1' fill='%23000000'/%3E%3Crect x='17' y='13' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='4' y='14' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='5' y='14' width='11' height='1' fill='%23000000'/%3E%3Crect x='16' y='14' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='5' y='15' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='6' y='15' width='9' height='1' fill='%23000000'/%3E%3Crect x='15' y='15' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='6' y='16' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='7' y='16' width='7' height='1' fill='%23000000'/%3E%3Crect x='14' y='16' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='7' y='17' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='8' y='17' width='5' height='1' fill='%23000000'/%3E%3Crect x='13' y='17' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='8' y='18' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='9' y='18' width='3' height='1' fill='%23000000'/%3E%3Crect x='12' y='18' width='1' height='1' fill='%234A3A5E'/%3E%3Crect x='9' y='19' width='3' height='1' fill='%234A3A5E'/%3E%3C/svg%3E");
+  --dr-bar-on: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='21' height='20' viewBox='0 0 21 20' shape-rendering='crispEdges'%3E%3Crect x='9' y='0' width='3' height='1' fill='%23FFFFFF'/%3E%3Crect x='8' y='1' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='9' y='1' width='3' height='1' fill='%23240024'/%3E%3Crect x='12' y='1' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='7' y='2' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='8' y='2' width='5' height='1' fill='%23240024'/%3E%3Crect x='13' y='2' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='6' y='3' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='7' y='3' width='7' height='1' fill='%23240024'/%3E%3Crect x='14' y='3' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='6' y='4' width='9' height='1' fill='%23240024'/%3E%3Crect x='15' y='4' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='5' y='5' width='11' height='1' fill='%23240024'/%3E%3Crect x='16' y='5' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='4' y='6' width='13' height='1' fill='%23240024'/%3E%3Crect x='17' y='6' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='2' y='7' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='3' y='7' width='15' height='1' fill='%23240024'/%3E%3Crect x='18' y='7' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='1' y='8' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='2' y='8' width='17' height='1' fill='%23240024'/%3E%3Crect x='19' y='8' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='0' y='9' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='1' y='9' width='19' height='1' fill='%23240024'/%3E%3Crect x='20' y='9' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='0' y='10' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='1' y='10' width='19' height='1' fill='%23240024'/%3E%3Crect x='20' y='10' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='1' y='11' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='2' y='11' width='17' height='1' fill='%23240024'/%3E%3Crect x='19' y='11' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='2' y='12' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='3' y='12' width='15' height='1' fill='%23240024'/%3E%3Crect x='18' y='12' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='3' y='13' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='4' y='13' width='13' height='1' fill='%23240024'/%3E%3Crect x='17' y='13' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='4' y='14' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='5' y='14' width='11' height='1' fill='%23240024'/%3E%3Crect x='16' y='14' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='5' y='15' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='6' y='15' width='9' height='1' fill='%23240024'/%3E%3Crect x='15' y='15' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='6' y='16' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='7' y='16' width='7' height='1' fill='%23240024'/%3E%3Crect x='14' y='16' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='7' y='17' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='8' y='17' width='5' height='1' fill='%23240024'/%3E%3Crect x='13' y='17' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='8' y='18' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='9' y='18' width='3' height='1' fill='%23240024'/%3E%3Crect x='12' y='18' width='1' height='1' fill='%23FFFFFF'/%3E%3Crect x='9' y='19' width='3' height='1' fill='%23FFFFFF'/%3E%3C/svg%3E");
+  --dr-bar-bad: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='21' height='20' viewBox='0 0 21 20' shape-rendering='crispEdges'%3E%3Crect x='9' y='0' width='3' height='1' fill='%23C0283C'/%3E%3Crect x='8' y='1' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='9' y='1' width='3' height='1' fill='%23000000'/%3E%3Crect x='12' y='1' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='7' y='2' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='8' y='2' width='5' height='1' fill='%23000000'/%3E%3Crect x='13' y='2' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='6' y='3' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='7' y='3' width='7' height='1' fill='%23000000'/%3E%3Crect x='14' y='3' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='5' y='4' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='6' y='4' width='9' height='1' fill='%23000000'/%3E%3Crect x='15' y='4' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='5' y='5' width='11' height='1' fill='%23000000'/%3E%3Crect x='16' y='5' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='4' y='6' width='13' height='1' fill='%23000000'/%3E%3Crect x='17' y='6' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='2' y='7' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='3' y='7' width='15' height='1' fill='%23000000'/%3E%3Crect x='18' y='7' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='1' y='8' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='2' y='8' width='17' height='1' fill='%23000000'/%3E%3Crect x='19' y='8' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='0' y='9' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='1' y='9' width='19' height='1' fill='%23000000'/%3E%3Crect x='20' y='9' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='0' y='10' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='1' y='10' width='19' height='1' fill='%23000000'/%3E%3Crect x='20' y='10' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='1' y='11' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='2' y='11' width='17' height='1' fill='%23000000'/%3E%3Crect x='19' y='11' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='2' y='12' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='3' y='12' width='15' height='1' fill='%23000000'/%3E%3Crect x='18' y='12' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='3' y='13' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='4' y='13' width='13' height='1' fill='%23000000'/%3E%3Crect x='17' y='13' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='4' y='14' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='5' y='14' width='11' height='1' fill='%23000000'/%3E%3Crect x='16' y='14' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='5' y='15' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='6' y='15' width='9' height='1' fill='%23000000'/%3E%3Crect x='15' y='15' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='6' y='16' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='7' y='16' width='7' height='1' fill='%23000000'/%3E%3Crect x='14' y='16' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='7' y='17' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='8' y='17' width='5' height='1' fill='%23000000'/%3E%3Crect x='13' y='17' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='8' y='18' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='9' y='18' width='3' height='1' fill='%23000000'/%3E%3Crect x='12' y='18' width='1' height='1' fill='%23C0283C'/%3E%3Crect x='9' y='19' width='3' height='1' fill='%23C0283C'/%3E%3C/svg%3E");
+  /* 50% pixel dither: the pixel-art stand-in for a blurred backdrop */
+  --dr-dither: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2' viewBox='0 0 2 2' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='1' height='1' fill='%23000000'/%3E%3Crect x='1' y='1' width='1' height='1' fill='%23000000'/%3E%3C/svg%3E");
+}
+.menu__win, .menu__desc, .sett__box, .sett__desc, .deck__win, .deck__desc, .dr-ask__box {
+  position: relative; box-sizing: border-box;
+  border: 24px solid transparent; border-radius: 0;
+  border-image: url(../img/act4/deltarune/ui/dwbox.png) 12 fill / 24px stretch;
+  background: none; box-shadow: none;
+  image-rendering: pixelated;
+}
+/* the parts the browser draws still wear the palette */
+.menu, .sett, .deck { scrollbar-color: var(--dr-hint) #000; }
+.menu ::selection, .sett ::selection, .deck ::selection { background: var(--dr-sel); color: #000; }
+/* The window's name sits on its top rim, like Deltarune's CHAR/STATS tags. */
+.menu__win::before {
+  content: attr(data-tag);
+  position: absolute; left: 8px; top: -30px; padding: 0 8px;
+  background: #000; color: var(--dr-rim);
+  font: 400 32px/1 var(--font); text-transform: uppercase; letter-spacing: 2px;
+}
+/* Selection bars: a 20px-tall pixel hexagon (the reference's bar shape) at 2x,
+   so every bar is exactly 40px tall and its stair-step ends stay whole. */
+.menu__act, .menu__tier, .sett__cat, .deck__tile {
+  position: relative; box-sizing: border-box;
+  height: 40px; min-height: 40px;
+  border: solid transparent; border-width: 0 20px; border-radius: 0;
+  border-image: var(--dr-bar-off) 0 10 fill / 0 20px stretch;
+  background: none; color: var(--dr-rim);
+  image-rendering: pixelated;
+}
+/* the soul: one sprite, shown only on the line the cursor is on */
+.menu__act::before, .menu__tier::before {
+  content: ''; position: absolute; left: 0; top: 50%;
+  width: 16px; height: 16px; margin-top: -8px;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
+  image-rendering: pixelated; visibility: hidden;
+}
+
+/* ── "leave the game?" (NEU.engine.confirmExit), in the kit ─────────
+   Same window, same bars, same soul. Default answer stays NO; z 95. */
+.dr-ask {
+  position: fixed; inset: 0; z-index: 95;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--dr-dither) 0 0 / 4px 4px, rgba(0, 0, 0, 0.6);
+}
+.dr-ask__box { width: min(560px, 92vw); padding: 24px 16px 16px; text-align: center; }
+.dr-ask__h { margin: 0 0 8px; font: 400 32px/1.2 var(--font); color: var(--dr-rim); }
+.dr-ask__keys, .dr-ask__note { margin: 0 0 16px; font: 400 16px/1.5 var(--font); color: var(--dr-hint); }
+.dr-ask__note { margin: 16px 0 0; }
+.dr-ask__opts { display: flex; justify-content: center; gap: 24px; }
+.dr-ask__opt {
+  position: relative; box-sizing: border-box; width: 160px; height: 40px; padding: 0 24px;
+  border: solid transparent; border-width: 0 20px; border-radius: 0;
+  border-image: var(--dr-bar-off) 0 10 fill / 0 20px stretch; image-rendering: pixelated;
+  background: none; color: var(--dr-rim); font: 400 16px/1 var(--font); cursor: pointer;
+}
+.dr-ask__opt[aria-pressed="true"] { border-image-source: var(--dr-bar-on); color: var(--dr-sel); }
+.dr-ask__soul {
+  position: absolute; left: 0; top: 50%; width: 16px; height: 16px; margin-top: -8px;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%; image-rendering: pixelated;
+}
+.dr-ask__soul[hidden] { display: none !important; }
+
 /* ── in-game main menu ─────────────────────────────────────────── */
 .menu {
   position: fixed; inset: 0; z-index: 93;
-  display: grid; place-items: center; padding: 24px;
-  background: rgba(8, 8, 11, 0.82);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; padding: 24px 24px 72px; box-sizing: border-box;
+  background: var(--dr-dither) 0 0 / 4px 4px, rgba(0, 0, 0, 0.55);
   font-variant-ligatures: none;
 }
 .menu[hidden] { display: none !important; }
 .menu__win {
-  width: min(560px, 100%); max-height: calc(100dvh - 48px); overflow: auto;
-  box-sizing: border-box; padding: 32px;
-  background: #12081E; border: 4px solid var(--edge); border-radius: 8px;
-  box-shadow: inset 0 0 0 2px #1A1024;
+  width: min(560px, 100%);
+  padding: 24px 16px 8px; margin-top: 16px;
 }
-.menu__head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.menu__title { margin: 0; font: 700 48px/1.1 var(--font, monospace); color: var(--text); letter-spacing: 4px; }
-.menu__ver { font: 400 16px/1 var(--font, monospace); color: var(--dim); }
-.menu__screen { display: flex; flex-direction: column; gap: 8px; margin: 24px 0 16px; }
-.menu__h { margin: 0 0 8px; font: 400 16px/1.5 var(--font, monospace); color: var(--dim); }
+.menu__win.is-wide { width: min(960px, 100%); }
+/* the list scrolls inside the window, so the rim tag is never clipped */
+.menu__cols { max-height: calc(100dvh - 312px); overflow: auto; }
+.menu__head { display: flex; align-items: baseline; justify-content: center; gap: 16px; }
+.menu__title {
+  margin: 0; font: 400 48px/1 var(--font, monospace); color: var(--dr-rim);
+  letter-spacing: 8px; text-transform: uppercase;
+}
+.menu__ver { font: 400 16px/1 var(--font, monospace); color: var(--dr-hint); }
+.menu__cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.menu__win.is-wide .menu__cols { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); }
+.menu__side { border-left: 2px solid var(--dr-line); padding: 0 8px 0 24px; }
+.menu__side:empty { display: none; }
+.menu__screen { display: flex; flex-direction: column; gap: 8px; margin: 0 0 8px; }
+.menu__h {
+  display: flex; align-items: center; gap: 16px; margin: 0 0 8px;
+  font: 400 16px/1.5 var(--font, monospace); color: var(--dr-hint);
+}
+.menu__h::before, .menu__h::after { content: ''; flex: 1 1 16px; height: 2px; background: var(--dr-line); }
 .menu__act, .menu__tier {
-  display: flex; align-items: center; gap: 16px; width: 100%;
-  min-height: 48px; padding: 8px 16px; box-sizing: border-box;
-  font: 400 16px/1.5 var(--font, monospace); text-align: left;
-  color: var(--text); background: #1A1024;
-  border: 2px solid var(--edge); border-radius: 4px;
+  display: flex; align-items: center; justify-content: center; gap: 16px; width: 100%;
+  padding: 0 24px;
+  font: 400 16px/1.5 var(--font, monospace); text-align: center;
   cursor: pointer;
 }
-.menu__act::before { content: '\25B6'; color: var(--accent); font-size: 16px; }
-.menu__act:hover, .menu__act:focus-visible,
-.menu__tier:hover, .menu__tier:focus-visible {
-  outline: 3px solid var(--accent); outline-offset: 2px;
-  background: #2A1E3A; color: var(--text);
+.menu__act:hover, .menu__act:focus, .menu__act:focus-visible,
+.menu__tier:hover, .menu__tier:focus, .menu__tier:focus-visible {
+  outline: none; border-image-source: var(--dr-bar-on); color: var(--dr-sel);
 }
-.menu__primary { border-color: var(--accent); background: #2A1E3A; }
-.menu__danger { border-color: #E23B55; color: #FFB0A0; }
-.menu__danger::before { content: '\2716'; }
-.menu__back::before { content: '\2190'; }
-.menu__tier { flex-direction: column; align-items: flex-start; gap: 4px; }
-.menu__tier-name { font: 700 16px/1.2 var(--font, monospace); }
+.menu__act:focus::before, .menu__tier:focus::before { visibility: visible; }
+.menu__danger { border-image-source: var(--dr-bar-bad); color: var(--dr-bad); }
+.menu__danger:hover, .menu__danger:focus, .menu__danger:focus-visible { color: var(--dr-bad); }
+/* the tier's meter and one-liner stay in the button for screen readers;
+   the eye reads them in the detail panel and the strip */
+.menu__tier .glyph__meter, .menu__tier .menu__tier-fx {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+.menu__tier-name { font: 400 16px/1.2 var(--font, monospace); }
 .menu__tier-fx { font: 400 16px/1.3 var(--font, monospace); color: var(--dim); }
+.menu__side-h {
+  margin: 0 0 8px; padding-bottom: 8px; border-bottom: 2px solid var(--dr-line);
+  font: 400 32px/1 var(--font, monospace); color: var(--dr-gold); text-transform: uppercase;
+}
+.menu__side .glyph__meter { display: flex !important; gap: 4px; width: auto; margin: 0 0 8px; }
+.menu__side .glyph__meter > i { width: 12px; height: 16px; border: 2px solid var(--dr-line); background: #000; border-radius: 0; }
+.menu__side .glyph__meter > .is-filled { border-color: var(--dr-gold); background: #FFA040; }
+.menu__stats { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.menu__stats li { display: flex; align-items: center; gap: 12px; font: 400 16px/1.5 var(--font, monospace); color: var(--dr-hint); }
+.menu__stats li::before {
+  content: ''; flex: none; width: 15px; height: 15px;
+  background: url(../img/act4/deltarune/ui/star.png); image-rendering: pixelated;
+}
+.menu__stats b { font-weight: 400; color: var(--dr-rim); }
+.menu__stats b::after { content: ':'; }
+
+
+/* ── typewriter strips (NEU.glyph.type) ── the text is whole in the DOM;
+   a stepped clip reveals it one letter-width at a time. */
+.dr-type { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.rm) .dr-type { animation: drType calc(var(--n) * 28ms) steps(var(--n)) both; }
+}
+@keyframes drType { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+
+/* ── title plate: the drawn logo, and the soul that drops onto it ── */
+.menu__title-t {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.menu__logo { display: block; width: 155px; height: 50px; }
+.menu__head { align-items: flex-end; }
+.menu__drop {
+  width: 16px; height: 16px; margin: 0 0 4px -8px; flex: none;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%; image-rendering: pixelated;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .menu.is-intro .menu__drop { animation: drDrop .9s steps(9) both; }
+  .menu.is-intro .menu__logo { animation: drLand .9s steps(9) both; }
+}
+@keyframes drDrop {
+  0% { transform: translateY(-120px); } 45% { transform: translateY(0); }
+  60% { transform: translateY(-16px); } 75% { transform: translateY(0); }
+  85% { transform: translateY(-4px); } 100% { transform: translateY(0); }
+}
+@keyframes drLand { 0%, 44% { transform: none; } 50% { transform: translateY(3px) scaleY(.92); } 60%, 100% { transform: none; } }
+
+/* ── difficulty panel: name and meter share a row; the live preview box ── */
+.menu__side-top {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  margin: 0 0 8px; padding-bottom: 8px; border-bottom: 2px solid var(--mood, var(--dr-line));
+}
+/* the tier's name is a one-line label here; the banner below is the loud part */
+.menu__side-top .menu__side-h { margin: 0; padding: 0; border: 0; font-size: 16px; letter-spacing: 4px; white-space: nowrap; }
+.menu__side-top .glyph__meter { margin: 0; }
+.menu__preview {
+  display: block; width: 400px; height: 56px; margin: 0 0 8px;
+  border: 2px solid var(--mood, var(--dr-line)); background: #000; image-rendering: pixelated;
+}
+.menu__stats li { line-height: 1.4; white-space: nowrap; }
+
+/* ── the Final Breath gate: the confirm screen in the tier's red ── */
+.menu__win[data-mood="finalbreath"] .menu__h { color: var(--mood); font-size: 48px; line-height: 1; justify-content: center; }
+.menu__win[data-mood="finalbreath"] .menu__h::before, .menu__win[data-mood="finalbreath"] .menu__h::after { background: var(--mood); }
+.menu__win[data-mood="finalbreath"] .menu__file { color: var(--dr-rim); text-align: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .menu__win[data-mood="finalbreath"] .menu__h { animation: drPulse 1.2s steps(6) infinite; }
+}
+
+/* ── difficulty personalities ─────────────────────────────────────
+   Each tier gets its own colour, banner and motion in the detail panel,
+   and whatever it changes against its neighbour is shouted (NEW!).
+   Motion is steps() for the pixel feel, never a flash, and the
+   reduced-motion rules above (.menu.is-calm, prefers-reduced-motion)
+   drop every animation and leave the final frame. */
+.menu [data-mood="bot"] { --mood: #C8B8FF; }
+.menu [data-mood="easy"] { --mood: #BFD4FF; }
+.menu [data-mood="medium"] { --mood: #FFFFFF; }
+.menu [data-mood="hard"] { --mood: #FFA040; }
+.menu [data-mood="vhard"] { --mood: #FF7A30; }
+.menu [data-mood="ultrakill"] { --mood: #FF3030; }
+.menu [data-mood="finalbreath"] { --mood: #FF2020; }
+.menu__side[data-mood] .menu__side-h { color: var(--mood); border-bottom-color: var(--mood); }
+.menu__side[data-mood] .glyph__meter > .is-filled { background: var(--mood); border-color: var(--mood); }
+.menu__desc[data-mood] { color: var(--mood); }
+.menu__banner { margin: 0 0 8px; white-space: nowrap; }
+.menu__banner b {
+  display: inline-block; font: 400 48px/1.1 var(--font); color: var(--mood, var(--dr-rim));
+  text-transform: uppercase; letter-spacing: 2px; transform-origin: left center;
+}
+.menu__banner small { display: block; margin-top: 0; white-space: normal; font: 400 16px/1.5 var(--font); color: var(--dr-hint); }
+.menu__stats li.is-new b { color: var(--mood, var(--dr-sel)); }
+.menu__stats li.is-new span { padding: 0 6px; background: var(--mood, var(--dr-sel)); color: #000; }
+.menu__new {
+  display: inline-block; font: 400 16px/1 var(--font); font-style: normal;
+  color: var(--mood, var(--dr-sel)); text-transform: uppercase;
+}
+/* the selected bar wears the tier's colour; the hardest two make the soul shake */
+.menu__tier[data-i="0"]:focus { color: #C8B8FF; }
+.menu__tier[data-i="1"]:focus { color: #BFD4FF; }
+.menu__tier[data-i="2"]:focus { color: #FFFFFF; }
+.menu__tier[data-i="3"]:focus { color: #FFA040; }
+.menu__tier[data-i="4"]:focus { color: #FF7A30; }
+.menu__tier[data-i="5"]:focus, .menu__tier[data-i="6"]:focus { color: #FF3030; }
+/* last breath: the soul, dimmed, under a white pixel X */
+.menu__side[data-mood="finalbreath"] .menu__banner b { font-size: 64px; }
+.menu__side[data-mood="finalbreath"] .menu__banner b::before {
+  content: ''; display: inline-block; width: 48px; height: 48px; margin-right: 12px; vertical-align: -2px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='1' fill='%23FFFFFF'/%3E%3Crect x='8' y='0' width='2' height='1' fill='%23FFFFFF'/%3E%3Crect x='0' y='1' width='3' height='1' fill='%23FFFFFF'/%3E%3Crect x='7' y='1' width='3' height='1' fill='%23FFFFFF'/%3E%3Crect x='1' y='2' width='3' height='1' fill='%23FFFFFF'/%3E%3Crect x='6' y='2' width='3' height='1' fill='%23FFFFFF'/%3E%3Crect x='2' y='3' width='6' height='1' fill='%23FFFFFF'/%3E%3Crect x='3' y='4' width='4' height='1' fill='%23FFFFFF'/%3E%3Crect x='3' y='5' width='4' height='1' fill='%23FFFFFF'/%3E%3Crect x='2' y='6' width='6' height='1' fill='%23FFFFFF'/%3E%3Crect x='1' y='7' width='3' height='1' fill='%23FFFFFF'/%3E%3Crect x='6' y='7' width='3' height='1' fill='%23FFFFFF'/%3E%3Crect x='0' y='8' width='3' height='1' fill='%23FFFFFF'/%3E%3Crect x='7' y='8' width='3' height='1' fill='%23FFFFFF'/%3E%3Crect x='0' y='9' width='2' height='1' fill='%23FFFFFF'/%3E%3Crect x='8' y='9' width='2' height='1' fill='%23FFFFFF'/%3E%3C/svg%3E") center / 40px 40px no-repeat, url(../img/act4/deltarune/tvtime/soul.png) 100% 0 / 200% 100% no-repeat;
+  image-rendering: pixelated;
+}
+.menu__side[data-mood="finalbreath"] { border-left-color: #FF2020; }
+.menu__side[data-mood="medium"] .menu__banner b { border-bottom: 4px solid var(--dr-gold); }
+.menu__side[data-mood="easy"] .menu__banner b { letter-spacing: 0; }
+.menu__side[data-mood="finalbreath"] .menu__banner b { letter-spacing: 0; }
+.menu__side[data-mood="ultrakill"] .menu__banner b { text-shadow: 4px 0 #FFFF00, -4px 0 #4A3A5E; }
+.menu__side[data-mood="hard"] .menu__banner b { transform: skewX(-12deg); }
+@media (prefers-reduced-motion: no-preference) {
+  .menu__new { animation: drPop .3s steps(3) both; }
+  .menu__side[data-mood="bot"] .menu__banner b { animation: drBob 2.4s steps(6) infinite; }
+  .menu__side[data-mood="bot"] .menu__banner b::after { content: 'z'; display: inline-block; margin-left: 8px; font-size: 32px; animation: drZ 2.4s steps(6) infinite; }
+  .menu__side[data-mood="easy"] .menu__banner b { animation: drBreathe 3.2s steps(8) infinite; }
+  .menu__side[data-mood="medium"] .menu__banner b { animation: drStamp .36s steps(3) both; }
+  .menu__side[data-mood="hard"] .menu__banner b { animation: drDash .4s steps(4) both, drJudder .5s steps(2) .4s infinite; }
+  .menu__side[data-mood="vhard"] .menu__banner b { animation: drThud .5s steps(5) both; }
+  .menu__side[data-mood="vhard"] { animation: drShake .3s steps(3) .45s; }
+  .menu__side[data-mood="ultrakill"] .menu__banner b { animation: drGlitch .5s steps(2) infinite; }
+  .menu__side[data-mood="finalbreath"] .menu__banner b { animation: drPulse 1.2s steps(6) infinite; }
+  .menu__side[data-mood="finalbreath"] .menu__banner b::before { animation: drSoulShake .5s steps(2) infinite; }
+  .menu__tier[data-i="5"]:focus::before, .menu__tier[data-i="6"]:focus::before { animation: drSoulShake .5s steps(2) infinite; }
+}
+@keyframes drPop { 0% { transform: scale(0); } 66% { transform: scale(1.4); } 100% { transform: scale(1); } }
+@keyframes drBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes drZ { 0% { transform: translate(0, 0); opacity: 1; } 100% { transform: translate(12px, -16px); opacity: .2; } }
+@keyframes drBreathe { 0%, 100% { letter-spacing: 0; } 50% { letter-spacing: 4px; } }
+@keyframes drStamp { 0% { transform: scale(1.8); } 100% { transform: scale(1); } }
+@keyframes drDash { 0% { transform: translateX(160px) skewX(-12deg); } 100% { transform: translateX(0) skewX(-12deg); } }
+@keyframes drJudder { 0%, 100% { transform: translateX(0) skewX(-12deg); } 50% { transform: translateX(-4px) skewX(-12deg); } }
+@keyframes drThud { 0% { transform: translateY(-40px) scale(1.4); } 60% { transform: translateY(4px) scale(1); } 100% { transform: translateY(0) scale(1); } }
+@keyframes drShake { 0%, 100% { transform: translateX(0); } 33% { transform: translateX(-6px); } 66% { transform: translateX(6px); } }
+@keyframes drGlitch { 0%, 100% { transform: translate(2px, -2px); } 50% { transform: translate(-2px, 2px); } }
+@keyframes drPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+@keyframes drSoulShake { 0%, 100% { translate: 0 0; } 50% { translate: 2px 0; } }
+
+/* ── typed rows: each stat line arrives in turn (statList's --n / --d) ── */
+.menu__stats li { position: relative; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.rm) .menu__stats li { animation: drType calc(var(--n) * 14ms) steps(var(--n)) var(--d) both; }
+}
+/* ── Final Breath's lie, and her cuts through it ─────────────────────
+   While lying the panel wears Easy's calm blue and shows Easy's numbers
+   with cheerful tags. Each cut drops the lie away, stamps the real value
+   and leaves a red scar through the row; the last cut breaks the banner
+   open. Calm motion never lies: it shows the real panel at once. */
+.menu__slash {
+  position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3;
+  pointer-events: none; image-rendering: pixelated;
+}
+.menu .menu__side.is-lying { --mood: #BFD4FF; }
+/* the lie's banner: calm, blue, no crossed soul */
+.menu__side.is-lying .menu__banner b::before { display: none; }
+.menu__fake { display: none; font-style: normal; }
+.menu__stats li.is-faking > span, .menu__stats li.is-faking .menu__new { display: none; }
+.menu__stats li.is-faking b { color: var(--dr-rim); }
+.menu__stats li.is-faking .menu__fake, .menu__stats li.is-cut .menu__fake {
+  display: inline-block; padding: 0 6px; background: #BFD4FF; color: #000;
+}
+.menu__stats li.is-cut .menu__fake { text-decoration: line-through; animation: drFall .48s steps(4) forwards; }
+.menu__stats li.is-cut > span { padding: 0 6px; background: #FF2020; color: #000; animation: drMark .3s steps(3) both; }
+.menu__stats li.is-cut b { color: #FF5050; }
+.menu__stats li.is-cut .menu__new { animation: drPop .3s steps(3) .2s both; }
+.menu__stats li.is-cut::after {
+  content: ''; position: absolute; left: -12px; right: -12px; top: 50%; height: 2px; margin-top: -1px;
+  background: rgba(255, 32, 32, .55); transform: rotate(-1.2deg); pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .menu__side.is-lying .menu__banner b { animation: drBob 2.4s steps(6) infinite; }
+  .menu__side.is-broken[data-mood="finalbreath"] .menu__banner b { animation: drSlam .45s steps(4) both, drPulse 1.2s steps(6) .45s infinite; }
+}
+@keyframes drFall { 0% { transform: none; opacity: 1; } 100% { transform: translate(24px, 18px) rotate(14deg); opacity: 0; } }
+@keyframes drMark { 0% { transform: scale(2.2) rotate(-6deg); } 100% { transform: none; } }
+@keyframes drSlam { 0% { transform: scale(2.6) rotate(-8deg); } 70% { transform: scale(.94) rotate(1deg); } 100% { transform: none; } }
+.menu__desc {
+  width: min(960px, 100%); min-height: 72px; margin: 0; padding: 0 16px;
+  display: flex; align-items: center;
+  font: 400 16px/1.5 var(--font, monospace); color: var(--dr-rim);
+}
+.menu__desc:not(:empty)::before { content: '*'; margin-right: 16px; font-size: 32px; line-height: 1; }
+.menu__win:not(.is-wide) + .menu__desc { width: min(560px, 100%); }
+/* nothing to say: keep the strip's space so the window does not jump */
+.menu__desc:empty, .sett__desc:empty, .deck__desc:empty { visibility: hidden; }
+.menu .menu__act.menu__mini { padding: 0 0 0 20px; }
+.menu .menu__mini::before { left: -4px; }
 .menu__file { display: flex; flex-direction: column; gap: 4px; margin: 0 0 8px;
-  font: 400 16px/1.5 var(--font, monospace); color: var(--text); }
-.menu__note, .menu__keys { margin: 8px 0 0; font: 400 16px/1.5 var(--font, monospace); color: var(--dim); }
+  font: 400 16px/1.5 var(--font, monospace); color: var(--dr-rim); }
+.menu__note { margin: 0 0 8px; font: 400 16px/1.5 var(--font, monospace); color: var(--dr-hint); text-align: center; }
+.menu__keys {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 48px; margin: 0; padding: 0 48px;
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  background: #000; border-top: 2px solid var(--dr-line);
+  font: 400 16px/1 var(--font, monospace); color: var(--dr-rim);
+}
+.menu__keys kbd, .bh__keys kbd {
+  display: inline-grid; place-items: center; min-width: 32px; height: 32px;
+  padding: 0 6px; box-sizing: border-box; border: 2px solid var(--dr-rim); border-radius: 0;
+  background: #000; color: var(--dr-rim); font: 400 16px/1 var(--font, monospace);
+}
+.menu__keys .glyph__copy { margin-right: 24px; }
 .menu__note:empty { display: none; }
 @media (max-height: 800px) {
   .menu__win { padding: 16px; }
   .menu__keys { margin-top: 4px; }
   .menu__screen { gap: 4px; margin: 12px 0 8px; }
   .menu__act, .menu__tier { min-height: 40px; padding: 6px 12px; }
+}
+/* the frozen block above shrinks rows; keep the soul's gutter and the rim tag's room */
+@media (max-height: 800px) {
+  .menu .menu__win { padding: 24px 16px 8px; }
+  .menu .menu__act, .menu .menu__tier { min-height: 40px; padding: 0 24px; }
 }
 .menu.is-calm *, .menu.is-calm *::before, .menu.is-calm *::after { transition: none !important; animation: none !important; }
 @media (prefers-reduced-motion: reduce) {
@@ -64,9 +361,9 @@
 /* Three save slots. The label wraps instead of clipping a long group or
    tier name; the two actions stay at least 40px tall on a 720p screen. */
 .menu__slot { display: flex; flex-direction: column; gap: 8px; padding: 8px 0;
-  border-top: 1px dotted rgba(244, 244, 244, 0.3); }
-.menu__slot-h { font: 400 16px/1.5 var(--font, monospace); color: var(--dim); overflow-wrap: anywhere; }
-.menu__slot-b { display: flex; gap: 8px; }
+  border-top: 2px solid var(--dr-line); }
+.menu__slot-h { font: 400 16px/1.5 var(--font, monospace); color: var(--dr-hint); overflow-wrap: anywhere; }
+.menu__slot-b { display: flex; gap: 8px; flex: 0 0 216px; }
 .menu__prog { margin: 0 0 8px; }
 .menu__prog h4 { margin: 0 0 4px; font: 400 16px/1.5 var(--font, monospace); color: var(--text); }
 .menu__prog ul { margin: 0; padding-left: 20px; }
@@ -75,8 +372,8 @@
   justify-content: center; padding: 6px 10px; }
 .menu__io { width: 100%; box-sizing: border-box; min-height: 128px; padding: 8px;
   resize: vertical; font: 400 16px/1.5 var(--font, monospace); color: var(--text);
-  background: #0C0614; border: 2px solid var(--edge); border-radius: 4px; }
-.menu__io:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  background: #000; border: 2px solid var(--dr-line); border-radius: 0; }
+.menu__io:focus-visible { outline: 2px solid var(--dr-rim); outline-offset: 2px; }
 @media (max-height: 800px) {
   /* One row per slot at 720p so Back stays on screen, not below a scroll. */
   .menu__slot { flex-direction: row; align-items: center; }
@@ -297,21 +594,128 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 }
 @media (max-width: 900px) { .sleep__rug { left: -52px; } }
 
-/* The deck (js/game/deck.js), Deltarune style: the selected game's
-   panel is the black two-step box, the selected caption is yellow, and
-   the red soul (one element, moved by pick()) is the cursor. */
-.deck__sel {
-  width: min(512px, 100%); box-sizing: border-box; padding: 16px 24px;
-  background: #000; border: 4px solid #fff;
-  box-shadow: inset 0 0 0 4px #000, inset 0 0 0 6px #fff;
+/* ── the deck (js/game/deck.js) ───────────────────────────────────
+   The console's home screen, drawn with the DR panel kit: Deltarune's
+   battle grid behind, the dark-world window with LIBRARY on its rim,
+   grouped rows on the left (the story, previously, extras), the
+   selected game's cover and facts on the right, then the description
+   strip and the key bar. Its layer (z 78) is set in css/style.css. */
+.deck {
+  display: grid; grid-template-rows: auto minmax(0, 1fr);
+  background: #000; color: var(--dr-rim);
+  opacity: 0; transition: opacity .28s steps(4, end);
+  overflow: hidden;
 }
-.deck__tile { position: relative; }
-.deck__tile.is-on .deck__cap { color: #ff0; padding-left: 24px; }
+.deck.is-in { opacity: 1; }
+.deck__bg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; image-rendering: pixelated;
+}
+.deck__bar, .deck__body, .deck > .bh__keys { position: relative; z-index: 1; }
+.deck__bar {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 48px; padding: 0 48px; box-sizing: border-box;
+  background: #000; border-bottom: 2px solid var(--dr-line);
+  font: 400 16px/1 var(--font);
+}
+.deck__brand { color: var(--dr-rim); letter-spacing: 4px; text-transform: uppercase; }
+.deck__stat { display: flex; align-items: center; gap: 16px; color: var(--dr-hint); }
+.deck__wifi { color: var(--dr-gold); letter-spacing: 2px; }
+.deck__batt {
+  position: relative; display: inline-block; width: 32px; height: 16px;
+  box-sizing: border-box; padding: 2px; border: 2px solid var(--dr-hint);
+}
+.deck__batt::after { content: ''; position: absolute; right: -6px; top: 4px; width: 4px; height: 4px; background: var(--dr-hint); }
+.deck__batt i { display: block; height: 100%; background: var(--dr-gold); }
+.deck__body {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; min-height: 0; padding: 24px 24px 72px; box-sizing: border-box;
+}
+.deck__win {
+  display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 24px;
+  width: min(960px, 100%); padding: 24px 16px 16px;
+}
+.deck__h {
+  position: absolute; left: 8px; top: -30px; margin: 0; padding: 0 8px; background: #000;
+  font: 400 32px/1 var(--font); color: var(--dr-rim); text-transform: uppercase; letter-spacing: 2px;
+}
+.deck__shelf {
+  display: flex; flex-direction: column; gap: 4px;
+  margin: 0; padding: 26px 0 0; list-style: none;
+  max-height: calc(100dvh - 322px); overflow-y: auto; scrollbar-width: none;
+}
+.deck__shelf::-webkit-scrollbar { display: none; }
+.deck__tile {
+  display: flex; align-items: center; justify-content: center; flex: none;
+  padding: 0 24px; cursor: pointer;
+}
+/* the rows are text, like the reference's bars; each cover (kept in the row
+   for the fallback and the tests) is shown big in the detail panel */
+.deck__tile .deck__art { display: none; }
+.deck__cap { font: 400 16px/1.2 var(--font); text-align: center; }
+.deck__tile.is-on { border-image-source: var(--dr-bar-on); }
+.deck__tile.is-on .deck__cap { color: var(--dr-sel); }
+/* the ones that don't run are greyed: a promise the shelf already made */
+.deck__tile.is-dead .deck__cap { color: var(--dr-off); }
+.deck__tile.is-dead.is-on .deck__cap { color: var(--dr-sel); }
+.deck__tile.group-start:not(:first-child) { margin-top: 30px; }
+.deck__tile.group-start::before {
+  content: attr(data-group-label);
+  position: absolute; left: -20px; right: -20px; top: -28px; padding-bottom: 4px;
+  border-bottom: 2px solid var(--dr-line);
+  font: 400 16px/1 var(--font); color: var(--dr-gold);
+  text-transform: uppercase; letter-spacing: 4px; text-align: left;
+}
 .deck__soul {
-  position: absolute; left: 0; top: 142px; width: 16px; height: 16px;
+  position: absolute; left: 0; top: 50%; width: 16px; height: 16px; margin-top: -8px;
   background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
   image-rendering: pixelated;
 }
+.deck__sel {
+  display: grid; grid-template-columns: 144px minmax(0, 1fr);
+  gap: 16px 24px; align-content: start;
+  padding: 16px 8px 0 24px; border-left: 2px solid var(--dr-line);
+}
+.deck__cover { grid-row: 1 / span 4; width: 144px; height: 144px; }
+.deck__cover .deck__art { display: grid; place-items: center; width: 144px; height: 144px; image-rendering: pixelated; }
+.deck__cover svg { width: 96px; height: 96px; }
+.deck__t {
+  margin: 0; padding-bottom: 8px; border-bottom: 2px solid var(--dr-line);
+  font: 400 32px/1 var(--font); color: var(--dr-gold); text-transform: uppercase;
+}
+.deck__m { display: grid; gap: 8px; align-content: start; margin: 0; padding: 0; list-style: none; }
+.deck__m li { display: flex; align-items: center; gap: 12px; font: 400 16px/1.5 var(--font); color: var(--dr-hint); }
+.deck__m li::before {
+  content: ''; flex: none; width: 15px; height: 15px;
+  background: url(../img/act4/deltarune/ui/star.png); image-rendering: pixelated;
+}
+.deck__m li:first-child { color: var(--dr-rim); text-transform: uppercase; letter-spacing: 2px; }
+.deck__play {
+  grid-column: 2; justify-self: start;
+  height: 40px; padding: 0 16px; box-sizing: border-box; cursor: pointer;
+  border: solid transparent; border-width: 0 20px; border-radius: 0;
+  border-image: var(--dr-bar-on) 0 10 fill / 0 20px stretch;
+  background: none; color: var(--dr-sel); font: 400 16px/1 var(--font);
+}
+.deck__play:hover, .deck__play:focus-visible { outline: 2px solid var(--dr-rim); outline-offset: 2px; }
+.deck__err { grid-column: 2; margin: 0; font: 400 16px/1.4 var(--font); color: var(--dr-bad); }
+.deck__err.is-shake { animation: deckShake .34s steps(4, end); }
+@keyframes deckShake {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+.deck__desc {
+  width: min(960px, 100%); min-height: 72px; margin: 0; padding: 0 16px;
+  display: flex; align-items: center; font: 400 16px/1.5 var(--font); color: var(--dr-rim);
+}
+.deck__desc:not(:empty)::before { content: '*'; margin-right: 16px; font-size: 32px; line-height: 1; }
+.deck > .bh__keys {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 48px; margin: 0; padding: 0 48px;
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  background: #000; border-top: 2px solid var(--dr-line); color: var(--dr-rim);
+}
+.deck > .bh__keys .glyph__copy { margin-right: 24px; }
 
 /* Summoning hall overlay (js/act4/summon.js): embers, the vignette and
    the summoning itself, over the room canvas and inside #eng, so it
@@ -483,281 +887,149 @@ html.rm .bh:not([hidden]), html.rm .dk:not([hidden]) { animation: none; }
 }
 
 
-/* ── Settings: Final Fantasy III Pixel Remaster CONFIG (WO W1.7) ─
-   Stepped vertical ramp #2B3FB0 → #1A2A8A → #0E1A5C (3 bands),
-   2px #F4F4F4 rounded (4px) border with 1px dark outer line,
-   two-pane layout with category list left and option rows right,
-   white pointing-hand cursor beside focused row.
+/* ── Settings, in the DR panel kit ────────────────────────────────
+   Same four layers as the menu: the dark-world window with SETTINGS
+   on its rim, Deltarune's C-menu icons as the category list (the heart
+   moves into the open one, like the real menu), option rows on the
+   right with the soul beside the focused one, the focused row's hint
+   in the strip below, the key bar at the bottom. z 94, under .tbox.
    All font sizes are multiples of 16px. */
-
-@keyframes settHandBob {
-  0%, 100% { transform: translateX(0); }
-  50%      { transform: translateX(4px); }
+.sett {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; padding: 24px 24px 72px; box-sizing: border-box;
+  background: var(--dr-dither) 0 0 / 4px 4px, rgba(0, 0, 0, 0.55);
 }
-
 .sett__box {
-  width: min(720px, 94vw);
-  max-height: calc(100vh - 48px);
-  background: linear-gradient(180deg, #2B3FB0 0%, #2B3FB0 33%, #1A2A8A 33%, #1A2A8A 66%, #0E1A5C 66%, #0E1A5C 100%);
-  border: 2px solid #F4F4F4;
-  border-radius: 4px;
-  box-shadow: 0 0 0 1px #050814, 0 16px 48px rgba(0, 0, 0, 0.85);
-  color: #F4F4F4;
-  padding: 24px;
+  width: min(880px, 94vw);
+  max-height: none; overflow: visible;
+  padding: 24px 16px 8px;
+  color: var(--dr-rim);
   font-size: 16px;
 }
-
 .sett__h {
-  font: 400 32px/1 var(--font-quest, monospace);
-  color: #F4F4F4;
-  margin: 0 0 16px;
-  text-shadow: 2px 2px 0 #050814;
+  position: absolute; left: 8px; top: -30px; margin: 0; padding: 0 8px;
+  background: #000; color: var(--dr-rim);
+  font: 400 32px/1 var(--font-quest, monospace); text-transform: uppercase; letter-spacing: 2px;
 }
-
 .sett__x {
-  border-color: #F4F4F4;
-  color: #F4F4F4;
-  border-radius: 4px;
+  top: -28px; right: 16px; width: 32px; height: 28px;
+  background: #000; border: 2px solid var(--dr-rim); border-radius: 0;
+  color: var(--dr-rim);
 }
-.sett__x:hover, .sett__x:focus-visible {
-  background: #2B3FB0;
-  border-color: #FFFFFF;
-}
+.sett__x:hover, .sett__x:focus-visible { color: var(--dr-sel); border-color: var(--dr-sel); outline: none; }
 
-.sett__two-pane {
-  display: flex;
-  gap: 20px;
-  min-height: 340px;
-}
-
-.sett__cats {
-  flex: 0 0 160px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border-right: 2px solid rgba(244, 244, 244, 0.3);
-  padding-right: 12px;
-}
-
+.sett__two-pane { display: flex; gap: 24px; min-height: 340px; }
+.sett__cats { flex: 0 0 248px; display: flex; flex-direction: column; gap: 8px; padding-top: 16px; }
 .sett__cat {
-  position: relative;
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 8px 12px 8px 24px;
-  font: 400 16px/1 var(--font, monospace);
-  color: #F4F4F4;
-  background: transparent;
-  border: 2px solid transparent;
-  border-radius: 4px;
-  cursor: pointer;
-  text-align: left;
+  display: flex; align-items: center; gap: 16px;
+  height: auto; min-height: 52px; padding: 2px 8px;
+  border: 0; border-image: none;
+  font: 400 16px/1 var(--font, monospace); color: var(--dr-rim);
+  cursor: pointer; text-align: left;
 }
-
-.sett__cat:hover {
-  background: rgba(43, 63, 176, 0.5);
+/* Deltarune's own menu icons, 2x: gold when closed, the heart inside when open */
+.sett__cat::before {
+  content: ''; flex: none; width: 66px; height: 48px;
+  background: url(../img/act4/deltarune/ui/menu-icons.png) -74px 0 / 214px 248px no-repeat;
+  image-rendering: pixelated;
 }
-
-.sett__cat[aria-selected="true"],
-.sett__cat.is-active {
-  background: #1A2A8A;
-  border-color: #F4F4F4;
-  color: #FFFFFF;
-}
+.sett__cat[data-cat="accessibility"]::before { background-position-y: 0; }
+.sett__cat[data-cat="keybinds"]::before { background-position-y: -50px; }
+.sett__cat[data-cat="display"]::before { background-position-y: -100px; }
+.sett__cat[data-cat="config"]::before { background-position-y: -150px; }
+.sett__cat[data-cat="sound"]::before { background-position-y: -200px; }
+.sett__cat[aria-selected="true"]::before, .sett__cat.is-active::before { background-position-x: 0; }
+.sett__cat:hover, .sett__cat:focus-visible { outline: none; color: var(--dr-sel); }
+.sett__cat[aria-selected="true"], .sett__cat.is-active { color: var(--dr-sel); }
 
 .sett__panes {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  max-height: calc(100vh - 160px);
-  padding-right: 8px;
+  flex: 1 1 auto; overflow-y: auto;
+  max-height: calc(100dvh - 288px);
+  padding: 8px 8px 16px 24px; border-left: 2px solid var(--dr-line);
 }
-
-/* Phone: give the pane the full width so the new particle-budget segment and
-   overlay slider stay reachable instead of wrapping to one word per line. */
 @media (max-width: 520px) {
   .sett__two-pane { flex-direction: column; gap: 12px; }
-  /* 200% zoom at 320 CSS px: a row wraps its slider or switch instead of pushing it past the edge */
   .sett__row { flex-wrap: wrap; }
-  .sett__cats { flex: none; flex-direction: row; flex-wrap: wrap; gap: 4px;
-    border-right: 0; border-bottom: 2px solid rgba(244, 244, 244, 0.3); padding: 0 0 8px; }
-  .sett__cat { min-height: 40px; padding: 6px 10px; }
-  .sett__panes { max-height: calc(100dvh - 240px); padding-right: 0; }
+  .sett__cats { flex: none; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 0 0 8px; }
+  .sett__panes { max-height: calc(100dvh - 240px); padding: 0; border-left: 0; }
 }
-
-.sett__pane[hidden] {
-  display: none !important;
-}
-
-.sett__pane {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
+.sett__pane[hidden] { display: none !important; }
+.sett__pane { display: flex; flex-direction: column; gap: 0; }
 
 .sett__row {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 8px 10px 24px;
-  border-top: 1px dotted rgba(244, 244, 244, 0.3);
-  font-size: 16px;
-  color: #F4F4F4;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 48px; padding: 4px 8px 4px 28px;
+  border-top: 2px solid var(--dr-line);
+  font-size: 16px; color: var(--dr-rim);
 }
-
-.sett__row:first-child {
-  border-top: 0;
-}
-
-.sett__row:hover,
-.sett__row:focus-within,
-.sett__row.is-focused {
-  background: rgba(43, 63, 176, 0.35);
-}
-
-.sett__lbl {
-  font: 400 16px/1.4 var(--font, monospace);
-  color: #F4F4F4;
-}
-
+.sett__row:first-child { border-top: 0; }
+.sett__row:focus-within .sett__lbl, .sett__row.is-focused .sett__lbl { color: var(--dr-sel); }
+.sett__lbl { font: 400 16px/1.4 var(--font, monospace); color: var(--dr-rim); }
+/* the hint moves to the strip under the window; it stays in the label for screen readers */
 .sett__lbl small {
-  display: block;
-  margin-top: 4px;
-  color: #C9CED8;
-  font-size: 16px;
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; font-size: 16px;
 }
+.sett__lbl small.sett__fx { color: var(--dr-sel); }
+.sett__dots { flex: 1 1 auto; height: 1px; margin: 0 8px; border-bottom: 2px dotted var(--dr-line); }
+.sett__val-wrap { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; color: var(--dr-rim); }
+.sett__arrow { font-size: 16px; color: #ED1C24; user-select: none; }
 
-/* The difficulty slider's live one-liner. Accent, not a new token. */
-.sett__lbl small.sett__fx { color: var(--accent); }
-
-.sett__dots {
-  flex: 1 1 auto;
-  border-bottom: 2px dotted rgba(244, 244, 244, 0.4);
-  margin: 0 8px;
-  height: 1px;
+.sett__sw, .sett__key, .sett__key-ext, .sett__act, .sett__seg {
+  border: 2px solid var(--dr-rim); border-radius: 0; background: #000; color: var(--dr-rim);
 }
-
-.sett__val-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  color: #F4F4F4;
+.sett__sw, .sett__key, .sett__key-ext {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; padding: 0 12px;
+  font: 400 16px/1 var(--font, monospace); cursor: pointer;
 }
-
-.sett__arrow {
-  font-size: 16px;
-  color: #F4F4F4;
-  user-select: none;
-}
-
-.sett__sw {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 80px;
-  min-height: 44px;
-  padding: 0 12px;
-  font: 400 16px/1 var(--font, monospace);
-  color: #F4F4F4;
-  background: rgba(14, 26, 92, 0.7);
-  border: 2px solid #F4F4F4;
-  border-radius: 4px;
-  cursor: pointer;
-}
+.sett__sw { min-width: 112px; white-space: nowrap; }
+.sett__tabreset { align-self: flex-start; margin-top: 8px; }
+.sett__rng { border-radius: 0; }
+.sett__key, .sett__key-ext { min-width: 64px; }
 .sett__sw::after { display: none; }
-.sett__sw[aria-checked="true"] {
-  background: #2B3FB0;
-  border-color: #FFFFFF;
+.sett__sw[aria-checked="true"] { color: var(--dr-sel); background: var(--dr-void); }
+.sett__sw:hover, .sett__key:hover, .sett__key-ext:hover, .sett__act:hover { border-color: var(--dr-sel); }
+.sett__sw:focus-visible, .sett__key:focus-visible, .sett__key-ext:focus-visible, .sett__act:focus-visible {
+  outline: 2px solid var(--dr-sel); outline-offset: 2px;
 }
-.sett__sw:focus-visible {
-  outline: 2px solid #FFFFFF;
-  outline-offset: 2px;
-}
+.sett__act { min-height: 40px; padding: 0 16px; font: 400 16px/1 var(--font, monospace); }
+.sett__opt { min-height: 40px; font-size: 16px; color: var(--dr-rim); border-left: 2px solid var(--dr-rim); }
+.sett__opt[aria-checked="true"] { background: var(--dr-void); color: var(--dr-sel); }
+.sett__opt:focus-visible { outline: 2px solid var(--dr-sel); outline-offset: -4px; }
+.sett__rng::-webkit-slider-runnable-track { height: 8px; background: #000; border: 2px solid var(--dr-hint); border-radius: 0; }
+.sett__rng::-moz-range-track { height: 8px; background: #000; border: 2px solid var(--dr-hint); border-radius: 0; }
+.sett__rng::-webkit-slider-thumb { width: 16px; height: 24px; margin-top: -10px; background: var(--dr-sel); border-radius: 0; }
+.sett__rng::-moz-range-thumb { width: 16px; height: 24px; background: var(--dr-sel); border: 0; border-radius: 0; }
+.sett__rng:focus-visible { outline: 2px solid var(--dr-sel); outline-offset: 2px; }
 
-.sett__key,
-.sett__key-ext {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 64px;
-  min-height: 44px;
-  padding: 0 12px;
-  font: 400 16px/1 var(--font, monospace);
-  color: #F4F4F4;
-  background: rgba(14, 26, 92, 0.7);
-  border: 2px solid #F4F4F4;
-  border-radius: 4px;
-  cursor: pointer;
+/* the soul: beside the open category's focused row */
+.sett__row:focus-within::before, .sett__row.is-focused::before {
+  content: ''; position: absolute; left: 4px; top: 50%;
+  width: 16px; height: 16px; margin-top: -8px;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%;
+  image-rendering: pixelated;
 }
-.sett__key:hover, .sett__key-ext:hover {
-  border-color: #FFFFFF;
-  background: #2B3FB0;
+.sett__note { color: var(--dr-hint); }
+.sett__desc {
+  width: min(880px, 94vw); min-height: 72px; margin: 0; padding: 0 16px;
+  display: flex; align-items: center; font: 400 16px/1.5 var(--font, monospace); color: var(--dr-rim);
 }
-.sett__key:focus-visible, .sett__key-ext:focus-visible {
-  outline: 2px solid #FFFFFF;
-  outline-offset: 2px;
+.sett__desc:not(:empty)::before { content: '*'; margin-right: 16px; font-size: 32px; line-height: 1; }
+.sett__keys {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 48px; margin: 0; padding: 0 48px;
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  background: #000; border-top: 2px solid var(--dr-line);
+  font: 400 16px/1 var(--font, monospace); color: var(--dr-rim);
 }
-
-.sett__act {
-  min-height: 44px;
-  padding: 0 16px;
-  font: 400 16px/1 var(--font, monospace);
-  color: #F4F4F4;
-  background: rgba(14, 26, 92, 0.7);
-  border: 2px solid #F4F4F4;
-  border-radius: 4px;
-  cursor: pointer;
+.sett__keys kbd {
+  display: inline-grid; place-items: center; min-width: 32px; height: 32px;
+  padding: 0 6px; box-sizing: border-box; border: 2px solid var(--dr-rim); border-radius: 0;
+  background: #000; color: var(--dr-rim);
 }
-.sett__act:hover, .sett__act:focus-visible {
-  border-color: #FFFFFF;
-  background: #2B3FB0;
-}
-
-.sett__seg {
-  border: 2px solid #F4F4F4;
-  border-radius: 4px;
-  background: rgba(14, 26, 92, 0.7);
-}
-.sett__opt {
-  font-size: 16px;
-  color: #F4F4F4;
-  border-left: 2px solid #F4F4F4;
-}
-.sett__opt[aria-checked="true"] {
-  background: #2B3FB0;
-  color: #FFFFFF;
-}
-
-.sett__hand,
-.sett__cat:focus-visible::before,
-.sett__cat[aria-selected="true"]::before,
-.sett__row:focus-within::before,
-.sett__row.is-focused::before {
-  content: '';
-  position: absolute;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 16px 16px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23F4F4F4' d='M0 6h6V4h2V2h4v2h2v4h2v2h-2v2h-4v2H6v-2H4v-2H0V6z'/%3E%3Cpath fill='%230E1A5C' d='M1 7h5V5h2V3h4v2h2v4h2v1h-2v2h-4v1H6v-1H4v-2H1V7z'/%3E%3Cpath fill='%23FFFFFF' d='M2 8h4V6h2V4h3v1h1v3h2v1h-2v1h-3v1H6v-1H4v-1H2V8z'/%3E%3C/svg%3E");
-  animation: settHandBob 0.8s steps(2) infinite;
-}
-
-/* Reduced motion: no cursor bob */
-@media (prefers-reduced-motion: reduce) {
-  .sett__hand,
-  .sett__cat:focus-visible::before,
-  .sett__cat[aria-selected="true"]::before,
-  .sett__row:focus-within::before,
-  .sett__row.is-focused::before {
-    animation: none;
-  }
-}
+.sett__keys .glyph__copy { margin-right: 24px; }
+.sett__desc, .sett__box { image-rendering: pixelated; }
 
 /* C menu: ITEMS / EQUIP (js/act4/inventory.js). One block, one scale: the same
    black panel as the fight's C strip (js/core/kit.js drawStrip): white rim,
@@ -1437,3 +1709,132 @@ html.rm .tphud__hp { animation: none !important; }
 
 /* B4W: the themed mode-entry overlay (engine-trans enterMode); never takes input */
 #modeTrans { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 89; pointer-events: none; image-rendering: pixelated; }
+
+
+/* ══ The DR panel kit, everywhere else (2026-11-23) ══════════════════
+   The notes, the stall, the mage, the C menu, the practice room and the
+   pot's craft slot wear the same window, bars, soul and palette as the
+   menus. Overrides only: each surface's own block above keeps its layout,
+   its tests and its behaviour. */
+
+/* ── the notes (settings.js showNote): motion and flashing ──
+   On the public page the note is a plain pixel box (no game art there);
+   inside the game it is the dark-world window. The regular choice is
+   .is-primary: lit yellow, first, and focused when the note opens. */
+.rmnote {
+  padding: 16px; background: #000; color: var(--dr-rim);
+  border: 2px solid var(--dr-rim); border-radius: 0; box-shadow: none;
+}
+body.is-playing .rmnote { border: 24px solid transparent; border-radius: 0;
+  border-image: url(../img/act4/deltarune/ui/dwbox.png) 12 fill / 24px stretch;
+  background: none; box-shadow: none; outline: none; image-rendering: pixelated; padding: 0 8px 4px; }
+.rmnote__t { font: 400 16px/1.5 var(--font); text-wrap: balance; }
+.rmnote .rmnote__b { position: relative; box-sizing: border-box; height: 40px; min-height: 40px;
+  border: solid transparent; border-width: 0 20px; border-radius: 0;
+  border-image: var(--dr-bar-off) 0 10 fill / 0 20px stretch; image-rendering: pixelated;
+  background: none; color: var(--dr-rim); font: 400 16px/1 var(--font); cursor: pointer; padding: 0 16px 0 20px; }
+.rmnote .rmnote__b.is-primary { color: var(--dr-sel); }
+.rmnote .rmnote__b:hover, .rmnote .rmnote__b:focus { border-image-source: var(--dr-bar-on); outline: none; }
+/* the soul is game art: only inside the game */
+body.is-playing .rmnote .rmnote__b:focus::before { content: ''; position: absolute; left: 0; top: 50%; width: 16px; height: 16px; margin-top: -8px;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%; image-rendering: pixelated; }
+
+/* ── the stall (shop.js) ── */
+.shop {
+  --shop-line: var(--dr-rim); --shop-gold: var(--dr-gold); --shop-glow: var(--dr-gold);
+  --shop-heart: #FF0000; --shop-dim: var(--dr-hint);
+  background: var(--dr-dither) 0 0 / 4px 4px, #0B0610; overscroll-behavior: contain;
+}
+.shop .shop__win { border: 24px solid transparent; border-radius: 0;
+  border-image: url(../img/act4/deltarune/ui/dwbox.png) 12 fill / 24px stretch;
+  background: none; box-shadow: none; outline: none; image-rendering: pixelated; padding: 8px 8px 0; }
+.shop .shop__row, .shop .shop__row.is-sel { border-color: transparent; background: none; }
+.shop .shop__row { padding-left: 28px; }
+.shop .shop__row.is-sel { color: var(--dr-sel); }
+.shop .shop__row::before { content: ''; position: absolute; left: 0; top: 50%; width: 16px; height: 16px; margin-top: -8px;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%; image-rendering: pixelated; left: 4px; visibility: hidden; }
+.shop .shop__row.is-sel::before { visibility: visible; }
+/* the soul and the yellow are the cursor; a second ring would be two cursors */
+.shop .shop__row:focus-visible { outline: none; }
+.shop .shop__row.is-glow { color: var(--dr-gold); animation: none; }
+.shop .shop__row.is-glow.is-sel { color: var(--dr-sel); }
+.shop .shop__keys { font-size: 16px; color: var(--dr-hint); }
+.shopkit__tip { background: #000; border: 2px solid var(--dr-rim); border-radius: 0; color: var(--dr-rim); }
+.shopkit__test { background: #000; border: 2px solid var(--dr-rim); border-radius: 0; color: var(--dr-gold); }
+
+/* ── the mage (mage.js) ── */
+.mage .mage__menu, .mage .mage__box { border: 24px solid transparent; border-radius: 0;
+  border-image: url(../img/act4/deltarune/ui/dwbox.png) 12 fill / 24px stretch;
+  background: none; box-shadow: none; outline: none; image-rendering: pixelated; padding: 4px 8px; }
+.mage .mage__art { border: 4px solid var(--dr-rim); box-shadow: none; }
+.mage .mage__name { font-weight: 400; color: var(--dr-gold); text-shadow: none; }
+.mage .mage__row:hover, .mage .mage__row.is-sel { background: none; color: var(--dr-sel); }
+.mage .mage__row.is-sel::before { content: ''; position: absolute; left: 0; top: 50%; width: 16px; height: 16px; margin-top: -8px;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%; image-rendering: pixelated; }
+.mage .mage__gold, .mage .mage__keys { border-top: 2px solid var(--dr-line); }
+.mage .mage__warn { outline: none; }
+.mage .mage__warnBig { font-weight: 400; text-shadow: none; }
+
+/* ── the C menu (inventory.js) ── */
+.inv { border: 24px solid transparent; border-radius: 0;
+  border-image: url(../img/act4/deltarune/ui/dwbox.png) 12 fill / 24px stretch;
+  background: none; box-shadow: none; outline: none; image-rendering: pixelated; background: none; padding: 16px 16px 8px; }
+
+/* ── the practice room (dummy.js) ── */
+.dummy { background: var(--dr-dither) 0 0 / 4px 4px, rgba(0, 0, 0, 0.6); }
+.dummy .dummy__win { border: 24px solid transparent; border-radius: 0;
+  border-image: url(../img/act4/deltarune/ui/dwbox.png) 12 fill / 24px stretch;
+  background: none; box-shadow: none; outline: none; image-rendering: pixelated; padding: 16px 8px 8px; }
+.dummy .dummy__h { font-weight: 400; }
+.dummy .dummy__scene { border: 2px solid var(--dr-line); }
+.dummy .dummy__exit, .dummy .dummy__hit { position: relative; box-sizing: border-box; height: 40px; min-height: 40px;
+  border: solid transparent; border-width: 0 20px; border-radius: 0;
+  border-image: var(--dr-bar-off) 0 10 fill / 0 20px stretch; image-rendering: pixelated;
+  background: none; color: var(--dr-rim); font: 400 16px/1 var(--font); cursor: pointer; margin: 8px 4px; padding: 0 16px 0 20px; }
+.dummy .dummy__hit { border-image-source: var(--dr-bar-on); color: var(--dr-sel); }
+.dummy .dummy__exit:focus, .dummy .dummy__exit:hover { border-image-source: var(--dr-bar-on); }
+.dummy .dummy__exit:focus-visible, .dummy .dummy__hit:focus-visible { outline: none; }
+.dummy button:focus::before { content: ''; position: absolute; left: 0; top: 50%; width: 16px; height: 16px; margin-top: -8px;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%; image-rendering: pixelated; }
+
+/* ── the pot (craft.js): the CRAFT button is the kit's lit bar; the ready slot too ── */
+.craft__go {
+  position: relative; box-sizing: border-box; min-width: 144px; height: 48px; padding: 0 24px;
+  border: solid transparent; border-width: 0 20px; border-radius: 0;
+  border-image: var(--dr-bar-on) 0 10 fill / 0 20px stretch; image-rendering: pixelated;
+  background: none; color: var(--dr-sel); font: 400 16px/1 var(--font-display); cursor: pointer;
+}
+.craft__go:hover, .craft__go:focus-visible { outline: none; }
+.craft__go:focus-visible::before, .craft__go:hover::before {
+  content: ''; position: absolute; left: 0; top: 50%; width: 16px; height: 16px; margin-top: -8px;
+  background: url(../img/act4/deltarune/tvtime/soul.png) 0 0 / 200% 100%; image-rendering: pixelated;
+}
+.craft__out.is-ready { border-color: var(--dr-sel); animation: none; }
+.craft__out b { color: var(--dr-sel); }
+
+/* ── platform care for every overlay in the kit ──
+   Scroll stays inside the overlay instead of chaining to the page under it. */
+.menu, .sett, .dr-ask, .dummy { overflow: auto; overscroll-behavior: contain; }
+.deck, .menu__cols, .sett__panes, .deck__shelf, .shop__board, .inv { overscroll-behavior: contain; }
+/* short headings balance their lines; the strips avoid one-word orphans */
+.menu__h, .menu__side-h, .deck__t, .dr-ask__h, .menu__banner small { text-wrap: balance; }
+.menu__desc, .sett__desc, .deck__desc, .shop__say, .mage__say, .menu__file { text-wrap: pretty; }
+/* Forced Colors (Windows High Contrast) may drop border-image and url()
+   backgrounds, which is where every frame, bar and the soul live. Give
+   each a system-colour border, and every "you are here" an outline. */
+@media (forced-colors: active) {
+  .menu__win, .menu__desc, .sett__box, .sett__desc, .deck__win, .deck__desc, .dr-ask__box,
+  body.is-playing .rmnote, .shop .shop__win, .mage .mage__menu, .mage .mage__box, .inv, .dummy .dummy__win {
+    border: 2px solid CanvasText; border-image: none;
+  }
+  .menu__act, .menu__tier, .deck__tile, .deck__play, .dr-ask__opt, .rmnote .rmnote__b,
+  .dummy .dummy__exit, .dummy .dummy__hit {
+    border: 2px solid ButtonText; border-image: none;
+  }
+  .deck__tile.group-start::before { left: 0; right: 0; }
+  .menu__act:focus, .menu__tier:focus, .deck__tile.is-on, .dr-ask__opt[aria-pressed="true"],
+  .rmnote .rmnote__b:focus, .dummy button:focus, .shop .shop__row.is-sel, .mage .mage__row.is-sel,
+  .sett__cat[aria-selected="true"], .sett__row:focus-within {
+    outline: 3px solid Highlight; outline-offset: 2px;
+  }
+}

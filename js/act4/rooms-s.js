@@ -552,8 +552,7 @@
     gate('north', 's4_shade', 'south'),
     gate('south', 's2_well', 'south'),
     { t: 'save', x: 2, y: 2 },
-    prop('acacia', 8, 2),
-    { t: 'sign', x: 3, y: 2, lines: ['the sand is behind you. the village is ahead, and also beside.'] }
+    prop('acacia', 8, 2)
   ], function (c) {
     if (NEU.snail) NEU.snail.arrive('s1');
     if (c.flagged('s1_seen')) return;
@@ -593,23 +592,20 @@
     gate('north', 's9_beads', 'south'),
     prop('hut', 3, 2),
     prop('stall', 8, 6),
-    prop('stall', 2, 6),
-    { t: 'sign', x: 7, y: 2, lines: ['mats, beads, and nothing with a price.'] }
+    prop('stall', 2, 6)
   ], function () { if (NEU.snail) NEU.snail.arrive('s3'); }, 12, 10, 2, '.');
 
   addBox('s4_shade', sp('south', 'east', 'north'), [
     gate('south', 's1_gate', 'north'),
     gate('east', 's7_pool', 'west'),
     gate('north', 's10_shells', 'south'),
-    prop('acacia', 3, 6),
-    { t: 'sign', x: 7, y: 6, lines: ['shade. the only architecture the trees agreed to.'] }
+    prop('acacia', 3, 6)
   ], null, 14, 11, 3, 'd');
 
   addBox('s5_baobab', sp('west', 'east'), [
     gate('west', 's2_well', 'east'),
     gate('east', 's8_hearth', 'west'),
-    prop('baobab', 5, 2),
-    { t: 'sign', x: 5, y: 6, lines: ['a tree older than the argument about who planted it.'] }
+    prop('baobab', 5, 2)
   ], null, 11, 12, 4, 'r');
 
   room('s6_kraal', {
@@ -640,8 +636,7 @@
     gate('west', 's4_shade', 'east'),
     gate('east', 's12_termite', 'west'),
     gate('north', 's13_wind', 'south'),
-    prop('well', 4, 6),
-    { t: 'sign', x: 7, y: 6, lines: ['a pool with no water and a great deal of mud.'] }
+    prop('well', 4, 6)
   ], null, 12, 11, 5, 'm');
 
   var hearth = [];
@@ -723,8 +718,7 @@
       { t: 'stationlamp', x: 6, y: 1 },
       { t: 'exit', x: 5, y: 0, to: 's11_elder', spawn: 'south', style: 'arch' },
       { t: 'npc', x: 5, y: 4, colour: '#C47A32',
-        run: function () { if (NEU.snail) NEU.snail.open(); } },
-      { t: 'sign', x: 3, y: 6, lines: ['the snails stop where you have already stood.'] }
+        run: function () { if (NEU.snail) NEU.snail.open(); } }
     ],
     onEnter: function (c) {
       if (NEU.snail) NEU.snail.arrive('s14');
@@ -737,8 +731,7 @@
   addBox('s12_termite', sp('west', 'east'), [
     gate('west', 's7_pool', 'east'),
     gate('east', 'x0_foyer', 'west'),
-    prop('mound', 6, 4),
-    { t: 'sign', x: 3, y: 3, lines: ['a mound. the termites are not taking visitors.'] }
+    prop('mound', 6, 4)
   ], null, 13, 8, 9, 'r');
   addBox('s13_wind', sp('south'), [
     gate('south', 's7_pool', 'north'),
@@ -800,10 +793,7 @@
       n++;
       return cands.splice(at, 1)[0];
     }
-    for (i = 0; i < lines.length; i++) {
-      c = next();
-      if (c) def.entities.push({ t: 'sign', x: c[0], y: c[1], lines: [lines[i]] });
-    }
+    for (i = 0; i < lines.length; i++) next();
     for (i = 0; i < (talkers || []).length; i++) {
       c = next();
       if (!c) break;
@@ -953,8 +943,7 @@
   var V_FIELD_ENTS = [
     prop('dunecrest', 55, 76),
     { t: 'sign', x: 2, y: 63, lines: ['a bank with no way through. the trail you came on is the way back.'] },
-    { t: 'sign', x: 64, y: 84, lines: ['the lookout ends here. west, then north, gets you to the well.'] },
-    { t: 'sign', x: 56, y: 76, lines: ['from up here the roofs line up. the mound is the far one.'] }
+    { t: 'sign', x: 64, y: 84, lines: ['the lookout ends here. west, then north, gets you to the well.'] }
   ];
   var V_PUZZLES = [
     { id: 's2_well', plates: [[7, 50]] },
@@ -1297,8 +1286,6 @@
           }
           else c.say(['the arena door is shut.']);
         } },
-      { t: 'sign', x: 12, y: 12,
-        lines: ['steel, a stair and a door. the chair at the top has already turned.'] },
       { t: 'save', x: 17, y: 12 },
       /* lab floor: terminals, cable runs, warning lamps. Logs only. */
       term(1, 5, ['* LOG 117: coolant loop three whistles in b flat.',
@@ -1349,8 +1336,6 @@
     entities: exoBase().concat([
       { t: 'exit', x: 15, y: 16, to: 'x0_foyer', spawn: 'north', style: 'stairs' },
       { t: 'save', x: 12, y: 9 },
-      { t: 'sign', x: 18, y: 9,
-        lines: ['the stair turns around a column. the floor is a long way down.'] },
       term(9, 6, ['* SHAFT LOG: twelve turns, one chair.',
         '* the rail is older than the shaft. nobody knows why.']),
       term(9, 10, ['* SAFETY: keep hands inside the rail.',

@@ -206,8 +206,6 @@ function renderRoom(room, ts) {
   }).join(',\n') + '\n    },\n';
   const ents = room.exits.map(e => '      { t: \'exit\', x: ' + e.x + ', y: ' + e.y + ', to: ' + q(e.to) +
     ', spawn: ' + q(e.spawn) + ', style: ' + q(e.style) + ' }');
-  ents.push('      { t: \'sign\', x: 3, y: 5, lines: [' + q('silhouette: ' + room.silhouette + ' / mask: ' + room.mask) + '] }');
-  ents.push('      { t: \'sign\', x: 11, y: 5, lines: [' + q('beat: ' + room.beat + ' / topology: ' + room.topology) + '] }');
   ents.push('      { t: \'npc\', x: 7, y: 3, colour: \'#7E3E78\', look: \'wex\', lines: [' +
     q(room.landmark ? room.focal : 'a room made for walking through, not staying in.') + '] }');
   s += '    entities: [\n' + ents.join(',\n') + '\n    ]\n  });\n';

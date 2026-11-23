@@ -1707,30 +1707,29 @@
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'Leave ' + minigameName + '?');
     overlay.tabIndex = -1;
-    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:95;display:flex;align-items:center;justify-content:center;';
-    overlay.innerHTML = '<div style="background:#1A1016;padding:32px 48px;border:2px solid #E23B55;border-radius:4px;text-align:center;">' +
-      '<p style="font:24px \'Determination Mono\',monospace;color:#EDE7DE;margin:0 0 16px;">Leave ' + minigameName + '?</p>' +
-      '<p style="font:16px \'Determination Mono\',monospace;color:#8A8598;margin:0 0 24px;">Z = select, X = back</p>' +
-      '<div style="display:flex;gap:16px;justify-content:center;margin:0 0 20px;">' +
+    /* drawn by the DR panel kit (css/game.css .dr-ask) */
+    overlay.className = 'dr-ask';
+    overlay.innerHTML = '<div class="dr-ask__box">' +
+      '<p class="dr-ask__h">Leave ' + minigameName + '?</p>' +
+      '<p class="dr-ask__keys">Z = select, X = back</p>' +
+      '<div class="dr-ask__opts">' +
         confirmOpt('yes') + confirmOpt('no') +
       '</div>' +
-      '<div style="font:16px monospace;color:#8A8598;">' + (note || 'This run won\'t count. Your save is kept.') + '</div></div>';
+      '<div class="dr-ask__note">' + (note || 'This run won\'t count. Your save is kept.') + '</div></div>';
     document.body.appendChild(overlay);
     /* Focus moves INTO the prompt (C11) — onto the dialog itself, not a
        button. The highlight is the only selection: `sel` drives both the
        soul and what Z activates, so the two cannot disagree. Default NO. */
     var sel = 'no';
     function confirmOpt(a) {
-      return '<button type="button" data-ans="' + a + '" style="font:20px \'Determination Mono\',monospace;color:#EDE7DE;padding:10px 28px;cursor:pointer;">' +
-        '<span data-soul="' + a + '" aria-hidden="true" style="font:16px monospace;color:#E23B55;margin-right:8px;" hidden>&#9829;</span>' + a + '</button>';
+      return '<button type="button" class="dr-ask__opt" data-ans="' + a + '">' +
+        '<span class="dr-ask__soul" data-soul="' + a + '" aria-hidden="true" hidden></span>' + a + '</button>';
     }
     function paint() {
       var bs = overlay.querySelectorAll('button[data-ans]');
       for (var j = 0; j < bs.length; j++) {
         var a = bs[j].getAttribute('data-ans'), on = a === sel;
         bs[j].setAttribute('aria-pressed', on ? 'true' : 'false');
-        bs[j].style.background = on ? '#331419' : '#14111A';
-        bs[j].style.border = on ? '2px solid #E23B55' : '2px solid #8A8598';
         var soul = bs[j].querySelector('[data-soul]');
         if (soul) soul.hidden = !on;
       }

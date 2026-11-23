@@ -736,6 +736,38 @@
     box.appendChild(keysNote);
 
     panel.appendChild(box);
+
+    /* The strip under the window says what the focused thing does: a
+       row's own hint (still inside its label for screen readers), or for
+       a category, the names of the rows it opens. Visual copy only. */
+    var desc = document.createElement('p');
+    desc.className = 'sett__desc';
+    desc.setAttribute('aria-hidden', 'true');
+    panel.appendChild(desc);
+    var keyBar = document.createElement('p');
+    keyBar.className = 'sett__keys';
+    keyBar.innerHTML = '<kbd aria-hidden="true">\u2191\u2193</kbd><span class="glyph__copy">choose</span>' +
+      '<kbd aria-hidden="true">\u2190\u2192</kbd><span class="glyph__copy">in and out</span>' +
+      '<kbd aria-hidden="true">Esc</kbd><span class="glyph__copy">back</span>';
+    panel.appendChild(keyBar);
+    function lblText(l) {
+      var t = l.firstChild && l.firstChild.nodeType === 3 ? l.firstChild.nodeValue : l.textContent;
+      return (t || '').trim();
+    }
+    panel.addEventListener('focusin', function (e) {
+      var t = e.target, text = '', i;
+      var cat = t.getAttribute && t.getAttribute('data-cat');
+      if (cat && panes[cat]) {
+        var names = [], ls = panes[cat].querySelectorAll('.sett__lbl');
+        for (i = 0; i < ls.length && names.length < 6; i++) if (lblText(ls[i])) names.push(lblText(ls[i]));
+        text = names.join(' \u00b7 ') + (ls.length > 6 ? ' \u2026' : '');
+      } else {
+        var r = t.closest ? t.closest('.sett__row') : null, sm = r ? r.querySelectorAll('.sett__lbl small') : [];
+        for (i = 0; i < sm.length; i++) text += (text ? ' ' : '') + sm[i].textContent;
+      }
+      if (NEU.glyph && NEU.glyph.type) NEU.glyph.type(desc, text); else desc.textContent = text;
+    });
+
     document.body.appendChild(panel);
 
     /* The gear. Inline svg like the deck sigil — no request, scales
@@ -1025,13 +1057,28 @@
     actions.forEach(function (a) {
       var b = document.createElement('button');
       b.type = 'button';
-      b.className = 'rmnote__b';
+      b.className = 'rmnote__b' + (a[2] ? ' is-primary' : '');
       b.textContent = a[0];
       b.addEventListener('click', function () { hideNote(); if (a[1]) a[1](); });
       row.appendChild(b);
     });
     note.appendChild(row);
     document.body.appendChild(note);
+    /* The regular choice is lit and preselected, so a reflex Z or Enter keeps
+       the game as made; the calm one is still one arrow away. Players were
+       turning motion off by accident when no button had the cursor. */
+    var first = row.querySelector('.is-primary');
+    if (first) { try { first.focus({ preventScroll: true }); } catch (x) { first.focus(); } }
+    row.addEventListener('keydown', function (e) {
+      var bs = Array.prototype.slice.call(row.children), i = bs.indexOf(document.activeElement);
+      if (i < 0) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault(); e.stopPropagation();
+        bs[(i + (e.key === 'ArrowRight' ? 1 : bs.length - 1)) % bs.length].focus();
+      } else if ((e.key === 'z' || e.key === 'Z') && !e.repeat) {
+        e.preventDefault(); e.stopPropagation(); bs[i].click();
+      }
+    });
     var tboxEl = document.getElementById('tbox');
     if (tboxEl && typeof MutationObserver !== 'undefined') {
       /* re-tuck after the box's text settles: its top can shift after `hidden` clears */
@@ -1051,8 +1098,8 @@
     if (!M.device || M.pref !== 'auto' || !M.once('device')) return;
     showNote('your device asks for less motion, so this site stays calm: ' +
              'no spinning, shaking or flashing on its own. everything still works.',
-      [['keep it calm', null],
-       ['turn motion on', function () { M.set('full', null); refresh(); }],
+      [['turn motion on', function () { M.set('full', null); refresh(); }, true],
+       ['keep it calm', null],
        ['settings', open]]);
   }
 
@@ -1074,7 +1121,7 @@
     if (NEU.juice && NEU.juice.pause) { NEU.juice.pause(true); flashHeld = true; }
     showNote('heads up: the game has flashing lights and screen shake. ' +
              'you can turn them down any time with the gear (top left).',
-      [['ok', null],
+      [['ok', null, true],
        ['make it calm', calmAll],
        ['settings', open]], releaseFlash);
   }

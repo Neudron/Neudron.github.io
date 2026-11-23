@@ -2597,6 +2597,9 @@
   });
 
   NEU.scal = { open: open, close: close, TUNE: TUNE,
+    /* her sounds for other screens (the difficulty menu's cuts): the same
+       pooled, loudness-matched clips, loaded on first use */
+    sfx: function (n) { if (!SFX) preloadSfx(); sfxPlay(n); },
                get running() { return running; },
                get active() { return active; },
                get hp() { return bossHP; },

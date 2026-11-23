@@ -23,7 +23,7 @@
   var BufferTime = f(0.08), MaxFall = 160, Gravity = 900, HalfGravThreshold = 40, FastMaxFall = 240, FastMaxAccel = 300, MaxRun = 90, RunAccel = 1000,
     RunReduce = 400, AirMult = f(0.65), DuckFriction = 500, DuckCorrectCheck = 4, DuckCorrectSlide = 50, DodgeSlideSpeedMult = f(1.2),
     DuckSuperJumpXMult = f(1.25), DuckSuperJumpYMult = f(0.5), JumpGraceTime = f(0.1), JumpSpeed = -105, JumpHBoost = 40, VarJumpTime = f(0.2),
-    CeilingVarJumpGrace = f(0.05), UpwardCornerCorrection = 4, WallSpeedRetentionTime = f(0.06), WallJumpCheckDist = 3, WallJumpForceTime = f(0.16),
+    CeilingVarJumpGrace = f(0.05), UpwardCornerCorrection = 5, WallSpeedRetentionTime = f(0.06), WallJumpCheckDist = 3, WallJumpForceTime = f(0.16),
     WallJumpHSpeed = 130, WallSlideStartMax = 20, WallSlideTime = f(1.2), BounceVarJumpTime = f(0.2), BounceSpeed = -140, SuperBounceVarJumpTime = f(0.2),
     SuperBounceSpeed = -185, SuperJumpH = 260, SuperWallJumpSpeed = -160, SuperWallJumpVarTime = f(0.25), SuperWallJumpH = 170, DashSpeed = 240,
     EndDashSpeed = 160, EndDashUpMult = f(0.75), DashTime = f(0.15), DashCooldown = f(0.2), DashRefillCooldown = f(0.1), DashHJumpThruNudge = 6,
@@ -389,6 +389,7 @@
         p.dashDir = [sign(p.dashDir[0]), 0]; p.sy = 0; p.sx = f(p.sx * DodgeSlideSpeedMult); setDuck(true);
       }
     } else if (p.sy < 0) {
+      // TAS-pinned: 4 in Player.cs, but the-squeeze room 1's zip-mover catch needs the fifth pixel
       if (p.sx <= 0) for (i = 1; i <= UpwardCornerCorrection; i++) if (!solidAt(p.x - i, p.y - 1)) { p.x -= i; p.y -= 1; return; }
       if (p.sx >= 0) for (i = 1; i <= UpwardCornerCorrection; i++) if (!solidAt(p.x + i, p.y - 1)) { p.x += i; p.y -= 1; return; }
       if (p.varJumpTimer < f(VarJumpTime - CeilingVarJumpGrace)) p.varJumpTimer = 0;
@@ -903,12 +904,11 @@
     for (var i = 0; i < ents.length; i++) if (ents[i].t === 'touchSwitch' && (ents[i].flag || '') === (flag || '') && !ents[i].on) return;
     if (flag) L.flags[flag] = !inv; else L.sw = true;
   }
-  function attachStatics() {   // Solid.Awake: spikes riding a solid move with it
+  function attachStatics() {   // Solid.Awake: riders (spikes, spring, berry, refill, spinner, key) move with the solid
     var i, j, s, e, b;
     for (i = 0; i < solids.length; i++) { s = solids[i]; if (!s.statics) continue;
-      for (j = 0; j < ents.length; j++) { e = ents[j]; if (e.t !== 'spikes' || e.att) continue; b = e.box;
-        var ox = e.d === 'L' ? 1 : e.d === 'R' ? -1 : 0, oy = e.d === 'U' ? 1 : e.d === 'D' ? -1 : 0;
-        if (overlap(b.x + ox, b.y + oy, b.w, b.h, s) && !overlap(b.x, b.y, b.w, b.h, s)) { e.att = true; s.statics.push(e); } } }
+      for (j = 0; j < ents.length; j++) { e = ents[j]; if (['spikes', 'spring', 'berry', 'refill', 'spinner', 'key'].indexOf(e.t) < 0 || e.att) continue; b = e.box || e.bar; if (!b) continue;
+        if (overlap(b.x - 2, b.y - 2, b.w + 4, b.h + 4, s)) { e.att = true; s.statics.push(e); } } }
   }
   function overlapPlayerBody(e) { var b = boxAt(p.x, p.y, p.hb); return overlap(b[0], b[1], b[2], b[3], e); }
   function refillLike(e, use) {
@@ -916,7 +916,7 @@
     e.hit = function () { return hurtHit(e.box); };
     e.touch = function () { if (use()) { e.coll = false; e.co = 1; e.respawn = RespawnTime; } };
     e.update = function () {
-      if (e.co === 1) { freeze(0.05); e.co = 0; }   // refill coroutine runs the frame it is touched (TAS-pinned, see engine-rules)
+      if (e.co === 1) { freeze(e.two ? f(0.0667) : 0.05); e.co = 0; }   // refill coroutine runs the frame it is touched; the two-dash crystal holds one frame longer (a-03 TAS)
       if (e.respawn > 0) { e.respawn = f(e.respawn - DT); if (e.respawn <= 0) e.coll = true; }
     };
     pcs.push(e);
@@ -953,6 +953,7 @@
     for (i = 0; i < M.rooms.length && !r; i++) if (M.rooms[i].name === (opts.room || M.rooms[0].name)) r = M.rooms[i];
     L.freeze = 0; L.time = 0; L.frame = 0; L.trans = null; L.done = false; L.deaths = 0; L.camOffX = 0; L.camOffY = 0; L.log = opts.log || null; L.flags = {}; L.sw = false;
     DTN.count = 0; DTN.canStart = false; DTN.attacking = false; DTN.timer = 0;
+    if (!r.spawns || !r.spawns.length) for (i = 0; i < M.rooms.length; i++) if (M.rooms[i].spawns && M.rooms[i].spawns.length) { r = M.rooms[i]; break; }
     p = freshPlayer(r.spawns[0][0], r.spawns[0][1]); room = r; loadRoom(r);
     if (opts.spawn) { p.x = opts.spawn[0]; p.y = opts.spawn[1]; }
     if (opts.state) for (var sk in opts.state) p[sk] = opts.state[sk];

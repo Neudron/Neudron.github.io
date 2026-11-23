@@ -421,8 +421,6 @@
         spots = openFloor(rows, 1, function (fx, fy) { return fy > ZH - 4; });
         if (spots.length) {
           ents.push({ t: 'bench', x: z.x + spots[0].x, y: z.y + spots[0].y });
-          ents.push({ t: 'sign', x: z.x + spots[0].x + 2, y: z.y + spots[0].y,
-            lines: ['* a bench, a brazier, a long breath.', '* nothing lives here. ' + kn('r') + ' resets a puzzle elsewhere.'] });
         }
       }
     }

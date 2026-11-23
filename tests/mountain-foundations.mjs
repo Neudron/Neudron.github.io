@@ -225,4 +225,106 @@ check('non-mountain platformer camera mode remains unchanged', () => {
   assert.notEqual(p.level0().cameraMode, 'mountain');
 });
 
-console.log('mountain foundation: ' + checks + ' checks passed; full movement-route evidence remains pending');
+/* Advanced room: original geometry, real-controller replay, ablations, timing and reset.
+   These checks exercise the real movement controller, not graph reachability. */
+const ADV = 'mtest_reference';
+function advPlay(rec, mutate) {
+  p.open(ADV);
+  const L = p.level0();
+  if (mutate) mutate(L);
+  const refill = L.entities.find(e => e.t === 'refill' && e.y === 18);
+  const summit = L.entities.find(e => e.id === 'summit');
+  let f = 0, deaths = 0, wasDead = false, refillTouched = false, cpTouched = false;
+  for (const seg of rec) {
+    for (let j = 0; j < seg[0]; j++) {
+      const s = p.step(1 / 60, seg[1]);
+      f++;
+      if (s.dead && !wasDead) deaths++;
+      wasDead = s.dead;
+      if (refill && refill.t0 > 0) refillTouched = true;
+      if (summit && summit.active) cpTouched = true;
+      if (L.exited) break;
+    }
+    if (L.exited) break;
+  }
+  return { reached: !!L.exited, deaths, frames: f, end: { ...p.state }, refillTouched, cpTouched };
+}
+const advRec = () => p.levels[ADV].recording.map(pair => pair.slice());
+const advSub = (idx, input) => advRec().map((pair, i) => i === idx ? [pair[0], input] : pair);
+
+check('advanced room is an original, wider, isolated prototype with authored geometry', () => {
+  const def = p.levels[ADV];
+  assert.ok(def, 'advanced room exists');
+  assert.equal(def.w, 112);
+  assert.equal(def.h, 34);
+  assert.equal(def.cameraMode, 'mountain');
+  assert.equal(def.chunked, true);
+  assert.equal(def.provenance, 'reference-informed, original implementation');
+  assert.ok(neu.mountain.prototypes.indexOf(ADV) >= 0);
+  assert.ok(def.w > 40, 'wider cinematic framing than the old 40-tile room');
+  assert.equal(def.grid[30].substring(0, 17), '#################', 'start ground');
+  assert.equal(def.grid[30].substring(17, 112), '^'.repeat(95), 'spike death floor');
+  assert.equal(def.grid[25].substring(29, 47), '='.repeat(18), 'raised landing');
+  assert.equal(def.grid[13].substring(56, 67), '^'.repeat(11), 'upper-shelf spikes');
+  assert.equal(def.grid[5].substring(50, 67), '#'.repeat(17), 'reversal ceiling');
+  assert.equal(def.grid[8].substring(36, 47), '='.repeat(11), 'exit shelf');
+  assert.ok(def.entities.some(e => e.t === 'exit'));
+});
+check('advanced room has a deathless deterministic controller replay with earned checkpoint and airborne refill', () => {
+  const def = p.levels[ADV];
+  assert.ok(Array.isArray(def.recording));
+  const outcome = p.replay(ADV, def.recording);
+  assert.equal(outcome.reached, true);
+  assert.equal(outcome.deaths, 0);
+  assert.equal(outcome.frames, 356);
+  assert.equal(def.testing.successFrames, outcome.frames);
+  assert.ok(outcome.end.x > 690 && outcome.end.x < 715, 'exit reached on left exit shelf');
+  const traced = advPlay(def.recording);
+  assert.equal(traced.reached, true);
+  assert.equal(traced.cpTouched, true, 'mid checkpoint earned on canonical route');
+  assert.equal(traced.refillTouched, true, 'airborne refill consumed on canonical route');
+});
+check('advanced room defeats all-right, no-dash, no-reversal and refill-removal ablations', () => {
+  const base = advRec();
+  const noDashMap = { 'up right dash': 'right', 'up left dash': 'left', 'up dash': 'up', 'right dash': 'right' };
+  const noDash = base.map(pair => [pair[0], noDashMap[pair[1]] || pair[1]]);
+  const rightOnly = base.map(pair => [pair[0],
+    ({ 'up right dash': 'right dash', 'up left dash': 'right dash', 'up dash': 'right dash' })[pair[1]] || pair[1]]);
+  assert.equal(advPlay([[400, 'right']]).reached, false, 'careless running dies');
+  assert.equal(advPlay(noDash).reached, false, 'no-dash bypass fails');
+  assert.equal(advPlay(rightOnly).reached, false, 'simple right-dash bypass fails');
+  assert.equal(advPlay(advSub(3, 'right')).reached, false, 'pit-1 up-right dash required');
+  assert.equal(advPlay(advSub(14, 'up dash')).reached, false, 'no-reversal bypass fails');
+  assert.equal(advPlay(advSub(9, 'right')).reached, false, 'second up-dash required');
+  assert.equal(advPlay(base, L => {
+    const r = L.entities.find(e => e.t === 'refill' && e.y === 18);
+    r.dead = true; r.t0 = 999;
+  }).reached, false, 'airborne refill is required before the second up-dash');
+});
+check('advanced room dash timings are multi-frame windows, not single-frame brittle', () => {
+  const vary = (idx, value) => { const r = advRec(); r[idx][0] = value; return advPlay(r).reached; };
+  assert.equal(vary(3, 8), true, 'adjacent up-right dash succeeds');
+  assert.equal(vary(3, 10), true, 'late up-right dash succeeds');
+  assert.equal(vary(3, 5), false, 'too-short up-right dash fails');
+  assert.equal(vary(3, 14), false, 'too-long up-right dash fails');
+  assert.equal(vary(14, 7), true, 'adjacent reversal dash succeeds');
+  assert.equal(vary(14, 11), true, 'long reversal dash succeeds');
+});
+check('advanced room resets velocity and resource state after a death without a softlock', () => {
+  assert.ok(p.open(ADV));
+  let dead = false, respawned = false;
+  for (let n = 0; n < 200 && !respawned; n++) {
+    const s = p.step(1 / 60, 'right');
+    if (s.dead) dead = true;
+    if (dead && !s.dead) respawned = true;
+  }
+  assert.equal(dead, true, 'missed jump hits pit 1');
+  assert.equal(respawned, true, 'quick respawn completes');
+  assert.equal(p.state.vx, 0);
+  assert.equal(p.state.vy, 0);
+  assert.equal(p.state.dashes, 1);
+  assert.equal(p.levelId(), ADV);
+  assert.equal(p.replay(ADV, p.levels[ADV].recording).reached, true, 'room remains completable after a death');
+});
+
+console.log('mountain foundation: ' + checks + ' checks passed; advanced room route, ablations and reset verified');
