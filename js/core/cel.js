@@ -19,11 +19,11 @@
   'use strict';
   var NEU = window.NEU = window.NEU || {};
   var f = Math.fround, DT = f(0.0166667);
-  var NORMAL = 0, CLIMB = 1, DASH = 2, SWIM = 3, DREAMDASH = 9, INTROWALK = 12, INTRORESPAWN = 14, INTROWAKEUP = 15, CASSETTEFLY = 21, TUNNEL = 30;
+  var NORMAL = 0, CLIMB = 1, DASH = 2, SWIM = 3, DREAMDASH = 9, INTROWALK = 12, INTRORESPAWN = 14, INTROWAKEUP = 15, CASSETTEFLY = 21, TUNNEL = 30, BOOST = 31;
   var BufferTime = f(0.08), MaxFall = 160, Gravity = 900, HalfGravThreshold = 40, FastMaxFall = 240, FastMaxAccel = 300, MaxRun = 90, RunAccel = 1000,
     RunReduce = 400, AirMult = f(0.65), DuckFriction = 500, DuckCorrectCheck = 4, DuckCorrectSlide = 50, DodgeSlideSpeedMult = f(1.2),
     DuckSuperJumpXMult = f(1.25), DuckSuperJumpYMult = f(0.5), JumpGraceTime = f(0.1), JumpSpeed = -105, JumpHBoost = 40, VarJumpTime = f(0.2),
-    CeilingVarJumpGrace = f(0.05), UpwardCornerCorrection = 4, WallSpeedRetentionTime = f(0.06), WallJumpCheckDist = 3, WallJumpForceTime = f(0.16),
+    CeilingVarJumpGrace = f(0.05), UpwardCornerCorrection = 5, WallSpeedRetentionTime = f(0.06), WallJumpCheckDist = 3, WallJumpForceTime = f(0.16),
     WallJumpHSpeed = 130, WallSlideStartMax = 20, WallSlideTime = f(1.2), BounceVarJumpTime = f(0.2), BounceSpeed = -140, SuperBounceVarJumpTime = f(0.2),
     SuperBounceSpeed = -185, SuperJumpH = 260, SuperWallJumpSpeed = -160, SuperWallJumpVarTime = f(0.25), SuperWallJumpH = 170, DashSpeed = 240,
     EndDashSpeed = 160, EndDashUpMult = f(0.75), DashTime = f(0.15), DashCooldown = f(0.2), DashRefillCooldown = f(0.1), DashHJumpThruNudge = 6,
@@ -187,7 +187,11 @@
     var j = sjtOutside(x, y);
     return !!j && j.allowLR === (p.x > x) && (!wj || j.wj) && (!climb || j.climb) && j.y + j.h >= top() + (y - p.y) + 3;
   }
-  function solidSide(x, y, climb, wj) { return solidAt(x, y) || sjtSide(x, y, climb, wj); }
+  function solidSide(x, y, climb, wj) {
+    var s = solidFirst(x, y);
+    if (s && !(climb && s.ice)) return true;   // ice wall (notCoreMode wall booster): no grab / climb jump
+    return sjtSide(x, y, climb, wj);
+  }
   function sjtPoint(x, y) { for (var i = 0; i < sjts.length; i++) { var j = sjts[i]; if (x >= j.x && y >= j.y && x < j.x + j.w && y < j.y + j.h) return true; } return false; }
 
   /* ---------- Actor lift speed (Monocle Actor.LiftSpeed, 0.16 s grace) ---------- */
@@ -350,6 +354,7 @@
     var r = d.hit.onDash(dx, dy);
     if (r === 'rebound') { rebound(dx ? -sign(p.sx) : 0); return true; }
     if (r === 'bounce') { if (dx) reflectBounce(-sign(p.sx), 0); else reflectBounce(0, -sign(p.sy)); return true; }
+    if (r === 'dream') { startDreamDash(d.hit); return true; }
     return r === 'ignore';
   }
   function rebound(dir) {
@@ -447,6 +452,39 @@
       }
     } else p.tunnelSolid = s;
     return TUNNEL;
+  };
+
+  /* Vanilla dream dash (DreamBlock); p.dreamIn tracks having entered a block */
+  function startDreamDash(e) {
+    var d = p.dashDir; p.sx = f(d[0] * DashSpeed); p.sy = f(d[1] * DashSpeed);
+    p.dreamIn = false; p.dreamBlock = e; setState(DREAMDASH);
+  }
+  UPD[DREAMDASH] = function () {
+    var i, e, inside = false, s;
+    naiveMove(f(p.sx * DT), f(p.sy * DT));
+    for (i = 0; i < ents.length; i++) { e = ents[i]; if (e.t === 'dreamBlock' && e.coll && playerOverlaps(e)) { inside = true; break; } }
+    if (inside) { p.dreamIn = true; return DREAMDASH; }
+    if (!p.dreamIn) return DREAMDASH;
+    s = solidFirst(p.x, p.y);
+    if (s) { die(); return DREAMDASH; }   // crushed on exit unless it is another dream block (checked above)
+    if (p.dreamBlock && p.dreamBlock.oneUse) { p.dreamBlock.coll = false; p.dreamBlock.gone = true; }
+    if (In.grab.check() && p.dashDir[0] !== 0 && p.moveX === -p.dashDir[0]) { p.facing = p.moveX; return CLIMB; }
+    refillDash(); refillStamina(); p.dreamJump = true; p.autoJump = true; p.autoJumpTimer = 0;
+    p.sy = Math.min(p.sy, JumpSpeed); p.varJumpTimer = VarJumpTime; p.varJumpSpeed = p.sy;
+    setState(NORMAL); return NORMAL;
+  };
+
+  /* Vanilla BadelineBoost (noded): carried along nodes at 240 px/s, dash cancels */
+  BEGIN[BOOST] = function () { p.sx = 0; p.sy = 0; };
+  UPD[BOOST] = function () { if (canDash()) { addLift(); return startDash(); } return BOOST; };
+  CORO[BOOST] = function (c) {
+    var nodes = p.boostNodes || [], t, dx, dy, sx, sy;
+    if (p.boostIdx >= nodes.length) { p.sy = -180; setState(NORMAL); return DONE; }
+    t = nodes[p.boostIdx]; dx = t[0] - p.x; dy = t[1] - p.y;
+    sx = sign(dx) * Math.min(4, Math.abs(dx)); sy = sign(dy) * Math.min(4, Math.abs(dy));
+    p.x += sx; p.y += sy; p.rx = 0; p.ry = 0;
+    if (!sx && !sy) p.boostIdx++;
+    return null;
   };
 
   /* Normal */
@@ -801,7 +839,10 @@
       t = trigs[i];
       if (overlap(b[0], b[1], b[2], b[3], t)) {
         if (!t.inside) { t.inside = true; if (t.t === 'cameraOffsetTrigger') { L.camOffX = f(+t.a.cameraX * 48); L.camOffY = f(+t.a.cameraY * 32); }
-          if (t.t === 'changeRespawnTrigger') L.respawn = nearestSpawn(t.x + t.w / 2, t.y + t.h / 2); }
+          if (t.t === 'changeRespawnTrigger') L.respawn = nearestSpawn(t.x + t.w / 2, t.y + t.h / 2);
+          if (t.t === 'rumbleTrigger') { var nodes = t.nodes || [], k, n, w;
+            for (k = 0; k < nodes.length; k++) for (n = 0; n < ents.length; n++) { w = ents[n];
+              if (w.t === 'crumbleWall' && w.x + w.w / 2 >= Math.min(t.x, nodes[k][0]) && w.x + w.w / 2 <= Math.max(t.x, nodes[k][0])) w.crumble(); } } }
       } else t.inside = false;
     }
   }
@@ -865,7 +906,44 @@
     killbox: function (e) { e.box = { x: e.x, y: e.y, w: e.w, h: 32 }; e.coll = true; e.hit = function () { return hurtHit(e.box); }; e.touch = function () { die(); }; pcs.push(e); },
     heart: function (e) { e.coll = true; e.box = { x: e.x - 8, y: e.y - 8, w: 16, h: 16 }; e.hit = function () { return hurtHit(e.box); };
       e.touch = function () { if (dashAttacking()) { e.coll = false; L.done = true; if (L.log) L.log('heart', L.frame); } }; pcs.push(e); },
-    berry: function (e) { e.coll = true; e.box = { x: e.x - 7, y: e.y - 7, w: 14, h: 14 }; e.hit = function () { return hurtHit(e.box); }; e.touch = function () { e.coll = false; e.got = true; }; pcs.push(e); }
+    berry: function (e) { e.coll = true; e.box = { x: e.x - 7, y: e.y - 7, w: 14, h: 14 }; e.hit = function () { return hurtHit(e.box); }; e.touch = function () { e.coll = false; e.got = true; }; pcs.push(e); },
+    fakeWall: function (e) { e.coll = false; e.box = { x: e.x, y: e.y, w: e.w, h: e.h }; e.hit = function () { return hurtHit(e.box); };
+      e.touch = function () { e.gone = true; }; pcs.push(e); },
+    fallingBlock: function (e) { solidInit(e); e.x0 = e.x; e.y0 = e.y; e.ph = 0; e.on = false; e.at = 0; e.cs = 0;
+      e.update = function () {
+        var b, ride;
+        if (e.cs === 0) {
+          b = boxAt(p.x, p.y + 1); ride = !p.dead && overlap(b[0], b[1], b[2], b[3], e);
+          if (ride && (!e.climb || p.st !== CLIMB || solidFirst(p.x + p.facing, p.y) !== e)) { e.on = true; e.at = f(e.at + DT); if (e.at >= f(0.6)) e.cs = 1; }
+          else if (e.on) e.cs = 1;
+        }
+        if (e.cs === 1) { breakDashBlocks(e); if (blockedBelow(e)) e.cs = 2; else solidMoveV(e, f(160 * DT)); }
+      }; },
+    wallBooster: function (e) { solidInit(e); e.ice = !!e.ice; },
+    crumbleWall: function (e) { solidInit(e); e.on = false; e.at = 0;
+      e.crumble = function () { if (!e.on) { e.on = true; e.at = f(0.6); } };
+      e.update = function () { if (e.on && e.at > 0) { e.at = f(e.at - DT); if (e.at <= 0) { e.coll = false; e.gone = true; } } }; },
+    dashSwitch: function (e) { e.coll = true; e.on = false; e.box = { x: e.x, y: e.y, w: e.w, h: e.h };
+      e.hit = function () { return hurtHit(e.box); };
+      e.touch = function () { if (!e.on && dashAttacking()) { e.on = true; openGates(!!e.all, e); } };
+      pcs.push(e); },
+    templeGate: function (e) { solidInit(e); e.x0 = e.x; e.y0 = e.y; e.opened = false; e.at = 0;
+      e.openGate = function () { if (!e.opened) { e.opened = true; e.at = 0; } };
+      e.update = function () {
+        if (e.type === 'TouchSwitches' && L.sw) e.openGate();
+        if (e.opened && e.at < 1) { e.at = f(e.at + f(DT / f(0.8))); solidMoveTo(e, e.x0, f(e.y0 + f(e.h * Math.min(1, e.at)))); }
+      }; },
+    dreamBlock: function (e) { solidInit(e); e.dream = true; e.onDash = function () { return 'dream'; }; },
+    lightning: function (e) { e.box = { x: e.x, y: e.y, w: e.w, h: e.h }; e.coll = true; e.on = false; e.ph = 0;
+      e.hit = function () { return e.on && hurtHit(e.box); };
+      e.touch = function () { if (e.on) die(); };
+      e.update = function () { e.ph = f(e.ph + DT); if (e.ph >= 3) e.ph = f(e.ph - 3); e.on = e.ph < f(2); };   // shortcut: on/off period unverified (no TAS)
+      pcs.push(e); },
+    badelineBoost: function (e) { e.coll = true; e.box = { x: e.x - 8, y: e.y - 8, w: 16, h: 16 };
+      e.hit = function () { return hurtHit(e.box); };
+      e.touch = function () { if (p.dead || p.st === BOOST || p.st === DREAMDASH) return;
+        p.boostNodes = e.nodes || []; p.boostIdx = 0; setState(BOOST); };
+      pcs.push(e); }
   };
 
   function zipSeq(e) {   // vanilla ZipMover.Sequence
@@ -903,20 +981,38 @@
     for (var i = 0; i < ents.length; i++) if (ents[i].t === 'touchSwitch' && (ents[i].flag || '') === (flag || '') && !ents[i].on) return;
     if (flag) L.flags[flag] = !inv; else L.sw = true;
   }
-  function attachStatics() {   // Solid.Awake: spikes riding a solid move with it
+  function attachStatics() {   // Solid.Awake: riders (spikes, spring, berry, refill, spinner, key) move with the solid
     var i, j, s, e, b;
     for (i = 0; i < solids.length; i++) { s = solids[i]; if (!s.statics) continue;
-      for (j = 0; j < ents.length; j++) { e = ents[j]; if (e.t !== 'spikes' || e.att) continue; b = e.box;
-        var ox = e.d === 'L' ? 1 : e.d === 'R' ? -1 : 0, oy = e.d === 'U' ? 1 : e.d === 'D' ? -1 : 0;
-        if (overlap(b.x + ox, b.y + oy, b.w, b.h, s) && !overlap(b.x, b.y, b.w, b.h, s)) { e.att = true; s.statics.push(e); } } }
+      for (j = 0; j < ents.length; j++) { e = ents[j]; if (['spikes', 'spring', 'berry', 'refill', 'spinner', 'key'].indexOf(e.t) < 0 || e.att) continue; b = e.box || e.bar; if (!b) continue;
+        if (overlap(b.x - 2, b.y - 2, b.w + 4, b.h + 4, s)) { e.att = true; s.statics.push(e); } } }
   }
   function overlapPlayerBody(e) { var b = boxAt(p.x, p.y, p.hb); return overlap(b[0], b[1], b[2], b[3], e); }
+  function blockedBelow(e) {
+    if (gridHit(e.x, e.y + e.h + 1, e.w, 1)) return true;
+    for (var i = 0; i < solids.length; i++) { var s = solids[i]; if (s !== e && s.coll && overlap(e.x, e.y + e.h + 1, e.w, 1, s)) return true; }
+    return false;
+  }
+  function breakDashBlocks(e) {
+    for (var i = 0; i < solids.length; i++) { var s = solids[i];
+      if (s.t === 'dashBlock' && s.coll && overlap(e.x, e.y + e.h, e.w, 2, s)) { s.coll = false; s.broken = true; } }
+  }
+  function openGates(all, sw) {
+    var i, e, best = null, d = 1e18, dd;
+    for (i = 0; i < ents.length; i++) { e = ents[i]; if (e.t !== 'templeGate' || e.opened || !e.coll) continue;
+      if (all || e.type === 'NearestSwitch') {
+        if (all) e.openGate();
+        else { dd = (e.x - sw.x) * (e.x - sw.x) + (e.y - sw.y) * (e.y - sw.y); if (dd < d) { d = dd; best = e; } }
+      }
+    }
+    if (best) best.openGate();
+  }
   function refillLike(e, use) {
     e.coll = true; e.respawn = 0; e.co = 0; e.box = { x: e.x - 8, y: e.y - 8, w: 16, h: 16 };
     e.hit = function () { return hurtHit(e.box); };
     e.touch = function () { if (use()) { e.coll = false; e.co = 1; e.respawn = RespawnTime; } };
     e.update = function () {
-      if (e.co === 1) { freeze(0.05); e.co = 0; }   // refill coroutine runs the frame it is touched (TAS-pinned, see engine-rules)
+      if (e.co === 1) { freeze(e.two ? f(0.0667) : 0.05); e.co = 0; }   // refill coroutine runs the frame it is touched (TAS-pinned, see engine-rules)
       if (e.respawn > 0) { e.respawn = f(e.respawn - DT); if (e.respawn <= 0) e.coll = true; }
     };
     pcs.push(e);
@@ -953,6 +1049,7 @@
     for (i = 0; i < M.rooms.length && !r; i++) if (M.rooms[i].name === (opts.room || M.rooms[0].name)) r = M.rooms[i];
     L.freeze = 0; L.time = 0; L.frame = 0; L.trans = null; L.done = false; L.deaths = 0; L.camOffX = 0; L.camOffY = 0; L.log = opts.log || null; L.flags = {}; L.sw = false;
     DTN.count = 0; DTN.canStart = false; DTN.attacking = false; DTN.timer = 0;
+    if (!r.spawns || !r.spawns.length) for (i = 0; i < M.rooms.length; i++) if (M.rooms[i].spawns && M.rooms[i].spawns.length) { r = M.rooms[i]; break; }
     p = freshPlayer(r.spawns[0][0], r.spawns[0][1]); room = r; loadRoom(r);
     if (opts.spawn) { p.x = opts.spawn[0]; p.y = opts.spawn[1]; }
     if (opts.state) for (var sk in opts.state) p[sk] = opts.state[sk];
@@ -965,7 +1062,7 @@
     return api;
   }
   /* snapshot/restore for search tools: plain data only (coroutines are data, entity closures stay) */
-  var EKEYS = ['coll', 'vis', 'respawn', 'co', 'flash', 'got', 'inside', 'x', 'y', 'box', 'bar', 'mrx', 'mry', 'liftX', 'liftY', 'cs', 'cw', 'at', 'rate', 'tw', 'left', 'on', 'broken', 'gone'];
+  var EKEYS = ['coll', 'vis', 'respawn', 'co', 'flash', 'got', 'inside', 'x', 'y', 'box', 'bar', 'mrx', 'mry', 'liftX', 'liftY', 'cs', 'cw', 'at', 'rate', 'tw', 'left', 'on', 'broken', 'gone', 'ph', 'opened'];
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function hbName(h) { for (var k in HB) if (HB[k] === h) return k; return 'normal'; }
   function snapshot() {

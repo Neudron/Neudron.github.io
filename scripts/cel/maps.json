@@ -10,5 +10,23 @@
   "zip": "archives/strawberryjammappack_v1013.zip",
   "tas": "tas/StrawberryJamTAS/1_Beginner/the_squeeze.tas",
   "offset": 0
+ },
+ "beefy-uncle": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/3-Advanced/BeefyUncle.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "holly": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/3-Advanced/Holly.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "dozing": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/3-Advanced/Dozing.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
  }
 }
