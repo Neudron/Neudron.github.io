@@ -10,5 +10,17 @@
   "zip": "archives/strawberryjammappack_v1013.zip",
   "tas": "tas/StrawberryJamTAS/1_Beginner/the_squeeze.tas",
   "offset": 0
+ },
+ "bonicle": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/2-Intermediate/Bonicle.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "donker19": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/2-Intermediate/Donker19.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
  }
 }

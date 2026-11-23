@@ -4,8 +4,9 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { mapInfo } from './maps.mjs';
 let ZIP = null, zipSet = null;   // the mod pack zip of the map being converted (from maps.json)
-const zip = (p, enc) => execFileSync('unzip', ['-p', ZIP, p], { maxBuffer: 1 << 26, encoding: enc });
-const inZip = p => { if (!zipSet) zipSet = new Set(execFileSync('unzip', ['-Z1', ZIP], { maxBuffer: 1 << 26, encoding: 'utf8' }).split('\n')); return zipSet.has(p); };
+const norm = p => p ? String(p).replace(/\\/g, "/") : p;
+const zip = (p, enc) => execFileSync('unzip', ['-p', ZIP, norm(p)], { maxBuffer: 1 << 26, encoding: enc });
+const inZip = p => { if (!zipSet) zipSet = new Set(execFileSync('unzip', ['-Z1', ZIP], { maxBuffer: 1 << 26, encoding: 'utf8' }).split('\n')); return zipSet.has(norm(p)); };
 
 /* ---- autotiler (Celeste Autotiler.TileHandler semantics) ---- */
 function parseTilesets(xml) {
@@ -63,7 +64,8 @@ function autotile(map, layer, sets, beh, roomOf) {
   return out;
 }
 const DECOR = new Set(('bird towerviewer cobweb hanginglamp lamp lightbeam floatingDebris foregroundDebris pandorasBox/coloredWaterfall flutterbird '
-  + 'wire soundSource everest/coreMessage ContortHelper/LightSource FrostHelper/ColoredLightbeam MaxHelpingHand/SetFlagOnSpawnController').split(' '));
+  + 'wire soundSource everest/coreMessage ContortHelper/LightSource FrostHelper/ColoredLightbeam MaxHelpingHand/SetFlagOnSpawnController '
+  + 'fakeBlock bonfire').split(' '));
 const SPIN = new Set(['spinner', 'FrostHelper/IceSpinner']);
 const num = v => +v || 0;
 export function ent(e, rx, ry) {
@@ -81,6 +83,11 @@ export function ent(e, rx, ry) {
   if (n === 'exitBlock') return { t: 'exitBlock', x, y, w, h, tile: e.tileType || '' };
   if (n === 'CollabUtils2/MiniHeart') return { t: 'heart', x, y };
   if (n === 'invisibleBarrier') return { t: 'barrier', x, y, w, h };
+  // base-game solids: floatySpaceBlock stays static in normal gravity (these maps have no low-gravity trigger)
+  if (n === 'floatySpaceBlock') return { t: 'floaty', x, y, w, h };
+  if (n === 'crumbleBlock') return { t: 'crumble', x, y, w, h: num(e.height) || 8, rumble: false };
+  if (n === 'crumbleWallOnRumble') return { t: 'crumble', x, y, w, h, rumble: true };
+  if (n === 'blockField') return { t: 'blockField', x, y, w, h };
   if (n === 'killbox') return { t: 'killbox', x, y, w };
   if (/^spikes(Up|Down|Left|Right)$/.test(n)) return { t: 'spikes', d: n.slice(6)[0], x, y, w, h };
   const nd = nodes[0] || [x, y];
@@ -142,7 +149,7 @@ function bakeArt(id, m, meta, out) {
       const x = k % w, y = (k / w) | 0, ri = owner[k]; if (ri < 0) continue;
       const r = out.rooms[ri], c = g[k], set = sets[c], lx = x + tx0 - r.x / 8, ly = y + ty0 - r.y / 8;
       let ti = -1;
-      if (set && set.path && set.path.startsWith('SJ2021/')) {
+      if (set && set.path && set.path.indexOf('/') >= 0) {
         const key = layer + ':' + set.path;
         if (!tsIndex.has(key)) { const f = tex('tilesets/' + set.path); tsIndex.set(key, f ? out.tilesets.push(f) - 1 : -1); }
         ti = tsIndex.get(key);
@@ -151,12 +158,12 @@ function bakeArt(id, m, meta, out) {
       else r[layer + 'Art'].push(lx, ly, ti, t[0], t[1]);
     }
   }
-  for (const r of out.rooms) r.decals = r.decals.map(d => { const f = d.tex.startsWith('SJ2021/') ? tex('decals/' + d.tex) : null; return f ? { ...d, f } : null; }).filter(Boolean);
+  for (const r of out.rooms) r.decals = r.decals.map(d => { const f = d.tex.indexOf('/') >= 0 ? tex('decals/' + d.tex) : null; return f ? { ...d, f } : null; }).filter(Boolean);
   out.styles = [];
   const st = kid(m, 'Style');
   for (const g of st ? st.__children : []) for (const s of g.__children) {
     if (s.__name !== 'parallax') continue;
-    const f = String(s.texture).startsWith('bgs/SJ2021/') ? tex(s.texture) : null; if (!f) continue;
+    const f = /^bgs\/[^/]+\//.test(String(s.texture)) ? tex(s.texture) : null; if (!f) continue;
     out.styles.push({ f, fg: g.__name === 'Foregrounds', x: num(s.x), y: num(s.y), scx: num(s.scrollx), scy: num(s.scrolly), spx: num(s.speedx), spy: num(s.speedy),
       lx: !!s.loopx, ly: !!s.loopy, a: s.alpha == null ? 1 : num(s.alpha), color: s.color || 'FFFFFF', only: s.only || '*', exclude: s.exclude || '' });
   }
