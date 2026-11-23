@@ -571,8 +571,8 @@
     heading(paused ? 'MENU' : (save ? 'the woods are still there.' : 'something is hidden down here.'));
     if (paused) box._body.appendChild(button('Resume', 'menu__primary', close));
     box._body.appendChild(button('Play', 'menu__primary', function () {
-      if (NEU.save && NEU.save.load && NEU.save.load()) continueGame();
-      else setScreen('difficulty');
+      setScreen('difficulty');
+      if (hasSave() && NEU.diff && NEU.diff.index) focusAt(NEU.diff.index());
     }));
     box._body.appendChild(button('Config', '', function () {
       if (NEU.settings && NEU.settings.open) NEU.settings.open();
@@ -585,6 +585,8 @@
     filePanel();
     note('');
   }
+
+  function hasSave() { return !!(NEU.save && NEU.save.load && NEU.save.load()); }
 
   function continueGame() {
     close();
@@ -655,7 +657,7 @@
     }
     var back = button('Back', 'menu__back', function () { setScreen('root'); });
     box._body.appendChild(back);
-    note('you can change this later in the file.');
+    note(hasSave() ? 'your progress is kept.' : 'pick again any time you press play.');
   }
 
   function chooseTier(id, sure) {
@@ -669,7 +671,8 @@
       return;
     }
     if (NEU.diff && NEU.diff.set) NEU.diff.set(id);
-    if (NEU.save && NEU.save.newGame) NEU.save.newGame();
+    /* Play always lands here: a tier picked over an existing save keeps the save */
+    if (!hasSave() && NEU.save && NEU.save.newGame) NEU.save.newGame();
     close();
     if (NEU.act4 && NEU.act4.open) NEU.act4.open();
   }
