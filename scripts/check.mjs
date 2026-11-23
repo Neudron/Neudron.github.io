@@ -8,7 +8,7 @@
  * js/page/scene.js is excluded: it is the ES module holdout. In --check-skip
  * scratch mode the skip applies to every parse run (see probe below).
  *
- *   node scripts/check.mjs           # tracked files under js/ (CI has no tests/ dir)
+ *   node scripts/check.mjs           # tracked files under js/ and cel-tiers/ (CI has no tests/ dir)
  *   node scripts/check.mjs FILE JS   # explicit paths (tamper probes, scratch runs)
  *
  * npm run check. Wired into .github/workflows/deploy.yml between Install
@@ -60,7 +60,7 @@ if (args.length) {
     else rels.push({ file: path.relative(ROOT, full).split(path.sep).join('/') });
   }
 } else {
-  for (const rel of String(execFileSync('git', ['ls-files', 'js'], { cwd: ROOT }))
+  for (const rel of String(execFileSync('git', ['ls-files', 'js', 'cel-tiers'], { cwd: ROOT }))
     .split('\n').filter(Boolean)) {
     if (!SKIP.has(rel)) rels.push({ file: rel });
   }

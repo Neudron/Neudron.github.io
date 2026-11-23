@@ -4,8 +4,9 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { mapInfo } from './maps.mjs';
 let ZIP = null, zipSet = null;   // the mod pack zip of the map being converted (from maps.json)
-const zip = (p, enc) => execFileSync('unzip', ['-p', ZIP, p], { maxBuffer: 1 << 26, encoding: enc });
-const inZip = p => { if (!zipSet) zipSet = new Set(execFileSync('unzip', ['-Z1', ZIP], { maxBuffer: 1 << 26, encoding: 'utf8' }).split('\n')); return zipSet.has(p); };
+const norm = p => p ? String(p).replace(/\\/g, '/') : p;   // Celeste stores these paths with backslashes
+const zip = (p, enc) => execFileSync('unzip', ['-p', ZIP, norm(p)], { maxBuffer: 1 << 26, encoding: enc });
+const inZip = p => { if (!zipSet) zipSet = new Set(execFileSync('unzip', ['-Z1', ZIP], { maxBuffer: 1 << 26, encoding: 'utf8' }).split('\n')); return zipSet.has(norm(p)); };
 
 /* ---- autotiler (Celeste Autotiler.TileHandler semantics) ---- */
 function parseTilesets(xml) {
@@ -63,7 +64,8 @@ function autotile(map, layer, sets, beh, roomOf) {
   return out;
 }
 const DECOR = new Set(('bird towerviewer cobweb hanginglamp lamp lightbeam floatingDebris foregroundDebris pandorasBox/coloredWaterfall flutterbird '
-  + 'wire soundSource everest/coreMessage ContortHelper/LightSource FrostHelper/ColoredLightbeam MaxHelpingHand/SetFlagOnSpawnController').split(' '));
+  + 'wire soundSource everest/coreMessage ContortHelper/LightSource FrostHelper/ColoredLightbeam MaxHelpingHand/SetFlagOnSpawnController '
+  + 'fakeBlock bonfire playbackBillboard').split(' '));
 const SPIN = new Set(['spinner', 'FrostHelper/IceSpinner']);
 const num = v => +v || 0;
 export function ent(e, rx, ry) {
@@ -84,8 +86,44 @@ export function ent(e, rx, ry) {
   if (n === 'killbox') return { t: 'killbox', x, y, w };
   if (/^spikes(Up|Down|Left|Right)$/.test(n)) return { t: 'spikes', d: n.slice(6)[0], x, y, w, h };
   const nd = nodes[0] || [x, y];
+  /* Spring Collab 2020 / base-game entities: each tier kernel owns the behaviour for its own subset. */
+  if (n === 'floatySpaceBlock') return { t: 'floaty', x, y, w, h };
+  if (n === 'crumbleBlock') return { t: 'crumble', x, y, w, h: num(e.height) || 8, rumble: false };
+  if (n === 'crumbleWallOnRumble') return { t: 'crumbleWall', x, y, w, h, persistent: !!e.persistent };
+  if (n === 'blockField') return { t: 'blockField', x, y, w, h };
+  if (n === 'fakeWall') return { t: 'fakeWall', x, y, w, h };
+  if (n === 'fallingBlock') return { t: 'fallingBlock', x, y, w, h, climb: e.climbFall !== false };
+  if (n === 'wallBooster') return { t: 'wallBooster', x, y, w: 8, h: num(e.height) || 8, ice: !!e.notCoreMode, left: !!e.left };
+  if (n === 'dreamBlock') return { t: 'dreamBlock', x, y, w, h, oneUse: !!e.oneUse, fast: !!e.fastMoving, nodes };
+  if (n === 'swapBlock') return { t: 'swapBlock', x, y, w, h, nx: nd[0], ny: nd[1] };
+  if (n === 'booster') return { t: 'booster', x, y, red: !!e.red };
+  if (n === 'dashSwitchH') return { t: 'dashSwitch', x, y, w: 8, h: 8, dir: 'H', left: !!e.leftSide, persistent: !!e.persistent, all: !!e.allGates };
+  if (n === 'dashSwitchV') return { t: 'dashSwitch', x, y, w: 8, h: 8, dir: 'V', left: !!e.ceiling, persistent: !!e.persistent, all: !!e.allGates };
+  if (n === 'seeker') return { t: 'seeker', x, y, nx: nd[0], ny: nd[1] };
+  if (n === 'seekerBarrier') return { t: 'seekerBarrier', x, y, w, h };
+  if (n === 'templeGate') return { t: 'templeGate', x, y, w: 8, h: num(e.height) || 48, type: e.type || 'CloseBehindPlayer' };
+  if (n === 'templeCrackedBlock') return { t: 'templeCrackedBlock', x, y, w, h, persistent: !!e.persistent };
+  /* shortcut: spinner names follow the expert kernel (trk/rot); the beginner kernel names them track/rotate.
+     Reconverting cat-in-box-01 needs those two names swapped; existing cel/ data is already correct. */
+  if (n === 'trackSpinner') return { t: 'trkSpinner', x, y, nx: nd[0], ny: nd[1], speed: e.speed || 'Normal', spin: 'track', look: e.star ? 'star' : e.dust ? 'dust' : 'blade' };
+  if (n === 'rotateSpinner') return { t: 'rotSpinner', x, y, nx: nd[0], ny: nd[1], cw: !!e.clockwise, spin: 'rotate', look: e.star ? 'star' : e.dust ? 'dust' : 'blade' };
+  if (n === 'lockBlock') return { t: 'lockBlock', x, y, sprite: e.sprite || '' };
+  if (n === 'key') return { t: 'key', x, y, nodes };
+  if (n === 'colorSwitch') return { t: 'colorSwitch', x, y, col: String(e.type || 'red') };
+  if (n === 'clutterDoor') return { t: 'clutterDoor', x, y, w, h, type: String(e.type || 'red') };
+  if (n === 'clutterCabinet') return { t: 'clutterCabinet', x, y: y - 8, w: 16, h: 16 };
+  if (n === 'door') return { t: 'door', x, y };
+  if (n === 'movingPlatform') return { t: 'movingPlatform', x, y, w, h, nx: nd[0], ny: nd[1] };
+  if (n === 'cloud') return { t: 'cloud', x, y, small: !!e.small, fragile: !!e.fragile };
+  if (n === 'lightning') return { t: 'lightning', x, y, w, h, moveTime: e.moveTime == null ? 5 : +e.moveTime, perLevel: !!e.perLevel };
+  if (/^triggerSpikes(Up|Down|Left|Right)$/.test(n)) return { t: 'triggerSpikes', d: n.slice(13, 14), x, y, w, h };
+  if (n === 'lightningBlock') return { t: 'lightningBlock', x, y };
+  if (n === 'badelineBoost') return { t: 'badelineBoost', x, y, nodes, lock: !!e.lockCamera };
+  if (n === 'resortLantern') return { t: 'vanillaDecor', x, y: y - 8, w: 8, h: 16 };
+  if (n === 'clothesline') return { t: 'vanillaDecor', x, y, w: Math.max(16, Math.abs((nodes[0] || [x + 16, y])[0] - x)), h: 8 };
+  if (n === 'introCar') return { t: 'vanillaDecor', x: x - 16, y: y - 16, w: 32, h: 16 };
   if (n === 'zipMover') return { t: 'zipMover', x, y, w, h, nx: nd[0], ny: nd[1] };
-  if (n === 'dashBlock') return { t: 'dashBlock', x, y, w, h, canDash: e.canDash !== false, tile: String(e.tiletype || '') };
+  if (n === 'dashBlock') return { t: 'dashBlock', x, y, w, h, canDash: e.canDash !== false, perm: !!e.permanent, tile: String(e.tiletype || '') };
   if (n === 'touchSwitch') return { t: 'touchSwitch', x, y, flag: '' };
   if (n === 'MaxHelpingHand/FlagTouchSwitch') return { t: 'touchSwitch', x, y, flag: e.flag || '', inverted: !!e.inverted, persistent: !!e.persistent };
   if (n === 'switchGate') return { t: 'switchGate', x, y, w, h, nx: nd[0], ny: nd[1], flag: '', moveTime: 1.8, shake: 0.5, eased: true };
@@ -114,7 +152,8 @@ export function convert(id) {
     }
     for (const t of kids(r, 'triggers')) {
       const { __name, __children, id: _i, x, y, width, height, ...a } = t;
-      room.trig.push({ t: __name, x: rx + num(x), y: ry + num(y), w: num(width), h: num(height), a });
+      room.trig.push({ t: __name, x: rx + num(x), y: ry + num(y), w: num(width), h: num(height), a,
+        nodes: (__children || []).filter(c => c.__name === 'node').map(c => [rx + num(c.x), ry + num(c.y)]) });
     }
     out.rooms.push(room);
     room.decals = [];
@@ -142,7 +181,7 @@ function bakeArt(id, m, meta, out) {
       const x = k % w, y = (k / w) | 0, ri = owner[k]; if (ri < 0) continue;
       const r = out.rooms[ri], c = g[k], set = sets[c], lx = x + tx0 - r.x / 8, ly = y + ty0 - r.y / 8;
       let ti = -1;
-      if (set && set.path && set.path.startsWith('SJ2021/')) {
+      if (set && set.path && set.path.indexOf('/') >= 0) {
         const key = layer + ':' + set.path;
         if (!tsIndex.has(key)) { const f = tex('tilesets/' + set.path); tsIndex.set(key, f ? out.tilesets.push(f) - 1 : -1); }
         ti = tsIndex.get(key);
@@ -151,12 +190,12 @@ function bakeArt(id, m, meta, out) {
       else r[layer + 'Art'].push(lx, ly, ti, t[0], t[1]);
     }
   }
-  for (const r of out.rooms) r.decals = r.decals.map(d => { const f = d.tex.startsWith('SJ2021/') ? tex('decals/' + d.tex) : null; return f ? { ...d, f } : null; }).filter(Boolean);
+  for (const r of out.rooms) r.decals = r.decals.map(d => { const f = d.tex.indexOf('/') >= 0 ? tex('decals/' + d.tex) : null; return f ? { ...d, f } : null; }).filter(Boolean);
   out.styles = [];
   const st = kid(m, 'Style');
   for (const g of st ? st.__children : []) for (const s of g.__children) {
     if (s.__name !== 'parallax') continue;
-    const f = String(s.texture).startsWith('bgs/SJ2021/') ? tex(s.texture) : null; if (!f) continue;
+    const f = /^bgs\/[^/]+\//.test(String(s.texture)) ? tex(s.texture) : null; if (!f) continue;
     out.styles.push({ f, fg: g.__name === 'Foregrounds', x: num(s.x), y: num(s.y), scx: num(s.scrollx), scy: num(s.scrolly), spx: num(s.speedx), spy: num(s.speedy),
       lx: !!s.loopx, ly: !!s.loopy, a: s.alpha == null ? 1 : num(s.alpha), color: s.color || 'FFFFFF', only: s.only || '*', exclude: s.exclude || '' });
   }

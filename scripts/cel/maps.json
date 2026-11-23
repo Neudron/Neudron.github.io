@@ -10,5 +10,65 @@
   "zip": "archives/strawberryjammappack_v1013.zip",
   "tas": "tas/StrawberryJamTAS/1_Beginner/the_squeeze.tas",
   "offset": 0
+ },
+ "isa-good-friend": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/1-Beginner/IsaGoodFriend.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "thegur90": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/1-Beginner/Thegur90.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "cat-in-box-01": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/1-Beginner/Cat_in_Box_01.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "bonicle": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/2-Intermediate/Bonicle.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "donker19": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/2-Intermediate/Donker19.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "beefy-uncle": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/3-Advanced/BeefyUncle.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "holly": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/3-Advanced/Holly.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "dozing": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/3-Advanced/Dozing.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "death-kontrol": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/4-Expert/DeathKontrol.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "radley-mctuneston": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/4-Expert/RadleyMcTuneston.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
  }
 }

@@ -1,14 +1,24 @@
-/* cel-mode.js — the lower shaft: imported mod rooms played 1:1 on js/core/cel.js.
+/* cel-mode.js — the lower shaft: imported mod rooms played 1:1 on their own cel kernel.
    Optional, behind the elevator's -1 button after the cart ride. Kernel scene "cel".
-   Kernel and map data load on demand; when cel/<map>.js is missing (a deploy without
+   Kernel, view and map data load on demand; when cel/<map>.js is missing (a deploy without
    the local-only mod data) the shaft stays shut. Route progress lives in the save flag cel_route. */
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
-  var STEP = 1 / 60, ROUTE = ['forest-path', 'the-squeeze'];
-  var overlay, canvas, hud, attached = false, live = false, loading = false, idx = 0, acc = 0, keys = {}, prevMini = null;
+  var STEP = 1 / 60, ROUTE = ['forest-path', 'the-squeeze',
+    'isa-good-friend', 'thegur90', 'cat-in-box-01', 'donker19',
+    'beefy-uncle', 'holly', 'dozing', 'death-kontrol', 'radley-mctuneston'];
+  var overlay, canvas, hud, attachedView = null, live = false, loading = false, idx = 0, acc = 0, keys = {}, prevMini = null, activeEng = null;
   /* the dev route's layout (cel.html); NEU.keys.route applies the player's rebinds first */
   var MAP = { ArrowLeft: 'L', ArrowRight: 'R', ArrowUp: 'U', ArrowDown: 'D', c: 'J', ' ': 'K', x: 'X', z: 'G', Shift: 'H', v: 'Z' };
+  /* each mod map was converted against one kernel; unmerged rule sets stay apart (same table as cel.html) */
+  var ENG = {
+    'forest-path': 'base', 'the-squeeze': 'base',
+    'isa-good-friend': 'beginner', 'thegur90': 'beginner', 'cat-in-box-01': 'beginner',
+    'donker19': 'intermediate',
+    'beefy-uncle': 'advanced', 'holly': 'advanced', 'dozing': 'advanced',
+    'death-kontrol': 'expert', 'radley-mctuneston': 'expert'
+  };
 
   function need(list, ok, bad) {
     var s;
@@ -19,12 +29,20 @@
     s.onerror = bad;
     document.body.appendChild(s);
   }
+  function tier(id) { return ENG[id] || 'base'; }
+  function engNow() { return activeEng || (NEU.cel && NEU.celView ? 'base' : null); }
   function missing(id) {
-    var l = [];
-    if (!NEU.cel) l.push('js/core/cel.js');
-    if (!NEU.celView) l.push('js/core/cel-view.js');
+    var l = [], t = tier(id);
+    if (engNow() !== t) l = t === 'base' ? ['js/core/cel.js', 'js/core/cel-view.js'] : ['cel-tiers/cel-' + t + '.js', 'cel-tiers/cel-view-' + t + '.js'];
     if (!(NEU.celMaps && NEU.celMaps[id])) l.push('cel/' + id + '.js');
     return l;
+  }
+  function loadMap(id, ok, bad) {   /* engine+view pair first, then the map data; base reloads after a tier */
+    var t = tier(id);
+    need(missing(id), function () { activeEng = t; ok(); }, bad);
+  }
+  function bindView() {
+    if (attachedView !== NEU.celView) { NEU.celView.attach(canvas); attachedView = NEU.celView; }
   }
   function ensure() {
     overlay = document.getElementById('celmode');
@@ -60,12 +78,12 @@
     s = saved();
     if (s.i >= ROUTE.length) s = { i: 0 };
     idx = s.i; loading = true;
-    need(missing(ROUTE[idx]), function () {
+    loadMap(ROUTE[idx], function () {
       loading = false;
       ensure();
       live = true;
       overlay.hidden = false;
-      if (!attached) { NEU.celView.attach(canvas); attached = true; }
+      bindView();
       begin(s.room);
       prevMini = NEU.activeMinigame || null;
       NEU.activeMinigame = 'cel';
@@ -95,7 +113,7 @@
       return;
     }
     live = false; loading = true;
-    need(missing(ROUTE[idx]), function () { loading = false; live = true; begin(null); }, function () { live = true; close(); shut(); });
+    loadMap(ROUTE[idx], function () { loading = false; live = true; bindView(); begin(null); }, function () { live = true; close(); shut(); });
   }
   function tick(dtMs) {
     var n = 0, C = NEU.cel, p;
