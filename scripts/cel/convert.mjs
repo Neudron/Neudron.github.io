@@ -83,6 +83,11 @@ export function ent(e, rx, ry) {
   if (n === 'exitBlock') return { t: 'exitBlock', x, y, w, h, tile: e.tileType || '' };
   if (n === 'CollabUtils2/MiniHeart') return { t: 'heart', x, y };
   if (n === 'invisibleBarrier') return { t: 'barrier', x, y, w, h };
+  // base-game solids: floatySpaceBlock stays static in normal gravity (these maps have no low-gravity trigger)
+  if (n === 'floatySpaceBlock') return { t: 'floaty', x, y, w, h };
+  if (n === 'crumbleBlock') return { t: 'crumble', x, y, w, h: num(e.height) || 8, rumble: false };
+  if (n === 'crumbleWallOnRumble') return { t: 'crumble', x, y, w, h, rumble: true };
+  if (n === 'blockField') return { t: 'blockField', x, y, w, h };
   if (n === 'killbox') return { t: 'killbox', x, y, w };
   if (/^spikes(Up|Down|Left|Right)$/.test(n)) return { t: 'spikes', d: n.slice(6)[0], x, y, w, h };
   const nd = nodes[0] || [x, y];

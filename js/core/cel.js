@@ -78,7 +78,7 @@
   }
 
   /* ---------- world ---------- */
-  var M = null, G = null, room = null, ents = [], solids = [], jts = [], sjts = [], waters = [], pcs = [], trigs = [], p = null;
+  var M = null, G = null, room = null, ents = [], solids = [], jts = [], sjts = [], waters = [], pcs = [], trigs = [], bfs = [], p = null;
   var L = { freeze: 0, time: 0, frame: 0, trans: null, cam: { x: 0, y: 0 }, camOffX: 0, camOffY: 0, done: false, deaths: 0, respawn: null, log: null, flags: {}, sw: false };
   function buildGrid() {
     var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, i, r, w, h, cells, row, cx, cy, ch, bx, by;
@@ -857,6 +857,10 @@
     exitBlock: function (e) { e.coll = true; solids.push(e); if (hurtHit(e) || overlapPlayerBody(e)) e.coll = false;
       e.update = function () { if (!e.coll && !overlapPlayerBody(e)) e.coll = true; }; },
     barrier: function (e) { e.coll = true; solids.push(e); },
+    floaty: function (e) { solidInit(e); },
+    crumble: function (e) { solidInit(e); e.cs = 0; e.cw = 0;
+      e.update = function () { if (!e.rumble) entCo(e, crumbleSeq); }; },
+    blockField: function (e) { bfs.push(e); },
     spikes: function (e) {
       var d = e.d, s = d === 'U' || d === 'D' ? e.w : e.h;
       e.box = d === 'U' ? { x: e.x, y: e.y - 3, w: s, h: 3 } : d === 'D' ? { x: e.x, y: e.y, w: s, h: 3 } : d === 'L' ? { x: e.x - 3, y: e.y, w: 3, h: s } : { x: e.x, y: e.y, w: 3, h: s };
@@ -866,9 +870,22 @@
     killbox: function (e) { e.box = { x: e.x, y: e.y, w: e.w, h: 32 }; e.coll = true; e.hit = function () { return hurtHit(e.box); }; e.touch = function () { die(); }; pcs.push(e); },
     heart: function (e) { e.coll = true; e.box = { x: e.x - 8, y: e.y - 8, w: 16, h: 16 }; e.hit = function () { return hurtHit(e.box); };
       e.touch = function () { if (dashAttacking()) { e.coll = false; L.done = true; if (L.log) L.log('heart', L.frame); } }; pcs.push(e); },
-    berry: function (e) { e.coll = true; e.box = { x: e.x - 7, y: e.y - 7, w: 14, h: 14 }; e.hit = function () { return hurtHit(e.box); }; e.touch = function () { e.coll = false; e.got = true; }; pcs.push(e); }
+    berry: function (e) { e.coll = true; e.box = { x: e.x - 7, y: e.y - 7, w: 14, h: 14 }; e.hit = function () { return hurtHit(e.box); }; e.touch = function () { if (!berriesBlocked()) { e.coll = false; e.got = true; } }; pcs.push(e); }
   };
 
+  function crumbleSeq(e) {   // vanilla CrumbleBlock: rider -> short shake -> break, then respawn
+    switch (e.cs) {
+      case 0: if (!ridingSolid(e)) return null; e.cs = 1; return f(0.1);
+      case 1: e.coll = false; e.cs = 2; return f(1);
+      case 2: e.coll = true; e.cs = -1; return DONE;
+    }
+    return null;
+  }
+  function berriesBlocked() {   // Player.StrawberriesBlocked = CollideCheck<BlockField>()
+    var b = boxAt(p.x, p.y, p.hb), i;
+    for (i = 0; i < bfs.length; i++) if (overlap(b[0], b[1], b[2], b[3], bfs[i])) return true;
+    return false;
+  }
   function zipSeq(e) {   // vanilla ZipMover.Sequence
     var t;
     switch (e.cs) {
@@ -923,7 +940,7 @@
   }
   function loadRoom(r) {
     var i, e;
-    room = r; ents = []; solids = []; jts = []; sjts = []; waters = []; pcs = []; trigs = []; L.sw = false;
+    room = r; ents = []; solids = []; jts = []; sjts = []; waters = []; pcs = []; trigs = []; bfs = []; L.sw = false;
     for (i = 0; i < r.ents.length; i++) { e = {}; for (var k in r.ents[i]) e[k] = r.ents[i][k]; if (KIND[e.t]) { KIND[e.t](e); ents.push(e); } }
     attachStatics();
     for (i = 0; i < r.trig.length; i++) { e = {}; for (var k2 in r.trig[i]) e[k2] = r.trig[i][k2]; trigs.push(e); }

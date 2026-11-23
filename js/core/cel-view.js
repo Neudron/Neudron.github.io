@@ -85,6 +85,8 @@
       else if (e.t === 'dashBlock') { if (e.broken) { bx.fillStyle = 'rgba(122,106,88,0.28)'; bx.fillRect(x + 2, y + 2, e.w - 4, e.h - 4); bx.strokeStyle = 'rgba(201,183,154,0.45)'; bx.strokeRect(x + 2.5, y + 2.5, e.w - 5, e.h - 5); }
         else { bx.fillStyle = '#7a6a58'; bx.fillRect(x, y, e.w, e.h); bx.strokeStyle = '#c9b79a'; bx.strokeRect(x + 0.5, y + 0.5, e.w - 1, e.h - 1); } }
       else if (e.t === 'touchSwitch') { bx.strokeStyle = e.on ? '#f141df' : '#5fcde4'; bx.strokeRect(x - 7.5, y - 7.5, 15, 15); bx.fillStyle = bx.strokeStyle; bx.fillRect(x - 2, y - 2, 4, 4); }
+      else if (e.t === 'floaty') { bx.fillStyle = '#6b7a8a'; bx.fillRect(x, y, e.w, e.h); }
+      else if (e.t === 'crumble') { if (!e.coll) continue; bx.fillStyle = e.cs === 1 ? '#e8d27a' : '#8a7a5c'; bx.fillRect(x, y, e.w, e.h); }
       else if (e.t === 'sideJT') { bx.fillStyle = '#c9a56b'; bx.fillRect(e.allowLR ? x + 2 : x, y, 2, e.h); }
       else if (e.t === 'bubbleRegion') { bx.strokeStyle = 'rgba(255,120,220,0.6)'; bx.beginPath(); bx.arc(x + e.w / 2, y + e.h / 2, e.w / 2, 0, Math.PI * 2); bx.stroke(); }
       else if (e.t === 'spikes') { if (e.gone) continue; var b = e.box, n2, k2, s2 = 8; bx.fillStyle = '#d8dde6'; bx.beginPath();
