@@ -19,7 +19,7 @@
   'use strict';
   var NEU = window.NEU = window.NEU || {};
   var f = Math.fround, DT = f(0.0166667);
-  var NORMAL = 0, CLIMB = 1, DASH = 2, SWIM = 3, DREAMDASH = 9, INTROWALK = 12, INTRORESPAWN = 14, INTROWAKEUP = 15, CASSETTEFLY = 21, TUNNEL = 30;
+  var NORMAL = 0, CLIMB = 1, DASH = 2, SWIM = 3, DREAMDASH = 9, INTROWALK = 12, INTRORESPAWN = 14, INTROWAKEUP = 15, CASSETTEFLY = 21, TUNNEL = 30, BOOST = 31;
   var BufferTime = f(0.08), MaxFall = 160, Gravity = 900, HalfGravThreshold = 40, FastMaxFall = 240, FastMaxAccel = 300, MaxRun = 90, RunAccel = 1000,
     RunReduce = 400, AirMult = f(0.65), DuckFriction = 500, DuckCorrectCheck = 4, DuckCorrectSlide = 50, DodgeSlideSpeedMult = f(1.2),
     DuckSuperJumpXMult = f(1.25), DuckSuperJumpYMult = f(0.5), JumpGraceTime = f(0.1), JumpSpeed = -105, JumpHBoost = 40, VarJumpTime = f(0.2),
@@ -111,10 +111,13 @@
   function solidFirst(x, y, hb) {
     var b = boxAt(x, y, hb), i, e;
     if (gridHit(b[0], b[1], b[2], b[3])) return TILE_HIT;
-    for (i = 0; i < solids.length; i++) { e = solids[i]; if (e.coll && overlap(b[0], b[1], b[2], b[3], e)) return e; }
+    for (i = 0; i < solids.length; i++) { e = solids[i]; if (!e.coll) continue;
+      if (e.dream && p && p.st === DREAMDASH) continue;   // DreamBlock: pass through while dream-dashing
+      if (overlap(b[0], b[1], b[2], b[3], e)) return e; }
     return null;
   }
   function solidAt(x, y, hb) { return !!solidFirst(x, y, hb); }
+  function dreamAt(x, y) { var b = boxAt(x, y), i, e; for (i = 0; i < solids.length; i++) { e = solids[i]; if (e.dream && e.coll && overlap(b[0], b[1], b[2], b[3], e)) return e; } return null; }
   function jtAt(x, y, e) { var b = boxAt(x, y); return overlap(b[0], b[1], b[2], b[3], e); }
   function jtOutside(x, y) { for (var i = 0; i < jts.length; i++) if (jtAt(x, y, jts[i]) && !jtAt(p.x, p.y, jts[i])) return jts[i]; return null; }
   function jtHere() { for (var i = 0; i < jts.length; i++) if (jtAt(p.x, p.y, jts[i])) return jts[i]; return null; }
@@ -350,8 +353,13 @@
     var r = d.hit.onDash(dx, dy);
     if (r === 'rebound') { rebound(dx ? -sign(p.sx) : 0); return true; }
     if (r === 'bounce') { if (dx) reflectBounce(-sign(p.sx), 0); else reflectBounce(0, -sign(p.sy)); return true; }
+    if (r === 'dream') { p.dreamIdx = solids.indexOf(d); setState(DREAMDASH); return true; }
     return r === 'ignore';
   }
+  var DreamDashSpeed = 240;   // vanilla Player.DreamDashSpeed
+  BEGIN[DREAMDASH] = function () { p.sx = f(p.dashDir[0] * DreamDashSpeed); p.sy = f(p.dashDir[1] * DreamDashSpeed); p.dreamT = 0; p.dreamJump = false; };
+  UPD[DREAMDASH] = function () { return DREAMDASH; };
+  END[DREAMDASH] = function () { refillDash(); refillStamina(); };
   function rebound(dir) {
     p.sx = f(dir * 120); p.sy = -120; p.varJumpSpeed = p.sy; p.varJumpTimer = f(0.15); p.autoJump = true; p.autoJumpTimer = 0;
     p.dashAttack = 0; p.wallSlideTimer = WallSlideTime; p.wallBoostTimer = 0; p.forceMoveXTimer = 0; setState(NORMAL);
@@ -449,6 +457,12 @@
     } else p.tunnelSolid = s;
     return TUNNEL;
   };
+
+  /* Booster (base-game): constant-speed dash until the timer expires */
+  var BoostSpeed = 320;   // vanilla Booster.BoostSpeed
+  BEGIN[BOOST] = function () { p.boostT = f(0.3); };
+  UPD[BOOST] = function () { return BOOST; };
+  END[BOOST] = function () { p.dashAttack = 0; };
 
   /* Normal */
   BEGIN[NORMAL] = function () { p.maxFall = MaxFall; };
@@ -671,7 +685,7 @@
   function playerUpdate() {
     var first, w, s, i, e, was, to;
     if (p.dead) { p.deadTimer = f(p.deadTimer + DT); if (p.deadTimer > 1) respawn(); return; }
-    if (p.st === DREAMDASH || p.st === TUNNEL) p.onGround = false;
+    if (p.st === DREAMDASH || p.st === TUNNEL || p.st === BOOST) p.onGround = false;
     else if (p.sy >= 0) p.onGround = solidAt(p.x, p.y + 1) || !!jtOutside(p.x, p.y + 1);
     else p.onGround = false;
     if (p.wallSlideDir !== 0) { p.wallSlideTimer = Math.max(f(p.wallSlideTimer - DT), 0); p.wallSlideDir = 0; }
@@ -709,8 +723,25 @@
       if (solidAt(p.x, p.y + DashVFloorSnapDist) || jtOutside(p.x, p.y + DashVFloorSnapDist)) moveVExact(DashVFloorSnapDist);
     }
     if (p.sy > 0 && canUnDuck() && !p.onGround) setDuck(false);
-    if (p.st !== DREAMDASH && p.st !== TUNNEL) moveH(f(p.sx * DT), onCollideH);
-    if (p.st !== DREAMDASH && p.st !== TUNNEL) moveV(f(p.sy * DT), onCollideV);
+    if (p.st !== DREAMDASH && p.st !== TUNNEL && p.st !== BOOST) moveH(f(p.sx * DT), onCollideH);
+    if (p.st !== DREAMDASH && p.st !== TUNNEL && p.st !== BOOST) moveV(f(p.sy * DT), onCollideV);
+    if (p.st === DREAMDASH) {
+      naiveMove(f(p.sx * DT), f(p.sy * DT));
+      if (dreamAt(p.x, p.y)) p.dreamT = 0; else {
+        p.dreamT = f(p.dreamT + DT);
+        if (p.dreamT > f(0.1)) {
+          var db = solids[p.dreamIdx];
+          if (db && db.one) { db.coll = false; db.gone = true; }
+          freeze(f(0.05));
+          if (In.jump.pressed() && p.dashDir[0] !== 0) { p.dreamJump = true; jump(); }
+          setState(NORMAL);
+        }
+      }
+    } else if (p.st === BOOST) {
+      naiveMove(f(p.sx * DT), f(p.sy * DT));
+      p.boostT = f(p.boostT - DT);
+      if (p.boostT <= 0) setState(NORMAL);
+    }
     if (p.st === SWIM) {
       if (p.sy < 0 && p.sy >= SwimMaxRise) while (!swimCheck()) { p.sy = 0; if (moveVExact(1)) break; }
     } else if (p.st === NORMAL && swimCheck()) setState(SWIM);
@@ -968,7 +999,7 @@
     if (nm !== M || !G) { M = nm; buildGrid(); }
     var r = null, i;
     for (i = 0; i < M.rooms.length && !r; i++) if (M.rooms[i].name === (opts.room || M.rooms[0].name)) r = M.rooms[i];
-    L.freeze = 0; L.time = 0; L.frame = 0; L.trans = null; L.done = false; L.deaths = 0; L.camOffX = 0; L.camOffY = 0; L.log = opts.log || null; L.flags = {}; L.sw = false;
+    L.freeze = 0; L.time = 0; L.frame = 0; L.trans = null; L.done = false; L.deaths = 0; L.camOffX = 0; L.camOffY = 0; L.log = opts.log || null; L.flags = {}; L.sw = false; L.swN = 0;
     DTN.count = 0; DTN.canStart = false; DTN.attacking = false; DTN.timer = 0;
     if (!r.spawns || !r.spawns.length) for (i = 0; i < M.rooms.length; i++) if (M.rooms[i].spawns && M.rooms[i].spawns.length) { r = M.rooms[i]; break; }
     p = freshPlayer(r.spawns[0][0], r.spawns[0][1]); room = r; loadRoom(r);
@@ -983,7 +1014,7 @@
     return api;
   }
   /* snapshot/restore for search tools: plain data only (coroutines are data, entity closures stay) */
-  var EKEYS = ['coll', 'vis', 'respawn', 'co', 'flash', 'got', 'inside', 'x', 'y', 'box', 'bar', 'mrx', 'mry', 'liftX', 'liftY', 'cs', 'cw', 'at', 'rate', 'tw', 'left', 'on', 'broken', 'gone'];
+  var EKEYS = ['coll', 'vis', 'respawn', 'co', 'flash', 'got', 'inside', 'x', 'y', 'box', 'bar', 'mrx', 'mry', 'liftX', 'liftY', 'cs', 'cw', 'at', 'rate', 'tw', 'left', 'on', 'broken', 'gone', 'dream', 'x0', 'y0', 'dir', 'phase', 'locked', 'sx', 'sy', 'spd', 'open', 'car', 'dreamIdx', 'dreamT'];
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function hbName(h) { for (var k in HB) if (HB[k] === h) return k; return 'normal'; }
   function snapshot() {
@@ -1013,6 +1044,6 @@
   var api = NEU.cel = {
     start: start, step: step, DT: DT, snapshot: snapshot, restore: restore, setDuck: function (v) { setDuck(!!v); },
     get player() { return p; }, get room() { return room; }, get level() { return L; }, get ents() { return ents; }, get map() { return M; },
-    get grid() { return G; }, cellAt: cellAt, STATES: { NORMAL: NORMAL, CLIMB: CLIMB, DASH: DASH, SWIM: SWIM, INTROWALK: INTROWALK, TUNNEL: TUNNEL, CASSETTEFLY: CASSETTEFLY }
+    get grid() { return G; }, cellAt: cellAt, STATES: { NORMAL: NORMAL, CLIMB: CLIMB, DASH: DASH, SWIM: SWIM, DREAMDASH: DREAMDASH, INTROWALK: INTROWALK, TUNNEL: TUNNEL, CASSETTEFLY: CASSETTEFLY, BOOST: BOOST }
   };
 })();

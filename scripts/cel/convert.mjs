@@ -136,6 +136,22 @@ export function ent(e, rx, ry) {
     moveTime: e.moveTime == null ? 1.8 : +e.moveTime, shake: e.shakeTime == null ? 0.5 : +e.shakeTime, eased: e.moveEased !== false };
   if (n === 'MaxHelpingHand/SidewaysJumpThru') return { t: 'sideJT', x, y, h, allowLR: !e.left, climb: e.allowClimbing !== false, wj: e.allowWallJumping !== false };
   if (n === 'CommunalHelper/PlayerBubbleRegion') return { t: 'bubbleRegion', x, y, w, h, ctrl: nodes[0], end: nodes[1] };
+  /* Spring Collab 2020: base-game entities only (no helper-mod namespaces allowed in these maps) */
+  if (n === 'dreamBlock') return { t: 'dreamBlock', x, y, w, h, one: !!e.oneUse, fast: !!e.fastMoving };
+  if (n === 'blockField') return { t: 'blockField', x, y, w, h };   // Strawberry Blockfield: non-solid region, blocks berry pickup
+  if (n === 'swapBlock') return { t: 'swapBlock', x, y, w, h, nx: nd[0], ny: nd[1] };
+  if (n === 'booster') return { t: 'booster', x, y, red: !!e.red };
+  if (n === 'dashSwitchH') return { t: 'dashSwitch', x, y, w: 8, h: 8, dir: e.leftSide ? 'L' : 'R', persistent: !!e.persistent };
+  if (n === 'dashSwitchV') return { t: 'dashSwitch', x, y, w: 8, h: 8, dir: e.ceiling ? 'U' : 'D', persistent: !!e.persistent };
+  if (n === 'seeker') return { t: 'seeker', x, y, nx: nd[0], ny: nd[1] };
+  if (n === 'seekerBarrier') return { t: 'seekerBarrier', x, y, w, h };
+  if (n === 'templeGate') return { t: 'templeGate', x, y, w: 8, h, type: e.type || 'NearestSwitch' };
+  if (n === 'templeCrackedBlock') return { t: 'templeCrackedBlock', x, y, w, h, persistent: !!e.persistent };
+  if (n === 'trackSpinner') return { t: 'trackSpinner', x, y, nx: nd[0], ny: nd[1], speed: e.speed || 'Slow', star: !!e.star };
+  if (n === 'rotateSpinner') return { t: 'rotateSpinner', x, y, cx: nd[0], cy: nd[1], clockwise: !!e.clockwise, star: !!e.star };
+  if (n === 'fakeWall') return { t: 'fakeWall', x, y, w, h };
+  if (n === 'lockBlock') return { t: 'lockBlock', x, y, w: 16, h: 16, sprite: e.sprite || '' };
+  if (n === 'key') return { t: 'key', x, y, nodes };
   if (DECOR.has(n) || n === 'CollabUtils2/GoldenBerryPlayerRespawnPoint' || n === 'CollabUtils2/SpeedBerry') return null;
   return { t: '?', n, x, y };
 }
