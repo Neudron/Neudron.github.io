@@ -190,7 +190,11 @@
     var j = sjtOutside(x, y);
     return !!j && j.allowLR === (p.x > x) && (!wj || j.wj) && (!climb || j.climb) && j.y + j.h >= top() + (y - p.y) + 3;
   }
-  function solidSide(x, y, climb, wj) { return solidAt(x, y) || sjtSide(x, y, climb, wj); }
+  function solidSide(x, y, climb, wj) {
+    var s = solidFirst(x, y);
+    if (s && !(climb && s.ice)) return true;   // ice wall (notCoreMode wall booster): no grab / climb jump
+    return sjtSide(x, y, climb, wj);
+  }
   function sjtPoint(x, y) { for (var i = 0; i < sjts.length; i++) { var j = sjts[i]; if (x >= j.x && y >= j.y && x < j.x + j.w && y < j.y + j.h) return true; } return false; }
 
   /* ---------- Actor lift speed (Monocle Actor.LiftSpeed, 0.16 s grace) ---------- */
@@ -833,7 +837,10 @@
       t = trigs[i];
       if (overlap(b[0], b[1], b[2], b[3], t)) {
         if (!t.inside) { t.inside = true; if (t.t === 'cameraOffsetTrigger') { L.camOffX = f(+t.a.cameraX * 48); L.camOffY = f(+t.a.cameraY * 32); }
-          if (t.t === 'changeRespawnTrigger') L.respawn = nearestSpawn(t.x + t.w / 2, t.y + t.h / 2); }
+          if (t.t === 'changeRespawnTrigger') L.respawn = nearestSpawn(t.x + t.w / 2, t.y + t.h / 2);
+          if (t.t === 'rumbleTrigger') { var nodes = t.nodes || [], k, n, w;
+            for (k = 0; k < nodes.length; k++) for (n = 0; n < ents.length; n++) { w = ents[n];
+              if (w.t === 'crumbleWall' && w.x + w.w / 2 >= Math.min(t.x, nodes[k][0]) && w.x + w.w / 2 <= Math.max(t.x, nodes[k][0])) w.crumble(); } } }
       } else t.inside = false;
     }
   }
@@ -959,6 +966,25 @@
         if (overlap(b.x - 2, b.y - 2, b.w + 4, b.h + 4, s)) { e.att = true; s.statics.push(e); } } }
   }
   function overlapPlayerBody(e) { var b = boxAt(p.x, p.y, p.hb); return overlap(b[0], b[1], b[2], b[3], e); }
+  function blockedBelow(e) {
+    if (gridHit(e.x, e.y + e.h + 1, e.w, 1)) return true;
+    for (var i = 0; i < solids.length; i++) { var s = solids[i]; if (s !== e && s.coll && overlap(e.x, e.y + e.h + 1, e.w, 1, s)) return true; }
+    return false;
+  }
+  function breakDashBlocks(e) {
+    for (var i = 0; i < solids.length; i++) { var s = solids[i];
+      if (s.t === 'dashBlock' && s.coll && overlap(e.x, e.y + e.h, e.w, 2, s)) { s.coll = false; s.broken = true; } }
+  }
+  function openGates(all, sw) {
+    var i, e, best = null, d = 1e18, dd;
+    for (i = 0; i < ents.length; i++) { e = ents[i]; if (e.t !== 'templeGate' || e.opened || !e.coll) continue;
+      if (all || e.type === 'NearestSwitch') {
+        if (all) e.openGate();
+        else { dd = (e.x - sw.x) * (e.x - sw.x) + (e.y - sw.y) * (e.y - sw.y); if (dd < d) { d = dd; best = e; } }
+      }
+    }
+    if (best) best.openGate();
+  }
   function refillLike(e, use) {
     e.coll = true; e.respawn = 0; e.co = 0; e.box = { x: e.x - 8, y: e.y - 8, w: 16, h: 16 };
     e.hit = function () { return hurtHit(e.box); };
