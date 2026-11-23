@@ -10,5 +10,17 @@
   "zip": "archives/strawberryjammappack_v1013.zip",
   "tas": "tas/StrawberryJamTAS/1_Beginner/the_squeeze.tas",
   "offset": 0
+ },
+ "death-kontrol": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/4-Expert/DeathKontrol.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "radley-mctuneston": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/4-Expert/RadleyMcTuneston.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
  }
 }

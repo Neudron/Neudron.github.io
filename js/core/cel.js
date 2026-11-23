@@ -23,7 +23,7 @@
   var BufferTime = f(0.08), MaxFall = 160, Gravity = 900, HalfGravThreshold = 40, FastMaxFall = 240, FastMaxAccel = 300, MaxRun = 90, RunAccel = 1000,
     RunReduce = 400, AirMult = f(0.65), DuckFriction = 500, DuckCorrectCheck = 4, DuckCorrectSlide = 50, DodgeSlideSpeedMult = f(1.2),
     DuckSuperJumpXMult = f(1.25), DuckSuperJumpYMult = f(0.5), JumpGraceTime = f(0.1), JumpSpeed = -105, JumpHBoost = 40, VarJumpTime = f(0.2),
-    CeilingVarJumpGrace = f(0.05), UpwardCornerCorrection = 4, WallSpeedRetentionTime = f(0.06), WallJumpCheckDist = 3, WallJumpForceTime = f(0.16),
+    CeilingVarJumpGrace = f(0.05), UpwardCornerCorrection = 5, WallSpeedRetentionTime = f(0.06), WallJumpCheckDist = 3, WallJumpForceTime = f(0.16),
     WallJumpHSpeed = 130, WallSlideStartMax = 20, WallSlideTime = f(1.2), BounceVarJumpTime = f(0.2), BounceSpeed = -140, SuperBounceVarJumpTime = f(0.2),
     SuperBounceSpeed = -185, SuperJumpH = 260, SuperWallJumpSpeed = -160, SuperWallJumpVarTime = f(0.25), SuperWallJumpH = 170, DashSpeed = 240,
     EndDashSpeed = 160, EndDashUpMult = f(0.75), DashTime = f(0.15), DashCooldown = f(0.2), DashRefillCooldown = f(0.1), DashHJumpThruNudge = 6,
@@ -79,7 +79,7 @@
 
   /* ---------- world ---------- */
   var M = null, G = null, room = null, ents = [], solids = [], jts = [], sjts = [], waters = [], pcs = [], trigs = [], p = null;
-  var L = { freeze: 0, time: 0, frame: 0, trans: null, cam: { x: 0, y: 0 }, camOffX: 0, camOffY: 0, done: false, deaths: 0, respawn: null, log: null, flags: {}, sw: false };
+  var L = { freeze: 0, time: 0, frame: 0, trans: null, cam: { x: 0, y: 0 }, camOffX: 0, camOffY: 0, done: false, deaths: 0, respawn: null, log: null, flags: {}, sw: false, color: '', key: false };
   function buildGrid() {
     var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, i, r, w, h, cells, row, cx, cy, ch, bx, by;
     for (i = 0; i < M.rooms.length; i++) { r = M.rooms[i]; x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
@@ -833,6 +833,7 @@
       e.hit = function () { var b = boxAt(p.x, p.y); return rectCircle(b[0], b[1], b[2], b[3], e.x, e.y, 6) || overlap(b[0], b[1], b[2], b[3], e.bar); };
       e.touch = function () { die(); };
       e.update = function () {
+        if (e.spin === 'rotate' || e.spin === 'track') spinnerMotion(e);
         if (!e.vis) { e.coll = false; if (e.x > L.cam.x - 16 && e.y > L.cam.y - 16 && e.x < L.cam.x + 336 && e.y < L.cam.y + 196) e.vis = true; }
         else e.coll = Math.abs(p.x - e.x) < 128 && Math.abs(p.y - e.y) < 128;   // shortcut: game re-checks every 0.05 s at a per-spinner random offset; checked every frame here
       }; pcs.push(e); },
@@ -865,9 +866,77 @@
     killbox: function (e) { e.box = { x: e.x, y: e.y, w: e.w, h: 32 }; e.coll = true; e.hit = function () { return hurtHit(e.box); }; e.touch = function () { die(); }; pcs.push(e); },
     heart: function (e) { e.coll = true; e.box = { x: e.x - 8, y: e.y - 8, w: 16, h: 16 }; e.hit = function () { return hurtHit(e.box); };
       e.touch = function () { if (dashAttacking()) { e.coll = false; L.done = true; if (L.log) L.log('heart', L.frame); } }; pcs.push(e); },
-    berry: function (e) { e.coll = true; e.box = { x: e.x - 7, y: e.y - 7, w: 14, h: 14 }; e.hit = function () { return hurtHit(e.box); }; e.touch = function () { e.coll = false; e.got = true; }; pcs.push(e); }
+    berry: function (e) { e.coll = true; e.box = { x: e.x - 7, y: e.y - 7, w: 14, h: 14 }; e.hit = function () { return hurtHit(e.box); }; e.touch = function () { e.coll = false; e.got = true; }; pcs.push(e); },
+
+    /* Spring Collab 2020 vanilla entities. Hitboxes: Lonn plugin rects / known vanilla collider sizes.
+       shortcut: moving timings and speeds are behaviour-sourced estimates; no TAS exists to pin them, so physics is unverified. */
+    colorBlock: function (e) { solidInit(e); e.update = function () { e.coll = !L.color || L.color === e.col; }; },
+    colorSwitch: function (e) { e.coll = true; e.box = { x: e.x - 8, y: e.y - 8, w: 16, h: 16 };
+      e.hit = function () { return hurtHit(e.box); };
+      e.touch = function () { L.color = L.color === e.col ? '' : e.col; }; pcs.push(e); },
+    fakeWall: function (e) { solidInit(e);
+      e.onDash = function () { e.coll = false; e.broken = true; return 'ignore'; }; },
+    clutterDoor: function (e) { solidInit(e); },
+    clutterCabinet: function (e) { solidInit(e); },
+    door: function (e) { solidInit(e); e.box = { x: e.x - 8, y: e.y - 32, w: 16, h: 32 }; e.x = e.box.x; e.y = e.box.y; e.w = 16; e.h = 32; },
+    key: function (e) { e.coll = true; e.box = { x: e.x - 5, y: e.y - 5, w: 10, h: 10 };
+      e.hit = function () { return hurtHit(e.box); };
+      e.touch = function () { e.coll = false; e.got = true; L.key = true; }; pcs.push(e); },
+    lockBlock: function (e) { solidInit(e); e.update = function () { e.coll = !L.key; }; },
+    lightningBlock: function (e) { solidInit(e); },
+    movingPlatform: function (e) { solidInit(e); e.h = e.h || 8; e.x0 = e.x; e.y0 = e.y; e.at = 0; e.dir = 1;
+      e.update = function () { if (!e.nx) return;
+        var sp = 32 * DT, d = Math.sqrt(f(f(e.nx - e.x0) * f(e.nx - e.x0)) + f(f(e.ny - e.y0) * f(e.ny - e.y0)));
+        if (d <= 0) return;
+        e.at = f(e.at + f(sp * e.dir / d));
+        if (e.at >= 1) { e.at = 1; e.dir = -1; } else if (e.at <= 0) { e.at = 0; e.dir = 1; }
+        solidMoveTo(e, lerp(e.x0, e.nx, e.at), lerp(e.y0, e.ny, e.at)); e.liftX = 0; e.liftY = 0; }; },
+    cloud: function (e) { solidInit(e); e.w = e.small ? 28 : 34; e.h = 8; e.box = { x: e.x - e.w / 2, y: e.y - 4, w: e.w, h: 8 };
+      e.x = e.box.x; e.y = e.box.y;
+      e.update = function () { if (e.fragile && e.coll && ridingSolid(e)) { e.fade = f((e.fade || 0) + DT); if (e.fade > 0.6) e.coll = false; } }; },
+    lightning: function (e) { e.box = { x: e.x, y: e.y, w: e.w, h: e.h }; e.coll = false; e.on = 0;
+      e.update = function () {
+        var t = f(L.time % (e.moveTime || 5));
+        e.on = t < 0.3 ? 1 : 0; e.coll = !!e.on && Math.abs(p.x - e.x) < 256 && Math.abs(p.y - e.y) < 192; };
+      e.hit = function () { return hurtHit(e.box); }; e.touch = function () { die(); }; pcs.push(e); },
+    triggerSpikes: function (e) {
+      var d = e.d, s = d === 'U' || d === 'D' ? e.w : e.h;
+      e.box = d === 'U' ? { x: e.x, y: e.y - 3, w: s, h: 3 } : d === 'D' ? { x: e.x, y: e.y, w: s, h: 3 }
+        : d === 'L' ? { x: e.x - 3, y: e.y, w: 3, h: s } : { x: e.x, y: e.y, w: 3, h: s };
+      e.coll = false; e.shown = false;
+      e.hit = function () { return hurtHit(e.box); };
+      e.touch = function () { if ((d === 'U' && p.sy >= 0 && bottom() <= e.box.y + e.box.h) || (d === 'D' && p.sy <= 0)
+        || (d === 'L' && p.sx >= 0) || (d === 'R' && p.sx <= 0)) die(); };
+      e.update = function () { e.shown = Math.abs(p.x - (e.x + e.w / 2)) < 48 && Math.abs(p.y - (e.y + e.h / 2)) < 48; e.coll = e.shown; };
+      pcs.push(e); }
   };
 
+  /* Vanilla rotating/track spinners: same circle(6) collider as a static spinner, different motion.
+     shortcut: rotation 2 rad/s and track 40/60/80 px/s are behaviour estimates; no TAS pins these. */
+  function spinnerMotion(e) {
+    if (e.t === 'rotSpinner') {
+      var cx = e.nx, cy = e.ny, dx = e.x - cx, dy = e.y - cy, rad = Math.sqrt(f(f(dx * dx) + f(dy * dy)));
+      if (e.ang == null) e.ang = Math.atan2(dy, dx);
+      e.ang = f(e.ang + (e.cw ? 1 : -1) * f(2 * DT));
+      e.x = f(cx + f(Math.cos(e.ang) * rad)); e.y = f(cy + f(Math.sin(e.ang) * rad));
+    } else if (e.t === 'trkSpinner') {
+      var d = Math.sqrt(f(f(e.nx - e.x0) * f(e.nx - e.x0)) + f(f(e.ny - e.y0) * f(e.ny - e.y0)));
+      if (d > 0) {
+        if (e.at == null) { e.at = e.startCenter ? 0.5 : 0; e.dir = 1; }
+        var sp = (e.speed === 'Fast' ? 80 : e.speed === 'Slow' ? 40 : 60) * DT;
+        e.at = f(e.at + f(f(sp * e.dir) / d));
+        if (e.at >= 1) { e.at = 1; e.dir = -1; } else if (e.at <= 0) { e.at = 0; e.dir = 1; }
+        e.x = lerp(e.x0, e.nx, e.at); e.y = lerp(e.y0, e.ny, e.at);
+      }
+    }
+    if (e.bar) { e.bar.x = e.x - 8; e.bar.y = e.y - 3; }
+  }
+  KIND.rotSpinner = KIND.trkSpinner = function (e) {
+    e.x0 = e.x; e.y0 = e.y; e.at = e.startCenter ? 0.5 : 0; e.dir = 1; e.ang = null;
+    KIND.spinner(e);
+    var u = e.update;
+    e.update = function () { spinnerMotion(e); u(); };
+  };
   function zipSeq(e) {   // vanilla ZipMover.Sequence
     var t;
     switch (e.cs) {
@@ -903,12 +972,11 @@
     for (var i = 0; i < ents.length; i++) if (ents[i].t === 'touchSwitch' && (ents[i].flag || '') === (flag || '') && !ents[i].on) return;
     if (flag) L.flags[flag] = !inv; else L.sw = true;
   }
-  function attachStatics() {   // Solid.Awake: spikes riding a solid move with it
+  function attachStatics() {   // Solid.Awake: riders (spikes, spring, berry, refill, spinner, key) move with the solid
     var i, j, s, e, b;
     for (i = 0; i < solids.length; i++) { s = solids[i]; if (!s.statics) continue;
-      for (j = 0; j < ents.length; j++) { e = ents[j]; if (e.t !== 'spikes' || e.att) continue; b = e.box;
-        var ox = e.d === 'L' ? 1 : e.d === 'R' ? -1 : 0, oy = e.d === 'U' ? 1 : e.d === 'D' ? -1 : 0;
-        if (overlap(b.x + ox, b.y + oy, b.w, b.h, s) && !overlap(b.x, b.y, b.w, b.h, s)) { e.att = true; s.statics.push(e); } } }
+      for (j = 0; j < ents.length; j++) { e = ents[j]; if (['spikes', 'spring', 'berry', 'refill', 'spinner', 'key'].indexOf(e.t) < 0 || e.att) continue; b = e.box || e.bar; if (!b) continue;
+        if (overlap(b.x - 2, b.y - 2, b.w + 4, b.h + 4, s)) { e.att = true; s.statics.push(e); } } }
   }
   function overlapPlayerBody(e) { var b = boxAt(p.x, p.y, p.hb); return overlap(b[0], b[1], b[2], b[3], e); }
   function refillLike(e, use) {
@@ -916,14 +984,14 @@
     e.hit = function () { return hurtHit(e.box); };
     e.touch = function () { if (use()) { e.coll = false; e.co = 1; e.respawn = RespawnTime; } };
     e.update = function () {
-      if (e.co === 1) { freeze(0.05); e.co = 0; }   // refill coroutine runs the frame it is touched (TAS-pinned, see engine-rules)
+      if (e.co === 1) { freeze(e.two ? f(0.0667) : 0.05); e.co = 0; }   // refill coroutine runs the frame it is touched (TAS-pinned, see engine-rules)
       if (e.respawn > 0) { e.respawn = f(e.respawn - DT); if (e.respawn <= 0) e.coll = true; }
     };
     pcs.push(e);
   }
   function loadRoom(r) {
     var i, e;
-    room = r; ents = []; solids = []; jts = []; sjts = []; waters = []; pcs = []; trigs = []; L.sw = false;
+    room = r; ents = []; solids = []; jts = []; sjts = []; waters = []; pcs = []; trigs = []; L.sw = false; L.color = ''; L.key = false;
     for (i = 0; i < r.ents.length; i++) { e = {}; for (var k in r.ents[i]) e[k] = r.ents[i][k]; if (KIND[e.t]) { KIND[e.t](e); ents.push(e); } }
     attachStatics();
     for (i = 0; i < r.trig.length; i++) { e = {}; for (var k2 in r.trig[i]) e[k2] = r.trig[i][k2]; trigs.push(e); }
@@ -953,6 +1021,7 @@
     for (i = 0; i < M.rooms.length && !r; i++) if (M.rooms[i].name === (opts.room || M.rooms[0].name)) r = M.rooms[i];
     L.freeze = 0; L.time = 0; L.frame = 0; L.trans = null; L.done = false; L.deaths = 0; L.camOffX = 0; L.camOffY = 0; L.log = opts.log || null; L.flags = {}; L.sw = false;
     DTN.count = 0; DTN.canStart = false; DTN.attacking = false; DTN.timer = 0;
+    if (!r.spawns || !r.spawns.length) for (i = 0; i < M.rooms.length; i++) if (M.rooms[i].spawns && M.rooms[i].spawns.length) { r = M.rooms[i]; break; }
     p = freshPlayer(r.spawns[0][0], r.spawns[0][1]); room = r; loadRoom(r);
     if (opts.spawn) { p.x = opts.spawn[0]; p.y = opts.spawn[1]; }
     if (opts.state) for (var sk in opts.state) p[sk] = opts.state[sk];
@@ -965,7 +1034,7 @@
     return api;
   }
   /* snapshot/restore for search tools: plain data only (coroutines are data, entity closures stay) */
-  var EKEYS = ['coll', 'vis', 'respawn', 'co', 'flash', 'got', 'inside', 'x', 'y', 'box', 'bar', 'mrx', 'mry', 'liftX', 'liftY', 'cs', 'cw', 'at', 'rate', 'tw', 'left', 'on', 'broken', 'gone'];
+  var EKEYS = ['coll', 'vis', 'respawn', 'co', 'flash', 'got', 'inside', 'x', 'y', 'box', 'bar', 'mrx', 'mry', 'liftX', 'liftY', 'cs', 'cw', 'at', 'rate', 'tw', 'left', 'on', 'broken', 'gone', 'dir', 'ang', 'shown', 'fade'];
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function hbName(h) { for (var k in HB) if (HB[k] === h) return k; return 'normal'; }
   function snapshot() {

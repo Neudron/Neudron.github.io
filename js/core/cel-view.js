@@ -70,7 +70,22 @@
     for (i = 0; i < ents.length; i++) {
       e = ents[i]; x = e.x - cx; y = e.y - cy;
       if (e.t === 'water') { bx.fillStyle = 'rgba(80,160,255,0.35)'; bx.fillRect(x, y, e.w, e.h); bx.fillStyle = 'rgba(200,235,255,0.8)'; bx.fillRect(x, y, e.w, 1); }
-      else if (e.t === 'spinner') { bx.fillStyle = e.vis && e.coll ? '#7fe0ff' : '#4a7f99'; bx.beginPath(); bx.arc(x, y, 6, 0, Math.PI * 2); bx.fill(); bx.fillRect(x - 8, y - 3, 16, 4); }
+      else if (e.t === 'spinner' || e.t === 'rotSpinner' || e.t === 'trkSpinner') {
+        bx.fillStyle = e.vis && e.coll ? '#7fe0ff' : '#4a7f99';
+        bx.beginPath(); bx.arc(x, y, 6, 0, Math.PI * 2); bx.fill();
+        if (e.look !== 'star') bx.fillRect(x - 8, y - 3, 16, 4); else bx.fillRect(x - 5, y - 5, 10, 10);
+        if (e.nx !== undefined) { bx.strokeStyle = 'rgba(255,255,255,0.15)'; bx.beginPath(); bx.moveTo(e.nx - cx, e.ny - cy); bx.lineTo(x, y); bx.stroke(); } }
+      else if (e.t === 'colorBlock' || e.t === 'clutterDoor' || e.t === 'fakeWall' || e.t === 'clutterCabinet' || e.t === 'door' || e.t === 'lockBlock' || e.t === 'lightningBlock' || e.t === 'movingPlatform' || e.t === 'cloud') {
+        if ((e.t === 'fakeWall' && e.broken) || (e.t === 'cloud' && !e.coll)) continue;
+        bx.globalAlpha = (e.t === 'colorBlock' && !e.coll) ? 0.18 : 1;
+        bx.fillStyle = e.t === 'colorBlock' ? (e.col === 'red' ? '#a84444' : e.col === 'green' ? '#43a05a' : '#c9a53a')
+          : e.t === 'clutterDoor' ? '#4a4787' : e.t === 'lightningBlock' ? '#cfe9ef' : '#6b6257';
+        bx.fillRect(x, y, e.w, e.h); bx.globalAlpha = 1;
+        if (e.t === 'fakeWall' || e.t === 'colorBlock' || e.t === 'lockBlock') { bx.strokeStyle = '#c9b79a'; bx.strokeRect(x + 0.5, y + 0.5, e.w - 1, e.h - 1); } }
+      else if (e.t === 'lightning') { if (!e.on) continue; bx.fillStyle = '#fff7a0'; bx.fillRect(e.box.x - cx, e.box.y - cy, e.w, e.h); }
+      else if (e.t === 'colorSwitch') { bx.strokeStyle = '#e8d05a'; bx.strokeRect(e.x - 8 - cx, e.y - 8 - cy, 16, 16); bx.fillStyle = bx.strokeStyle; bx.fillRect(e.x - 2 - cx, e.y - 2 - cy, 4, 4); }
+      else if (e.t === 'key') { if (!e.coll) continue; bx.fillStyle = '#f0d060'; bx.fillRect(x - 4, y - 4, 8, 8); }
+      else if (e.t === 'vanillaDecor') { bx.fillStyle = 'rgba(180,180,200,0.28)'; bx.fillRect(x, y, e.w, e.h); }
       else if (e.t === 'refill' || e.t === 'dreamRefill') {
         if (!e.coll) { bx.strokeStyle = 'rgba(255,255,255,0.3)'; bx.strokeRect(x - 4, y - 4, 8, 8); continue; }
         bx.fillStyle = e.t === 'dreamRefill' ? '#ffd23a' : e.two ? '#ff6def' : '#5ef05e';
@@ -86,7 +101,9 @@
       else if (e.t === 'touchSwitch') { bx.strokeStyle = e.on ? '#f141df' : '#5fcde4'; bx.strokeRect(x - 7.5, y - 7.5, 15, 15); bx.fillStyle = bx.strokeStyle; bx.fillRect(x - 2, y - 2, 4, 4); }
       else if (e.t === 'sideJT') { bx.fillStyle = '#c9a56b'; bx.fillRect(e.allowLR ? x + 2 : x, y, 2, e.h); }
       else if (e.t === 'bubbleRegion') { bx.strokeStyle = 'rgba(255,120,220,0.6)'; bx.beginPath(); bx.arc(x + e.w / 2, y + e.h / 2, e.w / 2, 0, Math.PI * 2); bx.stroke(); }
-      else if (e.t === 'spikes') { if (e.gone) continue; var b = e.box, n2, k2, s2 = 8; bx.fillStyle = '#d8dde6'; bx.beginPath();
+      else if (e.t === 'spikes' || e.t === 'triggerSpikes') {
+        if (e.gone || (e.t === 'triggerSpikes' && !e.shown)) continue;
+        var b = e.box, n2, k2, s2 = 8; bx.fillStyle = '#d8dde6'; bx.beginPath();
         if (e.d === 'U' || e.d === 'D') { n2 = Math.max(1, Math.round(b.w / s2)); for (k2 = 0; k2 < n2; k2++) { var x0 = b.x - cx + k2 * s2, yb = e.d === 'U' ? b.y + b.h - cy : b.y - cy, yt = e.d === 'U' ? yb - 4 : yb + 4; bx.moveTo(x0, yb); bx.lineTo(x0 + 4, yt); bx.lineTo(x0 + 8, yb); } }
         else { n2 = Math.max(1, Math.round(b.h / s2)); for (k2 = 0; k2 < n2; k2++) { var y0 = b.y - cy + k2 * s2, xb = e.d === 'L' ? b.x + b.w - cx : b.x - cx, xt = e.d === 'L' ? xb - 4 : xb + 4; bx.moveTo(xb, y0); bx.lineTo(xt, y0 + 4); bx.lineTo(xb, y0 + 8); } }
         bx.fill(); }

@@ -4,8 +4,9 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { mapInfo } from './maps.mjs';
 let ZIP = null, zipSet = null;   // the mod pack zip of the map being converted (from maps.json)
-const zip = (p, enc) => execFileSync('unzip', ['-p', ZIP, p], { maxBuffer: 1 << 26, encoding: enc });
-const inZip = p => { if (!zipSet) zipSet = new Set(execFileSync('unzip', ['-Z1', ZIP], { maxBuffer: 1 << 26, encoding: 'utf8' }).split('\n')); return zipSet.has(p); };
+const norm = p => p ? String(p).replace(/\\/g, '/') : p;   // Celeste stores these paths with backslashes
+const zip = (p, enc) => execFileSync('unzip', ['-p', ZIP, norm(p)], { maxBuffer: 1 << 26, encoding: enc });
+const inZip = p => { if (!zipSet) zipSet = new Set(execFileSync('unzip', ['-Z1', ZIP], { maxBuffer: 1 << 26, encoding: 'utf8' }).split('\n')); return zipSet.has(norm(p)); };
 
 /* ---- autotiler (Celeste Autotiler.TileHandler semantics) ---- */
 function parseTilesets(xml) {
@@ -84,6 +85,8 @@ export function ent(e, rx, ry) {
   if (n === 'killbox') return { t: 'killbox', x, y, w };
   if (/^spikes(Up|Down|Left|Right)$/.test(n)) return { t: 'spikes', d: n.slice(6)[0], x, y, w, h };
   const nd = nodes[0] || [x, y];
+  if (n === 'rotateSpinner') return { t: 'rotSpinner', x, y, nx: nd[0], ny: nd[1], cw: !!e.clockwise, spin: 'rotate', look: e.star ? 'star' : e.dust ? 'dust' : 'blade' };
+  if (n === 'trackSpinner') return { t: 'trkSpinner', x, y, nx: nd[0], ny: nd[1], speed: e.speed || 'Normal', spin: 'track', look: e.star ? 'star' : e.dust ? 'dust' : 'blade' };
   if (n === 'zipMover') return { t: 'zipMover', x, y, w, h, nx: nd[0], ny: nd[1] };
   if (n === 'dashBlock') return { t: 'dashBlock', x, y, w, h, canDash: e.canDash !== false, tile: String(e.tiletype || '') };
   if (n === 'touchSwitch') return { t: 'touchSwitch', x, y, flag: '' };
@@ -93,6 +96,23 @@ export function ent(e, rx, ry) {
     moveTime: e.moveTime == null ? 1.8 : +e.moveTime, shake: e.shakeTime == null ? 0.5 : +e.shakeTime, eased: e.moveEased !== false };
   if (n === 'MaxHelpingHand/SidewaysJumpThru') return { t: 'sideJT', x, y, h, allowLR: !e.left, climb: e.allowClimbing !== false, wj: e.allowWallJumping !== false };
   if (n === 'CommunalHelper/PlayerBubbleRegion') return { t: 'bubbleRegion', x, y, w, h, ctrl: nodes[0], end: nodes[1] };
+  // vanilla base-game entities (Spring Collab 2020): behaviour ported in cel.js
+  if (n === 'redBlocks' || n === 'greenBlocks' || n === 'yellowBlocks') return { t: 'colorBlock', x, y, w, h, col: n.slice(0, n.length - 6) };
+  if (n === 'colorSwitch') return { t: 'colorSwitch', x, y, col: String(e.type || 'red') };
+  if (n === 'clutterDoor') return { t: 'clutterDoor', x, y, w, h, type: String(e.type || 'red') };
+  if (n === 'clutterCabinet') return { t: 'clutterCabinet', x, y: y - 8, w: 16, h: 16 };
+  if (n === 'fakeWall') return { t: 'fakeWall', x, y, w, h };
+  if (n === 'door') return { t: 'door', x, y };
+  if (n === 'key') return { t: 'key', x, y };
+  if (n === 'lockBlock') return { t: 'lockBlock', x, y };
+  if (n === 'movingPlatform') return { t: 'movingPlatform', x, y, w, h, nx: nd[0], ny: nd[1] };
+  if (n === 'cloud') return { t: 'cloud', x, y, small: !!e.small, fragile: !!e.fragile };
+  if (n === 'lightning') return { t: 'lightning', x, y, w, h, moveTime: e.moveTime == null ? 5 : +e.moveTime, perLevel: !!e.perLevel };
+  if (/^triggerSpikes(Up|Down|Left|Right)$/.test(n)) return { t: 'triggerSpikes', d: n.slice(13, 14), x, y, w, h };
+  if (n === 'lightningBlock') return { t: 'lightningBlock', x, y };
+  if (n === 'resortLantern') return { t: 'vanillaDecor', x, y: y - 8, w: 8, h: 16 };
+  if (n === 'clothesline') return { t: 'vanillaDecor', x, y, w: Math.max(16, Math.abs((nodes[0] || [x + 16, y])[0] - x)), h: 8 };
+  if (n === 'introCar') return { t: 'vanillaDecor', x: x - 16, y: y - 16, w: 32, h: 16 };
   if (DECOR.has(n) || n === 'CollabUtils2/GoldenBerryPlayerRespawnPoint' || n === 'CollabUtils2/SpeedBerry') return null;
   return { t: '?', n, x, y };
 }
@@ -142,7 +162,7 @@ function bakeArt(id, m, meta, out) {
       const x = k % w, y = (k / w) | 0, ri = owner[k]; if (ri < 0) continue;
       const r = out.rooms[ri], c = g[k], set = sets[c], lx = x + tx0 - r.x / 8, ly = y + ty0 - r.y / 8;
       let ti = -1;
-      if (set && set.path && set.path.startsWith('SJ2021/')) {
+      if (set && set.path && set.path.indexOf('/') >= 0) {
         const key = layer + ':' + set.path;
         if (!tsIndex.has(key)) { const f = tex('tilesets/' + set.path); tsIndex.set(key, f ? out.tilesets.push(f) - 1 : -1); }
         ti = tsIndex.get(key);
@@ -151,12 +171,12 @@ function bakeArt(id, m, meta, out) {
       else r[layer + 'Art'].push(lx, ly, ti, t[0], t[1]);
     }
   }
-  for (const r of out.rooms) r.decals = r.decals.map(d => { const f = d.tex.startsWith('SJ2021/') ? tex('decals/' + d.tex) : null; return f ? { ...d, f } : null; }).filter(Boolean);
+  for (const r of out.rooms) r.decals = r.decals.map(d => { const f = d.tex.indexOf('/') >= 0 ? tex('decals/' + d.tex) : null; return f ? { ...d, f } : null; }).filter(Boolean);
   out.styles = [];
   const st = kid(m, 'Style');
   for (const g of st ? st.__children : []) for (const s of g.__children) {
     if (s.__name !== 'parallax') continue;
-    const f = String(s.texture).startsWith('bgs/SJ2021/') ? tex(s.texture) : null; if (!f) continue;
+    const f = /^bgs\/[^/]+\//.test(String(s.texture)) ? tex(s.texture) : null; if (!f) continue;
     out.styles.push({ f, fg: g.__name === 'Foregrounds', x: num(s.x), y: num(s.y), scx: num(s.scrollx), scy: num(s.scrolly), spx: num(s.speedx), spy: num(s.speedy),
       lx: !!s.loopx, ly: !!s.loopy, a: s.alpha == null ? 1 : num(s.alpha), color: s.color || 'FFFFFF', only: s.only || '*', exclude: s.exclude || '' });
   }
