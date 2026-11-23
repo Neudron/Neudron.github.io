@@ -872,6 +872,7 @@
       e.hit = function () { var b = boxAt(p.x, p.y); return rectCircle(b[0], b[1], b[2], b[3], e.x, e.y, 6) || overlap(b[0], b[1], b[2], b[3], e.bar); };
       e.touch = function () { die(); };
       e.update = function () {
+        if (e.spin === 'rotate' || e.spin === 'track') spinnerMotion(e);
         if (!e.vis) { e.coll = false; if (e.x > L.cam.x - 16 && e.y > L.cam.y - 16 && e.x < L.cam.x + 336 && e.y < L.cam.y + 196) e.vis = true; }
         else e.coll = Math.abs(p.x - e.x) < 128 && Math.abs(p.y - e.y) < 128;   // shortcut: game re-checks every 0.05 s at a per-spinner random offset; checked every frame here
       }; pcs.push(e); },

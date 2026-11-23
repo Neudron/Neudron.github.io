@@ -70,7 +70,22 @@
     for (i = 0; i < ents.length; i++) {
       e = ents[i]; x = e.x - cx; y = e.y - cy;
       if (e.t === 'water') { bx.fillStyle = 'rgba(80,160,255,0.35)'; bx.fillRect(x, y, e.w, e.h); bx.fillStyle = 'rgba(200,235,255,0.8)'; bx.fillRect(x, y, e.w, 1); }
-      else if (e.t === 'spinner') { bx.fillStyle = e.vis && e.coll ? '#7fe0ff' : '#4a7f99'; bx.beginPath(); bx.arc(x, y, 6, 0, Math.PI * 2); bx.fill(); bx.fillRect(x - 8, y - 3, 16, 4); }
+      else if (e.t === 'spinner' || e.t === 'rotSpinner' || e.t === 'trkSpinner') {
+        bx.fillStyle = e.vis && e.coll ? '#7fe0ff' : '#4a7f99';
+        bx.beginPath(); bx.arc(x, y, 6, 0, Math.PI * 2); bx.fill();
+        if (e.look !== 'star') bx.fillRect(x - 8, y - 3, 16, 4); else bx.fillRect(x - 5, y - 5, 10, 10);
+        if (e.nx !== undefined) { bx.strokeStyle = 'rgba(255,255,255,0.15)'; bx.beginPath(); bx.moveTo(e.nx - cx, e.ny - cy); bx.lineTo(x, y); bx.stroke(); } }
+      else if (e.t === 'colorBlock' || e.t === 'clutterDoor' || e.t === 'fakeWall' || e.t === 'clutterCabinet' || e.t === 'door' || e.t === 'lockBlock' || e.t === 'lightningBlock' || e.t === 'movingPlatform' || e.t === 'cloud') {
+        if ((e.t === 'fakeWall' && e.broken) || (e.t === 'cloud' && !e.coll)) continue;
+        bx.globalAlpha = (e.t === 'colorBlock' && !e.coll) ? 0.18 : 1;
+        bx.fillStyle = e.t === 'colorBlock' ? (e.col === 'red' ? '#a84444' : e.col === 'green' ? '#43a05a' : '#c9a53a')
+          : e.t === 'clutterDoor' ? '#4a4787' : e.t === 'lightningBlock' ? '#cfe9ef' : '#6b6257';
+        bx.fillRect(x, y, e.w, e.h); bx.globalAlpha = 1;
+        if (e.t === 'fakeWall' || e.t === 'colorBlock' || e.t === 'lockBlock') { bx.strokeStyle = '#c9b79a'; bx.strokeRect(x + 0.5, y + 0.5, e.w - 1, e.h - 1); } }
+      else if (e.t === 'lightning') { if (!e.on) continue; bx.fillStyle = '#fff7a0'; bx.fillRect(e.box.x - cx, e.box.y - cy, e.w, e.h); }
+      else if (e.t === 'colorSwitch') { bx.strokeStyle = '#e8d05a'; bx.strokeRect(e.x - 8 - cx, e.y - 8 - cy, 16, 16); bx.fillStyle = bx.strokeStyle; bx.fillRect(e.x - 2 - cx, e.y - 2 - cy, 4, 4); }
+      else if (e.t === 'key') { if (!e.coll) continue; bx.fillStyle = '#f0d060'; bx.fillRect(x - 4, y - 4, 8, 8); }
+      else if (e.t === 'vanillaDecor') { bx.fillStyle = 'rgba(180,180,200,0.28)'; bx.fillRect(x, y, e.w, e.h); }
       else if (e.t === 'refill' || e.t === 'dreamRefill') {
         if (!e.coll) { bx.strokeStyle = 'rgba(255,255,255,0.3)'; bx.strokeRect(x - 4, y - 4, 8, 8); continue; }
         bx.fillStyle = e.t === 'dreamRefill' ? '#ffd23a' : e.two ? '#ff6def' : '#5ef05e';
