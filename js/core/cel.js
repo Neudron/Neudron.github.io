@@ -19,11 +19,11 @@
   'use strict';
   var NEU = window.NEU = window.NEU || {};
   var f = Math.fround, DT = f(0.0166667);
-  var NORMAL = 0, CLIMB = 1, DASH = 2, SWIM = 3, DREAMDASH = 9, INTROWALK = 12, INTRORESPAWN = 14, INTROWAKEUP = 15, CASSETTEFLY = 21, TUNNEL = 30;
+  var NORMAL = 0, CLIMB = 1, DASH = 2, SWIM = 3, DREAMDASH = 9, INTROWALK = 12, INTRORESPAWN = 14, INTROWAKEUP = 15, CASSETTEFLY = 21, TUNNEL = 30, BOOST = 31;
   var BufferTime = f(0.08), MaxFall = 160, Gravity = 900, HalfGravThreshold = 40, FastMaxFall = 240, FastMaxAccel = 300, MaxRun = 90, RunAccel = 1000,
     RunReduce = 400, AirMult = f(0.65), DuckFriction = 500, DuckCorrectCheck = 4, DuckCorrectSlide = 50, DodgeSlideSpeedMult = f(1.2),
     DuckSuperJumpXMult = f(1.25), DuckSuperJumpYMult = f(0.5), JumpGraceTime = f(0.1), JumpSpeed = -105, JumpHBoost = 40, VarJumpTime = f(0.2),
-    CeilingVarJumpGrace = f(0.05), UpwardCornerCorrection = 4, WallSpeedRetentionTime = f(0.06), WallJumpCheckDist = 3, WallJumpForceTime = f(0.16),
+    CeilingVarJumpGrace = f(0.05), UpwardCornerCorrection = 5, WallSpeedRetentionTime = f(0.06), WallJumpCheckDist = 3, WallJumpForceTime = f(0.16),
     WallJumpHSpeed = 130, WallSlideStartMax = 20, WallSlideTime = f(1.2), BounceVarJumpTime = f(0.2), BounceSpeed = -140, SuperBounceVarJumpTime = f(0.2),
     SuperBounceSpeed = -185, SuperJumpH = 260, SuperWallJumpSpeed = -160, SuperWallJumpVarTime = f(0.25), SuperWallJumpH = 170, DashSpeed = 240,
     EndDashSpeed = 160, EndDashUpMult = f(0.75), DashTime = f(0.15), DashCooldown = f(0.2), DashRefillCooldown = f(0.1), DashHJumpThruNudge = 6,
@@ -111,10 +111,13 @@
   function solidFirst(x, y, hb) {
     var b = boxAt(x, y, hb), i, e;
     if (gridHit(b[0], b[1], b[2], b[3])) return TILE_HIT;
-    for (i = 0; i < solids.length; i++) { e = solids[i]; if (e.coll && overlap(b[0], b[1], b[2], b[3], e)) return e; }
+    for (i = 0; i < solids.length; i++) { e = solids[i]; if (!e.coll) continue;
+      if (e.dream && p && p.st === DREAMDASH) continue;   // DreamBlock: pass through while dream-dashing
+      if (overlap(b[0], b[1], b[2], b[3], e)) return e; }
     return null;
   }
   function solidAt(x, y, hb) { return !!solidFirst(x, y, hb); }
+  function dreamAt(x, y) { var b = boxAt(x, y), i, e; for (i = 0; i < solids.length; i++) { e = solids[i]; if (e.dream && e.coll && overlap(b[0], b[1], b[2], b[3], e)) return e; } return null; }
   function jtAt(x, y, e) { var b = boxAt(x, y); return overlap(b[0], b[1], b[2], b[3], e); }
   function jtOutside(x, y) { for (var i = 0; i < jts.length; i++) if (jtAt(x, y, jts[i]) && !jtAt(p.x, p.y, jts[i])) return jts[i]; return null; }
   function jtHere() { for (var i = 0; i < jts.length; i++) if (jtAt(p.x, p.y, jts[i])) return jts[i]; return null; }
@@ -350,8 +353,13 @@
     var r = d.hit.onDash(dx, dy);
     if (r === 'rebound') { rebound(dx ? -sign(p.sx) : 0); return true; }
     if (r === 'bounce') { if (dx) reflectBounce(-sign(p.sx), 0); else reflectBounce(0, -sign(p.sy)); return true; }
+    if (r === 'dream') { p.dreamIdx = solids.indexOf(d); setState(DREAMDASH); return true; }
     return r === 'ignore';
   }
+  var DreamDashSpeed = 240;   // vanilla Player.DreamDashSpeed
+  BEGIN[DREAMDASH] = function () { p.sx = f(p.dashDir[0] * DreamDashSpeed); p.sy = f(p.dashDir[1] * DreamDashSpeed); p.dreamT = 0; p.dreamJump = false; };
+  UPD[DREAMDASH] = function () { return DREAMDASH; };
+  END[DREAMDASH] = function () { refillDash(); refillStamina(); };
   function rebound(dir) {
     p.sx = f(dir * 120); p.sy = -120; p.varJumpSpeed = p.sy; p.varJumpTimer = f(0.15); p.autoJump = true; p.autoJumpTimer = 0;
     p.dashAttack = 0; p.wallSlideTimer = WallSlideTime; p.wallBoostTimer = 0; p.forceMoveXTimer = 0; setState(NORMAL);
@@ -448,6 +456,12 @@
     } else p.tunnelSolid = s;
     return TUNNEL;
   };
+
+  /* Booster (base-game): constant-speed dash until the timer expires */
+  var BoostSpeed = 320;   // vanilla Booster.BoostSpeed
+  BEGIN[BOOST] = function () { p.boostT = f(0.3); };
+  UPD[BOOST] = function () { return BOOST; };
+  END[BOOST] = function () { p.dashAttack = 0; };
 
   /* Normal */
   BEGIN[NORMAL] = function () { p.maxFall = MaxFall; };
@@ -670,7 +684,7 @@
   function playerUpdate() {
     var first, w, s, i, e, was, to;
     if (p.dead) { p.deadTimer = f(p.deadTimer + DT); if (p.deadTimer > 1) respawn(); return; }
-    if (p.st === DREAMDASH || p.st === TUNNEL) p.onGround = false;
+    if (p.st === DREAMDASH || p.st === TUNNEL || p.st === BOOST) p.onGround = false;
     else if (p.sy >= 0) p.onGround = solidAt(p.x, p.y + 1) || !!jtOutside(p.x, p.y + 1);
     else p.onGround = false;
     if (p.wallSlideDir !== 0) { p.wallSlideTimer = Math.max(f(p.wallSlideTimer - DT), 0); p.wallSlideDir = 0; }
@@ -708,8 +722,25 @@
       if (solidAt(p.x, p.y + DashVFloorSnapDist) || jtOutside(p.x, p.y + DashVFloorSnapDist)) moveVExact(DashVFloorSnapDist);
     }
     if (p.sy > 0 && canUnDuck() && !p.onGround) setDuck(false);
-    if (p.st !== DREAMDASH && p.st !== TUNNEL) moveH(f(p.sx * DT), onCollideH);
-    if (p.st !== DREAMDASH && p.st !== TUNNEL) moveV(f(p.sy * DT), onCollideV);
+    if (p.st !== DREAMDASH && p.st !== TUNNEL && p.st !== BOOST) moveH(f(p.sx * DT), onCollideH);
+    if (p.st !== DREAMDASH && p.st !== TUNNEL && p.st !== BOOST) moveV(f(p.sy * DT), onCollideV);
+    if (p.st === DREAMDASH) {
+      naiveMove(f(p.sx * DT), f(p.sy * DT));
+      if (dreamAt(p.x, p.y)) p.dreamT = 0; else {
+        p.dreamT = f(p.dreamT + DT);
+        if (p.dreamT > f(0.1)) {
+          var db = solids[p.dreamIdx];
+          if (db && db.one) { db.coll = false; db.gone = true; }
+          freeze(f(0.05));
+          if (In.jump.pressed() && p.dashDir[0] !== 0) { p.dreamJump = true; jump(); }
+          setState(NORMAL);
+        }
+      }
+    } else if (p.st === BOOST) {
+      naiveMove(f(p.sx * DT), f(p.sy * DT));
+      p.boostT = f(p.boostT - DT);
+      if (p.boostT <= 0) setState(NORMAL);
+    }
     if (p.st === SWIM) {
       if (p.sy < 0 && p.sy >= SwimMaxRise) while (!swimCheck()) { p.sy = 0; if (moveVExact(1)) break; }
     } else if (p.st === NORMAL && swimCheck()) setState(SWIM);
@@ -865,9 +896,110 @@
     killbox: function (e) { e.box = { x: e.x, y: e.y, w: e.w, h: 32 }; e.coll = true; e.hit = function () { return hurtHit(e.box); }; e.touch = function () { die(); }; pcs.push(e); },
     heart: function (e) { e.coll = true; e.box = { x: e.x - 8, y: e.y - 8, w: 16, h: 16 }; e.hit = function () { return hurtHit(e.box); };
       e.touch = function () { if (dashAttacking()) { e.coll = false; L.done = true; if (L.log) L.log('heart', L.frame); } }; pcs.push(e); },
-    berry: function (e) { e.coll = true; e.box = { x: e.x - 7, y: e.y - 7, w: 14, h: 14 }; e.hit = function () { return hurtHit(e.box); }; e.touch = function () { e.coll = false; e.got = true; }; pcs.push(e); }
+    berry: function (e) { e.coll = true; e.box = { x: e.x - 7, y: e.y - 7, w: 14, h: 14 }; e.hit = function () { return hurtHit(e.box); };
+      e.touch = function () { if (inBlockField()) return; e.coll = false; e.got = true; }; pcs.push(e); },
+
+    /* ---- Spring Collab 2020: base-game entities ---- */
+    dreamBlock: function (e) { solidInit(e); e.dream = true; e.hit = { onDash: function () { return 'dream'; } }; },
+    blockField: function (e) { e.coll = true; e.box = { x: e.x, y: e.y, w: e.w, h: e.h }; },   // Strawberry Blockfield region; checked by inBlockField()
+    swapBlock: function (e) { solidInit(e); e.x0 = e.x; e.y0 = e.y; e.cs = 0; e.at = 0; e.tw = null;
+      e.update = function () { entCo(e, swapSeq); if (e.tw) tweenSolid(e, 0.4, false); e.liftX = 0; e.liftY = 0; }; },
+    booster: function (e) { e.coll = true; e.box = { x: e.x - 8, y: e.y - 8, w: 16, h: 16 }; e.hit = function () { return hurtHit(e.box); };
+      e.touch = function () { if (!dashAttacking() || !e.coll) return;
+        var d = p.lastAim; p.sx = f(d[0] * BoostSpeed); p.sy = f(d[1] * BoostSpeed);
+        if (p.dashDir[0] !== 0) p.facing = sign(p.dashDir[0]); setState(BOOST);
+        if (e.red) { e.coll = false; e.gone = true; } }; pcs.push(e); },
+    dashSwitch: function (e) { solidInit(e); e.on = false;
+      e.hit = { onDash: function () { if (!e.on) { e.on = true; L.swN = (L.swN || 0) + 1; } return 'rebound'; } }; },
+    seeker: function (e) { e.coll = true; e.box = { x: e.x - 6, y: e.y - 6, w: 12, h: 12 };
+      e.hit = function () { var b = boxAt(p.x, p.y); return rectCircle(b[0], b[1], b[2], b[3], e.x, e.y, 6); };
+      e.touch = function () { die(); };
+      e.x0 = e.x; e.y0 = e.y; e.sx = 0; e.sy = 0; e.phase = 0; e.locked = false; e.dir = 1;
+      if (!e.nx && !e.ny) { e.nx = e.x + 32; e.ny = e.y; }
+      e.update = function () { seekerUpdate(e); }; pcs.push(e); },
+    seekerBarrier: function (e) { e.coll = true; e.barrier = true; },   // blocks seekers only, not the player
+    templeGate: function (e) { solidInit(e); e.y0 = e.y; e.cs = 0; e.at = 0; e.open = false;
+      e.update = function () { entCo(e, gateSeqTemple); }; },
+    templeCrackedBlock: function (e) { solidInit(e);
+      e.hit = { onDash: function () { e.coll = false; e.gone = true; return 'ignore'; } }; },
+    trackSpinner: function (e) { e.coll = true; e.box = { x: e.x - 6, y: e.y - 6, w: 12, h: 12 };
+      e.hit = function () { var b = boxAt(p.x, p.y); return rectCircle(b[0], b[1], b[2], b[3], e.x, e.y, 6); };
+      e.touch = function () { die(); };
+      e.x0 = e.x; e.y0 = e.y; e.at = 0; e.dir = 1;
+      e.spd = e.speed === 'Fast' ? 80 : e.speed === 'Slow' ? 30 : 50;
+      e.update = function () { spinnerTrack(e); }; pcs.push(e); },
+    rotateSpinner: function (e) { e.coll = true; e.box = { x: e.x - 6, y: e.y - 6, w: 12, h: 12 };
+      e.hit = function () { var b = boxAt(p.x, p.y); return rectCircle(b[0], b[1], b[2], b[3], e.x, e.y, 6); };
+      e.touch = function () { die(); };
+      e.ang = Math.atan2(e.y - e.cy, e.x - e.cx); e.rad = Math.sqrt((e.x - e.cx) * (e.x - e.cx) + (e.y - e.cy) * (e.y - e.cy));
+      e.update = function () { e.ang = f(e.ang + DT * (e.clockwise ? 1.5 : -1.5)); e.x = f(e.cx + e.rad * Math.cos(e.ang)); e.y = f(e.cy + e.rad * Math.sin(e.ang)); }; pcs.push(e); },
+    fakeWall: function (e) { solidInit(e);
+      e.hit = { onDash: function () { e.coll = false; e.gone = true; return 'ignore'; } }; },
+    lockBlock: function (e) { solidInit(e); e.open = false; e.box = { x: e.x, y: e.y, w: 16, h: 16 };
+      e.update = function () { if (e.open && e.coll) { e.coll = false; e.gone = true; } }; },
+    key: function (e) { e.coll = true; e.box = { x: e.x - 5, y: e.y - 7, w: 10, h: 14 };
+      e.hit = function () { return hurtHit(e.box); };
+      e.car = false; e.touch = function () { if (!e.coll || e.car) return; e.car = true; };
+      e.update = function () { if (!e.car) return;
+        e.x = p.x; e.y = f(p.y - 12);
+        for (var i = 0; i < ents.length; i++) if (ents[i].t === 'lockBlock' && !ents[i].open && overlap(e.x - 5, e.y - 7, 10, 14, ents[i])) {
+          ents[i].open = true; e.car = false; e.coll = false; e.gone = true; } }; pcs.push(e); }
   };
 
+  /* ---- base-game entity helpers (Spring Collab maps) ---- */
+  function inBlockField() {
+    var i, e, b = boxAt(p.x, p.y);
+    for (i = 0; i < ents.length; i++) { e = ents[i]; if (e.t !== 'blockField') continue;
+      if (overlap(b[0], b[1], b[2], b[3], e.box || e)) return true; }
+    return false;
+  }
+  function tweenSolid(e, dur) {
+    var t = e.tw, pc, k;
+    if (t.fresh) { t.fresh = false; return; }
+    t.left = f(t.left - DT); pc = f(1 - f(Math.max(0, t.left) / f(dur))); k = sineInOut(pc);
+    if (e.dir > 0) solidMoveTo(e, lerp(e.x0, e.nx, k), lerp(e.y0, e.ny, k));
+    else solidMoveTo(e, lerp(e.nx, e.x0, k), lerp(e.ny, e.y0, k));
+    if (t.left <= 0) e.tw = null;
+  }
+  function swapSeq(e) {   // vanilla SwapBlock: swap between start and node on touch
+    switch (e.cs) {
+      case 0: if (!overlapPlayerBody(e)) return null; e.dir = 1; e.cs = 1; return null;
+      case 1: e.tw = { left: f(0.4), fresh: true }; e.cs = 2; return f(0.45);
+      case 2: e.tw = null; e.cs = 3; return null;
+      case 3: if (!overlapPlayerBody(e)) return null; e.dir = -1; e.cs = 4; return null;
+      case 4: e.tw = { left: f(0.4), fresh: true }; e.cs = 5; return f(0.45);
+      case 5: e.tw = null; e.cs = 0; return null;
+    }
+    return null;
+  }
+  function seekerUpdate(e) {
+    var tx, ty, dx, dy, d, sp, vx, vy, nx, ny, i, o;
+    if (!e.locked && Math.abs(p.x - e.x) < 120 && Math.abs(p.y - e.y) < 120) e.locked = true;
+    if (e.locked) { tx = p.x; ty = f(p.y - 4); sp = f(40 + Math.min(160, e.phase)); }
+    else { tx = e.dir > 0 ? e.nx : e.x0; ty = e.dir > 0 ? e.ny : e.y0; sp = 40; }
+    dx = f(tx - e.x); dy = f(ty - e.y); d = Math.sqrt(dx * dx + dy * dy) || 1;
+    vx = f(f(dx / d) * sp); vy = f(f(dy / d) * sp); nx = f(e.x + vx); ny = f(e.y + vy);
+    for (i = 0; i < ents.length; i++) { o = ents[i]; if (o.t !== 'seekerBarrier') continue;
+      if (overlap(f(nx - 6), f(ny - 6), 12, 12, o)) { e.locked = false; e.dir = -e.dir; vx = -vx; vy = -vy; nx = f(e.x + vx); ny = f(e.y + vy); break; } }
+    e.x = nx; e.y = ny;
+    if (e.locked) e.phase = f(e.phase + f(200 * DT)); else e.phase = 0;
+    if (!e.locked && Math.abs(e.x - (e.dir > 0 ? e.nx : e.x0)) < 4 && Math.abs(e.y - (e.dir > 0 ? e.ny : e.y0)) < 4) e.dir = -e.dir;
+  }
+  function spinnerTrack(e) {
+    var dx = f(e.nx - e.x0), dy = f(e.ny - e.y0), len = Math.sqrt(dx * dx + dy * dy) || 1;
+    e.at = f(e.at + f(f(e.spd * DT) / len) * e.dir);
+    if (e.at > 1) { e.at = f(2 - e.at); e.dir = -1; }
+    if (e.at < 0) { e.at = -e.at; e.dir = 1; }
+    e.x = f(e.x0 + dx * e.at); e.y = f(e.y0 + dy * e.at);
+  }
+  function gateSeqTemple(e) {   // vanilla TempleGate: slides up when its switch group is on
+    if (!e.open && (L.swN || 0)) { e.open = true; e.cs = 1; }
+    if (!e.open || e.cs < 0) return null;
+    e.at = f(e.at + f(DT / f(0.4))); if (e.at > 1) e.at = 1;
+    solidMoveTo(e, e.x, f(e.y0 - e.h * e.at));
+    if (e.at >= 1) e.cs = -1;
+    return null;
+  }
   function zipSeq(e) {   // vanilla ZipMover.Sequence
     var t;
     switch (e.cs) {
@@ -903,12 +1035,11 @@
     for (var i = 0; i < ents.length; i++) if (ents[i].t === 'touchSwitch' && (ents[i].flag || '') === (flag || '') && !ents[i].on) return;
     if (flag) L.flags[flag] = !inv; else L.sw = true;
   }
-  function attachStatics() {   // Solid.Awake: spikes riding a solid move with it
+  function attachStatics() {   // Solid.Awake: riders (spikes, spring, berry, refill, spinner, key) move with the solid
     var i, j, s, e, b;
     for (i = 0; i < solids.length; i++) { s = solids[i]; if (!s.statics) continue;
-      for (j = 0; j < ents.length; j++) { e = ents[j]; if (e.t !== 'spikes' || e.att) continue; b = e.box;
-        var ox = e.d === 'L' ? 1 : e.d === 'R' ? -1 : 0, oy = e.d === 'U' ? 1 : e.d === 'D' ? -1 : 0;
-        if (overlap(b.x + ox, b.y + oy, b.w, b.h, s) && !overlap(b.x, b.y, b.w, b.h, s)) { e.att = true; s.statics.push(e); } } }
+      for (j = 0; j < ents.length; j++) { e = ents[j]; if (['spikes', 'spring', 'berry', 'refill', 'spinner', 'key'].indexOf(e.t) < 0 || e.att) continue; b = e.box || e.bar; if (!b) continue;
+        if (overlap(b.x - 2, b.y - 2, b.w + 4, b.h + 4, s)) { e.att = true; s.statics.push(e); } } }
   }
   function overlapPlayerBody(e) { var b = boxAt(p.x, p.y, p.hb); return overlap(b[0], b[1], b[2], b[3], e); }
   function refillLike(e, use) {
@@ -916,14 +1047,14 @@
     e.hit = function () { return hurtHit(e.box); };
     e.touch = function () { if (use()) { e.coll = false; e.co = 1; e.respawn = RespawnTime; } };
     e.update = function () {
-      if (e.co === 1) { freeze(0.05); e.co = 0; }   // refill coroutine runs the frame it is touched (TAS-pinned, see engine-rules)
+      if (e.co === 1) { freeze(e.two ? f(0.0667) : 0.05); e.co = 0; }   // refill coroutine runs the frame it is touched (TAS-pinned, see engine-rules)
       if (e.respawn > 0) { e.respawn = f(e.respawn - DT); if (e.respawn <= 0) e.coll = true; }
     };
     pcs.push(e);
   }
   function loadRoom(r) {
     var i, e;
-    room = r; ents = []; solids = []; jts = []; sjts = []; waters = []; pcs = []; trigs = []; L.sw = false;
+    room = r; ents = []; solids = []; jts = []; sjts = []; waters = []; pcs = []; trigs = []; L.sw = false; L.swN = 0;
     for (i = 0; i < r.ents.length; i++) { e = {}; for (var k in r.ents[i]) e[k] = r.ents[i][k]; if (KIND[e.t]) { KIND[e.t](e); ents.push(e); } }
     attachStatics();
     for (i = 0; i < r.trig.length; i++) { e = {}; for (var k2 in r.trig[i]) e[k2] = r.trig[i][k2]; trigs.push(e); }
@@ -951,8 +1082,9 @@
     if (nm !== M || !G) { M = nm; buildGrid(); }
     var r = null, i;
     for (i = 0; i < M.rooms.length && !r; i++) if (M.rooms[i].name === (opts.room || M.rooms[0].name)) r = M.rooms[i];
-    L.freeze = 0; L.time = 0; L.frame = 0; L.trans = null; L.done = false; L.deaths = 0; L.camOffX = 0; L.camOffY = 0; L.log = opts.log || null; L.flags = {}; L.sw = false;
+    L.freeze = 0; L.time = 0; L.frame = 0; L.trans = null; L.done = false; L.deaths = 0; L.camOffX = 0; L.camOffY = 0; L.log = opts.log || null; L.flags = {}; L.sw = false; L.swN = 0;
     DTN.count = 0; DTN.canStart = false; DTN.attacking = false; DTN.timer = 0;
+    if (!r.spawns || !r.spawns.length) for (i = 0; i < M.rooms.length; i++) if (M.rooms[i].spawns && M.rooms[i].spawns.length) { r = M.rooms[i]; break; }
     p = freshPlayer(r.spawns[0][0], r.spawns[0][1]); room = r; loadRoom(r);
     if (opts.spawn) { p.x = opts.spawn[0]; p.y = opts.spawn[1]; }
     if (opts.state) for (var sk in opts.state) p[sk] = opts.state[sk];
@@ -965,7 +1097,7 @@
     return api;
   }
   /* snapshot/restore for search tools: plain data only (coroutines are data, entity closures stay) */
-  var EKEYS = ['coll', 'vis', 'respawn', 'co', 'flash', 'got', 'inside', 'x', 'y', 'box', 'bar', 'mrx', 'mry', 'liftX', 'liftY', 'cs', 'cw', 'at', 'rate', 'tw', 'left', 'on', 'broken', 'gone'];
+  var EKEYS = ['coll', 'vis', 'respawn', 'co', 'flash', 'got', 'inside', 'x', 'y', 'box', 'bar', 'mrx', 'mry', 'liftX', 'liftY', 'cs', 'cw', 'at', 'rate', 'tw', 'left', 'on', 'broken', 'gone', 'dream', 'x0', 'y0', 'dir', 'phase', 'locked', 'sx', 'sy', 'spd', 'open', 'car', 'dreamIdx', 'dreamT'];
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function hbName(h) { for (var k in HB) if (HB[k] === h) return k; return 'normal'; }
   function snapshot() {
@@ -995,6 +1127,6 @@
   var api = NEU.cel = {
     start: start, step: step, DT: DT, snapshot: snapshot, restore: restore, setDuck: function (v) { setDuck(!!v); },
     get player() { return p; }, get room() { return room; }, get level() { return L; }, get ents() { return ents; }, get map() { return M; },
-    get grid() { return G; }, cellAt: cellAt, STATES: { NORMAL: NORMAL, CLIMB: CLIMB, DASH: DASH, SWIM: SWIM, INTROWALK: INTROWALK, TUNNEL: TUNNEL, CASSETTEFLY: CASSETTEFLY }
+    get grid() { return G; }, cellAt: cellAt, STATES: { NORMAL: NORMAL, CLIMB: CLIMB, DASH: DASH, SWIM: SWIM, DREAMDASH: DREAMDASH, INTROWALK: INTROWALK, TUNNEL: TUNNEL, CASSETTEFLY: CASSETTEFLY, BOOST: BOOST }
   };
 })();

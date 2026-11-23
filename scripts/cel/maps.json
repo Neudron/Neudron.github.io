@@ -10,5 +10,23 @@
   "zip": "archives/strawberryjammappack_v1013.zip",
   "tas": "tas/StrawberryJamTAS/1_Beginner/the_squeeze.tas",
   "offset": 0
+ },
+ "isa-good-friend": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/1-Beginner/IsaGoodFriend.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "thegur90": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/1-Beginner/Thegur90.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
+ },
+ "cat-in-box-01": {
+  "bin": "mods/spring-collab-2020/Maps/SpringCollab2020/1-Beginner/Cat_in_Box_01.bin",
+  "zip": "archives/springcollab2020.zip",
+  "tas": null,
+  "offset": null
  }
 }

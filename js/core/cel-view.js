@@ -91,6 +91,20 @@
         else { n2 = Math.max(1, Math.round(b.h / s2)); for (k2 = 0; k2 < n2; k2++) { var y0 = b.y - cy + k2 * s2, xb = e.d === 'L' ? b.x + b.w - cx : b.x - cx, xt = e.d === 'L' ? xb - 4 : xb + 4; bx.moveTo(xb, y0); bx.lineTo(xt, y0 + 4); bx.lineTo(xb, y0 + 8); } }
         bx.fill(); }
       else if ((e.t === 'exitBlock' || e.t === 'barrier') && e.coll && e.t === 'exitBlock') { bx.fillStyle = '#6b5f7a'; bx.fillRect(x, y, e.w, e.h); }
+      /* Spring Collab 2020: base-game entities, flat placeholders on exact hitboxes */
+      else if (e.t === 'dreamBlock' && e.coll) { bx.fillStyle = '#3a3a5c'; bx.fillRect(x, y, e.w, e.h); bx.strokeStyle = '#7a6ad0'; bx.strokeRect(x + 0.5, y + 0.5, e.w - 1, e.h - 1); }
+      else if (e.t === 'blockField') { bx.strokeStyle = 'rgba(255,200,80,0.4)'; bx.strokeRect(x + 0.5, y + 0.5, e.w - 1, e.h - 1); }
+      else if (e.t === 'swapBlock' && !e.gone) { bx.fillStyle = '#7a5a8a'; bx.fillRect(x, y, e.w, e.h); bx.strokeStyle = '#d0a0e0'; bx.strokeRect(x + 0.5, y + 0.5, e.w - 1, e.h - 1); }
+      else if (e.t === 'booster' && !e.gone) { bx.fillStyle = e.red ? '#ff5a5a' : '#5ab8ff'; bx.beginPath(); bx.arc(x, y, 7, 0, Math.PI * 2); bx.fill(); }
+      else if (e.t === 'dashSwitch') { bx.fillStyle = e.on ? '#ffd23a' : '#88a0b0'; bx.fillRect(x, y, e.w, e.h); }
+      else if (e.t === 'seeker' && !e.gone) { bx.fillStyle = '#ff8a3a'; bx.beginPath(); bx.arc(x, y, 6, 0, Math.PI * 2); bx.fill(); bx.fillStyle = '#fff'; bx.beginPath(); bx.arc(x, y, 2, 0, Math.PI * 2); bx.fill(); }
+      else if (e.t === 'seekerBarrier') { bx.fillStyle = 'rgba(120,180,255,0.25)'; bx.fillRect(x, y, e.w, e.h); }
+      else if (e.t === 'templeGate' && !e.gone) { bx.fillStyle = '#5a4d3a'; bx.fillRect(x, y, e.w, e.h); bx.fillStyle = '#d0b070'; bx.fillRect(x, y, 4, e.h); }
+      else if (e.t === 'templeCrackedBlock' && !e.gone) { bx.fillStyle = '#8a7050'; bx.fillRect(x, y, e.w, e.h); bx.strokeStyle = '#c0a070'; bx.strokeRect(x + 0.5, y + 0.5, e.w - 1, e.h - 1); }
+      else if ((e.t === 'trackSpinner' || e.t === 'rotateSpinner') && !e.gone) { bx.fillStyle = '#7fe0ff'; bx.beginPath(); bx.arc(x, y, 6, 0, Math.PI * 2); bx.fill(); }
+      else if (e.t === 'fakeWall' && !e.gone) { bx.fillStyle = '#6a6a7a'; bx.fillRect(x, y, e.w, e.h); bx.strokeStyle = '#9090a0'; bx.strokeRect(x + 0.5, y + 0.5, e.w - 1, e.h - 1); }
+      else if (e.t === 'lockBlock' && !e.gone) { bx.fillStyle = e.open ? 'rgba(150,150,100,0.3)' : '#b0a050'; bx.fillRect(x, y, 16, 16); }
+      else if (e.t === 'key' && !e.gone) { bx.fillStyle = '#ffd23a'; bx.fillRect(x - 5, y - 7, 10, 14); }
     }
   }
   function player(p, cx, cy, S) {
