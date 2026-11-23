@@ -69,6 +69,15 @@
   var running = false, last = 0, t = 0, lastDt = 1 / 60;
   var px = 0, py = 0, keys = {}, hp = MAXHP, inv = 0;
   var assisting = false, assistSet = { left: false, right: false, up: false, down: false };
+  /* Assistant-owned directions last one frame only. Dropping them before the
+     guard keeps the guard reading real player keys, so the planner re-fires. */
+  function dropAssistKeys() {
+    if (assistSet.left) keys.left = false;
+    if (assistSet.right) keys.right = false;
+    if (assistSet.up) keys.up = false;
+    if (assistSet.down) keys.down = false;
+    assistSet.left = assistSet.right = assistSet.up = assistSet.down = false;
+  }
   var rage = 0, tp = 0, shieldT = 0;
   var rageMode = 0, rageModeT = 0;
   var stripOpen = false, stripSel = 0, healCd = 0, healToast = 0, healsOn = true;
@@ -935,12 +944,15 @@
      the optional platforms a pattern sets on NEU.scalSoul. */
   function movePlayer(dt) {
     /* Bot tier: same steering as Polt, no auto strike (three-target funnel). */
-    if (B.tier === 'bot' && !keys.left && !keys.right && !keys.up && !keys.down) {
-      var as = dm.assist(F, bullets, { AX: AX, AY: AY, AW: AW, AH: AH });
-      keys.left = as.left; keys.right = as.right; keys.up = as.up; keys.down = as.down;
-      assistSet.left = as.left; assistSet.right = as.right; assistSet.up = as.up; assistSet.down = as.down;
-      assisting = as.left || as.right || as.up || as.down;
-      if (as.dash) dm.key(F, { key: 'x' });
+    if (B.tier === 'bot') {
+      dropAssistKeys();
+      if (!keys.left && !keys.right && !keys.up && !keys.down) {
+        var as = dm.assist(F, bullets, { AX: AX, AY: AY, AW: AW, AH: AH });
+        keys.left = as.left; keys.right = as.right; keys.up = as.up; keys.down = as.down;
+        assistSet.left = as.left; assistSet.right = as.right; assistSet.up = as.up; assistSet.down = as.down;
+        assisting = as.left || as.right || as.up || as.down;
+        if (as.dash) dm.key(F, { key: 'x' });
+      }
     }
     F.x = px; F.y = py;
     dm.move(F, keys, dt, { AX: AX, AY: AY, AW: AW, AH: AH }, NEU.scalSoul.platforms);
@@ -2373,11 +2385,7 @@
     if (stripOpen) { e.preventDefault(); stripKey(e); return; }
     var d = arrowName(e);
     if (d) {
-      if (assisting) {
-        if (assistSet.left) keys.left = false; if (assistSet.right) keys.right = false;
-        if (assistSet.up) keys.up = false; if (assistSet.down) keys.down = false;
-        assisting = false;
-      }
+      if (assisting) { dropAssistKeys(); assisting = false; }
       keys[d] = true; e.preventDefault(); return;
     }
     if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); if (!e.repeat) startCharge(); return; }

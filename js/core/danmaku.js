@@ -317,7 +317,7 @@
     if (!A.planned || A.t >= 7) {
       if (A.planned) A.n++;
       A.t = 1; A.planned = true;
-      var cost = [], early = [], sp = NEU.danmaku.SPEED / 60;
+      var cost = [], early = [], hits = [], sp = NEU.danmaku.SPEED / 60;
       var cx = box.AX + box.AW / 2, cy = box.AY + box.AH / 2;
       for (d = 0; d < 9; d++) {
         var ix = AUTO[d][0], iy = AUTO[d][1], c = 0, hitEarly = 0, sx = F.x, sy = F.y;
@@ -333,11 +333,15 @@
           }
           if (touch) { c++; if (f <= 6) hitEarly = 1; }
         }
+        hits[d] = c;
         cost[d] = c + 0.001 * Math.hypot(sx - cx, sy - cy);
         early[d] = hitEarly;
       }
       var best = A.dir, bc = cost[best];
       for (d = 0; d < 9; d++) if (d !== best && cost[d] < bc - 1) { bc = cost[d]; best = d; }
+      /* A 1-frame hit gap dwarfs the 0.001 centre bias, so a safe last heading
+         could never yield to still once the field went quiet. Both safe: stop. */
+      if (hits[best] === 0 && hits[0] === 0) best = 0;
       A.dir = best;
       res.left = AUTO[best][0] < 0; res.right = AUTO[best][0] > 0;
       res.up = AUTO[best][1] < 0; res.down = AUTO[best][1] > 0;
