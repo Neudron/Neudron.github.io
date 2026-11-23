@@ -1411,11 +1411,13 @@
   /* Darkness with Light Slashes (WotG's DarknessWithLightSlashes.cs,
      rubric 6). The arena dims to 9 % (loud owns the dark) and six slash
      volleys sweep it, one every 80 f. Each volley is two waves of seven
-     lanes 44 px apart (the second half a lane lower, 30 f later, the other
-     way), one lane on the soul's height when the warning shows; each lane
-     shows 26 f ahead, then a 130 px band of light travels the full box in
-     70 f. From phase 3 the volley drifts 1 px/f toward the arena's middle. Dodge: slip through the
-     dark gap between lanes and time the bars. */
+     lanes 44 px apart (the second 30 f later, the other way), one lane on
+     the soul's height when the warning shows; each lane shows 26 f ahead,
+     then a 130 px band of light travels the full box in 70 f. From phase 3
+     the volley drifts 1 px/f toward the arena's middle. Both waves must use
+     the SAME lanes: a half-lane offset while the first wave is still live
+     halves the pitch to 22 px, and the 14 px hit bands leave an 8 px pass —
+     narrower than a soul. Dodge: slip through the dark gap between lanes. */
   ATK.DarknessLightSlashes = function (st) {
     var f = st.f, i, dir;
     move(A.AX + A.AW / 2, A.AY + A.AH * 0.2, 0.05);
@@ -1423,16 +1425,20 @@
     for (i = 0; i < 6; i++) {
       if (f !== 60 + i * SLASH_EVERY) continue;
       dir = i % 2;
-      /* v4-B3: two waves of seven lanes 44 px apart, the second half a lane lower and 30 f
-         later, flying the other way. The block is slid to sit inside the arena, one lane on
-         the soul where it fits. From phase 3 the whole volley drifts 1 px/f. */
+      /* Two waves of seven lanes 44 px apart, the second 30 f later, flying
+         the other way on the same lanes. The block is slid to sit inside the
+         arena, one lane on the soul where it fits. From phase 3 the whole
+         volley drifts 1 px/f. */
       slashVolley(dir, G.lvl >= 3);
       cue('chime');
     }
     if (f >= 60 + 5 * SLASH_EVERY + SLASH_WAVE_GAP + SLASH_WARN + 70 + 6) { loud(false); return true; }
     return false;
   };
-  var SLASH_LANES = 7, SLASH_PITCH = 44, SLASH_WARN = 26, SLASH_WAVE_GAP = 30, SLASH_EVERY = 80;
+  /* One volley's second wave lives until +30+26+70 = 126 f. The next volley
+     must not start before that or its shifted lanes interleave with the old
+     ones and squeeze the gap shut, so the cadence is 104 f. */
+  var SLASH_LANES = 7, SLASH_PITCH = 44, SLASH_WARN = 26, SLASH_WAVE_GAP = 30, SLASH_EVERY = 104;
   function slashVolley(dir, drift) {
     var span = (SLASH_LANES - 1) * SLASH_PITCH + SLASH_PITCH / 2, lo = A.AY + 6, hi = A.AY + A.AH - 6 - span,
         y0 = clamp(A.py - SLASH_PITCH * ((RNG() * 3) | 0), lo, Math.max(lo, hi)), t0 = G.fr, vy;
@@ -1441,7 +1447,7 @@
     function wave(n) {
       var d = n ? 1 - dir : dir, k, y;
       for (k = 0; k < SLASH_LANES; k++) {
-        y = y0 + k * SLASH_PITCH + n * SLASH_PITCH / 2;
+        y = y0 + k * SLASH_PITCH;
         if (y < A.AY + 6 || y > A.AY + A.AH - 6) continue;
         /* bw 8: the band is the 14 px the light actually hurts in, not a 130 px lane that looks unsafe */
         warn({ x: d ? A.AX + A.AW : A.AX, y: y, a: d ? Math.PI : 0, life: SLASH_WARN, w: 4, len: A.AW, bw: 8, vy: vy, t0: t0 });
@@ -2185,14 +2191,16 @@
   var PORTAL = { count: [5, 6, 7, 7, 8], every: [15, 12, 9, 9, 8], beamLife: [52, 56, 60, 60, 64],
                  bothWays: [1, 1, 1, 1, 1], dashes: [1, 2, 2, 2, 3] };
   var PORTAL_DASH = 12;   /* f of the reposition dash itself */
-  /* her dash to a third of the arena at her hover height. The path is
-     telegraphed as a warn line from where she stands, then she slides along it
-     in PORTAL_DASH f, leaving afterimages. p keeps the path for the portals. */
-  function repositionDash(p, c, lf) {
+  /* Her dash to the far edge at her hover height. The path is telegraphed as a
+     warn line from where she stands, then she slides along it in PORTAL_DASH f,
+     leaving afterimages. p keeps the path for the portals. The far edge (never
+     a fixed third) keeps the dash at least half the arena: portals opened along
+     a short path stack their beams on one line and leave no gap to stand in. */
+  function repositionDash(p, lf) {
     var TL = TIMING.PortalLaserbeams.tele;
     if (lf === 0) {
       p.x0 = A.bx; p.y0 = A.by;
-      p.x1 = hx(A.AX + A.AW * (c % 2 ? 1 / 6 : 5 / 6)); p.y1 = hy(A.by);
+      p.x1 = hx(A.bx < A.AX + A.AW / 2 ? A.AX + A.AW - 24 : A.AX + 24); p.y1 = hy(A.by);
       p.ang = Math.atan2(p.y1 - p.y0, p.x1 - p.x0);
       warn({ x: p.x0, y: p.y0, a: p.ang, len: Math.hypot(p.x1 - p.x0, p.y1 - p.y0), w: 2, life: TL });
     }
@@ -2206,7 +2214,7 @@
     var L = Math.min(G.lvl, 4), P = PORTAL, n = P.count[L], every = P.every[L], life = P.beamLife[L];
     var TL = TIMING.PortalLaserbeams.tele, PR = D(40), cyc = TL + PORTAL_DASH + (n - 1) * every + TL + life;
     var c = Math.floor(st.f / cyc), lf = st.f - c * cyc, p = st.p, k, i, j, px, py, a, dirs;
-    repositionDash(p, c, lf);
+    repositionDash(p, lf);
     /* portal i opens once the dash is done, every[L] f after the one before */
     k = lf - TL - PORTAL_DASH;
     if (k >= 0 && k % every === 0 && k / every < n) {

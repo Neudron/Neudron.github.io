@@ -572,7 +572,6 @@
     if (paused) box._body.appendChild(button('Resume', 'menu__primary', close));
     box._body.appendChild(button('Play', 'menu__primary', function () {
       setScreen('difficulty');
-      if (hasSave() && NEU.diff && NEU.diff.index) focusAt(NEU.diff.index());
     }));
     box._body.appendChild(button('Config', '', function () {
       if (NEU.settings && NEU.settings.open) NEU.settings.open();
@@ -814,7 +813,9 @@
     layout();
     if (SCREENS[screen]) SCREENS[screen]();
     box.setAttribute('aria-label', 'main menu \u2014 ' + screen);
-    focusAt(0);
+    /* The tier picker opens on the saved tier, or Medium for a fresh file.
+       Focus is the selection here: a stray Enter must not start on Bot. */
+    focusAt(screen === 'difficulty' && NEU.diff && NEU.diff.index ? NEU.diff.index() : 0);
   }
 
   function open(name) {
