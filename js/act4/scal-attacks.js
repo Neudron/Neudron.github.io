@@ -3057,10 +3057,10 @@
     } catch (e) { p.gc = false; }
     return p.gc;
   }
-  function drawBeam(ctx, x0, y0, ang, len, w, t, phase, pal) {
+  function drawBeam(ctx, x0, y0, ang, len, w, t, phase, pal, free) {   /* free: no arena to clip against (the dungeon kit's BRIMSTONE) */
     var p = BEAM_PAL[pal] || BEAM_PAL.brim, op = ctx.globalCompositeOperation, calm = rm();
     var clk = p.fx && !calm && typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
-    var fr = G ? G.fr : 0, tp = rayTip(x0, y0, ang), i, s, k = 1, D = len, im;
+    var fr = G ? G.fr : 0, tp = free ? { x: x0 + Math.cos(ang) * len, y: y0 + Math.sin(ang) * len } : rayTip(x0, y0, ang), i, s, k = 1, D = len, im;
     len = len | 0;
     if (p.fx) D = Math.min(len, Math.hypot(tp.x - x0, tp.y - y0));
     ctx.save();

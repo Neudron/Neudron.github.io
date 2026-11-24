@@ -615,7 +615,20 @@
     P('homestack', 8, 3, { lines: ['letters, all to the same wrong address.'] }),
     P('cat', 6, 3, { lines: ['a cat in the one warm patch of floor.'] })
   ], { nook: { x: 7, y: 3, face: 'down' } });
+  /* the small television in the hall: unplugged, dead, until the note is read. Then it shows one 0 and goes dark.
+     It never touches the page TV, the deck or the quiz: this is a different set. */
+  function tvZero(c) {
+    var es = c.ents(), self = null, i;
+    for (i = 0; i < es.length; i++) if (es[i].v === 'hometv') self = es[i];
+    if (c.flagged('tv_zero')) { c.say(['a dark screen. the 0 is still there if you do not look straight at it.'], 'narr'); return; }
+    if (!c.flagged('dad_note')) { c.say(['a small television. the plug is not in the wall.'], 'narr'); return; }
+    c.flag('tv_zero', 1);
+    if (self) self._zeroAt = Date.now();
+    if (NEU.juice && NEU.juice.hit) NEU.juice.hit('small');
+    c.say(['the unplugged television hums.', 'for a second there is a picture: a single 0.', 'then it is dark again.'], 'narr');
+  }
   corridor('e3_hall', 24, 'e4_corridor', 'e2_hall', ['door', 'curtain'], [12, 6, 21, 2], [
+    P('hometv', 5, 1, { run: tvZero }),
     { t: 'exit', x: 12, y: 1, to: 'e5_dad', spawn: 'door', style: 'door', locked: 'dad_door',
       label: 'dad',
       lines: ['a door you do not have a key for.', 'it wants a card.'] },

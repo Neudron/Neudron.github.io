@@ -73,12 +73,39 @@
     { id: 'a4_chair', text: 'let him sit down' },
     { id: 'a4_crack', text: 'notice the crack' },
     { id: 'a4_polt',  text: 'whatever that was' },
-    { id: 'a4_end',   text: 'take the hotdog' }
+    { id: 'a4_end',   text: 'take the hotdog' },
+    /* after the first boss: each step follows a flag, so sync() can mark it for a save that never saw it */
+    { id: 'a4_paint',   text: 'see what is behind it',            flag: 'painting_found' },
+    { id: 'a4_ride',    text: 'hold on',                          flag: 'cart_done' },
+    { id: 'a4_lift',    text: 'pick a floor',                     flag: 'elevator_out' },
+    { id: 'a4_summit',  text: 'get to the top',                   flag: 'mtn_summit' },
+    { id: 'a4_down',    text: 'come back down another way',       flag: ['mtn_heaven', 'mtn_evil'] },
+    { id: 'a4_parcel',  text: 'deliver what you were handed',     flag: 'dad_door' },
+    { id: 'a4_note',    text: 'read what was left',               flag: 'dad_note' },
+    { id: 'a4_photo',   text: 'look closer',                      flag: 'photo' },
+    { id: 'a4_well',    text: 'find water',                       flag: 'solved:s2_well' },
+    { id: 'a4_exo',     text: 'outlast the machines',             flag: 'exo_won' },
+    { id: 'a4_draedon', text: 'meet whoever built them',          flag: 'draedon_won' }
   ];
 
   function install() {
     if (!NEU.quest || !NEU.quest.add) return;
     STEPS.forEach(function (s) { NEU.quest.add(s, 'IV the woods'); });
+    /* the garage row sits right after the photograph that points to it */
+    if (NEU.quest.garage && NEU.save && NEU.save.flagged && NEU.save.flagged('photo')) NEU.quest.add(NEU.quest.garage, 'IV the woods', 'a4_photo');
+    sync();
+  }
+
+  /* mark every step whose flag is set. Idempotent: quest.mark never un-completes or double-counts. */
+  function sync() {
+    var list = STEPS.slice(), g = NEU.quest && NEU.quest.garage, i, s, fl, j;
+    if (!NEU.quest || !NEU.quest.mark || !NEU.save || !NEU.save.flagged) return;
+    if (g && NEU.save.flagged('photo')) list.push(g);
+    for (i = 0; i < list.length; i++) {
+      s = list[i]; if (!s.flag) continue;
+      fl = typeof s.flag === 'string' ? [s.flag] : s.flag;
+      for (j = 0; j < fl.length; j++) if (NEU.save.flagged(fl[j])) { NEU.quest.mark(s.id); break; }
+    }
   }
 
   function open() {
@@ -411,7 +438,7 @@
   }
 
   NEU.act4 = {
-    open: open, wake: wake, settle: settle, ending: ending, install: install, recall: recall, closeModes: closeModes,
+    open: open, wake: wake, settle: settle, ending: ending, install: install, sync: sync, recall: recall, closeModes: closeModes,
     get start() { return START; },
     get done() { return !!(NEU.save && NEU.save.flagged('act4_done')); },
     steps: STEPS

@@ -244,12 +244,13 @@
       if (fx === 'beam') {
         var tg = nearest();
         beam = { x: F.x, y: F.y, ang: tg ? Math.atan2(tg.y - F.y, tg.x - F.x) : facing(), charge: 0, fire: 0, ticks: 0 };
+        if (NEU.sfx && NEU.sfx.whoosh) NEU.sfx.whoosh();
       } else if (fx === 'shield') shield = true;
       else if (fx === 'nova') {
         n = Math.max(1, st.n || 16);
         for (i = 0; i < n; i++) { a = i * Math.PI * 2 / n; shots.push({ kind: 'nova', x: F.x, y: F.y,
           vx: Math.cos(a) * 220, vy: Math.sin(a) * 220, r: 6, dmg: st.dmg || 1, age: 0, life: 2, hit: [], pierce: false }); }
-      } else if (fx === 'heal') heal(st.heal === 'full' ? 6 : Number(st.heal) || 0);
+      } else if (fx === 'heal') heal(st.heal === 'full' ? MAXH : Number(st.heal) || 0);
       else { var rb = tp; tp += cost; if (tp !== rb) tpEvents.push(tp - rb); return; }
       var CF = { beam: 'fxGigBrim', shield: 'fxGigWard', nova: 'fxGigNova', heal: 'fxGigMend' };
       if (CF[fx]) casts.push({ x: F.x, y: F.y - 8, t: 0.45, d: 0.45, k: CF[fx] });
@@ -554,7 +555,17 @@
           ctx.fillRect(x - 1, y - 1, 3, 3);
         }
       }
-      if (beam) {
+      if (beam && NEU.scalBeam) {
+        /* BRIMSTONE, 1:1 with the SCal fight (boss-scal.js beamStart/beamUpdate/draw): her own beam look in the soul palette; charge grows a telegraph,
+           fire is the full beam, the last 0.15 s fades; each damage tick kicks a small shake along the beam. */
+        var bph = beam.charge < 0.25 ? 'charge' : (beam.fire > 0.95 - 0.15 ? 'fade' : 'fire');
+        NEU.scalBeam.draw(ctx, beam.x, beam.y, beam.ang, 900, 0.6,
+          bph === 'charge' ? beam.charge / 0.25 : bph === 'fade' ? (beam.fire - 0.95 + 0.15) / 0.15 : Math.min(1, beam.fire * 60 / 16), bph, 'soul', true);
+        if (bph !== 'charge' && beam.shook !== beam.ticks && NEU.juice && NEU.juice.hit) {
+          beam.shook = beam.ticks;
+          NEU.juice.hit('small', { dx: Math.cos(beam.ang), dy: Math.sin(beam.ang), shake: 0.06 });
+        }
+      } else if (beam) {
         ctx.fillStyle = beam.charge < 0.25 ? '#6F335A' : '#FF3A1A';
         for (i = 0; i < 32; i++) { x = (beam.x + Math.cos(beam.ang) * i * 28) | 0; y = (beam.y + Math.sin(beam.ang) * i * 28) | 0; ctx.fillRect(x - 2, y - 2, 5, 5); }
         ctx.fillStyle = '#FFF4D0'; ctx.fillRect((beam.x - 1) | 0, (beam.y - 1) | 0, 3, 3);
@@ -611,6 +622,9 @@
       /* 0..1 charge progress while Z is held, 0 otherwise */
       get charge() { return charge ? Math.min(1, chargeT / CHARGE_FULL) : 0; },
       get hp() { return hp; },
+      /* a host whose cap moves (saved hearts, boss tier) writes the live max in; the hearts and HEAL follow it */
+      get maxHp() { return MAXH; },
+      set maxHp(v) { MAXH = Math.max(1, Math.floor(Number(v)) || MAXH); hp = Math.min(hp, MAXH); },
       /* a host that owns the HP (the dungeon) writes it in so HEAL and the strip read true */
       set hp(v) { hp = Math.max(0, Math.min(MAXH, Number(v) || 0)); }
     };

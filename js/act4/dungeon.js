@@ -1,14 +1,14 @@
 /* dungeon.js — the dungeon (B3): ONE connected map under the woods, Terraria-shaped (a surface castle,
    then a winding descent of eleven 40x24 zones stitched on a 3x6 grid, brick between them). The only save
    is at the door; any death wakes you there, so d3/d6/d9 open chain lifts back up (flag dgn_lift_<n>).
-   Kept contracts: NEU.plat.open('d0'..'d10'), the d5 mage gate, the d10 bone door (boss_key -> polt),
+   Kept contracts: NEU.plat.open('d0'..'d10'), the d5 mage gate, the d10 bone door (boss_key -> a portcullis in the wall; the Polterghast chamber is its annex, dgn-polt.js),
    the painting (cart + painting_found), flag dgn_depth, NEU.dungeon.{here,spawnPx,bossOpen,bossLine,mageSign,toSurface}. */
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
   var P = NEU.plat;
   if (!P || !P._kinds) return;
-  var kinds = P._kinds, T = 16, W = 128, H = 148, ZW = 40, ZH = 24, SURF = 15, INK = '#12081E';
+  var kinds = P._kinds, T = 16, W0 = 128, W = 216, H = 148, ZW = 40, ZH = 24, SURF = 15, INK = '#12081E';   /* W0: the stitched dungeon; W adds the Polterghast annex east of d10 */
   /* each zone's cell on the 3x6 grid; GRID is the faction of every cell: B brick (blue), G slab (green), P tiled (pink) */
   var CELL = [[1, 0], [1, 1], [2, 1], [2, 2], [1, 2], [1, 3], [0, 3], [0, 4], [1, 4], [1, 5], [2, 5]];
   var GRID = ['BBB', 'BBB', 'BBB', 'GBB', 'GPP', 'PPP'];
@@ -262,7 +262,7 @@
       '##....................................##',
       '##......................................',
       '##......................................',
-      '##..w....C.....Q.......p.....l..w......',
+      '##..w....C.....Q.......p.....l..w.......',   /* DGN-04: this row was one tile short, which slid d10's row 140 a tile west of its entities; the annex needs the row square */
       '########################################',
       '########################################',
       '########################################'],
@@ -292,11 +292,30 @@
       '########################################']
   };
   var FOE = 'uUathNGXyTCEYQOW', DECOR = 'cLwbB';
+  /* DGN-04: the Polterghast chamber is an annex of d10 behind the bone door, not a level of its own. 96x56 tiles at (x,y): its floor row is d10's floor row 141,
+     its mouth is the corridor behind the door. spawn is the retry anchor (chamber-local tile). inner is the world tile column that seals the gate once the hero is past it.
+     shelves [x, y, len], movers [cx, cy, halfX, halfY, speed, phase], crystals [x, y] are chamber-local plat tiles; dgn-polt.js binds the fight to this rectangle. */
+  var CH = { x: 120, y: 87, w: 96, h: 56, spawn: { x: 5, y: 53 }, inner: 123, door: { x: 114, y: 138, w: 2, h: 3 },
+    shelves: [[10, 47, 9], [77, 47, 9], [34, 40, 28], [10, 33, 9], [77, 33, 9], [28, 26, 12], [56, 26, 12], [40, 19, 16], [10, 19, 9], [77, 19, 9], [38, 12, 20]],
+    movers: [[22, 43, 14, 0, 0.9, 0], [70, 43, -14, 0, 0.9, 0], [46, 31, 0, 6, 0.7, 0], [24, 23, 10, 0, 1.1, 1.5], [70, 23, -10, 0, 1.1, 1.5]],
+    crystals: [[14, 44], [81, 44], [30, 36], [65, 36], [47, 22], [20, 16], [75, 16], [47, 8], [47, 46]] };
+  function inCh(tx, ty) { return tx >= CH.x && tx < CH.x + CH.w && ty >= CH.y && ty < CH.y + CH.h; }
+  /* the chamber's cel entities, native cel px (one plat tile is 8): a mover swings between two ends at its old sine's mean speed */
+  function chamberCel() {
+    var out = [], m, v, i;
+    for (m = 0; m < CH.movers.length; m++) {
+      v = CH.movers[m];
+      out.push({ t: 'movingPlatform', x: (CH.x + v[0] - Math.abs(v[2])) * 8, y: (CH.y + v[1] - Math.abs(v[3])) * 8, nx: (CH.x + v[0] + Math.abs(v[2])) * 8, ny: (CH.y + v[1] + Math.abs(v[3])) * 8,
+        w: 24, h: 8, spd: Math.round(16 * Math.max(Math.abs(v[2]), Math.abs(v[3])) * v[4] / Math.PI), at0: (1 + Math.sin(v[5])) / 2 * 0.98 + 0.01 });
+    }
+    for (i = 0; i < CH.crystals.length; i++) out.push({ t: 'refill', x: (CH.x + CH.crystals[i][0]) * 8 + 4, y: (CH.y + CH.crystals[i][1]) * 8 + 4 });
+    return out;
+  }
   var zones = [], spawners = [], decor = [], ents = [], cracks = {}, save = null, lifts = {}, here = '', goal = '', live = null;
   /* WO-DGN world additions, all attached to the one map (no new level, no new authority).
      braziers are numbered globally; flags dgn_lit_<n> are saved through NEU.save.
      water is decorative: the lever only drains it, never changes Celeste physics. */
-  var braN = 0, water = [], rest = {}, secrets = [];
+  var braN = 0, water = [], rest = {}, secrets = [], dress = [];
   function openFloor(rows, want, skip) {
     var out = [], y, x, ch, row;
     for (y = 1; y < rows.length - 1; y++) {
@@ -366,9 +385,10 @@
   function zoneAt(px, py) {
     var tx = Math.floor(px / T), ty = Math.floor(py / T), i, z;
     for (i = 0; i < zones.length; i++) { z = zones[i]; if (tx >= z.x && tx < z.x + ZW && ty >= z.y && ty < z.y + ZH) return z; }
-    return null;
+    return inCh(tx, ty) ? zones[10] : null;   /* the annex is d10 */
   }
   function faction(tx, ty) {
+    if (inCh(tx, ty)) return GRID[5].charAt(2);
     var c = Math.max(0, Math.min(2, Math.floor((tx - 4) / ZW))), r = Math.max(0, Math.min(5, Math.floor(ty / ZH)));
     return GRID[r].charAt(c);
   }
@@ -454,6 +474,27 @@
       for (i = 1; i < cs.length; i++)
         ents.push({ t: 'dgnplaque', x: cz.x + cs[i].x, y: cz.y + cs[i].y, chamber: c.id, lines: [c.lines[(i - 1) % c.lines.length]] });
     }
+    /* DGN-02 baked set dressing (look-dungeon.js paints it into the chunks; pure presentation, no collision, flag or spawn).
+       bellfrm: cold stone niche around the d0 bell. pool: warm light at the shaft mouth. tide: mineral flood line that stays after the drain.
+       arch: broken ribbed pier either side of the bone door (x = pier tile, d = side the rib springs toward). course: vault masonry, bottom row first. */
+    dress.push({ k: 'bellfrm', x: 70, y: 4 }, { k: 'pool', x: 64, y: 14 },
+      { k: 'tide', x: green.x + 4, y: green.y + 12, w: 32, lx: green.x + 5, ly: green.y + 20 },
+      { k: 'arch', x: vault.x + 28, y: vault.y + 20, h: 6, d: 1, b: 1.25, r: 38 }, { k: 'arch', x: vault.x + 22, y: vault.y + 20, h: 6, d: 1, b: 1.25, r: 38 },
+      { k: 'arch', x: CH.door.x + 3, y: CH.door.y + 2, h: 3, d: -1, b: 1.1, r: 12 },
+      { k: 'course', x: vault.x + 1, y: vault.y + 20, w: 35, a: [0.85, 0.6, 0.38] },
+      { k: 'jamb', x: CH.door.x, y: CH.door.y, w: CH.door.w, h: CH.door.h },
+      { k: 'course', x: CH.x, y: 140, w: 2, a: [0.85, 0.6, 0.38, 0.18], any: 1 }, { k: 'course', x: CH.x + 2, y: CH.y + CH.h - 3, w: CH.w - 4, a: [0.85, 0.6, 0.38, 0.18], any: 1 });
+    /* DGN-04: the chamber and the way in. The door wall (brick above a 2x3 gap) stands where the bone door always stood; behind it a four-tile corridor runs
+       through d10's old east wall to the chamber mouth (floor row 141 is shared). The gap's collision is six 'bossbar' tiles, see the bone door below. */
+    for (y = 2; y < CH.h - 2; y++) for (x = 2; x < CH.w - 2; x++) g[CH.y + y][CH.x + x] = ' ';
+    for (n = 0; n < CH.shelves.length; n++) for (x = 0; x < CH.shelves[n][2]; x++) g[CH.y + CH.shelves[n][1]][CH.x + CH.shelves[n][0] + x] = '=';
+    for (y = 131; y <= 137; y++) for (x = CH.door.x; x < CH.door.x + CH.door.w; x++) g[y][x] = '#';
+    for (y = 131; y <= 136; y++) for (x = CH.door.x + CH.door.w; x < CH.x; x++) g[y][x] = '#';
+    for (y = 137; y <= 140; y++) for (x = CH.x; x < CH.x + 2; x++) g[y][x] = '.';
+    decor = decor.filter(function (d) { return !(d.x >= CH.door.x && d.x < CH.x && d.y >= 131 && d.y <= 137); });   /* the old pocket's chains and lantern are brick now */
+    decor.push({ k: 'L', x: CH.x - 3, y: 137, f: 'P' });
+    for (y = 0; y < CH.door.h; y++) for (x = 0; x < CH.door.w; x++) ents.push({ t: 'bossbar', x: CH.door.x + x, y: CH.door.y + y, solid: true });
+    ents.push({ t: 'rematch', x: CH.x + 9, y: 140 });
     /* W10 surface hut: packed-earth hut on the open grass, west of the castle. */
     for (x = HUT.x0 - 1; x <= HUT.x1 + 1; x++) g[HUT.roof][x] = 'g';
     for (y = HUT.wall0; y <= HUT.wall1; y++) {
@@ -473,7 +514,7 @@
       if (ents[i].n === 0) { ents[i].n = [3, 6, 9][n++]; ents[i].top = true; }
       lifts[ents[i].n + (ents[i].top ? 'top' : '')] = ents[i];
     }
-    ents.push({ t: 'leave', x: 1, y: SURF - 1 }, { t: 'leave', x: W - 2, y: SURF - 1 });
+    ents.push({ t: 'leave', x: 1, y: SURF - 1 }, { t: 'leave', x: W0 - 2, y: SURF - 1 });
     return g.map(function (r) { return r.join(''); });
   }
   function px(cell) { return cell ? { x: (cell.x + 0.5) * T, y: (cell.y + 1) * T } : null; }
@@ -481,22 +522,33 @@
   function talk(lines, cue) { if (NEU.talk && !P.replaying()) NEU.talk(lines, 'narr', cue); }
   function flag(k, v) { if (NEU.save && NEU.save.flag && !P.replaying()) NEU.save.flag(k, v); }
   function flagged(k) { return !!(NEU.save && NEU.save.flagged && NEU.save.flagged(k)); }
+  function heartCap() { return 6 + (flagged('dgn_heart_1') ? 1 : 0) + (flagged('dgn_heart_2') ? 1 : 0) + (flagged('dgn_heart_3') ? 1 : 0); }
 
   var def = P.level('dgn', {
     rows: build(), spawn: zones[0].spawn, entities: ents, tileset: 'dungeon', view: 'terraria', chunked: true, hp: 6, solid: '#g',
     onOpen: function (opts) {
-      finishDoorFx();
       live = P.level0(); here = ''; goal = opts.goal || '';
       /* saved max-hearts raise only the LIVE cap; the template stays at 6 so
-         older suites and fresh saves keep the original contract. */
-      live.hp = 6 + (flagged('dgn_heart_1') ? 1 : 0) + (flagged('dgn_heart_2') ? 1 : 0) + (flagged('dgn_heart_3') ? 1 : 0);
+         older suites and fresh saves keep the original contract. The cap goes first and the hero's hearts follow it: plat set them from the template's 6. */
+      live.hp = heartCap();
+      P.hero().hp = live.hp;
       track();
+      rematchOn(flagged('polt_dead'));
+      if (flagged('polt_dead') && !P.replaying()) gateTo(true, true);   /* a cleared chamber stands open and quiet */
     },
-    onDeath: function () { toSurface(); },
+    /* a fight death retries at the chamber mouth (dgn-polt.js answers false here and plat respawns); everywhere else it is the surface bed */
+    onDeath: function () { if (NEU.dgnPolt && NEU.dgnPolt.on && NEU.dgnPolt.on()) return false; toSurface(); },
+    onRespawn: function () { if (NEU.dgnPolt && NEU.dgnPolt.retry) NEU.dgnPolt.retry(); },
+    celEnts: chamberCel(), chamber: CH,
+    /* the chamber stays black while its gate is shut and no fight runs: the way in is a keyed door, and nothing past it is shown early */
+    chamberHidden: function () { return gateState() === 'closed' && !(NEU.dgnPolt && NEU.dgnPolt.on && NEU.dgnPolt.on()); },
+    /* the camera stops at the stitched dungeon's east edge except down in the lower vaults, where it follows the hero into the annex */
+    camW: function (h) { return h.y < 85 * T ? W0 : W; },
     tick: function () { track(); restCalm(); }
   });
   def.zones = zones; def.decor = decor; def.cracks = cracks; def.spawners = spawners; def.faction = faction; def.zoneAt = zoneAt;
-  def.water = water; def.rest = rest;
+  def.water = water; def.rest = rest; def.dress = dress;
+  def.cel = true;   /* the dungeon moves on the cel kernel (the cel.html movement); refills, springs, crumbles and the swinging plates are cel entities */
   /* backward-compat aliases so legacy tests/suites that reference d0..d10 levels resolve to the one map */
   for (var _ai = 0; _ai <= 10; _ai++) P.levels['d' + _ai] = def;
 
@@ -534,7 +586,7 @@
           if (!flagged('dgn_lift_woke_' + z.n)) { flag('dgn_lift_woke_' + z.n, 1); talk(['* a chain lift wakes.']); }
         }
         if (z.n === 10) {
-          NEU.dungeon.bossOpen = false; NEU.dungeon.bossLine = '';
+          NEU.dungeon.bossOpen = gateState() === 'open'; NEU.dungeon.bossLine = '';
           /* BUG-0032b: the descent pays once at the bottom, through the one coin authority. */
           if (!P.replaying() && NEU.save && NEU.save.addCoins && NEU.save.flagged && !NEU.save.flagged('dgn_descent_paid')) {
             NEU.save.addCoins(25);
@@ -551,8 +603,9 @@
     for (i = 0; i < live.entities.length; i++) { e = live.entities[i]; if (e.t === t && Math.abs((e.x + 0.5) * T - h.x) < r && Math.abs((e.y + 1) * T - h.y) < r) return true; }
     return false;
   }
-  function toSurface() {
-    NEU.dungeon.lastDeath = here;
+  /* o.won: the victory walk home. Only a death records where it happened. */
+  function toSurface(o) {
+    if (!(o && o.won)) NEU.dungeon.lastDeath = here;
     if (NEU.mage && NEU.mage.active && NEU.mage.close) NEU.mage.close();
     return origOpen('dgn', { spawn: { x: BED.x, y: BED.y }, zone: 'd0', wipe: 0.25 });   /* the wipe-in the death wipe-out hands over to */
   }
@@ -600,7 +653,7 @@
     if (P.replaying() || e.dead || !flagged(e.req)) return;
     e.dead = true;
     flag('dgn_heart_' + e.n, 1);
-    if (live) live.hp = 6 + (flagged('dgn_heart_1') ? 1 : 0) + (flagged('dgn_heart_2') ? 1 : 0) + (flagged('dgn_heart_3') ? 1 : 0);
+    if (live) live.hp = heartCap();
     P.heal(1);
     talk(['* a life crystal. the heart can hold a little more.']);
   } });
@@ -613,31 +666,70 @@
     if (NEU.mage && typeof NEU.mage.open === 'function') { NEU.dungeon.mageSign = ''; if (!P.replaying()) NEU.mage.open(); }
     else { NEU.dungeon.mageSign = 'closed'; talk(['* closed']); }
   } });
+  /* ── the bone door (DGN-04): a portcullis in a brick wall ──
+     Six solid 'bossbar' tiles are its collision. They clear from the floor up as the panel rises in three ratchet steps, so the gap you see is the gap you can
+     walk through; reduced motion shows it open at once. The encounter seals it again once the hero is past the inner threshold. */
+  var GATE_H = 48, GATE_STEP = 16, GATE_T0 = 10, GATE_STEP_FR = 16, GATE_MOVE = 6, GATE_DROP = 12;
+  function gateEnt() {
+    var L = P.level0(), i;
+    if (!L || L.id !== 'dgn' || !L.entities) return null;
+    if (L._gate) return L._gate;
+    for (i = 0; i < L.entities.length; i++) if (L.entities[i].t === 'bossdoor') return (L._gate = L.entities[i]);
+    return null;
+  }
+  function gateState() { var e = gateEnt(); return e ? e.gate || 'closed' : 'closed'; }
+  function barsDead(on) {   /* the collision tiles: on = every one cleared, else every one solid */
+    var i, es = P.level0().entities;
+    for (i = 0; i < es.length; i++) if (es[i].t === 'bossbar') es[i].dead = on;
+  }
+  function gateRise(e, rise) {   /* rise px of panel travel: a bar tile clears once the panel's foot is above it */
+    var i, es = P.level0().entities;
+    e.rise = rise;
+    for (i = 0; i < es.length; i++) if (es[i].t === 'bossbar') es[i].dead = GATE_H - rise <= (es[i].y - CH.door.y) * T;
+  }
+  function gateTo(open, instant) {
+    var e = gateEnt();
+    if (!e) return;
+    e.fr = 0;
+    if (instant || P.reduced()) { e.gate = open ? 'open' : 'closed'; gateRise(e, open ? GATE_H : 0); }
+    else { e.gate = open ? 'opening' : 'closing'; if (!open) barsDead(false); }
+    NEU.dungeon.bossOpen = !!open;
+  }
+  function gateTick(e) {
+    var t, k, u, rise;
+    if (e.gate === 'opening') {
+      e.fr++; t = e.fr - GATE_T0; k = Math.max(0, Math.floor(t / GATE_STEP_FR));
+      u = Math.max(0, Math.min(1, (t - k * GATE_STEP_FR) / GATE_MOVE)); u = 1 - (1 - u) * (1 - u);
+      rise = Math.min(GATE_H, (k + u) * GATE_STEP);
+      gateRise(e, rise);
+      if (rise >= GATE_H) e.gate = 'open';
+    } else if (e.gate === 'closing') {
+      e.fr++; u = Math.min(1, e.fr / GATE_DROP);
+      e.rise = GATE_H * (1 - u * u);
+      if (u >= 1) { e.rise = 0; e.gate = 'closed'; }
+    }
+  }
+  function rematchOn(on) { var i, es = P.level0() && P.level0().entities; if (es) for (i = 0; i < es.length; i++) if (es[i].t === 'rematch') es[i].dead = !on; }
   kd('bossdoor', { touch: function (e, input, melee) {
+    if (!melee || P.replaying() || (e.gate && e.gate !== 'closed')) return;
+    if (NEU.dgnPolt && NEU.dgnPolt.engage && NEU.save && NEU.save.has && NEU.save.has('boss_key')) { gateTo(true); return; }
+    NEU.dungeon.bossOpen = false; NEU.dungeon.bossLine = '* a bone lock. it wants a key.'; talk([NEU.dungeon.bossLine]);
+  }, tick: gateTick });
+  kd('bossbar', {});
+  kd('rematch', { touch: function (e, input, melee) {
     if (!melee || e.dead || P.replaying()) return;
-    if (NEU.save && NEU.save.has && NEU.save.has('boss_key')) {
-      var snap = null, cv, g;
-      /* D3: keep the kept contract instant (bossOpen / close / polt.open), but take a
-         mode-bridge snapshot first so the opening can play over the incoming fight. */
-      try { snap = NEU.kernel && NEU.kernel.bridge && NEU.kernel.bridge(); } catch (sErr) { snap = null; }
-      if (!snap) {
-        cv = document.getElementById('platCanvas');
-        if (cv && cv.getContext) {
-          snap = document.createElement('canvas'); snap.width = cv.width || 640; snap.height = cv.height || 360;
-          g = snap.getContext('2d'); if (g && g.drawImage) g.drawImage(cv, 0, 0);
-        }
-      }
-      e.dead = true; NEU.dungeon.bossOpen = true; P.close();
-      if (NEU.polt && NEU.polt.open) NEU.polt.open();
-      playDoorOpening(snap, e);
-    } else { NEU.dungeon.bossOpen = false; NEU.dungeon.bossLine = '* a bone lock. it wants a key.'; talk([NEU.dungeon.bossLine]); }
+    e.dead = true;
+    if (NEU.dgnPolt && NEU.dgnPolt.rematch) NEU.dgnPolt.rematch();
   } });
   kd('painting', { touch: function (e, input, melee) {
     var cv;
     if (P.replaying()) return;
     if (!melee) { e.held = false; return; }
     if (e.held) return;
-    e.held = true; flag('painting_found', 1);
+    e.held = true;
+    /* the painting waits for the thing at the bottom of the dungeon; an older save already past it keeps its cart */
+    if (!flagged('polt_dead') && !flagged('painting_found')) { talk(['* a painting of somewhere you have not been yet.']); return; }
+    flag('painting_found', 1);
     if (NEU.cart && typeof NEU.cart.open === 'function') NEU.cart.open();
     cv = document.getElementById('platCanvas');
     if (cv && NEU.juice && NEU.juice.shakeEl) NEU.juice.shakeEl(cv);
@@ -667,19 +759,20 @@
     if (!flagged('dgn_bed_met')) { flag('dgn_bed_met', 1); talk(['* the bed is warm. whatever waits below, you wake up here.']); }
   } });
 
-  /* one input recording per zone, spawn to the next zone (d10: to the bone door); fixes201 replays each twice */
+  /* one input recording per zone, spawn to the next zone (d10: to the bone door); fixes201 replays each twice.
+     Found by a beam search over the cel kernel (tests/_dgn-route.mjs) and proved by P.replay on the live level: the dungeon moves on cel.js. */
   var REC = {
-    d0: [[4, 'dash s d'], [4, 'space d'], [8, 'd'], [4, 'space d'], [4, ''], [4, 'dash s d'], [4, 'd'], [16, 'a s melee'], [4, 'd']],
-    d1: [[4, 'dash s d'], [4, 'd'], [4, 'space d'], [4, 'dash s d'], [4, 'd'], [16, 'd s melee'], [4, 'a s melee'], [8, 'd s melee'], [4, 'd'], [4, 'dash d'], [4, 'd'], [4, 'space d']],
-    d2: [[4, 'dash s d'], [8, 'space d'], [8, 'd'], [4, 'space d'], [4, 'dash s d'], [4, 'd'], [4, 'space d'], [4, 'd'], [8, 'space'], [4, 'dash s a'], [8, 'd']],
-    d3: [[4, 'dash a'], [4, 'd'], [4, 'space d'], [4, 'space a'], [8, 'space d'], [4, 'dash w'], [4, 'd'], [8, 'a'], [4, 'shift w a'], [12, 'space'], [4, ''], [4, 'a'], [4, 'dash s a'], [4, 'space a'], [8, 'a'], [4, 'space a'], [4, 'dash s a'], [4, 'd'], [4, 'space d'], [4, 'dash s a'], [4, 'd']],
-    d4: [[4, 'dash s a'], [4, 'd'], [4, 'space d'], [4, 'a'], [4, 'dash s a'], [4, 'd'], [4, 'space d'], [4, 'dash s a'], [8, 'space a'], [12, 'a'], [8, 'a s melee'], [12, 'd s melee'], [4, 'a s melee'], [4, 'd s melee'], [4, 'a s melee'], [4, 'd']],
-    d5: [[4, 'a'], [4, 'space a'], [4, 'dash s a'], [4, 'd'], [16, 'a s melee'], [4, 'd s melee'], [8, 'a s melee'], [4, 'a'], [4, 'dash a'], [4, 'd']],
-    d6: [[4, 'dash s a'], [4, 'space a'], [12, 'a'], [4, 'a s melee'], [4, 'a'], [4, 'dash s a'], [4, 'd'], [4, 'space d'], [4, 'a'], [4, 'dash a'], [16, 'd'], [4, 'a s melee'], [4, 'd']],
-    d7: [[4, 'dash s d'], [4, 'd'], [4, 'space'], [4, 'a'], [4, 'shift w d'], [4, 'space d'], [4, 'space a'], [4, 'dash s d'], [4, 'space d'], [12, 'd'], [4, 'd s melee'], [4, 'space a'], [4, 'space d'], [4, 'd'], [4, 'dash s d'], [4, 'space d'], [12, 'd'], [4, 'd s melee'], [4, 'dash s d'], [4, 'd']],
-    d8: [[4, 'dash s d'], [4, 'space'], [8, ''], [4, 'space d'], [4, 'd'], [4, 'shift w d'], [8, ''], [4, 'shift w d'], [4, 'space d'], [8, 'd'], [8, ''], [4, 'shift w d'], [4, 'space d'], [4, 'a'], [4, 'd'], [4, 'shift w d'], [4, 'space d'], [8, 'd'], [4, ''], [4, 'a'], [4, 'd s melee'], [4, 'space'], [8, 'd'], [4, 'space d'], [4, 'd'], [4, 'space'], [4, 'space a'], [4, 'space d'], [4, 'd'], [4, ''], [4, 'shift w d'], [12, 'space d'], [4, 'dash s d'], [8, 'space d'], [12, 'd'], [8, 'd s melee'], [4, 'a s melee'], [4, 'd s melee'], [4, 'a s melee'], [4, 'd']],
-    d9: [[4, 'space d'], [4, 'd'], [4, 'dash s d'], [4, 'd'], [8, 'd s melee'], [4, 'a s melee'], [4, 'd s melee'], [4, 'a s melee'], [12, 'd s melee'], [4, 'dash d'], [4, 'd']],
-    d10: [[4, 'dash s d'], [4, 'd'], [4, 'space d'], [4, 'd'], [4, 'dash s d'], [4, 'd'], [4, 'space d'], [4, 'dash s d'], [4, 'd'], [4, 'space d'], [4, 'd']]
+    d0: [[4, 'dash d'], [4, 'dash s d'], [12, 'space d'], [4, 'd'], [4, 'space d'], [12, 'd'], [4, 'a'], [4, 'dash s d'], [8, 'dash s a'], [4, 'd']],
+    d1: [[4, 'dash d'], [4, 'dash s d'], [4, 'space d'], [16, 'd'], [16, 'dash s d'], [4, 'a'], [4, 'dash s d'], [8, 'd'], [4, 'dash d'], [4, 'dash s d'], [4, 'd'], [4, 'space d']],
+    d2: [[4, 'dash d'], [4, 'dash s d'], [4, 'space d'], [8, 'd'], [4, 'space d'], [16, 'd'], [4, 'space d'], [8, 'd'], [16, 'a'], [4, 'd']],
+    d3: [[4, 'dash d'], [4, 'dash w'], [12, 'space a'], [4, 'a'], [4, 'space shift a'], [4, 'space d'], [4, 'space a'], [4, 'a'], [4, 'space shift a'], [4, 'd'], [4, 'space shift a'], [4, 'space d'], [8, 'a'], [4, 'dash d'], [4, 'dash s a'], [4, 'space a'], [8, 'a'], [8, 'space a'], [8, 'a'], [4, 'space a'], [4, 'd']],
+    d4: [[4, 'dash d'], [4, 'dash s a'], [8, 'space a'], [8, 'a'], [4, 'space a'], [4, 'dash d'], [4, 'dash s a'], [4, 'd'], [8, 'space a'], [12, 'd'], [32, 'shift s'], [4, 'd']],
+    d5: [[4, 'space a'], [4, 'dash d'], [4, 'dash s a'], [8, 'd'], [4, 'dash s a'], [4, 'dash s d'], [4, 'dash s a'], [4, 'dash s'], [4, 'a'], [4, 'dash s a'], [4, 'a'], [4, 'dash d'], [4, 'a']],
+    d6: [[4, 'dash d'], [4, 'dash s a'], [12, 'space a'], [4, 'a'], [4, 'space a'], [4, 'a'], [4, 'space a'], [4, 'dash d'], [4, 'dash s a'], [8, 'space a'], [4, 'a'], [4, 'd'], [4, 'space a'], [4, 'dash d'], [4, 'dash s'], [4, 'd']],
+    d7: [[4, 'dash d'], [4, 'space d'], [4, 'd'], [4, 'space d'], [4, 'space shift d'], [12, 'd'], [4, 'dash d'], [4, 'dash s d'], [8, 'space d'], [4, 'd'], [4, 'space d'], [8, 'd'], [8, 'space d'], [4, 'd'], [8, 'space d']],
+    d8: [[4, 'dash d'], [4, 'dash w'], [12, 'space d'], [8, 'd'], [4, 'dash d'], [4, 'dash s d'], [8, 'space d'], [4, 'd'], [4, 'space d'], [12, 'd'], [12, 'dash s d'], [4, 'a']],
+    d9: [[4, 'space d'], [4, 'd'], [4, 'dash d'], [4, 'dash s d'], [8, 'd'], [12, 'dash s d'], [4, 'dash s a'], [4, 'd'], [4, 'dash s d'], [4, 'd'], [4, 'space d'], [4, 'dash d'], [4, 'd']],
+    d10: [[4, 'dash d'], [4, 'dash s d'], [8, 'space d'], [8, 'd'], [4, 'space d'], [12, 'd'], [8, 'space d'], [4, 'd']]
   };
   var origOpen = P.open, origReplay = P.replay;
   P.open = function (id, opts) {
@@ -788,7 +881,7 @@
   function tLights(list) { var h = P.hero(); list.push(h.x / T, (h.y - 11) / T, 0.8); }
   function tDraw(c, cx, cy) { var kt = tk(); if (!kt) return; c.save(); c.translate(-cx, -cy); kt.draw(c); c.restore(); }
   P.level('t0', {
-    rows: tRows(), spawn: { x: 2, y: 15 }, entities: TENTS, tileset: 'dungeon', view: 'terraria', chunked: true, hp: 6, solid: '#',
+    rows: tRows(), spawn: { x: 2, y: 15 }, entities: TENTS, tileset: 'dungeon', view: 'terraria', chunked: true, hp: 6, solid: '#', cel: true,
     faction: function () { return 'B'; }, zoneAt: function () { return null; }, cracks: {},
     decor: [{ k: 'w', x: 5, y: 15, f: 'B' }, { k: 'w', x: 16, y: 15, f: 'B' }, { k: 'w', x: 28, y: 15, f: 'B' }, { k: 'w', x: 36, y: 15, f: 'B' }, { k: 'w', x: 49, y: 15, f: 'B' }, { k: 'w', x: 55, y: 15, f: 'B' }],
     onOpen: tOpen, tick: tTick, key: tKey, draw: tDraw, lights: tLights, swing: function () { return 0; }   /* a hook: plat charges melee only when the level has one */
@@ -809,60 +902,6 @@
   kd('tchest', { touch: function (e, input, melee) {
     if (melee && !e.opened) talk(['* press ' + kn('c') + ' to open the chest and equipment.']);
   } });
-
-  /* ── D3: the bone door opening ─────────────────────────────────────────
-     The fight switch stays instant (fixes201/161 keep their contract). What is
-     new is a mode-bridge snapshot of the dungeon laid over the incoming fight:
-     key turn -> two chains drop -> the panels open over 1.2 s, the view pans
-     down the corridor, then a Deltarune-style fight box grows from the doorway
-     (obj_growtangle: growcon 1 animate-in, growth 0..1). */
-  var DOOR_T = { key: [0, 200], chains: [200, 500], open: [500, 1700], pan: [900, 1700], box: [1500, 1900] };
-  var doorFx = { active: false, reduced: false, done: false, snap: null, canvas: null, elapsed: 0, timeline: DOOR_T,
-    raf: 0, timer: 0, token: 0 };
-  function seg(ms, r) { return Math.max(0, Math.min(1, (ms - r[0]) / (r[1] - r[0]))); }
-  function doorProgress(ms) {
-    return { key: seg(ms, DOOR_T.key), chains: seg(ms, DOOR_T.chains), open: seg(ms, DOOR_T.open),
-      pan: seg(ms, DOOR_T.pan), box: seg(ms, DOOR_T.box) };
-  }
-  function finishDoorFx() {
-    doorFx.token++;
-    doorFx.active = false; doorFx.done = true;
-    if (doorFx.raf) { if (window.cancelAnimationFrame) window.cancelAnimationFrame(doorFx.raf); doorFx.raf = 0; }
-    if (doorFx.timer) { clearTimeout(doorFx.timer); doorFx.timer = 0; }
-    var cv = doorFx.canvas;
-    if (cv && cv.parentNode) cv.parentNode.removeChild(cv);
-    doorFx.canvas = null;
-  }
-  function playDoorOpening(snap, e) {
-    finishDoorFx();
-    var tok = doorFx.token;
-    doorFx.snap = snap; doorFx.elapsed = 0; doorFx.done = false;
-    doorFx.reduced = !!(P.reduced && P.reduced());
-    doorFx.active = !doorFx.reduced;
-    if (doorFx.reduced) { doorFx.done = true; return; }
-    var cv = document.createElement('canvas');
-    cv.id = 'boneDoorFx';
-    cv.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:79;image-rendering:pixelated;';
-    document.body.appendChild(cv);
-    doorFx.canvas = cv;
-    var g = cv.getContext('2d');
-    var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
-    function frame(now) {
-      if (!doorFx.active || tok !== doorFx.token) return;
-      var ms = Math.max(0, Math.min(DOOR_T.box[1], now - t0)), pr = doorProgress(ms);
-      doorFx.elapsed = ms;
-      if (e) e.unlock = pr.open;
-      if (g && NEU.dungeonLook && NEU.dungeonLook.drawOpening) {
-        cv.width = window.innerWidth || 640; cv.height = window.innerHeight || 360;
-        NEU.dungeonLook.drawOpening(g, cv.width, cv.height, snap, pr);
-      }
-      if (ms >= DOOR_T.box[1]) { finishDoorFx(); return; }
-      if (window.requestAnimationFrame) doorFx.raf = window.requestAnimationFrame(frame);
-      else doorFx.timer = setTimeout(function () { frame(t0 + ms + 16); }, 16);
-    }
-    if (window.requestAnimationFrame) doorFx.raf = window.requestAnimationFrame(frame);
-    else doorFx.timer = setTimeout(function () { frame(t0); }, 16);
-  }
 
   function enterDungeon(opts) {
     var id = typeof opts === 'string' ? opts : (opts && opts.id) || 'd0';
@@ -892,7 +931,9 @@
       }
     },
     zones: zones, lifts: lifts, zoneAt: zoneAt,
-    doorFx: doorFx, doorProgress: doorProgress, finishDoorFx: finishDoorFx,
+    chamber: CH, rematchOn: rematchOn,
+    /* the bone door: open / seal (instant skips the animation) and its state, 'closed' | 'opening' | 'open' | 'closing' */
+    gate: { state: gateState, open: function (instant) { gateTo(true, instant); }, seal: function (instant) { gateTo(false, instant); } },
     here: function () { return P.running() && P.levelId() === 'dgn' ? here : ''; },
     spawnPx: function (id) { var n = dN(id); return n < 0 ? null : px(zones[n].spawn); },
     savePx: function () { return px(save); },
@@ -903,6 +944,7 @@
   if (window.addEventListener) window.addEventListener('keydown', function (e) {
     if (!P.running() || P.levelId() !== 'dgn' || P.replaying() || e.repeat) return;
     if (NEU.tboxOpen && NEU.tboxOpen()) return;
+    if (NEU.dgnPolt && NEU.dgnPolt.on && NEU.dgnPolt.on()) return;   /* the fight owns the keys; its map stays shut */
     if (NEU.kernel && NEU.kernel.current && NEU.kernel.current() !== 'plat') return;
     /* routed() has already turned the player's bound key into 'e' */
     if (String(e.key).toLowerCase() !== 'e') return;

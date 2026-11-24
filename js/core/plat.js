@@ -11,7 +11,8 @@
     stamina: 110, climbUp: 45.45, climbStill: 10, climbJump: 27.5, climbUpV: -90, climbDownV: 160, climbSlip: 60, climbAccel: 1800,
     grabY: 0.2, hopY: -240, hopX: 200, hopForce: 0.2, boostTime: 0.2, climbNoMove: 0.1, buffer: 0.08, spring: -370, springVar: 0.2,
     duckX: 1.25, duckY: 0.5, slideMult: 1.2, pogo: -280, swing: 0.15, hurtInv: 0.67, kbX: 270, kbY: -210, dashI: 0.25,
-    meleeCharge: 0.4, meleeFull: 1.0 };
+    meleeCharge: 0.4, meleeFull: 1.0,
+    flightSpeed: 300, flightAccel: 1800 };   /* free 8-way flight a boss level can switch on (P.setFlight): 5 px/frame, our constant */
   var levels = {}, kinds = {}, current = null, live = false, paused = false, replaying = false;
   var canvas = document.getElementById('platCanvas'), overlay = document.getElementById('plat');
   var ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
@@ -33,7 +34,7 @@
       maxFall: C.maxFall, dashTime: 0, dashCd: 0, refillCd: 0, dashAttack: 0, dashX: 0, dashY: 0, duck: false,
       wallSlide: C.slideTime, slideDir: 0, wallBoost: 0, boostDir: 0, forceX: 0, forceDir: 0, climbNoMove: 0, lastClimb: 0,
       swing: 0, pogo: false, squash: 0, stretch: 0, walked: 0, hp: 0, inv: 0, hopWait: 0,
-      meleeHold: 0, charging: false, chargeK: 0, swingPow: 1, swingDown: false, hitStop: 0, hurtFlash: 0 };
+      meleeHold: 0, charging: false, chargeK: 0, swingPow: 1, swingDown: false, hitStop: 0, hurtFlash: 0, flying: false, hold: false };
   }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function sign(v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
@@ -174,7 +175,7 @@
   function touchEntities(input, melee) {
     var i, e, ex, ey, dx, dy, kind;
     for (i = 0; i < current.entities.length; i++) {
-      e = current.entities[i]; if (e.dead || (e.t === 'refill' && e.t0 > 0)) continue;
+      e = current.entities[i]; if (e.dead || e.celOwn || (e.t === 'refill' && e.t0 > 0)) continue;
       ex = (e.x + 0.5) * TILE; ey = (e.y + 1) * TILE;
       dx = Math.abs(player.x - ex); dy = Math.abs((player.y - HH / 2) - (ey - 8));
       if (dx > 22 || dy > (e.t === 'painting' ? 48 : 24)) continue;
@@ -290,6 +291,16 @@
     }
     if (player.jumpBuf > 0) { if (player.coyote > 0) jump(mx); else wallJumps(input, mx); }
   }
+  /* a boss level's free flight: 8-way, no gravity, the dash still works and refills in the air */
+  function flight(dt, input, mx, my) {
+    var tx = mx * C.flightSpeed, ty = my * C.flightSpeed, a = C.flightAccel * dt;
+    if (mx) player.face = mx;
+    if (player.dashes < 1 && player.dashCd <= 0) player.dashes = 1;
+    if (canDash()) { startDash(mx, my); return; }
+    if (mx && my) { tx *= 0.7071; ty *= 0.7071; }
+    player.vx = approach(player.vx, tx, a); player.vy = approach(player.vy, ty, a);
+    player.onGround = false; player.varJump = 0;
+  }
   function climb(dt, input, mx, my) {
     var target = 0, slip = false;
     player.climbNoMove -= dt;
@@ -345,11 +356,11 @@
     var x0 = Math.floor((player.x + player.vx * STEP - HW) / TILE), x1 = Math.floor((player.x + player.vx * STEP + HW) / TILE);
     var y0 = Math.floor((player.y + player.vy * STEP - HH) / TILE), y1 = Math.floor((player.y + player.vy * STEP - 1) / TILE), tx, ty, broke = false;
     for (ty = y0; ty <= y1; ty++) for (tx = x0; tx <= x1; tx++)
-      if (cell(tx, ty) === 'x') { if (!current.broken) current.broken = {}; current.broken[tx + ',' + ty] = true; broke = true; dropChunk(tx, ty); }
+      if (cell(tx, ty) === 'x') { if (!current.broken) current.broken = {}; current.broken[tx + ',' + ty] = true; broke = true; dropChunk(tx, ty); if (cel) NEU.cel.setCell(tx, ty, ''); }
     if (broke && !current.chunked) { delete bakeCache[current.id]; bake(); }
   }
   function step(dt, raw) {
-    var input = parseInput(raw), prev = player.prev, mx, my, i, e;
+    var input = parseInput(raw), prev = player.prev, mx, my, i, e, cl = !!cel;
     ticked = false;
     if (!current || current.exited) return getState();
     /* D4: during the level slide the hero is held in place — a Celeste-style
@@ -372,20 +383,23 @@
       if (!player.dead) { if (!replaying && current.onDeath && current.onDeath() !== false) return getState(); respawn(); }
       return getState();
     }
+    if (player.hold) input = {};   /* a level's soul section holds the hero where he stands: no walking, swinging or dashing underneath it */
     player.jumpBuf = input.jump && !prev.jump ? C.buffer : Math.max(0, player.jumpBuf - dt);
     player.dashBuf = input.dash && !prev.dash ? C.buffer : Math.max(0, player.dashBuf - dt);
     player.meleeBuf = input.melee && !prev.melee ? C.buffer : Math.max(0, player.meleeBuf - dt);
     player.dashCd = Math.max(0, player.dashCd - dt); player.dashAttack = Math.max(0, player.dashAttack - dt);
     player.inv = Math.max(0, player.inv - dt); player.swing = Math.max(0, player.swing - dt);
     if (player.slideDir) { player.wallSlide = Math.max(0, player.wallSlide - dt); player.slideDir = 0; }
+    if (!cl) {
     player.onGround = player.vy >= 0 && blocked(player.x, player.y + 1, 1, player.y);
     if (player.onGround) { player.stamina = C.stamina; player.wallSlide = C.slideTime; player.coyote = C.coyote; player.pogo = false; }
     else player.coyote = Math.max(0, player.coyote - dt);
     if (player.refillCd > 0) player.refillCd -= dt; else if (player.onGround) refill();
     if (player.varJump > 0) player.varJump = Math.max(0, player.varJump - dt);
+    }
     mx = (input.right ? 1 : 0) - (input.left ? 1 : 0); my = (input.down ? 1 : 0) - (input.up ? 1 : 0);
-    if (player.forceX > 0) { player.forceX -= dt; mx = player.forceDir; }
-    if (player.wallBoost > 0) {
+    if (!cl && player.forceX > 0) { player.forceX -= dt; mx = player.forceDir; }
+    if (!cl && player.wallBoost > 0) {
       player.wallBoost -= dt;
       if (mx && mx === player.boostDir) { player.vx = C.wallH * mx; player.stamina += C.climbJump; player.wallBoost = 0; }
     }
@@ -397,17 +411,22 @@
     player.chargeK = player.charging ? clamp((player.meleeHold - C.meleeCharge) / (C.meleeFull - C.meleeCharge), 0, 1) : 0;
     if (meleeUp && wasHold >= C.meleeFull && current.swing) doSwing(my === 1, true);
     if (player.meleeBuf > 0 && player.swing <= 0) { player.meleeBuf = 0; doSwing(my === 1, false); }
-    if (player.st === 1) climb(dt, input, mx, my);
+    if (player.hold) { player.vx = player.vy = 0; player.st = 0; }
+    else if (cl) { if (player.st === 2) breakBlocks(); celMove(dt, input); }
+    else if (player.st === 1) climb(dt, input, mx, my);
     else if (player.st === 2) dashing(dt, input, mx);
+    else if (player.flying) flight(dt, input, mx, my);
     else normal(dt, input, mx, my);
+    if (!cl) {
     if (player.st === 2) breakBlocks();
     i = player.vy > 0; moveX(player.vx * dt);
     if (moveY(player.vy * dt) && i && player.vy === 0) player.squash = 0.12;
+    }
     if (player.swing > 0 && my === 1 && player.vy >= 0 && !player.onGround && pogo()) {}
     else spikes();
     if (NEU.dungeon) NEU.dungeon._liftLock = false;
     touchEntities(input, player.swing === C.swing);
-    for (i = 0; i < current.entities.length; i++) { e = current.entities[i]; if (kinds[e.t] && kinds[e.t].tick) kinds[e.t].tick(e, dt); }
+    for (i = 0; i < current.entities.length; i++) { e = current.entities[i]; if (kinds[e.t] && kinds[e.t].tick && !e.celOwn) kinds[e.t].tick(e, dt); }
     if (current.tick) current.tick(dt);
     ticked = true;
     if (player.x < -24 || player.y > current.h * TILE + 64) die();
@@ -416,6 +435,72 @@
     for (i = afterimages.length - 1; i >= 0; i--) { afterimages[i].t -= dt; if (afterimages[i].t <= 0) afterimages.splice(i, 1); }
     placeCamera(reduced ? -2 : (current.view === 'terraria' && (Math.abs(player.x - prevX) > 48 || Math.abs(player.y - prevY) > 48) ? -1 : dt));
     return getState();
+  }
+  /* CEL HOST: a level with cel:true moves the hero on NEU.cel (js/core/cel.js, the frame-exact Celeste kernel the cel.html route plays);
+     plat keeps hearts, foes, the kit, the camera and the paint. One plat tile is one 8 px cel tile, plat px = 2 x cel px, hero 16x22 = 8x11. */
+  /* plat entities the cel kernel owns outright: it draws, collides and runs them (the cel.html assets); plat skips them */
+  var CELKIND = {
+    refill: function (e) { return { t: 'refill', x: e.x * 8 + 4, y: e.y * 8 + 4 }; },
+    spring: function (e) { return { t: 'spring', o: 'F', use: true, x: e.x * 8 + 4, y: e.y * 8 + 8 }; },
+    dgncrumb: function (e) { return { t: 'crumble', x: e.x * 8, y: e.y * 8, w: 8, h: 8 }; },
+    chainplat: function (e) {
+      var sw = (e.sw || 2) * 8;
+      return { t: 'movingPlatform', x: e.ax * 8 - sw - 4, y: e.ay * 8, nx: e.ax * 8 + sw - 4, ny: e.ay * 8, w: 16, h: 8,
+        spd: Math.max(8, Math.round(16 * (e.sw || 2) * (e.spd || 1.5) / Math.PI)), at0: 0.5 + 0.49 * Math.sin(e.phase || 0) };
+    }
+  };
+  var cel = null;   /* { map, puppets: [{ e, c }], sync: {x,y,vx,vy,dashes} } while a cel level runs */
+  function celMap() {
+    var rows = [], ents = [], x, y, r, ch, i, e, pu = [], k;
+    for (y = 0; y < current.h; y++) {
+      r = '';
+      for (x = 0; x < current.w; x++) { ch = cell(x, y); r += solidCell(ch) ? 'A' : '0'; if (ch === '=') ents.push({ t: 'jumpThru', x: x * 8, y: y * 8, w: 8 }); }
+      rows.push(r);
+    }
+    for (i = 0; i < current.entities.length; i++) {
+      e = current.entities[i];
+      if (CELKIND[e.t] && !e.dead) { e.celOwn = true; e.solid = false; ents.push(CELKIND[e.t](e)); continue; }
+      if (e.solid && !e.celOwn) { pu.push({ e: e }); ents.push({ t: 'puppet', x: e.x * 8, y: e.y * 8, w: 8, h: 8, pid: pu.length - 1 }); } }
+    for (i = 0; i < (current.celEnts || []).length; i++) { e = {}; for (k in current.celEnts[i]) e[k] = current.celEnts[i][k]; ents.push(e); }
+    return { map: { id: 'plat:' + current.id, rooms: [{ name: 'plat', x: 0, y: 0, w: current.w * 8, h: current.h * 8, fg: rows, bg: [], dark: false, down: false,
+      spawns: [[(current.spawn.x + 0.5) * 8, (current.spawn.y + 1) * 8]], ents: ents, trig: [] }] }, puppets: pu };
+  }
+  function celBoot() {
+    var m = celMap();
+    current.solids = current.entities.filter(function (e) { return e.solid; });
+    celAttach(m);
+  }
+  /* start the kernel on a built map and keep the hero's speed and charge (a carried dash from open opts.carry, or a replay handing the live level back) */
+  function celAttach(m) {
+    var C_ = NEU.cel, i, j, v = { sx: player.vx / 2, sy: player.vy / 2, dashes: player.dashes };
+    C_.start(m.map, { intro: false }); C_.put(v);
+    for (i = 0; i < C_.ents.length; i++) if (C_.ents[i].t === 'puppet') m.puppets[C_.ents[i].pid].c = C_.ents[i];
+    cel = { map: m.map, puppets: m.puppets, sync: null };
+    for (j = 0; j < m.puppets.length; j++) m.puppets[j].c.coll = !m.puppets[j].e.dead;
+    celPull();
+  }
+  function celPull() {
+    var cp = NEU.cel.player, was = player.onGround, S = NEU.cel.STATES;
+    player.x = cp.x * 2; player.y = cp.y * 2; player.vx = cp.sx * 2; player.vy = cp.sy * 2; player.face = cp.facing;
+    player.onGround = !!cp.onGround; player.dashes = cp.dashes; player.stamina = cp.stamina;
+    player.st = cp.st === S.DASH ? 2 : cp.st === S.CLIMB ? 1 : 0; player.duck = cp.hb[1] < 11;
+    if (player.onGround && !was && player.vy === 0) player.squash = 0.12;
+    if (was && cel.sync && cel.sync.vy >= 0 && player.vy < 0) player.stretch = 0.12;   /* a jump, a spring, a wall kick: the take-off pose */
+    cel.sync = { x: player.x, y: player.y, vx: player.vx, vy: player.vy, dashes: player.dashes, face: player.face };
+  }
+  function celMove(dt, input) {
+    var C_ = NEU.cel, s = cel.sync, i, pu, o = {}, any = false;
+    if (player.x !== s.x) { o.x = player.x / 2; any = true; }
+    if (player.y !== s.y) { o.y = player.y / 2; any = true; }
+    if (player.vx !== s.vx) { o.sx = player.vx / 2; o.free = true; any = true; }
+    if (player.vy !== s.vy) { o.sy = player.vy / 2; o.free = true; any = true; }
+    if (player.dashes !== s.dashes) { o.dashes = player.dashes; any = true; }
+    if (player.face !== s.face) { o.facing = player.face; any = true; }
+    if (any) C_.put(o);
+    for (i = 0; i < cel.puppets.length; i++) { pu = cel.puppets[i]; if (pu.e.dead) pu.c.coll = false; else C_.puppetTo(pu.c, pu.e.x * 8, pu.e.y * 8); }
+    C_.step({ L: input.left, R: input.right, U: input.up, D: input.down, J: input.jump, X: input.dash, G: input.grab });
+    celPull();
+    if (C_.player.dead && !player.dead) die();
   }
   function getState() { return { x: player.x, y: player.y, vx: player.vx, vy: player.vy, face: player.face, st: player.st,
     dashes: player.dashes, onGround: player.onGround, stamina: player.stamina, dead: player.dead > 0, hp: player.hp, inv: player.inv > 0,
@@ -445,6 +530,7 @@
     player.dashes = 1; player.st = 0; player.hp = current.hp || 0;
     player.wipe = current.quickRespawn ? 0.07 : WIPE;
     simClock = 0;
+    if (current.cel && NEU.cel) celBoot();
     if (current.onRespawn) current.onRespawn();
     if (current.cameraMode === 'mountain' || current.tileset === 'dungeon') placeCamera(-1);
   }
@@ -538,7 +624,7 @@
     camera.x += (tx - camera.x) * kx; camera.y += (ty - camera.y) * ky;
   }
   function placeCamera(dt) {
-    var worldH = current.h * TILE, worldW = current.w * TILE, tx, ty, k, cfg;
+    var worldH = current.h * TILE, worldW = (current.camW ? current.camW(player) : current.w) * TILE, tx, ty, k, cfg;   /* camW: a level may stop the camera short of its far edge */
     if (current.cameraMode === 'arena') {
       /* Bullet-hell arena: per-room mode on the one camera, never a second
          global. 16x16 deadzone, 12-24 px look-ahead, frame-rate-independent
@@ -657,10 +743,11 @@
     ctx.globalAlpha = 1;
     for (i = 0; i < L.entities.length; i++) {
       e = L.entities[i];
-      if (e.dead && e.t !== 'crumble') continue;
+      if ((e.dead && e.t !== 'crumble') || e.celOwn) continue;
       if (e.x * TILE - cx < area.x0 - 48 || e.x * TILE - cx > area.x1 + 16 || e.y * TILE - cy < area.y0 - 64 || e.y * TILE - cy > area.y1 + 16) continue;
       drawEntity(e, ctx, cx, cy, now);
     }
+    if (cel && NEU.celView) NEU.celView.drawEnts(ctx, cx, cy, 2);
     if (L.draw) L.draw(ctx, cx, cy, now);
     if (player.dead <= 0) {
       if (player.onGround) {
@@ -990,6 +1077,7 @@
     else if (bakeCache[id]) baked = bakeCache[id]; else { bake(); bakeCache[id] = baked; }
     sizeView(Math.round((window.innerWidth || 640) * (window.devicePixelRatio || 1)), Math.round((window.innerHeight || 360) * (window.devicePixelRatio || 1)));
     placeCamera(-1);
+    cel = null; if (current.cel && NEU.cel) celBoot();
     if (current.onOpen) current.onOpen(opts);
     prevX = player.x; prevY = player.y; prevCamX = camera.x; prevCamY = camera.y;
     draw();
@@ -1032,7 +1120,7 @@
     if (!live) return;
     if (NEU.boss) NEU.boss.close('plat');
     clearLevelSlide();
-    live = false;
+    live = false; cel = null;
     if (overlay) overlay.hidden = true;
     if (current && current.onClose) current.onClose();
     if (NEU.activeMinigame === 'plat') NEU.activeMinigame = null;
@@ -1043,7 +1131,7 @@
     /* dt arrives in ms (kernel rAF delta); convert to seconds before the 0.25 s clamp, or every frame adds 0.00025 s and the hero never moves */
     accumulator += Math.min(0.25, Math.max(0, dt) / 1000) * (current.slow ? current.slow() : 1);
     var n = 0;
-    while (accumulator >= STEP && n++ < MAX_STEPS && live) { step(STEP, keys); accumulator -= STEP; }
+    while (accumulator >= STEP && n++ < MAX_STEPS && live) { step(STEP, current.assist ? current.assist(keys) || keys : keys); accumulator -= STEP; }   /* a level's assist (the Bot tier) may speak for the hero when no real key is held */
     if (levelSlide && NEU.engineTrans && NEU.engineTrans.active) NEU.engineTrans.step(dt / 1000);
     draw();
   }
@@ -1051,7 +1139,7 @@
     var oldLevel = current, oldPlayer = player, oldLive = live, oldPaused = paused;
     var oldAccumulator = accumulator, oldClock = simClock, oldImages = afterimages, oldBaked = baked;
     var oldStack = NEU.kernel ? NEU.kernel.stack.slice() : null;
-    var oldMini = NEU.activeMinigame, oldSlide = levelSlide;
+    var oldMini = NEU.activeMinigame, oldSlide = levelSlide, oldCel = cel;
     replaying = true;
     levelSlide = null;
     if (!open(id, opts)) { replaying = false; levelSlide = oldSlide; return { reached: false, deaths: 0, frames: 0 }; }
@@ -1064,6 +1152,8 @@
     var reached = !!current.exited, end = getState();
     replaying = false;
     live = oldLive; current = oldLevel; player = oldPlayer; paused = oldPaused;
+    cel = null;
+    if (oldCel && NEU.cel) { var cx0 = player.x, cy0 = player.y; celAttach(oldCel); NEU.cel.put({ x: cx0 / 2, y: cy0 / 2 }); celPull(); }   /* the live level's kernel comes back where the hero stands */
     accumulator = oldAccumulator; simClock = oldClock; afterimages = oldImages; baked = oldBaked; levelSlide = oldSlide;
     if (oldStack && NEU.kernel) { NEU.kernel.stack.length = 0; for (i = 0; i < oldStack.length; i++) NEU.kernel.stack.push(oldStack[i]); }
     NEU.activeMinigame = oldMini;
@@ -1110,7 +1200,7 @@
     if (e.wait > 0) { e.wait -= dt; return; }
     tx = e.returning ? e.sx : (e.targetX == null ? e.sx : e.targetX); ty = e.returning ? e.sy : (e.targetY == null ? e.sy - 4 : e.targetY);
     e.x = approach(e.x, tx, dt * 3); e.y = approach(e.y, ty, dt * 3);
-    if (ride) { player.x += (e.x - ox) * TILE; player.y += (e.y - oy) * TILE; }
+    if (ride && !cel) { player.x += (e.x - ox) * TILE; player.y += (e.y - oy) * TILE; }
     if (Math.abs(e.x - tx) < 0.05 && Math.abs(e.y - ty) < 0.05) { if (e.returning) e.go = false; else e.returning = true; }
   } };
   /* BLUE WING (WO-DGN): a hanging lamp/chains that swings as a moving platform and
@@ -1121,7 +1211,7 @@
     e.ph += dt * (e.spd || 1.5);
     e.x = e.ax + Math.sin(e.ph) * (e.sw || 2);
     e.y = e.ay + (1 - Math.cos(e.ph)) * (e.drop || 0.25);
-    if (feetOn(e)) { player.x += (e.x - ox) * TILE; player.y += (e.y - oy) * TILE; }
+    if (feetOn(e) && !cel) { player.x += (e.x - ox) * TILE; player.y += (e.y - oy) * TILE; }
   }, draw: function (c, px, py, e) {
     var i;
     for (i = 1; i <= 7; i++) fr(c, px + 7, py - i * TILE, 2, 6, i & 1 ? '#6A6878' : '#9A98A8');
@@ -1204,9 +1294,11 @@
     view: function () { return { w: view.w, h: view.h, scale: view.scale }; },
     backdrop: null, live: null, foreground: null, hud: null, skin: null,
     get state() { return getStateSafe(); }, step: step, replay: replay, tick: tick,
+    setHold: function (on) { if (player) { player.hold = !!on; if (on) { player.vx = player.vy = 0; player.st = 0; } } }, holding: function () { return !!(player && player.hold); },
+    setFlight: function (on) { if (player) { player.flying = !!on; if (!on) player.vy = Math.max(player.vy, 0); } }, flying: function () { return !!(player && player.flying); },
     hurt: hurt, die: die, heal: function (n) { if (current && current.hp) player.hp = Math.min(current.hp, player.hp + n); },
     grantInvuln: function (s) { if (player) player.inv = Math.max(player.inv || 0, s || 0); },
-    hero: function () { return player; }, level0: function () { return current; },
+    hero: function () { return player; }, celOn: function () { return !!cel; }, level0: function () { return current; },
     wind: windNow, time: function () { return simClock; },
     restartRoom: function () { if (!current) return false; respawn(); return true; },
     solid: function (tx, ty) { return !!current && solidCell(cell(tx, ty)); }, cell: function (tx, ty) { return current ? cell(tx, ty) : '#'; },

@@ -566,16 +566,21 @@
     return Math.min(480, w - 200) | 0;
   }
 
-  function hud(ctx, F, o) {
-    ctx.font = FONT; ctx.textBaseline = 'top';
+  /* The white chip behind the boss fill lags a hit, then drains. F needs { clock, hudAt, chip, hitAt }; returns the life ratio. */
+  function trail(F, o) {
     var r = Math.max(0, Math.min(1, o.hp / o.max));
     var d = Math.max(0, F.clock - F.hudAt); F.hudAt = F.clock;
     if (r > F.chip) F.chip = r;
     else if (F.clock - F.hitAt > 0.4) F.chip = Math.max(r, F.chip - d * 0.6);
-    /* panelOnly: fights with their own boss bar still use the YOU panel.
-       The bar, name and percentage are skipped; the player panel and the
-       screen-reader line below are shared. */
-    if (!o.panelOnly) {
+    return r;
+  }
+
+  /* The top-centre boss bar: a Calamity frame, red fill (gold while shielded), a trailing chip, phase ticks, name left and percent right.
+     One look for every fight (Scal, the Console, Draedon and the dungeon's Polterghast); a host without a danmaku field passes its own
+     { clock, hudAt, chip, hitAt }. o = { w, name, hp, max, ticks, invuln, glitch }. */
+  function bossBar(ctx, F, o) {
+    var r = trail(F, o);
+    ctx.font = FONT; ctx.textBaseline = 'top';
     var bw = barW(o.w), bx = ((o.w - bw) / 2) | 0, by = 36;
     var inv = !!o.invuln;
     ctx.fillStyle = '#05050A'; ctx.fillRect(bx - 4, by - 4, bw + 8, 20);
@@ -597,7 +602,16 @@
     var glx = (o.glitch && !still) ? ((Math.floor(F.clock * 2) & 1) ? 2 : -2) : 0;
     ctx.textAlign = 'left'; ctx.fillText(o.name, bx + glx, by - 24);
     ctx.textAlign = 'right'; ctx.fillText(Math.ceil(r * 100) + '%', bx + bw, by - 24);
-    }
+  }
+
+  function hud(ctx, F, o) {
+    ctx.font = FONT; ctx.textBaseline = 'top';
+    /* panelOnly: fights with their own boss bar still use the YOU panel.
+       The bar, name and percentage are skipped; the player panel and the
+       screen-reader line below are shared. */
+    if (!o.panelOnly) {
+      bossBar(ctx, F, o);
+    } else trail(F, o);
 
     var pw = Math.min(300, o.w - 64), ph = 48;
     var px = ((o.w - pw) / 2 + 12) | 0;
@@ -704,7 +718,7 @@
     adrenaline: adrenaline, rage: rage, soulMode: soulMode,
     stageLook: stageLook,
     glow: glow, drawBullet: drawBullet, drawFX: drawFX, drawFlash: drawFlash,
-    hud: hud, barW: barW,
+    hud: hud, bossBar: bossBar, barW: barW,
     DASH_CD: DASH_CD, ADREN_ON: ADREN_ON,
     TAP: 0,      /* double-tap window, s; 0 = off: X is the only dash */
     soul: {

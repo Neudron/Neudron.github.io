@@ -295,7 +295,7 @@
     H: ['101', '101', '111', '101', '101'], I: ['111', '010', '010', '010', '111'], N: ['101', '111', '111', '111', '101'],
     D: ['110', '101', '101', '101', '110'], L: ['100', '100', '100', '100', '111'], P: ['110', '101', '110', '100', '100'],
     R: ['110', '101', '110', '101', '101'], S: ['011', '100', '010', '001', '110'], V: ['101', '101', '101', '101', '010'],
-    '|': ['010', '010', '010', '010', '010']
+    '|': ['010', '010', '010', '010', '010'], '0': ['111', '101', '101', '101', '111']
   };
   function word(R, text, cx, y, col, gap) {
     var sp = gap || 4, w = text.length * sp - 1, x0 = Math.round(cx - w / 2);
@@ -1187,6 +1187,19 @@
       g.globalAlpha = 1;
     },
     light: function () { return { r: 34, col: '#B892FF', glow: 0.12 }; }
+  };
+  /* the soot between the thrones; the zero shows once the nova has burned it clean (flag throne_zero) */
+  skins.scorch = {
+    width: 0,
+    draw: function (g, e, d) {
+      var seen = !!(d.api && d.api.flagged && d.api.flagged('throne_zero'));
+      blit(g, sprite('scorch' + (seen ? 'z' : ''), 26, 20, 13, 12, function (R) {
+        var rows = GL['0'], y, x;
+        R(-9, -10, 18, 10, '#0A0810'); R(-7, -12, 14, 2, '#14101C'); R(-10, -6, 2, 4, '#14101C'); R(8, -7, 2, 5, '#14101C');
+        if (seen) for (y = 0; y < 5; y++) for (x = 0; x < 3; x++) if (rows[y].charAt(x) === '1') R(-4 + x * 3, -9 + y * 2, 3, 2, '#B892FF');
+      }), d);
+    },
+    light: function (e, d) { return d && d.api && d.api.flagged && d.api.flagged('throne_zero') ? { r: 30, col: '#B892FF', glow: 0.16 } : null; }
   };
   skins.wordstone = {
     width: 0,

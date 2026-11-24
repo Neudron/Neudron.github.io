@@ -169,7 +169,8 @@ for (const f of [shell[0], game[0], scene[0], 'index.html']) {
   console.log('     ' + f.padEnd(34) + kb(fs.statSync(path.join(DIST, f)).size).padStart(8) +
     ' raw  ' + kb(gz(f)).padStart(8) + ' gzip');
 }
-if (fs.statSync(path.join(DIST, game[0])).size > 1500 * 1024) fail('game chunk over 1.5MB');
+/* GitHub limits only (owner decision 2026-11-09): a file must stay under 50 MiB */
+if (fs.statSync(path.join(DIST, game[0])).size > 50 * 1024 * 1024) fail('game chunk over 50 MiB');
 if (fs.statSync(path.join(DIST, shell[0])).size > 400 * 1024) fail('shell chunk over 400KB');
 
 if (process.exitCode) { console.error('\nARTIFACT VERIFY FAILED'); process.exit(1); }

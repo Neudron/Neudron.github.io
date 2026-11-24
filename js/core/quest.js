@@ -194,9 +194,11 @@
     /* Later acts register their own steps rather than this file
        knowing about content it has never seen. Idempotent, because the
        console tile can be clicked twice. */
-    add: function (step, group) {
-      for (var i = 0; i < STEPS.length; i++) if (STEPS[i].id === step.id) return;
-      STEPS.push(step);
+    add: function (step, group, after) {
+      var at = -1, i;
+      for (i = 0; i < STEPS.length; i++) if (STEPS[i].id === step.id) return;
+      for (i = 0; i < STEPS.length; i++) if (STEPS[i].id === after) at = i;
+      if (at >= 0) STEPS.splice(at + 1, 0, step); else STEPS.push(step);
       if (group) {
         if (GROUPS.indexOf(group) < 0) GROUPS.push(group);
         GROUP_OF[step.id] = group;
@@ -253,7 +255,7 @@
 
   /* The photograph points here. Added when the compartment is taken,
      so the list does not name the garage before the picture exists. */
-  NEU.quest.garage = { id: 'a4_garage', text: 'the city garage' };
+  NEU.quest.garage = { id: 'a4_garage', text: 'the city garage', flag: 's0_seen' };
 
   /* Every tick writes through. Cheap — save.js coalesces. */
   (function (q) {

@@ -671,16 +671,22 @@
     draw(nowMs);
   }
 
-  function win() {
-    running = false; mode = 'won'; bullets = []; release = RELEASE_F;
-    if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', -1);
-    if (NEU.juice) { NEU.juice.hit('huge', { colour: '#7FE3C4', shake: cap('huge') });
-                     NEU.juice.burst(bx, by, 60, COL.ecto, 260); }
+  /* the one place a kill is recorded: the soul fight and the dungeon fight (dgn-polt.js) both end here, so
+     polt_dead and tv_restored keep a single author. Idempotent: every effect is a flag or a one-shot. */
+  function finish() {
     if (NEU.save) NEU.save.flag('polt_dead', 1);
     if (NEU.save) NEU.save.flag('tv_restored', 1);
     if (NEU.restoreTV) NEU.restoreTV();
     showTvCard();
     if (NEU.quest) NEU.quest.mark('a4_polt');
+  }
+
+  function win() {
+    running = false; mode = 'won'; bullets = []; release = RELEASE_F;
+    if (NEU.music && NEU.music.bossPhase) NEU.music.bossPhase('polt', -1);
+    if (NEU.juice) { NEU.juice.hit('huge', { colour: '#7FE3C4', shake: cap('huge') });
+                     NEU.juice.burst(bx, by, 60, COL.ecto, 260); }
+    finish();
     draw(performance.now());
     /* the shatter plays AFTER the save, so a tab closed mid-beat keeps
        the kill. Seen once, it is skippable. */
@@ -1397,7 +1403,7 @@
     running: function () { return running || !!dying || release > 0; }
   });
 
-  NEU.polt = { open: open, close: close, win: win,
+  NEU.polt = { open: open, close: close, win: win, finish: finish,
                /* B4 review surface: boss scale, arena depth and the
                   reduced-motion gate are observable from tests. */
                get scale() { return BOSS_SCALE; },

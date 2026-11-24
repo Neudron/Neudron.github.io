@@ -18,7 +18,8 @@ const MODE_EDGES = [
   { from: 'p1_tavern', to: 'm0', spawn: null, via: 'mode', mode: 'platform' },
   { from: 'm7', to: 'p1_tavern', spawn: null, via: 'mode', mode: 'platform' },
   { from: 'd_city', to: 'dgn', spawn: null, via: 'mode', mode: 'dungeon' },
-  { from: 'dgn', to: 'd_city', spawn: null, via: 'mode', mode: 'dungeon' }
+  { from: 'dgn', to: 'd_city', spawn: null, via: 'mode', mode: 'dungeon' },
+  { from: 'dgn', to: 'z0_workshop', spawn: null, via: 'mode', mode: 'elevator' }
 ];
 // One-way routes are intentional: d3_square is the park-gate entry to the city end (rooms-d.js:290-294); e1_hall routes there (rooms-d.js:407).
 // The bed exit changes from woods to hall after home is reached (rooms-e.js:298-301); that redirect is the declared `alt` on the exit (rooms-e.js:334).
@@ -26,6 +27,7 @@ const MODE_EDGES = [
 // The Exo arena is entered by the scripted fight sequence (rooms-s.js:776); its hatch exits to the foyer (rooms-s.js:871).
 // Platform ascent and the tavern exits intentionally move forward or return to the woods.
 const ONE_WAY = new Set([
+  'a1_hollow>wex_hollow_trunk', 'z0_workshop>wex_savanna_01', 'dgn>z0_workshop',
   'p1_tavern>m0', 'm7>p1_tavern',
   'p1_tavern>a_woods',
   'e1_hall>d3_square', 'e6_room>a_woods', 'e6_room>e3_hall',

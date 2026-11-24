@@ -293,6 +293,16 @@
      puts a hooded figure on the cold campfire; they have no face,
      only two pale eyes, and one line about a painting. The list is a
      getter so the flag is read on each visit, not at load. */
+  /* the root across the gap north of the campfire: it wants the axe, nothing else */
+  function rootChop(c) {
+    if (!c.has('axe')) {
+      say(c, ['a root has grown across a gap in the trees.', 'it is thicker than your arm. something sharp would do.']);
+      return;
+    }
+    c.flag('a1_root', 1);
+    if (NEU.juice && NEU.juice.hit) NEU.juice.hit('medium');
+    say(c, ['you put the axe through the root. it gives.', 'behind it, a gap just wide enough.']);
+  }
   function a1Entities() {
     var list = woodsLook(13).concat([
       { t: 'save', x: 6, y: 5 },
@@ -300,6 +310,7 @@
         lines: ['a signpost. the writing has run.',
                 'you can make out one word. "ahead".'] },
       { t: 'exit', x: 23, y: 7, to: 'a2_path', spawn: 'west', style: 'tunnel' },
+      { t: 'exit', x: 14, y: 2, to: 'a1_hollow', spawn: 'south', style: 'tunnel', locked: 'a1_root', run: rootChop },
       P('moon', 10, 7),
       P('campfire', 13, 4, { solid: true }),
       P('lantern', 12, 6, { solid: true }), P('lantern', 16, 8, { solid: true }), P('lantern', 20, 5),
@@ -546,8 +557,8 @@
   var WOODS_SRC = [
     { id: 'a1_clearing', room: A1, x: 0, y: 0, x0: 0, x1: 22, spawn: 'a1_default',
       spawns: { a1_default: { x: 10, y: 7, face: 'right' }, a1_north: { x: 10, y: 3, face: 'down' }, a1_east: { x: 22, y: 7, face: 'left' },
-                from_wex_woods_01: { x: 10, y: 2, face: 'down' } },
-      spawnMap: { default: 'a1_default', north: 'a1_north', east: 'a1_east' } },
+                from_wex_woods_01: { x: 10, y: 2, face: 'down' }, a1_hollow_back: { x: 14, y: 3, face: 'down' } },
+      spawnMap: { default: 'a1_default', north: 'a1_north', east: 'a1_east', hollow: 'a1_hollow_back' } },
     { id: 'a2_path', room: A2, x: 22, y: 4, x0: 1, x1: 24, spawn: 'a2_west',
       spawns: { a2_west: { x: 23, y: 7, face: 'right' }, a2_east: { x: 46, y: 11, face: 'left' } },
       spawnMap: { west: 'a2_west', east: 'a2_east' } },
@@ -670,6 +681,14 @@
      it, and it leads to that throne, not to hers. The door she means is
      in the east wall, between the columns, and it stays shut until she
      has finished talking. */
+  /* the soot between the thrones: a zero is cut under it. Only the grave nova burns it clean, once. */
+  function throneZero(c) {
+    if (c.flagged('throne_zero')) { say(c, ['a 0, cut into the stone. older than the thrones.']); return; }
+    if (!c.has('nova')) { say(c, ['the stone between the thrones is scorched black.', 'whatever burned here burned hot.']); return; }
+    c.flag('throne_zero', 1);
+    if (NEU.juice && NEU.juice.hit) NEU.juice.hit('large', { colour: '#B892FF' });
+    say(c, ['you let the grave nova go against the soot.', 'it peels away. cut deep underneath: 0.']);
+  }
   E.register('b1_throne', {
     tileset: 'castle',
     tiles: [
@@ -712,6 +731,7 @@
           if (!c.flagged('throne2_sit')) c.say(self.lines(c), 'narr');
           if (NEU.save) NEU.save.flag('throne2_sit', 1);
         } },
+      { t: 'npc', x: 11, y: 1, colour: '#2A2030', look: 'inscription', skin: 'scorch', run: throneZero },
       { t: 'npc', x: 9, y: 3, colour: '#C2405F', key: 'witch', skin: 'witchcast',
         lines: ['...'],
         run: function (c) { witchTalk(c); } },
@@ -1834,8 +1854,47 @@
     } else c.say(['it will not open yet.'], 'narr');
   }
 
+  /* ══ A1 hollow — the root room ══════════════════════════════════
+     Behind the root north of the campfire: a small cave with two
+     stones to push onto two plates. The rule is the same as B2 but
+     smaller: each stone needs a turn. The far door is a way into the
+     deep woods and only opens once the plates hold. */
+  E.register('a1_hollow', {
+    tileset: 'woods',
+    tiles: [
+      '##########',
+      '#........#',
+      '#........#',
+      '#........#',
+      '#........#',
+      '#........#',
+      '#........#',
+      '####.#####'
+    ].join('\n'),
+    spawns: { south: { x: 4, y: 6, face: 'up' }, default: { x: 4, y: 6, face: 'up' } },
+    entities: woodsLook(8).concat([
+      { t: 'plate', x: 1, y: 1 },
+      { t: 'plate', x: 8, y: 6 },
+      { t: 'block', x: 3, y: 4, push: true },
+      { t: 'block', x: 6, y: 4, push: true },
+      { t: 'exit', x: 4, y: 7, to: 'a1_clearing', spawn: 'hollow', style: 'tunnel' },
+      { t: 'exit', x: 8, y: 0, to: 'wex_hollow_trunk', spawn: 'from_wex_moonwell_north', style: 'tunnel', locked: 'solved:a1_hollow',
+        lines: ['roots, packed tight. they shift when something heavy settles.'] }
+    ]),
+    onEnter: function (c) {
+      if (c.flagged('a1_hollow_seen')) return;
+      c.flag('a1_hollow_seen', 1);
+      say(c, ['two flat stones in the dirt. two stones on the floor.', 'push each one onto its own plate. ' + (NEU.keys ? NEU.keys.label('r') : 'r') + ' starts over.']);
+    },
+    onSolved: function (c) {
+      c.markSolved('a1_hollow');
+      if (NEU.save) { if (NEU.save.has('lance')) NEU.save.addCoins(45); else NEU.save.give('lance'); }
+      say(c, ['the roots at the north end let go.', 'something was left here in the dirt, wrapped in cloth.']);
+    }
+  });
+
   /* Locked exits: an exit with `locked` refuses until the flag is set,
      and says which room it is waiting on rather than nothing. */
-  NEU.act4Rooms = ['a1_clearing','a2_path','a3_fork','b1_throne','b2_blocks',
+  NEU.act4Rooms = ['a1_clearing','a1_hollow','a2_path','a3_fork','b1_throne','b2_blocks',
                    'b3_braziers','b4_ice','b5_two','b6_dark','b7_altar','b8_arena'];
 })();

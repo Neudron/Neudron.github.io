@@ -328,7 +328,7 @@
     reveal();
     if (!NEU.save.has('photo')) {
       NEU.save.give('photo');
-      if (NEU.quest && NEU.quest.garage) NEU.quest.add(NEU.quest.garage, 'IV the woods');
+      if (NEU.quest && NEU.quest.garage) NEU.quest.add(NEU.quest.garage, 'IV the woods', 'a4_photo');
       speak(HINTS);
     }
     NEU.save.flag('photo', 1);

@@ -8,16 +8,17 @@
    melee / ranged / heal chips. Spells show their TP cost instead.
    z 90: over every fight canvas (76-78), under .tbox (96). Reduced motion
    snaps the tween instead of animating it.
-   In the dungeon it docks to the bottom edge (.is-dock): hearts, TP, the
-   equipped slots with their key labels and the heal items you carry. Boss
-   fights keep the floating strip untouched. Only the dock takes a click
-   (a chip opens the TP strip, the same as pressing its key). */
+   In the dungeon it docks (.is-dock) as three pieces: hearts with n/n
+   bottom-centre, the TP gauge a column on the left edge and the difficulty
+   tag top-right (BOT in rainbow, swaying in 3D); the same in exploration and
+   in the Polterghast fight. No chips, key labels or heal icons there. Boss
+   fights keep the floating strip untouched. */
 
 (function () {
   'use strict';
 
   var NEU = window.NEU = window.NEU || {};
-  var el = null, fill = null, num = null, deltaEl = null, tierEl = null, chips = {}, hpEl = null, useEl = null, dock = false, hpShown = -1, hpMax = 0, useSig = '', hurtT = 0;
+  var el = null, fill = null, num = null, deltaEl = null, tierEl = null, chips = {}, hpEl = null, hpnEl = null, hpRowEl = null, useEl = null, clear = false, hs = 1, dock = false, hpShown = -1, hpMax = 0, useSig = '', hurtT = 0;
   var shown = 0, kit = null;
   var flashT = 0, last = 0, raf = 0;
 
@@ -34,9 +35,11 @@
     el = document.createElement('div');
     el.id = 'tphud'; el.className = 'tphud'; el.hidden = true;
     el.setAttribute('aria-hidden', 'true');
-    var html = '<div class="tphud__hp"></div><span class="tphud__tier"></span><div class="tphud__tp"><span class="tphud__label">TP</span>'
+    var html = '<div class="tphud__tabs"><span class="tphud__tab"></span><span class="tphud__tier"></span></div>'
+      + '<div class="tphud__stats"><div class="tphud__hprow" role="status"><span class="tphud__hl"></span><div class="tphud__hp"></div><span class="tphud__hpn"></span></div>'
+      + '<div class="tphud__tp"><span class="tphud__label">TP</span>'
       + '<div class="tphud__bar"><div class="tphud__fill"></div></div>'
-      + '<span class="tphud__num">0%</span><span class="tphud__delta"></span></div><div class="tphud__acts">';
+      + '<span class="tphud__num">0%</span><span class="tphud__delta"></span></div></div><div class="tphud__acts">';
     for (var i = 0; i < SLOTS.length; i++) {
       html += '<div class="tphud__chip" data-slot="' + SLOTS[i].key + '">'
         + '<canvas class="tphud__icon" width="16" height="16"></canvas>'
@@ -49,15 +52,24 @@
     deltaEl = el.querySelector('.tphud__delta'); tierEl = el.querySelector('.tphud__tier');
     var nodes = el.querySelectorAll('.tphud__chip');
     for (i = 0; i < nodes.length; i++) chips[SLOTS[i].key] = nodes[i];
-    hpEl = el.querySelector('.tphud__hp'); useEl = el.querySelector('.tphud__use');
+    hpRowEl = el.querySelector('.tphud__hprow'); hpEl = el.querySelector('.tphud__hp'); useEl = el.querySelector('.tphud__use'); hpnEl = el.querySelector('.tphud__hpn');
+    /* the YOU tab and the HP label read as the Console panel's: a word, or its pixel glyph under compact hints */
+    label(el.querySelector('.tphud__tab'), 'player', 'YOU'); label(el.querySelector('.tphud__hl'), 'heart', 'HP');
     el.addEventListener('click', onDockClick);
   }
 
-  /* a dock chip does what its key does: C opens (or closes) the TP strip */
+  function label(n, glyph, text) { if (NEU.glyph && NEU.glyph.put) NEU.glyph.put(n, glyph, text); else n.textContent = text; }
+
+  /* a dock chip does what its key does, and only when the key would: C opens (or closes) the TP strip, never over a dialogue, the inventory,
+     Settings or another screen. The keyboard path is C itself (the chips are not tab stops: Space is the jump). */
+  function legal() {
+    return !(NEU.tboxOpen && NEU.tboxOpen()) && !(NEU.inv && NEU.inv.isOpen && NEU.inv.isOpen()) && !(NEU.settings && NEU.settings.open_) &&
+      !(NEU.kernel && NEU.kernel.current && NEU.kernel.current() !== 'plat') && !(NEU.plat && NEU.plat.replaying && NEU.plat.replaying());
+  }
   function onDockClick(e) {
     var L = NEU.plat && NEU.plat.level0 ? NEU.plat.level0() : null;
     if (!dock || !L || !L.key || !e.target.closest || !e.target.closest('.tphud__chip, .tphud__use')) return;
-    if (e.target.closest('[data-slot="melee"], [data-slot="ranged"]')) return;
+    if (e.target.closest('[data-slot="melee"], [data-slot="ranged"]') || !legal()) return;
     L.key('c', true);
   }
 
@@ -67,7 +79,7 @@
     for (i = 0; i < SLOTS.length; i++) {
       s = SLOTS[i]; n = chips[s.key].querySelector('.tphud__key');
       t = (s.hold ? 'HOLD ' : '') + keyText(s.def);
-      if (n.textContent !== t) n.textContent = t;
+      if (n.textContent !== t) { n.textContent = t; chips[s.key].setAttribute('aria-keyshortcuts', keyText(s.def)); }
     }
   }
 
@@ -85,10 +97,20 @@
       for (i = 0; i < max; i++) { cv = document.createElement('canvas'); cv.width = 7; cv.height = 7; cv.className = 'tphud__heart'; hpEl.appendChild(cv); }
     }
     if (hp === hpShown) return;
+    hpnEl.textContent = hp + '/' + max;
     if (hpShown > hp && !reduced() && !(NEU.motion && NEU.motion.calmFlash && NEU.motion.calmFlash())) { hurtT = 0.35; hpEl.classList.add('is-hurt'); }
     nodes = hpEl.children;
     for (i = 0; i < nodes.length; i++) { nodes[i].width = 7; heartPaint(nodes[i], i < hp); }
     hpShown = hp; hpEl.setAttribute('data-hp', hp);
+  }
+
+  /* the band fades while the hero stands behind it, so it never hides the player at floor level */
+  function paintClear() {
+    var P = NEU.plat, h = P.hero && P.hero(), c = P.cam && P.cam(), v = P.view && P.view(), r, x, y, on;
+    if (!h || !c || !v) return;
+    r = hpRowEl.getBoundingClientRect(); x = (h.x - c.x) * v.scale; y = (h.y - c.y) * v.scale;
+    on = x + 12 * v.scale > r.left && x - 12 * v.scale < r.right && y > r.top && y - 28 * v.scale < r.bottom;
+    if (on !== clear) { clear = on; el.classList.toggle('is-clear', on); }
   }
 
   /* the heal items you carry (the strip's consumables), as icon + count */
@@ -102,6 +124,7 @@
     useSig = sig; useEl.innerHTML = '';
     for (i = 0; i < out.length; i++) {
       node = document.createElement('div'); node.className = 'tphud__chip tphud__item'; node.title = out[i].d.name;
+      node.setAttribute('role', 'button'); node.setAttribute('aria-label', out[i].d.name + ' x' + out[i].n);
       cv = document.createElement('canvas'); cv.className = 'tphud__icon'; cv.width = 16; cv.height = 16;
       if (NEU.itemIcon) NEU.itemIcon(cv, out[i].d);
       node.appendChild(cv);
@@ -144,6 +167,7 @@
         cost.textContent = tp ? Math.round(tp) + '%' : '';
       }
       node.title = def.name + (def.desc ? ' — ' + def.desc : '');
+      node.setAttribute('role', s.cd === 'melee' || s.cd === 'ranged' ? 'img' : 'button'); node.setAttribute('aria-label', def.name);
     }
   }
 
@@ -180,11 +204,19 @@
     if (!el) return;
     var now = ts || 0, dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
     last = now;
-    var k = pick(), isDock = !!k && k === dungeonKit();
-    if (isDock !== dock) { dock = isDock; el.classList.toggle('is-dock', dock); hpShown = -1; if (k && !el.hidden) paintChips(k); }
+    var k = pick(), isDock = !!k && k === dungeonKit(), id, txt;
+    if (isDock !== dock) {
+      dock = isDock; el.classList.toggle('is-dock', dock); hpShown = -1; if (k && !el.hidden) paintChips(k);
+      if (dock) { el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'player status'); el.removeAttribute('aria-hidden'); }
+      else { el.removeAttribute('role'); el.removeAttribute('aria-label'); el.setAttribute('aria-hidden', 'true'); }
+    }
     /* the tier tag is a dock-only reading of the one difficulty authority */
-    if (dock && NEU.diff && NEU.diff.glyph) tierEl.textContent = NEU.diff.glyph() + ' ' + NEU.diff.name().toUpperCase();
-    else if (tierEl.textContent) tierEl.textContent = '';
+    if (dock && NEU.diff && NEU.diff.glyph) {
+      id = String(NEU.diff.name()).toLowerCase();
+      txt = id === 'bot' ? 'BOT' : NEU.diff.glyph() + ' ' + NEU.diff.name().toUpperCase();   /* BOT is a word of its own: big, rainbow, in 3D (CSS) */
+      if (tierEl.textContent !== txt) tierEl.textContent = txt;
+      if (tierEl.getAttribute('data-tier') !== id) tierEl.setAttribute('data-tier', id);
+    } else if (tierEl.textContent) { tierEl.textContent = ''; tierEl.removeAttribute('data-tier'); }
     if (k !== kit) {
       kit = k; shown = kit ? kit.tp : 0;
       if (kit && !el.hidden) paintChips(kit);
@@ -192,7 +224,8 @@
     if (!kit) { if (!el.hidden) el.hidden = true; return; }
     if (el.hidden) { el.hidden = false; shown = kit.tp; paintChips(kit); }
     if (dock) {
-      paintHearts(NEU.plat.level0()); paintUse(); paintKeys();
+      if (scale() !== hs) { hs = scale(); el.style.setProperty('--hs', hs); }
+      paintHearts(NEU.plat.level0()); paintClear();   /* hearts and the difficulty only: no chips, key labels or heal icons here */
       if (hurtT > 0 && (hurtT -= dt) <= 0) hpEl.classList.remove('is-hurt');
     }
     var target = kit.tp, evs = kit.drainTp ? kit.drainTp() : [], i, hasGain = false, hasSpend = false;
@@ -220,6 +253,7 @@
     if (Math.abs(target - shown) < 0.0005) shown = target;
     num.textContent = Math.round(shown * 100) + '%';
     fill.style.width = (shown * 100).toFixed(1) + '%';
+    fill.style.height = dock ? (shown * 100).toFixed(1) + '%' : '';   /* the dock's gauge is a column */
     var cds = kit.cooldowns ? kit.cooldowns() : null, j;
     for (j = 0; j < SLOTS.length; j++) {
       var s = SLOTS[j], node = chips[s.key];
@@ -238,5 +272,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
 
-  NEU.tphud = { pick: pick, frame: frame };
+  /* the HUD scale the Scal fight uses (its quarter steps above 860 x 660), so the panel and the boss bar match it at every window size */
+  function scale() { return NEU.scal && NEU.scal.scaleFor ? NEU.scal.scaleFor(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1) : 1; }
+  NEU.tphud = { pick: pick, frame: frame, scale: scale };
 })();

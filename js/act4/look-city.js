@@ -1287,6 +1287,19 @@
     neonpink: { w: 1, h: 1, ax: 0, ay: 0, paint: function () {},
             light: function () { return { r: 40, col: '#FF6BD6', glow: 0.14 }; } },
     none: { w: 1, h: 1, ax: 0, ay: 0, paint: function () {} },
+    /* the hall's small television: a dark set; static once the note is read; one 0 for two seconds after it is switched on */
+    hometv: { w: 18, h: 16, ax: 9, ay: 14, paint: function (P) {
+      P(-8, -12, 16, 12, '#0A0810'); P(-7, -11, 14, 10, '#3A3446'); P(-6, -10, 12, 8, '#0E0C14'); P(-4, 0, 8, 2, '#0A0810');
+      P(5, -3, 1, 1, '#6A5A7A'); P(-3, -14, 1, 3, '#0A0810'); P(2, -14, 1, 3, '#0A0810'); P(-4, -15, 2, 1, '#0A0810'); P(2, -15, 2, 1, '#0A0810');
+    }, anim: function (e, now) {
+      var S = NEU.save, i, k, near = !!(S && S.flagged && S.flagged('dad_note')), zero = !!(S && S.flagged && S.flagged('tv_zero')), shown = e._zeroAt && (Date.now() - e._zeroAt < 2200);
+      if (shown) {
+        Q(-6, -10, 12, 8, '#0E0C14'); Q(-3, -9, 6, 1, '#B892FF'); Q(-3, -3, 6, 1, '#B892FF'); Q(-3, -8, 1, 5, '#B892FF'); Q(2, -8, 1, 5, '#B892FF');
+      } else if (near && !zero) {
+        k = still() ? 0 : (now / 90) | 0;
+        for (i = 0; i < 14; i++) Q(-6 + ((i * 5 + k * 7) % 12), -10 + ((i * 3 + k * 5) % 8), 1, 1, i % 2 ? '#8A8498' : '#3A3446');
+      }
+    }, light: function (e) { var S = NEU.save; return S && S.flagged && S.flagged('dad_note') && !S.flagged('tv_zero') ? { r: 28, col: '#8A98C8', glow: 0.1, flicker: true } : null; } },
 
     /* ── the square ── */
     fountain: { w: 96, h: 104, ax: 48, ay: 72, paint: function (P) {

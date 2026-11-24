@@ -897,6 +897,15 @@
       e.update = function () { if (!e.coll && !overlapPlayerBody(e)) e.coll = true; }; },
     barrier: function (e) { e.coll = true; solids.push(e); },
     floaty: function (e) { solidInit(e); },
+    puppet: function (e) { solidInit(e); },   // a solid the host level drives (plat entities that carry the hero): solidMoveTo carries riders
+    movingPlatform: function (e) { solidInit(e); e.h = e.h || 8; e.x0 = e.x; e.y0 = e.y; e.at = 0; e.dir = 1;   // ping-pong between (x,y) and (nx,ny) at 32 px/s, riders carried
+      e.update = function () { if (!e.nx) return;
+        var sp = f((e.spd || 32) * DT), d = Math.sqrt(f(f(e.nx - e.x0) * f(e.nx - e.x0)) + f(f(e.ny - e.y0) * f(e.ny - e.y0)));
+        if (d <= 0) return;
+        if (e.at0 && !e.started) { e.at = e.at0; e.started = true; }
+        e.at = f(e.at + f(sp * e.dir / d));
+        if (e.at >= 1) { e.at = 1; e.dir = -1; } else if (e.at <= 0) { e.at = 0; e.dir = 1; }
+        solidMoveTo(e, lerp(e.x0, e.nx, e.at), lerp(e.y0, e.ny, e.at)); e.liftX = 0; e.liftY = 0; }; },
     crumble: function (e) { solidInit(e); e.cs = 0; e.cw = 0;
       e.update = function () { if (!e.rumble) entCo(e, crumbleSeq); }; },
     blockField: function (e) { bfs.push(e); },
@@ -1068,7 +1077,22 @@
     ['jump', 'dash', 'crouch', 'grab'].forEach(function (n) { In[n].counter = s.In[n][0]; In[n].down = s.In[n][1]; In[n].hit = s.In[n][2]; });
     var a = s.In.ax; In.mx.value = a[0]; In.mx.turned = a[1]; In.my.value = a[2]; In.my.turned = a[3]; In.ax.value = a[4]; In.ax.turned = a[5]; In.ay.value = a[6]; In.ay.turned = a[7];
   }
+  /* host hooks (plat.js runs the dungeon on this kernel): edit a tile, push outside changes into the hero, drive a puppet solid */
+  function setCell(tx, ty, ch) { var x = tx - G.ox / 8, y = ty - G.oy / 8; if (x >= 0 && y >= 0 && x < G.w && y < G.h) G.cells[y * G.w + x] = ch ? ch.charCodeAt(0) : 0; }
+  function put(o) {
+    if (!p) return;
+    if (o.x !== undefined) { p.x = Math.round(o.x); p.rx = 0; }
+    if (o.y !== undefined) { p.y = Math.round(o.y); p.ry = 0; }
+    if (o.sx !== undefined) p.sx = o.sx;
+    if (o.sy !== undefined) p.sy = o.sy;
+    if (o.dashes !== undefined) p.dashes = o.dashes;
+    if (o.facing) p.facing = o.facing;
+    if (o.free && (p.st === DASH || p.st === CLIMB)) setState(NORMAL);
+    if (o.jumpOff) { p.varJumpTimer = 0; p.autoJump = false; }
+  }
+  function puppetTo(e, x, y) { if (!e.coll) e.coll = true; solidMoveTo(e, x, y); }
   var api = NEU.cel = {
+    setCell: setCell, put: put, puppetTo: puppetTo,
     start: start, step: step, DT: DT, snapshot: snapshot, restore: restore, setDuck: function (v) { setDuck(!!v); },
     get player() { return p; }, get room() { return room; }, get level() { return L; }, get ents() { return ents; }, get map() { return M; },
     get grid() { return G; }, cellAt: cellAt, STATES: { NORMAL: NORMAL, CLIMB: CLIMB, DASH: DASH, SWIM: SWIM, DREAMDASH: DREAMDASH, INTROWALK: INTROWALK, TUNNEL: TUNNEL, CASSETTEFLY: CASSETTEFLY, BOOST: BOOST }

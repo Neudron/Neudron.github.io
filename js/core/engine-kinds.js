@@ -207,6 +207,8 @@
       /* A locked door says what it is waiting for. "Nothing happens"
          is the least useful sentence a game can produce. */
       if (e.locked && !(NEU.save && NEU.save.flagged(e.locked))) {
+        /* a door can answer for itself: the root asks for an axe, not for a flag */
+        if (typeof e.run === 'function') { e.run(sys); return; }
         sys.say(e.lines || ['it will not move yet.'], 'narr');
         sfx('locked');
         return;

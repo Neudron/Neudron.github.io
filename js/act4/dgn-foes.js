@@ -47,6 +47,7 @@
   var foes = [], shots = [], pops = [], fxs = [], dying = [], kit = null, F = { x: 0, y: 0, fx: 1, fy: 0 }, box = { AX: 0, AY: 0, AW: 640, AH: 360 }, lastDir = 0;
 
   function sheet(k) { return NEU.dgSheets && NEU.dgSheets[k]; }
+  function enc() { return !!(NEU.dgnPolt && NEU.dgnPolt.on && NEU.dgnPolt.on()); }   /* the chamber fight is engaged: it answers for the kit's targets, damage and hits */
   function sgn(v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
   function rnd() { return Math.random(); }
   function hero() { return P.hero(); }
@@ -345,11 +346,23 @@
     }
     f.rt = 0; f.rx = f.x; f.ry = f.y;
   }
+  function fade(dt) {
+    var i;
+    for (i = dying.length - 1; i >= 0; i--) if ((dying[i].t -= dt) <= 0) dying.splice(i, 1);
+    for (i = pops.length - 1; i >= 0; i--) if ((pops[i].t -= dt) <= 0) pops.splice(i, 1);
+    for (i = fxs.length - 1; i >= 0; i--) if ((fxs[i].t -= dt) <= 0) fxs.splice(i, 1);
+  }
+  function gateBusy(sp) {
+    var G = NEU.dungeon && NEU.dungeon.gate, D = NEU.dungeon && NEU.dungeon.chamber;
+    return !!(G && D && G.state() !== 'closed' && Math.abs(sp.x - D.door.x) < 24 && Math.abs(sp.y - D.door.y) < 12);
+  }
   function tick(dt) {
     var i, f, s, sp, sps = def.spawners, h = hero(), dx, dy, d;
     F.x = h.x; F.y = h.y - P.hh / 2; F.fx = h.face; F.fy = 0;
-    if (kit) { kit.hp = h.hp; kit.tick(dt); }
+    if (kit) { if (P.level0().hp) kit.maxHp = P.level0().hp; kit.hp = h.hp; kit.tick(dt); }
     if (P.replaying()) return;
+    /* the chamber fight (dgn-polt.js) owns the tick once it has engaged: the foes sleep and no hostile shot from outside is left to reach it */
+    if (NEU.dgnPolt && NEU.dgnPolt.step && NEU.dgnPolt.step(dt)) { shots.length = 0; fade(dt); return; }
     for (i = 0; i < foes.length; i++) { foes[i].ox = foes[i].x; foes[i].oy = foes[i].y; }
     for (i = 0; i < shots.length; i++) { shots[i].ox = shots[i].x; shots[i].oy = shots[i].y; }
     for (i = 0; i < foes.length; i++) {
@@ -376,14 +389,13 @@
         if (s.k !== 'fire' && s.k !== 'boom' && s.k !== 'hammer') shots.splice(i, 1);
       }
     }
-    for (i = dying.length - 1; i >= 0; i--) if ((dying[i].t -= dt) <= 0) dying.splice(i, 1);
-    for (i = pops.length - 1; i >= 0; i--) if ((pops[i].t -= dt) <= 0) pops.splice(i, 1);
-    for (i = fxs.length - 1; i >= 0; i--) if ((fxs[i].t -= dt) <= 0) fxs.splice(i, 1);
+    fade(dt);
     /* Terraria-style respawn: a spawner refills off screen and far away after 20 s; a fighter is Bone Lee 1 in 30 */
     for (i = 0; i < sps.length; i++) {
       sp = sps[i]; if (sp.foe && !sp.foe.dead) continue;
       if (sp.cd > 0) { sp.cd -= dt; continue; }
       if (onScreen((sp.x + 0.5) * T, (sp.y + 0.5) * T, 48) || Math.abs((sp.x + 0.5) * T - h.x) < 24 * T) continue;
+      if (gateBusy(sp)) continue;   /* nothing new walks out near the bone door once it is open */
       sp.foe = spawn('ath'.indexOf(sp.k) >= 0 && rnd() < 1 / 30 ? 'j' : sp.k, sp.x, sp.y, sp);
     }
     for (i = foes.length - 1; i >= 0; i--) if (foes[i].dead) foes.splice(i, 1);
@@ -401,10 +413,10 @@
   function open() {
     var i, sps = def.spawners;
     foes.length = 0; shots.length = 0; pops.length = 0; fxs.length = 0; dying.length = 0;
-    kit = NEU.kit ? NEU.kit.create({ F: F, box: box, noMelee: true, adapter: {
-      targets: function () { var out = [], i; for (i = 0; i < foes.length; i++) if (!foes[i].dead && foes[i].d.hp && onScreen(foes[i].x, foes[i].y, 0)) out.push(foes[i]); return out; },
-      damage: function (t, n, kind) { if (kind !== 'melee') hitFoe(t, 1, sgn(t.x - F.x)); },
-      hurtPlayer: function (n) { P.hurt(n, lastDir); }
+    kit = NEU.kit ? NEU.kit.create({ F: F, box: box, noMelee: true, maxHp: P.level0().hp || 6, adapter: {
+      targets: function () { var out = [], i; if (enc()) return NEU.dgnPolt.targets(); for (i = 0; i < foes.length; i++) if (!foes[i].dead && foes[i].d.hp && onScreen(foes[i].x, foes[i].y, 0)) out.push(foes[i]); return out; },
+      damage: function (t, n, kind) { if (enc()) NEU.dgnPolt.damage(t, n, kind); else if (kind !== 'melee') hitFoe(t, 1, sgn(t.x - F.x)); },
+      hurtPlayer: function (n) { P.hurt(n, enc() ? NEU.dgnPolt.lastDir() : lastDir); }
     } }) : null;
     if (P.replaying()) return;
     for (i = 0; i < sps.length; i++) { sps[i].cd = 0; sps[i].foe = spawn(sps[i].k, sps[i].x, sps[i].y, sps[i]); }
@@ -438,7 +450,7 @@
     var i, f, sh, k, L = NEU.dungeonLook, x, y, fl, still = P.reduced(), d, g;
     lerp();
     for (i = 0; i < foes.length; i++) {
-      f = foes[i]; if (f.dead || !onScreen(f.dx, f.dy, 64)) continue;
+      f = foes[i]; if (f.dead || enc() || !onScreen(f.dx, f.dy, 64)) continue;   /* the fight hides the sleeping foes of the vault behind it */
       sh = sheet(f.s); if (!sh) continue;
       if (f.d.ai === 'ball') for (k = 0; k < f.len; k += 12) L.cut(c, 'dgLink', 0, 0, 12, 12, f.px + (f.dx - f.px) * k / f.len - 6 - cx, f.py + (f.dy - f.py) * k / f.len - 6 - cy);
       x = f.dx - sh.fw / 2 - cx; y = f.dy + f.h / 2 - sh.fh - cy + (f.d.ai === 'skull' || f.d.ai === 'spirit' || f.d.ai === 'ball' || f.d.ai === 'wheel' ? (sh.fh - f.h) / 2 : 2);
@@ -517,6 +529,7 @@
     c.font = '16px "Determination Mono","Pixelify Sans",monospace'; c.textAlign = 'center'; c.textBaseline = 'bottom';
     for (i = 0; i < pops.length; i++) { c.fillStyle = '#12081E'; c.fillText(pops[i].s, (pops[i].x + 1) | 0, (pops[i].y + 1) | 0); c.fillStyle = '#FFE8A0'; c.fillText(pops[i].s, pops[i].x | 0, pops[i].y | 0); }
     c.textAlign = 'left';
+    if (NEU.dgnPolt && NEU.dgnPolt.hudWorld) NEU.dgnPolt.hudWorld(c, cx, cy);   /* the chamber fight: boss, shots and soul box under the kit strip */
     if (kit) kit.draw(c);
     if (kit && kit.stripOpen) {
       c.font = '16px monospace'; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillStyle = '#FF9E30';
@@ -524,6 +537,7 @@
       c.fillText('ITEMS', box.AX + (box.AW + Math.min(box.AW - 24, 464)) / 2 + 12 | 0, box.AY + box.AH / 2 | 0);
     }
     c.restore();
+    if (NEU.dgnPolt && NEU.dgnPolt.hudScreen) NEU.dgnPolt.hudScreen(c, cx, cy);   /* its name card and boss bar sit on screen pixels */
   }
   /* R7: e.key is routed by plat.js before it reaches us; a rebound key arrives here as its
      definition token already. Re-route explicitly so direct callers and rebound keys agree. */
@@ -543,16 +557,19 @@
     list.push(h.x / T, (h.y - 11) / T, 0.8);
     if (kit) for (i = 0; i < kit.shots.length; i++) list.push(kit.shots[i].x / T, kit.shots[i].y / T, 0.75);
     for (i = 0; i < shots.length; i++) if (shots[i].k !== 'beam') list.push(shots[i].x / T, shots[i].y / T, shots[i].k === 'fire' || shots[i].k === 'boom' ? 1 : 0.5);
+    if (NEU.dgnPolt && NEU.dgnPolt.lights) NEU.dgnPolt.lights(list);
   }
   function chain(name, fn) { var prev = def[name]; def[name] = prev ? function (a, b, c2, d) { prev(a, b, c2, d); return fn(a, b, c2, d); } : fn; }
   chain('onOpen', open); chain('tick', tick);
-  def.draw = draw; def.hud = hud; def.key = key; def.lights = lights; def.swing = axe;
+  def.draw = draw; def.hud = hud; def.key = key; def.lights = lights;
+  def.swing = function (h, down, charged) { return enc() ? NEU.dgnPolt.axe(h, down, charged) : axe(h, down, charged); };
+  def.assist = function (keys) { return enc() && NEU.dgnPolt.assist ? NEU.dgnPolt.assist(keys) : null; };   /* the Bot tier dodges for the hero in the chamber fight */
   def.slow = function () { return kit ? kit.slow : 1; };
   def.tp = function () { return kit ? kit.tp : 0; };
   def.onClose = function () {
+    if (NEU.dgnPolt && NEU.dgnPolt.abort) NEU.dgnPolt.abort();   /* an engaged fight lets go of its holds, shots, music and timers with the level */
     foes.length = 0; shots.length = 0; pops.length = 0; fxs.length = 0; dying.length = 0; kit = null;
-    if (NEU.dungeon && NEU.dungeon.finishDoorFx) NEU.dungeon.finishDoorFx();
   };
-  NEU.dgnFoes = { kinds: KIND, foes: foes, shots: shots, pops: pops, dying: dying, frameOf: frameOf, spawn: spawn, hit: hitFoe, axe: axe, kit: function () { return kit; },
+  NEU.dgnFoes = { F: F, kinds: KIND, foes: foes, shots: shots, pops: pops, dying: dying, frameOf: frameOf, spawn: spawn, hit: hitFoe, axe: axe, kit: function () { return kit; },
     gun: GUN, spell: SPELL, moods: MOODS, beamPath: beamPath, spot: spot, telegraph: TELEGRAPH };
 })();

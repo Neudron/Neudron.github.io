@@ -111,6 +111,13 @@
   function pulse() {
     if (sirenGain) sirenGain.gain.value = light ? 0.06 : 0;
   }
+  /* floor 0, once the two clues are in: out of the cabin and into the workshop memory */
+  function descend() {
+    close();
+    if (NEU.cart && NEU.cart.close) NEU.cart.close();
+    if (NEU.plat && NEU.plat.close && NEU.plat.running && NEU.plat.running()) NEU.plat.close();
+    if (NEU.engine && NEU.engine.warp) NEU.engine.warp('z0_workshop', 'door');
+  }
   function press(which) {
     if (!live || sent) return;
     if (which === '-1') {   /* the lower shaft: optional mod rooms (cel-mode.js) */
@@ -120,10 +127,13 @@
     }
     if (which === '0') {
       if (phase !== 'cabin' && phase !== 'floor') return;
+      /* a button that stays pressed in opens the floor: the second press goes down */
+      if (NEU.save && NEU.save.flagged && NEU.save.flagged('floor0_open')) { descend(); return; }
+      var clue = !!(NEU.save && NEU.save.flagged && NEU.save.flagged('throne_zero') && NEU.save.flagged('tv_zero'));
       phase = 'floor';
       if (screen) paintFloor();
-      if (NEU.save) NEU.save.flag('elevator_floor', 1);
-      if (NEU.talk) NEU.talk(['* YOU ARE ON FLOOR 0.'], 'narr');
+      if (NEU.save) { NEU.save.flag('elevator_floor', 1); if (clue) NEU.save.flag('floor0_open', 1); }
+      if (NEU.talk) NEU.talk(clue ? ['* YOU ARE ON FLOOR 0.', '* the button stays pressed in.'] : ['* YOU ARE ON FLOOR 0.'], 'narr');
       draw();
       return;
     }

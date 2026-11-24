@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   var NEU = window.NEU = window.NEU || {};
-  var VW = 320, VH = 180, imgs = {}, buf = null, bx = null, out = null, ox = null, styleT = 0;
+  var VW = 320, VH = 180, imgs = {}, buf = null, bx = null, out = null, ox = null, styleT = 0, host = false;
   var PH = { fg9: '#7a5230', bg1: '#2a2033' };
   function img(src) {
     if (!imgs[src]) { imgs[src] = new Image(); imgs[src].src = src; }
@@ -69,6 +69,8 @@
     var i, e, x, y;
     for (i = 0; i < ents.length; i++) {
       e = ents[i]; x = e.x - cx; y = e.y - cy;
+      /* host draw only: a level look may skin an entity at its live bounds (plat.celSkin); the standalone route never calls it */
+      if (host && NEU.plat && NEU.plat.celSkin && NEU.plat.celSkin(bx, e, x, y)) continue;
       if (e.t === 'water') { bx.fillStyle = 'rgba(80,160,255,0.35)'; bx.fillRect(x, y, e.w, e.h); bx.fillStyle = 'rgba(200,235,255,0.8)'; bx.fillRect(x, y, e.w, 1); }
       else if (e.t === 'spinner' || e.t === 'rotSpinner' || e.t === 'trkSpinner') {
         bx.fillStyle = e.vis && e.coll ? '#7fe0ff' : '#4a7f99';
@@ -157,5 +159,12 @@
     styles(M, true, cx, cy, room);
     ox.drawImage(buf, 0, 0, out.width, out.height);
   }
-  NEU.celView = { attach: attach, draw: draw };
+  /* host draw: the same entity art onto another canvas (plat.js), native px scaled by k, camera in the host's px */
+  function drawEnts(ctx, camX, camY, k) {
+    var C = NEU.cel, keep = bx;
+    if (!C.ents) return;
+    bx = ctx; host = true; ctx.save(); ctx.translate(-camX, -camY); ctx.scale(k, k);
+    try { entities(C.ents, 0, 0); } finally { ctx.restore(); bx = keep; host = false; }
+  }
+  NEU.celView = { attach: attach, draw: draw, drawEnts: drawEnts };
 })();

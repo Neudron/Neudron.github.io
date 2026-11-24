@@ -219,6 +219,34 @@
     } };
   }
 
+  /* floor 0: a workshop that is a memory of the study. The same room, the details wrong, and never a name. */
+  E.register('z0_workshop', {
+    tileset: 'dad',
+    dark: 64,
+    tiles: [
+      '################',
+      '#o.o.......o...#',
+      '#..............#',
+      '#..............#',
+      '#..o...........#',
+      '#..............#',
+      '#######.########',
+      '################'
+    ].join('\n'),
+    spawns: { door: { x: 7, y: 5, face: 'up' }, default: { x: 7, y: 5, face: 'up' } },
+    entities: [
+      { t: 'cityfloor', v: 'e5_dad', x: 0, y: 0 },
+      { t: 'cityprop', v: 'daddesk', x: 3, y: 1, lines: ['a workbench where the desk should be.', 'every tool is hung up. every tool is the wrong way round.'] },
+      { t: 'cityprop', v: 'dadlamp', x: 3, y: 1, dx: 6 },
+      { t: 'cityprop', v: 'dadclock', x: 3, y: 1, dx: -6, lines: ['the clock reads 0:00. it always has.'] },
+      { t: 'cityprop', v: 'homebooks', x: 14, y: 1, lines: ['manuals for something that was never finished.', 'the last page is the first page.'] },
+      { t: 'cityprop', v: 'homestack', x: 5, y: 4, lines: ['papers under a mug. the mug is warm.'] },
+      { t: 'cityprop', v: 'none', x: 7, y: 6, lines: ['the lift. it is waiting where you left it.'], run: function () { if (NEU.elevator && NEU.elevator.open) NEU.elevator.open(); } },
+      { t: 'exit', x: 7, y: 0, to: 'wex_savanna_01', spawn: 'from_wex_savanna_02_west', style: 'door', locked: 'photo',
+        lines: ['a door that was never in the study.', 'it is waiting on a picture.'] }
+    ]
+  });
+
   E.register('e5_dad', {
     tileset: 'dad',
     dark: 64,
@@ -267,7 +295,8 @@
       { t: 'cityprop', v: 'homestack', x: 5, y: 4, lines: ['papers held down by a chipped mug.'] },
       { t: 'cityprop', v: 'cat', x: 10, y: 3, lines: ['a cat asleep at the foot of the bed. do not tell dad.'] },
       { t: 'exit', x: 7, y: 6, to: 'e3_hall', spawn: 'dad', style: 'door' },
-      { t: 'exit', x: 7, y: 0, to: 'wex_lab_01', spawn: 'from_home_study', style: 'portal' }
+      { t: 'exit', x: 7, y: 0, to: 'wex_lab_01', spawn: 'from_home_study', style: 'portal', locked: 'draedon_won',
+        lines: ['a panel in the floor, bolted from underneath.', 'whoever bolted it is not finished down there.'] }
     ],
     onEnter: function () {
       ticking = true;
@@ -355,5 +384,5 @@
     }
   });
 
-  if (NEU.act4RoomsD && NEU.act4RoomsD.indexOf('e5_dad') < 0) NEU.act4RoomsD.push('e5_dad', 'e6_room');
+  if (NEU.act4RoomsD && NEU.act4RoomsD.indexOf('e5_dad') < 0) NEU.act4RoomsD.push('e5_dad', 'e6_room', 'z0_workshop');
 })();

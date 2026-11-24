@@ -274,7 +274,9 @@
         'two mountains. pick one, then take the door.',
         'press ' + key + ' on the canvas you want.'
       ];
-      if (!held && NEU.save) {
+      /* the package is for someone who has already come down the mountain once */
+      var down = NEU.save && (NEU.save.flagged('mtn_heaven') || NEU.save.flagged('mtn_evil'));
+      if (!held && NEU.save && down) {
         NEU.save.give('pkg_misleading');
         if (NEU.juice && NEU.juice.hit) NEU.juice.hit('small');
         lines.push('he hands you a misleading-looking package.');

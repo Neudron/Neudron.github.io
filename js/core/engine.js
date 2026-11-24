@@ -986,6 +986,7 @@
     if (room.onEnter) room.onEnter(API);
     if (selected && selected.onEnter) selected.onEnter(API);
     prevPX = px; prevPY = py; prevCamX = camX; prevCamY = camY;
+    if (NEU.act4 && NEU.act4.sync) NEU.act4.sync();   /* objectives follow the flags, so a save from before a step existed still shows it done */
     if (NEU.save) NEU.save.capture();
     return true;
   }

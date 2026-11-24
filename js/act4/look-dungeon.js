@@ -22,7 +22,7 @@
      platforms (Tiles_19) rows 6/8/7 blue/green/pink brick; pots (Tiles_28) row 10 dungeon; lanterns (Tiles_42) row 0 chain */
   var BANNER = { B: 10, G: 12, P: 14 }, BOOKS = { B: 1, G: 2, P: 3 }, SHELF = { B: 6, G: 8, P: 7 };
   var SKY = ['#0B0716', '#140D26', '#1E1434', '#2A1B44', '#3A2652', '#4E3260', '#66406A'];
-  var lights = [], sunTop = null, lc = null, lg = null, map = null, cache = {};
+  var lights = [], sunTop = null, lc = null, lg = null, limg = null, map = null, cache = {};
 
   function reducedNow() { return P.reduced(); }
   /* Some externally prepared PNGs have an opaque black matte instead of
@@ -152,16 +152,17 @@
       g.fillStyle = rr < 0.34 ? 'rgba(10,8,22,0.34)' : rr < 0.67 ? 'rgba(16,12,30,0.28)' : 'rgba(24,18,40,0.22)';
       g.fillRect(x * T, y * T, T, T);
       if (rr > 0.972) { /* a small fossil: three pale vertebrae in the brick */
-        g.fillStyle = '#5A5266';
+        g.fillStyle = '#3E3850';
         g.fillRect(x * T + 3, y * T + 7, 3, 2); g.fillRect(x * T + 7, y * T + 8, 3, 2); g.fillRect(x * T + 11, y * T + 7, 2, 2);
       } else if (rr < 0.02) { /* a dangling root from the ceiling of the cell */
-        g.fillStyle = '#3A3040';
+        g.fillStyle = '#2A2234';
         g.fillRect(x * T + 5, y * T, 1, 5); g.fillRect(x * T + 6, y * T + 4, 1, 3); g.fillRect(x * T + 9, y * T, 1, 3);
       } else if (rr > 0.94) { /* a bone crossing the cell */
-        g.fillStyle = '#4A4452';
+        g.fillStyle = '#322E3E';
         g.fillRect(x * T + 2, y * T + 11, 10, 1); g.fillRect(x * T + 2, y * T + 9, 2, 3); g.fillRect(x * T + 11, y * T + 10, 2, 3);
       }
     }
+    paintDress(g, L, x0, y0, w, h);
     for (y = y0; y < y0 + h; y++) for (x = x0; x < x0 + w; x++) {
       ch = (L.grid[y] || '').charAt(x);
       if (ch === '#') { f = frame(nb(L, x, y, isBrick), x, y); cut(g, BRICK[L.faction(x, y)], f[0] * 18, f[1] * 18, T, T, x * T, y * T); }
@@ -211,6 +212,92 @@
     } else if (d.k === 'B') {
       s = BOOKS[d.f];
       for (i = 0; i < 12; i++) cut(g, 'dgBooks', s * 54 + (i % 3) * 18, ((i / 3) | 0) * 18, T, T, x + (i % 3) * T, y - 3 * T + ((i / 3) | 0) * T);
+    }
+  }
+
+  /* ── DGN-02 set dressing, baked into the chunk. Back-wall values stay between the brick (INK) and the lit shelf cap. ── */
+  function rc(g, x, y, w, h, col) { g.fillStyle = col; g.fillRect(Math.round(x), Math.round(y), w, h); }
+  function near(d, x0, y0, w, h, mx, my) { return d.x + mx >= x0 && d.x - mx <= x0 + w && d.y + my >= y0 && d.y - my <= y0 + h; }
+  /* masonry course: rows[0] is the bottom row, each one fainter; mortar offsets by row so it reads as laid brick */
+  function course(g, L, x0, y0, w, h, cx, cy, cw, alphas, any) {   /* any: paint open air too (the chamber has no back wall) */
+    var i, x, y, a, off;
+    for (i = 0; i < alphas.length; i++) {
+      y = cy - i; if (y < y0 || y >= y0 + h) continue;
+      for (x = Math.max(cx, x0); x < Math.min(cx + cw, x0 + w); x++) {
+        if (P.solid(x, y) || !any && !hasWall(L, x, y)) continue;
+        a = alphas[i]; off = ((x + i) & 1) ? 8 : 0;
+        g.globalAlpha = a; rc(g, x * T, y * T, T, T, '#221836');
+        rc(g, x * T, y * T, T, 1, '#34264E'); rc(g, x * T, y * T + T - 1, T, 1, '#0E0818'); rc(g, x * T + off, y * T, 1, T, '#0E0818');
+        if (P.hash(x, y, 57) > 0.7) rc(g, x * T + 3 + off, y * T + 5, 4, 2, '#2C2044');
+        g.globalAlpha = 1;
+      }
+    }
+  }
+  /* a pier with a rib springing toward the door and breaking off: a thick violet rib with a lit upper edge and rubble at its foot. Ribs stay thin shapes and never run horizontal, so they cannot pass for a shelf. d.r is the arc radius (44 by default) */
+  function ribPier(g, d) {
+    var cxp = Math.round((d.x + 0.5) * T), floor = (d.y + 1) * T, top = floor - d.h * T, r = d.r || 44, i, th, ax, ay, lit = d.d > 0 ? cxp + 2 : cxp - 5, dk = d.d > 0 ? cxp - 8 : cxp + 5;
+    rc(g, cxp - 8, top, 16, floor - top, '#3A2C5C');
+    rc(g, lit, top, 3, floor - top, '#9A84D0'); rc(g, dk, top, 3, floor - top, '#120A20');
+    rc(g, cxp - 2, top + 5, 1, floor - top - 12, '#1A1030'); rc(g, cxp + 2, top + 5, 1, floor - top - 12, '#1A1030');
+    rc(g, cxp - 11, top - 4, 22, 5, '#4E3E80'); rc(g, cxp - 11, top - 4, 22, 1, '#A894E0');
+    rc(g, cxp - 12, floor - 8, 24, 8, '#4E3E80'); rc(g, cxp - 12, floor - 8, 24, 1, '#A894E0');
+    for (i = 0; i <= 30; i++) {
+      th = d.b * i / 30; ax = cxp + d.d * (r - Math.round(r * Math.cos(th))); ay = top - 4 - Math.round(r * Math.sin(th));
+      rc(g, ax - 3, ay - 3, 7, 7, '#6E5CA8'); rc(g, ax - 3, ay - 3, 7, 2, '#B0A0E0'); rc(g, ax - 3, ay + 3, 7, 1, '#1A1030');
+    }
+    rc(g, cxp + d.d * 14 - 3, floor - 5, 6, 5, '#4A3A76'); rc(g, cxp + d.d * 14 - 3, floor - 5, 6, 1, '#8A74C0');
+    rc(g, cxp + d.d * 22 - 2, floor - 3, 4, 3, '#3E2E62'); rc(g, cxp + d.d * 28 - 1, floor - 2, 3, 2, '#3E2E62');
+  }
+  /* the door gap's jambs and sill: a lit edge on the stone either side and a worn threshold, so the opening reads as a doorway even with the slab raised */
+  function jamb(g, d) {
+    var x0 = d.x * T, x1 = (d.x + d.w) * T, y0 = d.y * T, y1 = (d.y + d.h) * T;
+    rc(g, x0, y0, 3, y1 - y0, '#0E0818'); rc(g, x0 + 3, y0, 1, y1 - y0, '#5A4482');
+    rc(g, x1 - 3, y0, 3, y1 - y0, '#0E0818'); rc(g, x1 - 4, y0, 1, y1 - y0, '#3A2A56');
+    rc(g, x0, y0, x1 - x0, 3, '#0E0818'); rc(g, x0 + 3, y0 + 3, x1 - x0 - 6, 1, '#34264E');
+    rc(g, x0, y1 - 2, x1 - x0, 2, '#5A4482');
+  }
+  /* mineral crust at the old water top (its upper half stays in the air gap while the hall is full), scalloped deposits and drips below it, and the trail down to the sluice lever */
+  function tide(g, d) {
+    var y = d.y * T, x = d.x * T, w = d.w * T, i, r;
+    for (i = 0; i < w; i += 2) {
+      r = P.hash(i, d.y, 41);
+      g.globalAlpha = 0.95; rc(g, x + i, y - 3 - ((r * 3) | 0), 2, 3 + ((r * 3) | 0), '#C4EEE4'); rc(g, x + i, y, 2, 2, '#9AD8CC');
+      g.globalAlpha = 0.7; rc(g, x + i, y + 2, 2, 2 + ((r * 5) | 0), '#6AAEA6');
+      if (r > 0.82) { g.globalAlpha = 0.8; rc(g, x + i, y + 4, 2, 8 + ((r * 24) | 0), '#7AC0B8'); rc(g, x + i, y + 12 + ((r * 24) | 0), 2, 2, '#C4EEE4'); }
+    }
+    g.globalAlpha = 0.85;
+    for (i = 0; y + i < d.ly * T; i += 6) { rc(g, d.lx * T + 6 + (((i / 6) | 0) % 3 === 1 ? 1 : 0), y + i, 3, 4, '#7AC0B8'); rc(g, d.lx * T + 7, y + i, 1, 4, '#C4EEE4'); }
+    g.globalAlpha = 1;
+  }
+  /* the d0 bell's niche: a cold lit stone frame round a deep recess with a warm halo, so the bronze bell is the one warm landmark in the room */
+  function bellFrame(g, d) {
+    var cx = d.x * T + 8, y = d.y * T, hw = 46, hh = 58, i, k;
+    rc(g, cx - hw - 5, y, 2 * hw + 10, hh + 6, '#34405E'); rc(g, cx - hw - 5, y, 2, hh + 6, '#9AAED8'); rc(g, cx + hw + 3, y, 2, hh + 6, '#1E2640');
+    rc(g, cx - hw - 5, y, 2 * hw + 10, 2, '#9AAED8'); rc(g, cx - hw - 5, y + hh + 4, 2 * hw + 10, 2, '#9AAED8');
+    rc(g, cx - hw, y + 2, 2 * hw, hh + 2, '#0E0A14');
+    for (i = 0; i < 6; i++) { rc(g, cx - hw + i, y + 2 + i, 6 - i, 1, '#34405E'); rc(g, cx + hw - 6, y + 2 + i, 6 - i, 1, '#34405E'); }
+    for (k = 3; k >= 0; k--) { g.globalAlpha = 0.24; rc(g, cx - 18 - k * 8, y + 22 - k * 3, 36 + k * 16, 34 + k * 6, '#8A4A18'); }
+    g.globalAlpha = 1;
+    rc(g, cx - hw, y + hh + 1, 2 * hw, 3, '#C8924F'); rc(g, cx - hw, y + hh + 1, 2 * hw, 1, '#F8C070');
+  }
+  /* a warm rim on the two floor tiles flanking the shaft mouth: the descent reads as a doorway */
+  function pool(g, d) {
+    var y = (d.y + 1) * T;
+    rc(g, (d.x - 3) * T, y, T, 2, '#C8924F'); rc(g, (d.x + 2) * T, y, T, 2, '#C8924F');
+    g.globalAlpha = 0.5; rc(g, (d.x - 3) * T, y + 2, T, 2, '#F8A030'); rc(g, (d.x + 2) * T, y + 2, T, 2, '#F8A030'); g.globalAlpha = 1;
+  }
+  function paintDress(g, L, x0, y0, w, h) {
+    var ds = L.dress, i, d;
+    if (!ds) return;
+    for (i = 0; i < ds.length; i++) {
+      d = ds[i];
+      if (d.k === 'course') course(g, L, x0, y0, w, h, d.x, d.y, d.w, d.a, d.any);
+      else if (!near(d, x0, y0, w, h, d.w || 4, 12)) continue;
+      else if (d.k === 'arch') ribPier(g, d);
+      else if (d.k === 'tide') tide(g, d);
+      else if (d.k === 'jamb') jamb(g, d);
+      else if (d.k === 'bellfrm') bellFrame(g, d);
+      else if (d.k === 'pool') pool(g, d);
     }
   }
   P.painters.push(function (g, L, x0, y0, w, h) { if (!L || L.tileset !== 'dungeon' || x0 === undefined) return false; return paintChunk(g, L, x0, y0, w, h); });
@@ -319,7 +406,10 @@
       s = L.entities[i];
       if (s.t === 'brazier' && !s.dead && NEU.save.flagged('dgn_lit_' + s.n)) lights.push(s.x, s.y, 1.3);
     }
+    if (L.dress) for (i = 0; i < L.dress.length; i++) { s = L.dress[i]; if (s.k === 'pool') lights.push(s.x, s.y, 0.95); else if (s.k === 'bellfrm') lights.push(s.x, s.y + 3, 0.8); }
     if (L.lights) L.lights(lights);
+    /* DGN-02: a foe on a dark landing keeps a dim halo so its silhouette stays readable (the hero and shots already carry light) */
+    if (L.id === 'dgn' && NEU.dgnFoes && NEU.dgnFoes.foes) for (i = 0; i < NEU.dgnFoes.foes.length; i++) { s = NEU.dgnFoes.foes[i]; lights.push(s.x / T, s.y / T, 0.5); }
     for (i = 0; i < lights.length; i += 3) {
       x = Math.floor(lights[i]) - tx0; y = Math.floor(lights[i + 1]) - ty0;
       if (x >= 0 && y >= 0 && x < cols && y < rows && M[y * cols + x] < lights[i + 2]) M[y * cols + x] = lights[i + 2];
@@ -332,17 +422,34 @@
       for (l = 0, y = 0; y < rows; y++) { i = y * cols + x; l = Math.max(l * D[i], M[i]); M[i] = l; }
       for (l = 0, y = rows - 1; y >= 0; y--) { i = y * cols + x; l = Math.max(l * D[i], M[i]); M[i] = l; }
     }
+    landings(L, M, tx0, ty0, cols, rows);
     map = { n: n, L: M, D: D, tx0: tx0, ty0: ty0, cols: cols, rows: rows };
     return map;
+  }
+  /* DGN-02: a Cel-owned landing (plate, crumble, spring, refill) never falls into the dark: its own cells keep a floor of light
+     after the sweeps, so a bright cap still reads on a dark landing. Lit in place, not spread: no extra sweep, no allocation. */
+  function landings(L, M, tx0, ty0, cols, rows) {
+    var C = NEU.cel, es = L.cel && C && C.ents, i, e, b, x, y, xa, xb, ya;
+    if (!es) return;
+    for (i = 0; i < es.length; i++) {
+      e = es[i];
+      if (e.t !== 'movingPlatform' && e.t !== 'crumble' && e.t !== 'spring' && e.t !== 'refill') continue;
+      if (e.coll === false && e.t !== 'refill') continue;
+      b = e.box || e; xa = Math.floor(b.x / 8) - tx0; xb = Math.floor((b.x + b.w - 1) / 8) - tx0; ya = Math.floor(b.y / 8) - ty0;
+      for (x = Math.max(0, xa); x <= xb && x < cols; x++) for (y = Math.max(0, ya - 1); y <= ya && y < rows; y++)
+        if (M[y * cols + x] < (y === ya ? 0.62 : 0.4)) M[y * cols + x] = y === ya ? 0.62 : 0.4;
+    }
   }
   function lightAt(m, x, y) { x = Math.max(0, Math.min(m.cols - 1, x)); y = Math.max(0, Math.min(m.rows - 1, y)); return m.L[y * m.cols + x]; }
   /* half-tile cells, six steps, unlit is black: one ImageData pixel per cell, scaled x8 with no smoothing */
   function shade(c, L, cx, cy, a) {
-    var m = light(L, cx, cy, a.x1 - a.x0, a.y1 - a.y0), W2 = m.cols * 2, H2 = m.rows * 2, img, d, x, y, v, tx, ty, ox, oy, q, rk;
-    if (!lc || lc.width !== W2 || lc.height !== H2) { lc = P.mk(W2, H2); lg = lc.getContext && lc.getContext('2d'); }
+    var m = light(L, cx, cy, a.x1 - a.x0, a.y1 - a.y0), W2 = m.cols * 2, H2 = m.rows * 2, img, d, x, y, v, tx, ty, ox, oy, q, rk, cb = L.chamber && L.chamberHidden && L.chamberHidden() ? L.chamber : null;
+    if (!lc || lc.width !== W2 || lc.height !== H2) { lc = P.mk(W2, H2); lg = lc.getContext && lc.getContext('2d'); limg = null; }
     if (!lg || !lg.createImageData) return;
-    img = lg.createImageData(W2, H2);
-    if (!img || !img.data) return;   /* jsdom canvas stubs may define createImageData but return nothing */
+    /* DGN-02: one ImageData per buffer size, not one per frame; every alpha is rewritten below and RGB stays 0 */
+    img = limg || lg.createImageData(W2, H2);
+    if (!img || !img.data) { limg = null; return; }   /* jsdom canvas stubs may define createImageData but return nothing */
+    limg = img;
     d = img.data;
     for (y = 0; y < H2; y++) for (x = 0; x < W2; x++) {
       tx = x >> 1; ty = y >> 1; ox = (x & 1) ? 1 : -1; oy = (y & 1) ? 1 : -1;
@@ -351,7 +458,10 @@
       /* VOID MASS: rock cells keep a low ambient step so the back layer stays
          visible; only true shafts (' ') fall to full black (WO-DGN). */
       rk = (L.grid[m.ty0 + ty] || '').charAt(m.tx0 + tx);
-      if (rk === '#' || rk === '.' || isSpike(rk)) q = Math.max(q, rk === '#' ? 2 : 1);
+      if (rk === '#' || rk === '.' || isSpike(rk)) q = Math.max(q, rk === '#' ? 2 : isSpike(rk) ? 4 : 1);
+      /* DGN-02: the top half of every tile a foot can stand on (brick or shelf, open above) never drops below step 3 */
+      if ((rk === '#' || rk === '=') && !(y & 1) && ((L.grid[m.ty0 + ty - 1] || '').charAt(m.tx0 + tx) === '.' || (L.grid[m.ty0 + ty - 1] || '').charAt(m.tx0 + tx) === ' ')) q = Math.max(q, 3);
+      if (cb && m.tx0 + tx >= cb.x + 2 && m.tx0 + tx < cb.x + cb.w && m.ty0 + ty >= cb.y && m.ty0 + ty < cb.y + cb.h - 2) q = 0;   /* a sealed chamber's air is black; its two floor rows stay lit, so the corridor floor runs on unbroken past the door */
       d[(y * W2 + x) * 4 + 3] = Math.round((LEVELS - 1 - q) / (LEVELS - 1) * 255);
     }
     lg.putImageData(img, 0, 0);
@@ -377,12 +487,12 @@
   function minimap(c, L, a) {
     var seen = NEU.dungeon.mapSeen || {}, s = P.state;
     var cs = 3, cols = Math.ceil(L.w / 4), rows = Math.ceil(L.h / 4);
-    var pw = cols * cs + 10, ph = rows * cs + 26, px = a.x1 - pw - 12, py = a.y0 + 8;
+    var pw = cols * cs + 10, ph = rows * cs + 26, px = a.x1 - pw - 12, py = a.y0 + 72;   /* under the difficulty tag */
     var mcol = { B: '#3E5490', G: '#3E7A5A', P: '#8A4A70' };
     var i, j, k, key, f, ents = L.entities || [], e, ex, ey;
     c.fillStyle = '#0A0714'; c.fillRect(px, py, pw, ph);
-    c.fillStyle = '#4A3E5E'; c.fillRect(px, py, pw, 1); c.fillRect(px, py + ph - 1, pw, 1);
-    c.fillRect(px, py, 1, ph); c.fillRect(px + pw - 1, py, 1, ph);
+    c.fillStyle = '#5A5468'; c.fillRect(px, py, pw, 2); c.fillRect(px, py + ph - 2, pw, 2);   /* the boss bar's frame grey, 2 px like the combat panels */
+    c.fillRect(px, py, 2, ph); c.fillRect(px + pw - 2, py, 2, ph);
     c.font = FONT; c.textAlign = 'left'; c.textBaseline = 'top';
     c.fillStyle = '#C8BCE0'; if (NEU.glyph && NEU.glyph.compact()) { NEU.glyph.draw(c, 'map', px + 5, py + 5); c.fillText(NEU.glyph.key('e'), px + 25, py + 5); }
     else c.fillText('MAP  ' + (NEU.keys ? NEU.keys.label('e') : 'e'), px + 5, py + 5);
@@ -481,8 +591,8 @@
   /* The drain lever: amber before, cool blue once pulled. */
   kd('dgnlever').draw = function (c, x, y, e) {
     var on = !!(NEU.save && NEU.save.flagged && NEU.save.flagged('dgn_drain'));
-    P.fr(c, x + 4, y + 8, 8, 8, '#3E3C4A'); P.fr(c, x + 5, y + 9, 6, 6, '#6A6878');
-    P.fr(c, x + 7, y + 2, 2, 8, on ? '#5AC8E0' : '#C89A3A');
+    P.fr(c, x + 3, y + 7, 10, 9, INK); P.fr(c, x + 4, y + 8, 8, 8, '#3E3C4A'); P.fr(c, x + 5, y + 9, 6, 6, '#6A6878');
+    P.fr(c, x + 6, y + 1, 4, 9, INK); P.fr(c, x + 7, y + 2, 2, 8, on ? '#5AC8E0' : '#C89A3A'); P.fr(c, x + 6, y + 1, 4, 2, on ? '#9FE0F2' : '#FFD36A');
     P.fr(c, x + (on ? 9 : 5), y + 9, 3, 2, on ? '#9FE0F2' : '#FFD36A');
   };
   kd('bench').draw = function (c, x, y) {
@@ -499,9 +609,20 @@
   kd('dgnsecret').draw = function (c, x, y, e) {
     var on = !!(NEU.save && NEU.save.flagged && NEU.save.flagged(e.flag)), k = e.kind;
     if (k === 'bell') {
-      P.fr(c, x + 7, y, 2, 5, '#8A7456');
-      P.fr(c, x + 4, y + 5, 8, 7, on ? '#FFE080' : '#A88430'); P.fr(c, x + 5, y + 12, 6, 2, '#6A5018');
-      P.fr(c, x + 6, y + 6, 4, 2, on ? '#FFF6C0' : '#5A4620');
+      /* DGN-02b: a 34 px bronze bell hung from an iron beam inside its niche: dome, band, flared lip, clapper. The entity box is the top 16 px */
+      var cx = x + 8, r, hf, p, hi = on ? '#FFF6C0' : '#F0D070', mid = on ? '#FFD060' : '#C89A3A', lo = on ? '#C89A3A' : '#8A6420';
+      P.fr(c, cx - 30, y + 3, 60, 5, INK); P.fr(c, cx - 29, y + 4, 58, 3, '#6A5238'); P.fr(c, cx - 29, y + 4, 58, 1, '#B8985A');
+      P.fr(c, cx - 5, y + 8, 10, 3, INK); P.fr(c, cx - 3, y + 8, 6, 3, '#B8A070');
+      for (r = 0; r < 34; r++) {
+        hf = 5 + Math.round(11 * Math.sqrt(r / 33)) + (r > 29 ? 2 * (r - 29) : 0);
+        P.fr(c, cx - hf - 1, y + 11 + r, 2 * hf + 2, 1, INK);
+        P.fr(c, cx - hf, y + 11 + r, 2 * hf, 1, mid);
+        P.fr(c, cx - hf, y + 11 + r, Math.max(2, hf >> 1), 1, hi);
+        P.fr(c, cx + (hf >> 1) + 1, y + 11 + r, hf - (hf >> 1) - 1, 1, lo);
+      }
+      P.fr(c, cx - 15, y + 34, 30, 2, '#6A4A18'); P.fr(c, cx - 19, y + 43, 38, 2, on ? '#FFE890' : '#E8C060');
+      P.fr(c, cx - 3, y + 46, 6, 6, INK); P.fr(c, cx - 2, y + 47, 4, 4, '#8A6420'); P.fr(c, cx - 2, y + 47, 2, 2, '#E8C060');
+      P.glow(c, cx, y + 34, on ? 64 : 48, '#F8A030', on ? 0.3 : 0.2);
     } else if (k === 'book') {
       P.fr(c, x + 2, y + 2, 12, 14, '#4A3018'); P.fr(c, x + 3, y + 3, 10, 12, '#2A1C10');
       P.fr(c, x + 4, y + 4, 2, 10, '#8A5A32'); P.fr(c, x + 7, y + 4, 3, 10, '#5A8A6A'); P.fr(c, x + 11, y + 4, 1, 10, '#8A3A5A');
@@ -563,18 +684,22 @@
     P.fr(c, gx + [2, 2, 2, 29, 29, 29][k], gy + [12, 22, 32, 12, 22, 32][k], 1, 2, '#B892FF');
     P.glow(c, gx + 16, gy + 24, 28, '#7A52B8', 0.10);
   };
+  /* the bone door: a slab in a 2x3 gap of the door wall (x is the gap's left edge). It rises into the lintel in ratchet steps (e.rise px, dungeon.js owns the steps and
+     the six collision tiles); only the part still inside the gap is drawn, so above the opening it is masonry, never door. Two chains show where it hangs. */
   kd('bossdoor').draw = function (c, x, y, e) {
-    var s = bossSpr(), gx = x - 8, gy = y - 32, has = !!(NEU.save && NEU.save.has && NEU.save.has('boss_key'));
-    var u = (e && e.unlock) || 0;
-    /* the two chain anchors the D3 opening drops from (palette-drawn: IMG-17 has not arrived) */
-    P.fr(c, gx + 11, gy - 6, 2, 6, '#8A7456'); P.fr(c, gx + 19, gy - 6, 2, 6, '#8A7456');
-    if (!u) c.drawImage(s.cv, gx, gy);
-    else {
-      c.drawImage(s.cv, 0, 0, 16, 48, gx - u * 12, gy, 16, 48);
-      c.drawImage(s.cv, 16, 0, 16, 48, gx + 16 + u * 12, gy, 16, 48);
-      P.fr(c, gx + 16 - u * 12, gy, u * 24, 48, '#05030A');
-    }
-    P.fr(c, gx + 11, gy + 12, 2, 2, has ? '#FF8AC8' : '#3A2A20'); P.fr(c, gx + 19, gy + 12, 2, 2, has ? '#FF8AC8' : '#3A2A20');
+    var s = bossSpr(), gx = x, gy = y - 32, has = !!(NEU.save && NEU.save.has && NEU.save.has('boss_key')), rise = Math.min(40, (e && e.rise) || 0), yy;   /* raised, an 8 px lip of the slab stays in sight under the lintel */
+    c.drawImage(s.cv, 0, rise, 32, 48 - rise, gx, gy, 32, 48 - rise);   /* what is left of the slab inside the gap */
+    if (rise < 12) { P.fr(c, gx + 11, gy + 12 - rise, 2, 2, has ? '#FF8AC8' : '#3A2A20'); P.fr(c, gx + 19, gy + 12 - rise, 2, 2, has ? '#FF8AC8' : '#3A2A20'); }
+    for (yy = gy - rise - 2; yy > gy - 30; yy -= 4) { P.fr(c, gx + 5, yy, 2, 3, yy & 4 ? '#8A7456' : '#C4A882'); P.fr(c, gx + 25, yy, 2, 3, yy & 4 ? '#8A7456' : '#C4A882'); }
+  };
+  kd('bossbar').draw = function () {};
+  /* the rematch plinth: a cold stone step with an ecto flame. Only a cleared save ever sees it. */
+  kd('rematch').draw = function (c, x, y, e, now) {
+    var f = reducedNow() ? 0 : ((now / 200) | 0) % 4, up = f === 1 || f === 3 ? 1 : 0;
+    P.fr(c, x + 1, y + 8, 14, 8, INK); P.fr(c, x + 2, y + 9, 12, 7, '#4A4660'); P.fr(c, x + 2, y + 9, 12, 2, '#8E88AC'); P.fr(c, x + 2, y + 14, 12, 2, '#2A2640');
+    P.fr(c, x + 4, y + 5, 8, 4, INK); P.fr(c, x + 5, y + 6, 6, 3, '#6A6488');
+    P.glow(c, x + 8, y - 2, 44, '#7FE3C4', 0.28);
+    P.fr(c, x + 5, y - 3 - up, 6, 9, '#2E9A86'); P.fr(c, x + 6, y - 8 - up, 4, 6, '#2E9A86'); P.fr(c, x + 6, y - 5 - up, 4, 9, '#7FE3C4'); P.fr(c, x + 7, y - 2, 2, 5, '#E8FFF8');
   };
   /* a lift: a dungeon shelf on a chain that runs up out of sight */
   kd('lift').draw = function (c, x, y, e) {
@@ -631,43 +756,102 @@
     if (e.cs === 1) { P.fr(c, x + 3 + j, y + 3 + f, 10, 1, '#FFA8D8'); P.fr(c, x + 3 + j, y + 12 + f, 10, 1, '#FFA8D8'); }
   };
 
-  /* D3: draw one frame of the bone-door opening over the mode-bridge snapshot.
-     pr = NEU.dungeon.doorProgress(ms). Palette only; no sheet, no new asset. */
-  function drawOpening(g, w, h, snap, pr) {
-    var dx = Math.round(w * 0.5), dy = Math.round(h * 0.62), pan = Math.round(pr.pan * 40), i, n, y, len;
-    g.save(); g.imageSmoothingEnabled = false;
-    g.fillStyle = INK; g.fillRect(0, 0, w, h);
-    if (snap) g.drawImage(snap, 0, -pan, w, h);            /* camera pans down the corridor */
-    /* key turns in the lock */
-    if (pr.key > 0 && pr.key < 1) {
-      g.save(); g.translate(dx, dy - 20); g.rotate(pr.key * Math.PI / 2);
-      P.fr(g, -2, -9, 4, 10, '#E8C85A'); P.fr(g, -6, -11, 12, 3, '#E8C85A');
-      P.fr(g, -2, 1, 4, 3, '#E8C85A'); P.fr(g, 2, -3, 3, 2, '#E8C85A'); g.restore();
+
+  /* ── DGN-02: Cel-owned entity skins, painted by cel-view.js on the live collision bounds (host draw only; the cel.html route keeps its own art).
+     celSkin(c, e, x, y, k): c is in cel pixels, so we scale back to screen pixels. One painter per entity: a true return tells cel-view to skip its box. ── */
+  function chain(c, ax, ay, bx, by, fade) {
+    var n = Math.max(1, Math.round(Math.sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay)) / 4)), i;
+    for (i = 0; i <= n; i++) {
+      c.globalAlpha = fade ? 0.7 + 0.3 * i / n : 1;
+      rc(c, ax + (bx - ax) * i / n - 1, ay + (by - ay) * i / n - 1, 3, 4, i & 1 ? '#8A889C' : '#D8D6E8');
     }
-    /* two chains drop from the lintel */
-    for (i = 0; i < 2; i++) {
-      len = Math.round(pr.chains * (dy - 60));
-      for (y = 0; y < len; y += 6) P.fr(g, dx + (i ? 11 : -11), y + 4, 2, 5, y & 6 ? '#8A7456' : '#C4A882');
-    }
-    /* the bone panels part over 1.2 s */
-    if (pr.open > 0) {
-      var gap = Math.round(pr.open * 48);
-      P.fr(g, dx - gap / 2, dy - 44, gap, 52, '#05030A');
-      P.fr(g, dx - gap / 2, dy - 44, 2, 52, '#E8D2B0'); P.fr(g, dx + gap / 2 - 2, dy - 44, 2, 52, '#C4A882');
-    }
-    /* the fight box grows out of the doorway (obj_growtangle animate-in) */
-    if (pr.box > 0) {
-      var bw = Math.max(2, Math.round(pr.box * w * 0.72)), bh = Math.max(2, Math.round(pr.box * h * 0.6));
-      var bx = dx - bw / 2, by = dy - bh / 2;
-      P.fr(g, bx, by, bw, 2, '#5AE08A'); P.fr(g, bx, by + bh - 2, bw, 2, '#5AE08A');
-      P.fr(g, bx, by, 2, bh, '#5AE08A'); P.fr(g, bx + bw - 2, by, 2, bh, '#5AE08A');
-    }
-    g.restore();
+    c.globalAlpha = 1;
   }
+  /* plate: a bright worn cap exactly on the collision top, a bronze body, a chain V up to an anchor */
+  function skinMover(c, e, X, Y, k) {
+    var W = Math.round(e.w * k), H = Math.round((e.h || 8) * k), mx = ((e.nx !== undefined ? (e.x0 + e.nx) / 2 : e.x) + e.w / 2) * k, my = Math.min(e.y0 !== undefined ? e.y0 : e.y, e.ny !== undefined ? e.ny : e.y) * k - 80, i, rl, rr;
+    X = Math.round(X); Y = Math.round(Y);
+    mx = Math.max(X + W / 2 - 48, Math.min(X + W / 2 + 48, mx));   /* a long traverse hangs from a trolley overhead, not a 45 degree swing */
+    my = Math.max(my, Y - 96);   /* a trolley rides at most 6 tiles above the plate, so the chain never fades into the dark */
+    if (e.nx !== undefined && Math.abs(e.nx - e.x0) > 4) {
+      /* a horizontal traverse: the trolley rides a fixed rail the whole length of the travel, so the plate is never anchored to bare air */
+      rl = Math.round(Math.min(e.x0, e.nx) * k + W / 2) - 10; rr = Math.round(Math.max(e.x0, e.nx) * k + W / 2) + 10;
+      rc(c, rl, my - 2, rr - rl, 5, INK); rc(c, rl + 1, my - 1, rr - rl - 2, 2, '#7A6C58'); rc(c, rl + 1, my - 1, rr - rl - 2, 1, '#C8B890');
+      for (i = rl; i <= rr - 2; i += 48) rc(c, i, my - 5, 2, 3, '#5A4E3E');   /* hangers */
+      rc(c, rl - 2, my - 6, 4, 11, INK); rc(c, rl - 1, my - 5, 2, 9, '#9A8A70'); rc(c, rr - 2, my - 6, 4, 11, INK); rc(c, rr - 1, my - 5, 2, 9, '#9A8A70');   /* end stops */
+      mx = X + W / 2;
+    }
+    chain(c, mx, my, X + 4, Y, true); chain(c, mx, my, X + W - 4, Y, true);
+    rc(c, mx - 9, my - 4, 18, 6, INK); rc(c, mx - 8, my - 3, 16, 3, '#9A8A70'); rc(c, mx - 8, my - 3, 16, 1, '#E8D8A8'); rc(c, mx - 6, my, 2, 2, INK); rc(c, mx + 4, my, 2, 2, INK);
+    rc(c, X, Y, W, H, INK);
+    rc(c, X + 1, Y + 3, W - 2, H - 5, '#5E4E3A'); rc(c, X + 1, Y + H - 4, W - 2, 2, '#3E3226');
+    for (i = 0; i < W - 2; i += 2) rc(c, X + 1 + i, Y + 1, 2, 2, P.hash(i, e.y0 | 0, 11) < 0.14 ? '#8A7650' : '#F0E0B0');
+    rc(c, X + 1, Y + 3, W - 2, 1, '#B89A58');
+    for (i = 16; i < W - 8; i += 16) rc(c, X + i, Y + 4, 1, H - 8, '#3A2E20');
+    rc(c, X + 3, Y + 6, 2, 2, '#D8C08A'); rc(c, X + W - 5, Y + 6, 2, 2, '#D8C08A');
+  }
+  /* crumble: faction stone, a bright cap split by a crack that widens when it starts to go; a faint ghost while it is gone */
+  var CRP = { B: ['#9AB4F0', '#3E5490', '#1E2A50'], G: ['#9AD0A8', '#3E7A5A', '#1C3A2A'], P: ['#F0A8D0', '#8A4A70', '#4A2038'] };
+  function skinCrumble(c, e, X, Y, k, now) {
+    var L = P.level0(), p = CRP[L.faction(Math.floor(e.x / 8), Math.floor(e.y / 8))] || CRP.B, W = Math.round(e.w * k), H = Math.round(e.h * k), g, j;
+    X = Math.round(X); Y = Math.round(Y);
+    if (e.coll === false) {
+      c.globalAlpha = 0.35;
+      for (j = 0; j < W; j += 4) { rc(c, X + j, Y, 2, 1, p[0]); rc(c, X + j, Y + H - 1, 2, 1, p[0]); }
+      for (j = 0; j < H; j += 4) { rc(c, X, Y + j, 1, 2, p[0]); rc(c, X + W - 1, Y + j, 1, 2, p[0]); }
+      c.globalAlpha = 1; return;
+    }
+    if (e.cs === 1 && !reducedNow()) X += (((now / 40) | 0) & 1) ? 1 : -1;
+    g = e.cs === 1 ? 2 : 1;
+    rc(c, X, Y, W, H, INK); rc(c, X + 1, Y + 3, W - 2, H - 4, p[1]); rc(c, X + 1, Y + 1, W - 2, 2, p[0]);
+    rc(c, X + 1, Y + H - 3, W - 2, 2, p[2]);
+    rc(c, X + (W >> 1) - 1, Y + 1, g, 3, INK); rc(c, X + (W >> 1) - 1 + g, Y + 4, 1, 3, INK); rc(c, X + (W >> 1) - 2, Y + 7, 2, 2, INK);
+    rc(c, X + 3, Y + 5, 2, 1, p[2]); rc(c, X + W - 6, Y + 9, 3, 1, p[2]);
+  }
+  /* spring: pad, coil, base. At rest the coil is compressed under the pad; on a bounce the pad snaps down and the coil closes */
+  function skinSpring(c, e, X, Y, k) {
+    var W = Math.round(e.box.w * k), H = Math.round(e.box.h * k), px = Math.round(e.box.x * k), py = Math.round(e.box.y * k), f = e.flash > 0 ? 1 : 0, r, off;
+    if (e.o !== 'F') return false;
+    rc(c, px, py + f * 3, W, H - f * 3, INK);
+    rc(c, px + 2, py + 1 + f * 3, W - 4, 3, '#F0C040'); rc(c, px + 2, py + 1 + f * 3, W - 4, 1, '#FFF0A0');
+    for (r = 0; r < H - 7 - f * 3; r++) { off = (r & 3) < 2 ? (r & 3) * 3 : (4 - (r & 3)) * 3; rc(c, px + 6 + off, py + 4 + f * 3 + r, W - 12 - (off ? 3 : 0), 1, r & 1 ? '#8A84A0' : '#D8D4E8'); }
+    rc(c, px + 1, py + H - 3, W - 2, 3, '#4A4250'); rc(c, px + 1, py + H - 3, W - 2, 1, '#9A94AC');
+  }
+  /* refill: a solid gem while ready, a hollow outline with a centre dot while empty; two-dash gems add spikes */
+  function skinRefill(c, e, X, Y, k) {
+    var half = 9, r, wv, two = !!e.two, full = e.coll !== false, bob = (full && !reducedNow() && ((((P.time() * 1000) / 420) | 0) & 1)) ? 1 : 0, col = two ? '#FF6DEF' : '#5EF05E', dk = two ? '#B02EA8' : '#2E9A3A';
+    X = Math.round(X); Y = Math.round(Y) - bob;
+    if (!full) {
+      c.globalAlpha = 0.6;
+      for (r = -half; r <= half; r += 2) { wv = half - Math.abs(r); rc(c, X - wv, Y + r, 1, 1, '#7A9A8A'); rc(c, X + wv, Y + r, 1, 1, '#7A9A8A'); }
+      rc(c, X - 1, Y - 1, 2, 2, '#7A9A8A'); c.globalAlpha = 1; return;
+    }
+    P.glow(c, X, Y, 24, col, 0.28);
+    for (r = -half; r <= half; r++) { wv = half - Math.abs(r); rc(c, X - wv - 1, Y + r, 2 * wv + 3, 1, INK); }
+    for (r = -half; r <= half; r++) { wv = half - Math.abs(r); rc(c, X - wv, Y + r, wv + 1, 1, col); rc(c, X + 1, Y + r, wv, 1, dk); if (r <= 0) rc(c, X - wv, Y + r, 2, 1, '#E8FFE8'); }
+    if (two) { rc(c, X - 1, Y - half - 4, 2, 3, col); rc(c, X - 1, Y + half + 2, 2, 3, col); }
+  }
+  var SKIN = { movingPlatform: skinMover, crumble: skinCrumble, spring: skinSpring, refill: skinRefill };
+  /* the kernel draws every entity of the level each frame, and the whole dungeon holds a hundred: one wholly off screen is skipped as handled (a mover's path and chain count) */
+  function offscreen(e) {
+    var cam = P.cam(), v = P.view(), b = e.box || e, w = b.w || 18, h = b.h || 18, xs = [b.x, e.x0, e.nx], ys = [b.y, e.y0, e.ny], x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, i;
+    for (i = 0; i < 3; i++) {
+      if (xs[i] !== undefined) { x0 = Math.min(x0, xs[i]); x1 = Math.max(x1, xs[i]); }
+      if (ys[i] !== undefined) { y0 = Math.min(y0, ys[i]); y1 = Math.max(y1, ys[i]); }
+    }
+    return x1 + w < cam.x / 2 - 40 || x0 - w > (cam.x + v.w) / 2 + 40 || y1 + h < cam.y / 2 - 40 || y0 - 56 > (cam.y + v.h) / 2 + 40;
+  }
+  P.celSkin = function (c, e, x, y) {
+    var L = P.level0(), fn = SKIN[e.t], ok, k = 2;   /* plat.js hosts the kernel at 2 screen px per cel px */
+    if (!fn || !L || L.tileset !== 'dungeon') return false;
+    if (offscreen(e)) return true;
+    c.save(); c.scale(1 / k, 1 / k); ok = fn(c, e, x * k, y * k, k, P.time() * 1000); c.restore();
+    return ok !== false;
+  };
 
   NEU.dungeonLook = {
     tileset: 'dungeon', frames: FR, centre: CW, frame: frame, sheet: sheet, cut: cut, mag: mag,
     light: light, lightMap: function () { return map; }, levels: LEVELS, air: AIR, solid: SOLID,
-    minimap: minimap, drawOpening: drawOpening
+    minimap: minimap
   };
 })();
